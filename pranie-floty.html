@@ -2269,7 +2269,10 @@ window.FLEET_DATA = {
         <div class="sheet">
           <button class="close" data-close>&times;</button>
           <h2>${rec ? 'Edytuj wpis' : 'Nowy wpis'}</h2>
-          <div class="sub mono" style="font-size:12px;color:var(--ink-soft);">${escapeHtml(plate.toUpperCase())}</div>
+          <div class="field" style="margin-top:0;">
+            <label>Tablica rejestracyjna</label>
+            <input type="text" id="f_tablica" value="${escapeHtml(plate.toUpperCase())}" style="text-transform:uppercase;font-family:'JetBrains Mono',monospace;letter-spacing:0.04em;" autocapitalize="characters">
+          </div>
 
           <div class="field-row">
             <div class="field">
@@ -2335,7 +2338,7 @@ window.FLEET_DATA = {
       if(e.target.id === 'formOverlay') closeModal();
     });
     document.querySelector('[data-close]').addEventListener('click', closeModal);
-    document.getElementById('saveBtn').addEventListener('click', () => submitForm(plate.toUpperCase()));
+    document.getElementById('saveBtn').addEventListener('click', () => submitForm());
     if(rec){
       document.getElementById('deleteBtn').addEventListener('click', () => {
         showConfirm('Usunąć wpis?', `Wpis dla ${rec.tablica} zostanie trwale usunięty.`, async () => {
@@ -2349,7 +2352,8 @@ window.FLEET_DATA = {
     }
   }
 
-  async function submitForm(plate){
+  async function submitForm(){
+    const plate = document.getElementById('f_tablica').value.trim().toUpperCase();
     const typ = document.getElementById('f_typ').value.trim();
     const marka = document.getElementById('f_marka').value.trim();
     const zlecone = document.getElementById('f_zlecone').checked;
@@ -2373,7 +2377,7 @@ window.FLEET_DATA = {
 
     if(editingId){
       const rec = records.find(x => x.id === editingId);
-      Object.assign(rec, { typ, marka, zlecone, kto_zlecil, data_zlecenia, uwagi, data_prania, kto_wykonal, koszt });
+      Object.assign(rec, { tablica: plate, typ, marka, zlecone, kto_zlecil, data_zlecenia, uwagi, data_prania, kto_wykonal, koszt });
     } else {
       records.push({
         id: uid(),

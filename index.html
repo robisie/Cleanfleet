@@ -2464,7 +2464,11 @@ window.FLEET_DATA = {
           <div class="field-row">
             <div class="field">
               <label>Data prania</label>
-              <input type="date" id="f_data_prania" value="${rec&&rec.data_prania?rec.data_prania:todayISO()}">
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input type="date" id="f_data_prania" value="${rec&&rec.data_prania?rec.data_prania:todayISO()}" style="flex:1;">
+                <button type="button" class="btn btn-outline" id="clearWashDateBtn" style="white-space:nowrap;padding:10px 12px;">Wyczyść</button>
+              </div>
+              <div class="muted" style="margin-top:5px;font-size:11px;">Data prania może pozostać pusta.</div>
             </div>
             <div class="field">
               <label>Kto wykonał</label>
@@ -2486,10 +2490,10 @@ window.FLEET_DATA = {
       </div>`;
     document.getElementById('modalRoot').innerHTML = html;
 
-    document.getElementById('formOverlay').addEventListener('click', (e) => {
-      if(e.target.id === 'formOverlay') closeModal();
-    });
     document.querySelector('[data-close]').addEventListener('click', closeModal);
+    document.getElementById('clearWashDateBtn').addEventListener('click', () => {
+      document.getElementById('f_data_prania').value = '';
+    });
     document.getElementById('saveBtn').addEventListener('click', () => submitForm());
     if(rec){
       document.getElementById('deleteBtn').addEventListener('click', () => {
@@ -2564,9 +2568,6 @@ window.FLEET_DATA = {
         </div>
       </div>`;
     document.getElementById('modalRoot').innerHTML = html;
-    document.getElementById('confirmOverlay').addEventListener('click', (e) => {
-      if(e.target.id === 'confirmOverlay') closeModal();
-    });
     document.getElementById('confirmCancel').addEventListener('click', closeModal);
     document.getElementById('confirmOk').addEventListener('click', async () => {
       closeModal();
@@ -2675,9 +2676,6 @@ window.FLEET_DATA = {
         </div>
       </div>`;
     document.getElementById('modalRoot').innerHTML = html;
-    document.getElementById('reportOverlay').addEventListener('click', (e) => {
-      if(e.target.id === 'reportOverlay') closeModal();
-    });
     document.querySelector('[data-close]').addEventListener('click', closeModal);
   }
 
@@ -2782,7 +2780,6 @@ window.FLEET_DATA = {
         </div>
       </div>`;
     document.getElementById('modalRoot').innerHTML = html;
-    document.getElementById('pdfOverlay').addEventListener('click', (e) => { if(e.target.id === 'pdfOverlay') closeModal(); });
     document.querySelector('[data-close]').addEventListener('click', closeModal);
 
     const summaryRadios = Array.from(document.querySelectorAll('input[name="pdfSumMode"]'));
@@ -2951,7 +2948,6 @@ window.FLEET_DATA = {
         </div>
       </div>`;
     document.getElementById('modalRoot').innerHTML = html;
-    document.getElementById('pdfPreviewOverlay').addEventListener('click', (e) => { if(e.target.id === 'pdfPreviewOverlay') closeModal(); });
     document.querySelector('[data-close]').addEventListener('click', closeModal);
   }
 
@@ -3129,9 +3125,6 @@ window.FLEET_DATA = {
         </div>
       </div>`;
     document.getElementById('modalRoot').innerHTML = html;
-    document.getElementById('importChoiceOverlay').addEventListener('click', (e) => {
-      if(e.target.id === 'importChoiceOverlay') closeModal();
-    });
     document.getElementById('cancelImportBtn').addEventListener('click', () => { pendingImportRows = null; closeModal(); });
     document.getElementById('mergeBtn').addEventListener('click', () => runImport('merge'));
     document.getElementById('replaceBtn').addEventListener('click', () => runImport('replace'));

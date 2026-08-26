@@ -52,7 +52,6 @@
 
   header{
     padding:22px 20px 16px;
-    border-bottom:1px solid var(--line);
     background:var(--paper);
     position:sticky;
     top:0;
@@ -60,8 +59,9 @@
   }
   header h1{font-size:22px;font-weight:800;}
 
-  .header-top{display:flex;align-items:center;justify-content:space-between;}
-  .app-logo{height:54px;width:auto;display:block;}
+  .header-top{display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:54px;}
+  .app-logo{height:54px;width:auto;display:block;flex:0 0 auto;}
+  .header-divider{height:1px;background:var(--line);margin:16px 0 0;}
   .hamburger{
     background:none;border:none;cursor:pointer;
     width:36px;height:36px;
@@ -70,8 +70,22 @@
   }
   .hamburger:active{background:var(--paper-alt);}
   .hamburger svg{width:22px;height:22px;}
-  .header-actions{display:flex;align-items:center;gap:10px;min-width:0;}
-  .header-actions .cf-user{margin-top:0;max-width:210px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .header-actions{display:flex;align-items:center;gap:12px;min-width:0;margin-left:auto;}
+  .header-actions .cf-user{margin-top:0;max-width:min(42vw,320px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--ink-soft);}
+  .header-actions .hamburger{flex:0 0 36px;}
+
+  @media (max-width:520px){
+    header{padding:16px 14px 14px;}
+    .header-top{gap:12px;}
+    .app-logo{height:48px;max-width:58vw;object-fit:contain;object-position:left center;}
+    .header-actions{gap:8px;}
+    .header-actions .cf-user{max-width:46vw;font-size:11px;}
+    .header-divider{margin-top:13px;}
+    .cf-syncbar{font-size:10px;}
+    .search-box{margin-top:13px;}
+    .search-box input{min-width:0;font-size:15px;padding:13px 12px;}
+    .search-box .btn{padding:12px 14px;}
+  }
 
   .menu-overlay{
     position:fixed;inset:0;
@@ -118,7 +132,7 @@
   .search-box{
     display:flex;
     gap:8px;
-    margin-top:22px;
+    margin-top:16px;
   }
   .search-box input{
     flex:1;
@@ -372,7 +386,7 @@
   .toast.show{opacity:1;}
 
   /* CleanFleet Supabase connection UI */
-  .cf-syncbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;padding:3px 0 0;border:0;border-radius:0;background:transparent;font-size:11px;color:var(--ink-soft);}
+  .cf-syncbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:0;border:0;border-radius:0;background:transparent;font-size:11px;color:var(--ink-soft);line-height:1.35;}
   .cf-sync-left{min-width:0;display:flex;align-items:center;gap:6px;}
   .cf-dot{width:7px;height:7px;border-radius:50%;background:#8b8b8b;flex:none;}
   .cf-dot.ok{background:#4f8a10;}
@@ -417,14 +431,15 @@
         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6h16M4 12h16M4 18h16" stroke="#16150F" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
     </div>
+    <div class="header-divider" aria-hidden="true"></div>
+    <div class="cf-syncbar">
+      <div class="cf-sync-left"><span class="cf-dot" id="cfSyncDot"></span><span id="cfSyncText">Łączenie z bazą…</span></div>
+      <button id="cfRefreshBtn" type="button">Odśwież dane</button>
+    </div>
     <div class="search-box">
       <input type="text" id="searchInput" placeholder="np. 7765 lub ST7765X" list="plateList" autocomplete="off" autocapitalize="characters">
       <datalist id="plateList"></datalist>
       <button class="btn btn-solid" id="searchBtn">Szukaj</button>
-    </div>
-    <div class="cf-syncbar">
-      <div class="cf-sync-left"><span class="cf-dot" id="cfSyncDot"></span><span id="cfSyncText">Łączenie z bazą…</span></div>
-      <button id="cfRefreshBtn" type="button">Odśwież dane</button>
     </div>
   </div>
 </header>

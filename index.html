@@ -432,6 +432,34 @@
 }
 
 </style>
+
+<style id="mobile-user-header-fix">
+@media (max-width: 600px) {
+  .header-top, .topbar, .header-main {
+    min-width: 0 !important;
+  }
+  .header-user {
+    min-width: 0 !important;
+    max-width: calc(100% - 90px) !important;
+    line-height: 1.15 !important;
+  }
+  .header-user .user-label {
+    display: block !important;
+    white-space: nowrap !important;
+    font-size: 11px !important;
+    margin-bottom: 2px !important;
+  }
+  .header-user .user-email {
+    display: block !important;
+    max-width: 100% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 12px !important;
+  }
+}
+</style>
+
 </head>
 <body>
 

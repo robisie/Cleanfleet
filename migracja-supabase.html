@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CleanFleet — migracja danych</title>
+<style>body{font-family:Inter,Arial,sans-serif;background:#f7f6f1;color:#16150f;margin:0;padding:24px}.card{max-width:680px;margin:30px auto;background:#fff;border:1px solid #ddd;border-radius:14px;padding:24px}h1{font-size:26px}.muted{color:#666;font-size:14px}.row{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding:10px 0}.btn{width:100%;padding:14px;border:0;border-radius:9px;background:#6e7a17;color:#fff;font-weight:700;margin-top:18px}.danger{color:#c24b3f}.ok{color:#52610d}.log{white-space:pre-wrap;background:#f3f2ed;padding:12px;border-radius:8px;font-size:12px;margin-top:16px}.small{font-size:12px;color:#666}</style></head>
+<body><div class="card"><h1>CleanFleet — migracja danych</h1><p class="muted">Ten ekran jednorazowo przenosi dane z obecnego localStorage urządzenia do centralnej bazy Supabase. Nie usuwamy niczego z urządzenia.</p><div id="auth"></div><div id="stats"></div><button class="btn" id="run" disabled>Przenieś dane do Supabase</button><div class="log" id="log">Oczekiwanie…</div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>
+const SUPABASE_URL='https://nxmrobbhfqijmbjjzbof.supabase.co';
+const SUPABASE_KEY='sb_publishable_9lz7NUv2-MloX7MEcH2-vQ_AZS8IIHz';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
+const logEl=document.getElementById('log'), statsEl=document.getElementById('stats'), run=document.getElementById('run');
+let session=null, source={registry:{},records:[],options:{}};
+const uid=()=>crypto.randomUUID();
+function log(x){logEl.textContent=x;}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function loadSource(){
+  try{source.registry=JSON.parse(localStorage.getItem('vehicle-registry')||'{}')}catch{}
+  try{source.records=JSON.parse(localStorage.getItem('wash-records')||'[]')}catch{}
+  try{source.options=JSON.parse(localStorage.getItem('option-lists')||'{}')}catch{}
+  const marker=localStorage.getItem('seeded-v1');
+  statsEl.innerHTML='<div class="row"><b>Pojazdy na tym urządzeniu</b><span>'+Object.keys(source.registry).length+'</span></div><div class="row"><b>Wpisy prania na tym urządzeniu</b><span>'+source.records.length+'</span></div><div class="row"><b>LocalStorage</b><span class="ok">'+(marker?'zainicjalizowany':'brak znacznika')+'</span></div>';
+}
+async function init(){
+  const {data}=await sb.auth.getSession(); session=data.session;
+  if(!session){document.getElementById('auth').innerHTML='<p class="danger">Brak aktywnej sesji. Najpierw zaloguj się w aplikacji CleanFleet.</p>';loadSource();return;}
+  document.getElementById('auth').innerHTML='<p class="ok">Zalogowano: '+esc(session.user.email)+'</p>';
+  loadSource(); run.disabled=false; log('Gotowe. Sprawdź liczbę pojazdów i wpisów, a następnie uruchom migrację.');
+}
+run.onclick=async()=>{
+  run.disabled=true; log('Migracja rozpoczęta…');
+  try{
+    const vehicles=Object.entries(source.registry).map(([plate,v])=>({plate:String(plate).toUpperCase(),type:v.typ||'',brand:v.marka||''}));
+    if(vehicles.length){const {error}=await sb.from('vehicles').upsert(vehicles,{onConflict:'plate'});if(error)throw error;}
+    const records=source.records.map(r=>({id:uid(),plate:String(r.tablica||'').toUpperCase(),type:r.typ||'',brand:r.marka||'',ordered:!!r.zlecone,ordered_by:r.kto_zlecil||'',order_date:r.data_zlecenia||null,notes:r.uwagi||'',wash_date:r.data_prania||null,performed_by:r.kto_wykonal||'',cost:Number(r.koszt)||0,approved:!!r.zatwierdzone,paid:!!r.zaplacone,created_at:typeof r.created_at==='number'?new Date(r.created_at).toISOString():(r.created_at||new Date().toISOString())}));
+    if(records.length){const {error}=await sb.from('wash_records').insert(records);if(error)throw error;}
+    localStorage.setItem('cf-migrated-to-supabase',new Date().toISOString());
+    log(`MIGRACJA ZAKOŃCZONA\n\nPojazdy: ${vehicles.length}\nWpisy: ${records.length}\n\nDane w localStorage pozostają nienaruszone. Nie uruchamiaj migracji drugi raz, chyba że celowo chcesz utworzyć kolejne kopie wpisów.`);
+    run.textContent='Migracja zakończona';
+  }catch(e){console.error(e);log('BŁĄD MIGRACJI\n\n'+(e.message||e));run.disabled=false;}
+};
+init();
+</script></body></html>

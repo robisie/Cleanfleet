@@ -390,6 +390,47 @@
   .cf-login-msg{min-height:20px;margin-top:12px;font-size:13px;color:#b33;}
   .cf-user{font-size:11px;color:var(--ink-soft);margin-top:4px;}
 
+
+/* v17 — przywrócony, zaakceptowany układ nagłówka z v10-v12 */
+.header-top{display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:54px;width:100%;}
+.app-logo{height:54px;width:auto;display:block;flex:0 0 auto;}
+.header-divider{height:1px;background:var(--line);margin:16px 0 0;}
+.header-actions{display:flex;align-items:center;gap:12px;min-width:0;margin-left:auto;flex:0 0 auto;}
+.header-actions .cf-user{margin-top:0;max-width:min(42vw,320px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--ink-soft);}
+.header-actions .hamburger{flex:0 0 36px;}
+.cf-syncbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:0;border:0;border-radius:0;background:transparent;font-size:11px;color:var(--ink-soft);line-height:1.35;}
+.cf-sync-left{min-width:0;display:flex;align-items:center;gap:6px;}
+.cf-dot{width:7px;height:7px;border-radius:50%;background:#8b8b8b;flex:none;}
+.cf-dot.ok{background:#4f8a10;}
+.cf-dot.err{background:#c0392b;}
+.cf-syncbar button{border:0;background:transparent;color:var(--ink-soft);border-radius:0;padding:2px 0;font-size:11px;cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
+.search-box{display:flex;gap:8px;margin-top:16px;}
+@media (max-width:520px){
+  header{padding:16px 14px 14px;}
+  .header-top{gap:12px;}
+  .app-logo{height:48px;max-width:58vw;object-fit:contain;object-position:left center;}
+  .header-actions{gap:8px;}
+  .header-actions .cf-user{max-width:46vw;font-size:11px;}
+  .header-divider{margin-top:13px;}
+  .cf-syncbar{font-size:10px;}
+  .search-box{margin-top:13px;}
+  .search-box input{min-width:0;font-size:15px;padding:13px 12px;}
+  .search-box .btn{padding:12px 14px;}
+}
+/* v17 — typ pojazdu jako drugi badge, w zieleni logo */
+.record-badges{display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap;}
+.record-type-badge{
+  font-family:'JetBrains Mono',monospace;
+  font-size:10.5px;
+  letter-spacing:0.06em;
+  text-transform:uppercase;
+  padding:3px 8px;
+  border-radius:4px;
+  background:var(--green-bg);
+  color:var(--green-ink);
+  white-space:nowrap;
+}
+
 </style>
 </head>
 <body>
@@ -2321,7 +2362,10 @@ window.FLEET_DATA = {
           </div>
           <div style="text-align:right;">
             <div class="record-cost">${fmtMoney(r.koszt)}</div>
-            <div class="record-badge">${escapeHtml(r.marka||'----')}</div>
+            <div class="record-badges">
+              <div class="record-type-badge">${escapeHtml(r.typ||'—')}</div>
+              <div class="record-badge">${escapeHtml(r.marka||'----')}</div>
+            </div>
           </div>
         </div>
         <div class="record-toggles">

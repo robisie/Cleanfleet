@@ -2741,9 +2741,15 @@ window.FLEET_DATA = {
         <div class="sheet" style="max-width:420px;">
           <button class="close" data-close>&times;</button>
           <h2>Eksportuj PDF</h2>
-          <div class="confirm-text">Wybierz miesiąc — PDF obejmie zatwierdzone pojazdy z tego okresu.</div>
+          <div class="confirm-text">Wybierz miesiąc i ustaw zawartość raportu.</div>
+
           <div class="report-controls">
             <input type="month" id="pdfMonthPicker" value="${defaultMonth}">
+          </div>
+
+          <div class="field">
+            <label>Numer faktury</label>
+            <input id="pdfInvoiceNumber" type="text" placeholder="np. FV/08/2026/123" autocomplete="off">
           </div>
 
           <div class="field">
@@ -2752,23 +2758,41 @@ window.FLEET_DATA = {
           </div>
 
           <div class="field">
-            <label>Podsumowanie kwot</label>
+            <label>Typy pojazdów w raporcie</label>
             <label class="field-check" style="margin-top:8px;">
-              <input type="radio" name="pdfSumMode" value="both" checked>
-              <label style="margin:0;">Bus i pozostałe — osobno</label>
+              <input type="checkbox" class="pdf-type-check" value="personal" checked>
+              <label style="margin:0;">Osobowe</label>
             </label>
             <label class="field-check" style="margin-top:8px;">
-              <input type="radio" name="pdfSumMode" value="bus">
-              <label style="margin:0;">Tylko Bus</label>
+              <input type="checkbox" class="pdf-type-check" value="heavy" checked>
+              <label style="margin:0;">Ciężarowe</label>
             </label>
             <label class="field-check" style="margin-top:8px;">
-              <input type="radio" name="pdfSumMode" value="other">
-              <label style="margin:0;">Tylko pozostałe (bez Bus)</label>
+              <input type="checkbox" class="pdf-type-check" value="bus" checked>
+              <label style="margin:0;">Busy</label>
             </label>
+          </div>
+
+          <div class="field">
+            <label>Podsumowanie</label>
             <label class="field-check" style="margin-top:8px;">
-              <input type="radio" name="pdfSumMode" value="none">
+              <input type="checkbox" id="pdfNoSummary">
               <label style="margin:0;">Bez podsumowania</label>
             </label>
+            <div id="pdfSummaryTypes">
+              <label class="field-check" style="margin-top:8px;">
+                <input type="checkbox" class="pdf-summary-type" value="personal" checked>
+                <label style="margin:0;">Osobowe</label>
+              </label>
+              <label class="field-check" style="margin-top:8px;">
+                <input type="checkbox" class="pdf-summary-type" value="heavy" checked>
+                <label style="margin:0;">Ciężarowe</label>
+              </label>
+              <label class="field-check" style="margin-top:8px;">
+                <input type="checkbox" class="pdf-summary-type" value="bus" checked>
+                <label style="margin:0;">Busy</label>
+              </label>
+            </div>
           </div>
 
           <div class="sheet-actions">
@@ -2777,8 +2801,21 @@ window.FLEET_DATA = {
         </div>
       </div>`;
     document.getElementById('modalRoot').innerHTML = html;
-    document.getElementById('pdfOverlay').addEventListener('click', (e) => { if(e.target.id === 'pdfOverlay') closeModal(); });
     document.querySelector('[data-close]').addEventListener('click', closeModal);
+
+    const noSummary = document.getElementById('pdfNoSummary');
+    const summaryChecks = Array.from(document.querySelectorAll('.pdf-summary-type'));
+    const syncSummaryControls = () => {
+      summaryChecks.forEach(cb => { cb.disabled = noSummary.checked; });
+      document.getElementById('pdfSummaryTypes').style.opacity = noSummary.checked ? '0.45' : '1';
+    };
+    noSummary.addEventListener('change', syncSummaryControls);
+    summaryChecks.forEach(cb => cb.addEventListener('change', () => {
+      if(cb.checked) noSummary.checked = false;
+      syncSummaryControls();
+    }));
+    syncSummaryControls();
+
     document.getElementById('pdfGenerateBtn').addEventListener('click', generateMonthPdf);
   }
 
@@ -2790,38 +2827,56 @@ window.FLEET_DATA = {
     rozliczone: {header:'Rozliczone', cell:r => r.zaplacone ? 'TAK' : 'NIE'}
   };
 
+  function pdfVehicleType(r){
+    const t = String(r.typ || '').trim().toUpperCase();
+    if(t.includes('BUS')) return 'bus';
+    if(t === 'OSOBOWY' || t === 'OSOBOWE' || t.includes('OSOBOW')) return 'personal';
+    return 'heavy';
+  }
+
   async function generateMonthPdf(){
     if(!window.jspdf || !window.html2canvas){
       showToast('Nie udało się wczytać generatora PDF — sprawdź połączenie z internetem');
       return;
     }
+
     const val = document.getElementById('pdfMonthPicker').value;
+    const invoiceNumber = document.getElementById('pdfInvoiceNumber').value.trim();
     if(!val) return;
+    if(!invoiceNumber){
+      showToast('Wpisz numer faktury');
+      document.getElementById('pdfInvoiceNumber').focus();
+      return;
+    }
 
     const selectedCols = Array.from(document.querySelectorAll('.pdf-col-check:checked')).map(el => el.value);
     if(selectedCols.length === 0){
       showToast('Wybierz co najmniej jedną kolumnę');
       return;
     }
-    const sumMode = document.querySelector('input[name="pdfSumMode"]:checked').value;
 
-    const rows = records.filter(r => r.zatwierdzone && r.data_prania && r.data_prania.slice(0,7) === val)
+    const selectedVehicleTypes = Array.from(document.querySelectorAll('.pdf-type-check:checked')).map(el => el.value);
+    if(selectedVehicleTypes.length === 0){
+      showToast('Wybierz co najmniej jeden typ pojazdu');
+      return;
+    }
+
+    const noSummary = document.getElementById('pdfNoSummary').checked;
+    const selectedSummaryTypes = noSummary ? [] : Array.from(document.querySelectorAll('.pdf-summary-type:checked')).map(el => el.value);
+    if(!noSummary && selectedSummaryTypes.length === 0){
+      showToast('Wybierz typ podsumowania albo zaznacz „Bez podsumowania”');
+      return;
+    }
+
+    const rows = records
+      .filter(r => r.zatwierdzone && r.data_prania && r.data_prania.slice(0,7) === val)
+      .filter(r => selectedVehicleTypes.includes(pdfVehicleType(r)))
       .sort((a,b) => a.data_prania.localeCompare(b.data_prania));
 
-    const [y, m] = val.split('-');
-    const monthNames = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
-    const monthLabel = `${monthNames[parseInt(m,10)-1]} ${y}`;
-
-    const isBus = r => String(r.typ||'').toUpperCase() === 'BUS';
-    const busSum = rows.filter(isBus).reduce((s,r) => s + (Number(r.koszt)||0), 0);
-    const otherSum = rows.filter(r => !isBus(r)).reduce((s,r) => s + (Number(r.koszt)||0), 0);
     const activeCols = PDF_COLUMNS.filter(c => selectedCols.includes(c.key));
 
     showToast('Generuję PDF…');
 
-    // Build an off-screen HTML version of the report — the browser renders
-    // Polish characters natively and correctly, so turning THIS into an
-    // image sidesteps jsPDF's broken custom-font glyph mapping entirely.
     const headerCells = activeCols.map(c => `<th style="text-align:left;padding:8px 10px;background:#16150F;color:#F5F4EE;font-size:13px;">${escapeHtml(colDefs[c.key].header)}</th>`).join('');
     const bodyRows = rows.map((r,i) => `
       <tr style="background:${i % 2 ? '#F7F6F1' : '#FFFFFF'};">
@@ -2829,18 +2884,25 @@ window.FLEET_DATA = {
       </tr>`).join('');
 
     let sumHtml = '';
-    if(sumMode !== 'none'){
-      const lines = [];
-      if(sumMode === 'both' || sumMode === 'bus') lines.push(`Suma — Bus: ${fmtMoney(busSum)}`);
-      if(sumMode === 'both' || sumMode === 'other') lines.push(`Suma — pozostałe: ${fmtMoney(otherSum)}`);
-      sumHtml = `<div style="margin-top:18px;font-size:14px;font-weight:700;">${lines.map(l => `<div style="margin-top:4px;">${escapeHtml(l)}</div>`).join('')}</div>`;
+    if(!noSummary){
+      const summaryLabels = {personal:'Osobowe', heavy:'Ciężarowe', bus:'Busy'};
+      const summaryLines = selectedSummaryTypes.map(type => {
+        const total = rows.filter(r => pdfVehicleType(r) === type).reduce((sum,r) => sum + (Number(r.koszt)||0), 0);
+        return `<div style="display:flex;justify-content:space-between;gap:20px;margin-top:5px;"><span>${summaryLabels[type]}</span><span>${fmtMoney(total)}</span></div>`;
+      }).join('');
+      sumHtml = `<div style="margin-top:18px;font-size:14px;font-weight:700;border-top:1px solid #D9D6C9;padding-top:10px;">${summaryLines}</div>`;
     }
 
+    const logoImg = document.querySelector('.app-logo');
+    const logoSrc = logoImg ? logoImg.src : '';
     const container = document.createElement('div');
-    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;background:#ffffff;color:#16150F;font-family:Arial,Helvetica,sans-serif;padding:28px;';
+    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;background:#ffffff;color:#16150F;font-family:Arial,Helvetica,sans-serif;padding:32px;';
     container.innerHTML = `
-      <div style="font-size:22px;font-weight:800;margin-bottom:4px;">CleanFleet — Podsumowanie miesiąca</div>
-      <div style="font-size:14px;color:#5B584B;margin-bottom:18px;">${escapeHtml(monthLabel)}</div>
+      <div style="margin-bottom:22px;">
+        ${logoSrc ? `<img src="${logoSrc}" style="height:58px;width:auto;display:block;margin-bottom:18px;">` : ''}
+        <div style="font-size:17px;font-weight:700;line-height:1.35;">Załącznik do faktury</div>
+        <div style="font-size:16px;margin-top:3px;">${escapeHtml(invoiceNumber)}</div>
+      </div>
       <table style="width:100%;border-collapse:collapse;">
         <thead><tr>${headerCells}</tr></thead>
         <tbody>${bodyRows}</tbody>
@@ -2851,7 +2913,7 @@ window.FLEET_DATA = {
 
     let canvas;
     try{
-      canvas = await html2canvas(container, {scale:2, backgroundColor:'#ffffff'});
+      canvas = await html2canvas(container, {scale:2, backgroundColor:'#ffffff', useCORS:true});
     }catch(e){
       document.body.removeChild(container);
       showToast('Nie udało się wygenerować PDF');
@@ -2886,7 +2948,8 @@ window.FLEET_DATA = {
       firstPage = false;
     }
 
-    const filename = `pranie-floty-${val}.pdf`;
+    const safeInvoice = invoiceNumber.replace(/[^a-zA-Z0-9._-]+/g,'_');
+    const filename = `zalacznik-do-faktury-${safeInvoice}-${val}.pdf`;
     const blobUrl = doc.output('bloburl');
     showPdfPreview(blobUrl, filename);
   }

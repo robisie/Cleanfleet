@@ -461,47 +461,46 @@
 </style>
 
 
-<style id="cf-mobile-user-v22">
+<style id="cf-mobile-user-v23">
 @media (max-width: 600px) {
   .header-actions {
-    display:flex !important;
-    align-items:center !important;
-    gap:8px !important;
-    min-width:0 !important;
-    margin-left:auto !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
   }
   .header-actions .cf-user {
-    display:flex !important;
-    flex-direction:column !important;
-    align-items:flex-end !important;
-    justify-content:center !important;
-    gap:1px !important;
-    max-width:calc(100vw - 150px) !important;
-    min-width:0 !important;
-    white-space:normal !important;
-    overflow:visible !important;
-    text-overflow:clip !important;
-    line-height:1.1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    min-width: 0 !important;
+    max-width: calc(100vw - 145px) !important;
+    line-height: 1.1 !important;
+    overflow: hidden !important;
   }
   .cf-user-label {
-    display:block !important;
-    white-space:nowrap !important;
-    font-size:10px !important;
+    display: block !important;
+    white-space: nowrap !important;
+    font-size: 10px !important;
   }
   .cf-user-email {
-    display:block !important;
-    max-width:100% !important;
-    white-space:nowrap !important;
-    overflow:hidden !important;
-    text-overflow:ellipsis !important;
-    font-size:11px !important;
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 11px !important;
   }
   .header-actions .hamburger {
-    flex:0 0 36px !important;
-    width:36px !important;
-    height:36px !important;
+    flex: 0 0 36px !important;
+    width: 36px !important;
+    height: 36px !important;
   }
 }
+</style>
 
 </head>
 <body>
@@ -2312,9 +2311,16 @@ window.FLEET_DATA = {
     const session = (await cfSupabase.auth.getSession()).data.session;
     const userText = document.getElementById('cfUserText');
     if(userText) {
-      userText.innerHTML = session?.user?.email
-        ? '<span class="cf-user-label">Zalogowano:</span><span class="cf-user-email">'+escapeHtml(session.user.email)+'</span>'
-        : '';
+      userText.textContent = '';
+      if(session?.user?.email) {
+        const label = document.createElement('span');
+        label.className = 'cf-user-label';
+        label.textContent = 'Zalogowano:';
+        const email = document.createElement('span');
+        email.className = 'cf-user-email';
+        email.textContent = session.user.email;
+        userText.append(label, email);
+      }
     }
     cfSetSync('Dane aktualne · '+cfFormatSyncTime(cfLastSync),'ok');
   }

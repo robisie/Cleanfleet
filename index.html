@@ -2851,9 +2851,6 @@ window.FLEET_DATA = {
       return selectedTypes.includes(getPdfVehicleGroup(r.typ));
     }).sort((a,b) => a.data_prania.localeCompare(b.data_prania));
 
-    const [y, m] = val.split('-');
-    const monthNames = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
-    const monthLabel = `${monthNames[parseInt(m,10)-1]} ${y}`;
     const activeCols = PDF_COLUMNS.filter(c => selectedCols.includes(c.key));
 
     showToast('Generuję PDF…');
@@ -2879,11 +2876,14 @@ window.FLEET_DATA = {
     }
 
     const container = document.createElement('div');
-    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;background:#ffffff;color:#16150F;font-family:Arial,Helvetica,sans-serif;padding:28px;';
+    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;background:#ffffff;color:#16150F;font-family:Arial,Helvetica,sans-serif;padding:32px;box-sizing:border-box;';
+    const logoSrc = document.querySelector('.app-logo')?.src || '';
     container.innerHTML = `
-      <div style="font-size:22px;font-weight:800;margin-bottom:6px;">CleanFleet — Podsumowanie miesiąca</div>
-      <div style="font-size:16px;font-weight:700;margin-bottom:4px;">Załącznik do faktury nr: ${escapeHtml(invoiceNumber)}</div>
-      <div style="font-size:14px;color:#5B584B;margin-bottom:18px;">${escapeHtml(monthLabel)}</div>
+      <div style="margin-bottom:26px;">
+        ${logoSrc ? `<img src="${logoSrc}" alt="CleanFleet" style="display:block;width:235px;height:auto;margin:0 0 18px 0;">` : ''}
+        <div style="font-size:16px;font-weight:700;line-height:1.35;">Załącznik do faktury</div>
+        <div style="font-size:14px;font-weight:600;line-height:1.35;margin-top:3px;">Nr faktury: ${escapeHtml(invoiceNumber)}</div>
+      </div>
       <table style="width:100%;border-collapse:collapse;">
         <thead><tr>${headerCells}</tr></thead>
         <tbody>${bodyRows}</tbody>

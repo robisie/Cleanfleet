@@ -460,6 +460,49 @@
 }
 </style>
 
+
+<style id="cf-mobile-user-v22">
+@media (max-width: 600px) {
+  .header-actions {
+    display:flex !important;
+    align-items:center !important;
+    gap:8px !important;
+    min-width:0 !important;
+    margin-left:auto !important;
+  }
+  .header-actions .cf-user {
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:flex-end !important;
+    justify-content:center !important;
+    gap:1px !important;
+    max-width:calc(100vw - 150px) !important;
+    min-width:0 !important;
+    white-space:normal !important;
+    overflow:visible !important;
+    text-overflow:clip !important;
+    line-height:1.1 !important;
+  }
+  .cf-user-label {
+    display:block !important;
+    white-space:nowrap !important;
+    font-size:10px !important;
+  }
+  .cf-user-email {
+    display:block !important;
+    max-width:100% !important;
+    white-space:nowrap !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+    font-size:11px !important;
+  }
+  .header-actions .hamburger {
+    flex:0 0 36px !important;
+    width:36px !important;
+    height:36px !important;
+  }
+}
+
 </head>
 <body>
 
@@ -2268,7 +2311,11 @@ window.FLEET_DATA = {
     renderRecords();
     const session = (await cfSupabase.auth.getSession()).data.session;
     const userText = document.getElementById('cfUserText');
-    if(userText) userText.textContent = session?.user?.email ? 'Zalogowano: '+session.user.email : '';
+    if(userText) {
+      userText.innerHTML = session?.user?.email
+        ? '<span class="cf-user-label">Zalogowano:</span><span class="cf-user-email">'+escapeHtml(session.user.email)+'</span>'
+        : '';
+    }
     cfSetSync('Dane aktualne · '+cfFormatSyncTime(cfLastSync),'ok');
   }
 

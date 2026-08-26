@@ -2407,7 +2407,10 @@ window.FLEET_DATA = {
           <div class="field-row">
             <div class="field">
               <label>Data prania</label>
-              <input type="date" id="f_data_prania" value="${rec&&rec.data_prania?rec.data_prania:todayISO()}">
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="date" id="f_data_prania" value="${rec&&rec.data_prania?rec.data_prania:''}" style="flex:1;min-width:0">
+                <button type="button" class="btn btn-secondary" id="clearWashDateBtn" style="white-space:nowrap">Wyczyść</button>
+              </div>
             </div>
             <div class="field">
               <label>Kto wykonał</label>
@@ -2428,6 +2431,12 @@ window.FLEET_DATA = {
         </div>
       </div>`;
     document.getElementById('modalRoot').innerHTML = html;
+    const clearWashDateBtn = document.getElementById('clearWashDateBtn');
+    if(clearWashDateBtn){
+      clearWashDateBtn.addEventListener('click', () => {
+        document.getElementById('f_data_prania').value = '';
+      });
+    }
 
     document.getElementById('formOverlay').addEventListener('click', (e) => {
       if(e.target.id === 'formOverlay') closeModal();

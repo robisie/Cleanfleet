@@ -195,6 +195,10 @@
     border-radius:10px;
     padding:14px 16px;
   }
+  /* v11 — delikatne kolory ramek zależne od statusu wpisu */
+  .record-card.status-approved{border-color:rgba(107,125,0,.55);}
+  .record-card.status-done{border-color:rgba(196,120,20,.55);}
+  .record-card.status-neutral{border-color:var(--line);}
   .record-top{
     display:flex;
     justify-content:space-between;
@@ -2350,8 +2354,9 @@ window.FLEET_DATA = {
   }
 
   function recordCardHtml(r){
+    const statusClass = r.zatwierdzone ? 'status-approved' : (r.data_prania && r.kto_wykonal ? 'status-done' : 'status-neutral');
     return `
-      <div class="record-card">
+      <div class="record-card ${statusClass}">
         <div class="record-top" data-open="${r.id}">
           <div>
             <div class="record-plate">${escapeHtml(r.tablica)}</div>

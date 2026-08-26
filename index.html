@@ -2175,26 +2175,65 @@ window.FLEET_DATA = {
   function cfMapRecord(row){ return { id: row.id, tablica: row.plate, typ: row.type || '', marka: row.brand || '', zlecone: !!row.ordered, kto_zlecil: row.ordered_by || '', data_zlecenia: row.order_date || '', uwagi: row.notes || '', data_prania: row.wash_date || '', kto_wykonal: row.performed_by || '', koszt: Number(row.cost)||0, zatwierdzone: !!row.approved, zaplacone: !!row.paid, created_at: new Date(row.created_at).getTime() || Date.now() }; }
   function cfRecordToDb(r){ return { id:r.id, plate:r.tablica, type:r.typ||'', brand:r.marka||'', ordered:!!r.zlecone, ordered_by:r.kto_zlecil||'', order_date:r.data_zlecenia||null, notes:r.uwagi||'', wash_date:r.data_prania||null, performed_by:r.kto_wykonal||'', cost:Number(r.koszt)||0, approved:!!r.zatwierdzone, paid:!!r.zaplacone, created_at:new Date(r.created_at||Date.now()).toISOString() }; }
 
+  async function cfFetchJson(path, session, label){
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
+    try {
+      const res = await fetch(CF_SUPABASE_URL + '/rest/v1/' + path, {
+        method: 'GET',
+        cache: 'no-store',
+        signal: controller.signal,
+        headers: {
+          'apikey': CF_SUPABASE_KEY,
+          'Authorization': 'Bearer ' + session.access_token,
+          'Accept': 'application/json'
+        }
+      });
+      const text = await res.text();
+      let body = null;
+      try { body = text ? JSON.parse(text) : null; } catch(e) { body = text; }
+      if(!res.ok){
+        const msg = body && (body.message || body.error_description || body.error) ? (body.message || body.error_description || body.error) : ('HTTP '+res.status);
+        throw new Error(label + ': ' + msg);
+      }
+      return Array.isArray(body) ? body : [];
+    } catch(err){
+      if(err && err.name === 'AbortError') throw new Error(label + ': przekroczono 12 sekund oczekiwania');
+      throw err;
+    } finally { clearTimeout(timer); }
+  }
+
   async function loadAll(){
     cfSetSync('Pobieranie aktualnych danych…');
-    const { data: vehicleRows, error: ve } = await cfSupabase.from('vehicles').select('plate,type,brand').order('plate');
-    if(ve){ cfSetSync('Błąd bazy: '+ve.message,'err'); showToast('Nie udało się pobrać pojazdów'); return; }
-    const { data: recordRows, error: re } = await cfSupabase.from('wash_records').select('id,plate,type,brand,ordered,ordered_by,order_date,notes,wash_date,performed_by,cost,approved,paid,created_at').order('created_at',{ascending:false});
-    if(re){ cfSetSync('Błąd bazy: '+re.message,'err'); showToast('Nie udało się pobrać wpisów'); return; }
+    try {
+      const sessionResult = await cfSupabase.auth.getSession();
+      const session = sessionResult && sessionResult.data ? sessionResult.data.session : null;
+      if(!session){
+        cfShowLogin(true);
+        cfSetSync('Wymagane logowanie','err');
+        return;
+      }
+      const vehicleRows = await cfFetchJson('vehicles?select=plate,type,brand&order=plate.asc', session, 'Pojazdy');
+      cfSetSync('Pobrano pojazdy · '+vehicleRows.length+' · pobieranie wpisów…');
+      const recordRows = await cfFetchJson('wash_records?select=id,plate,type,brand,ordered,ordered_by,order_date,notes,wash_date,performed_by,cost,approved,paid,created_at&order=created_at.desc', session, 'Wpisy prania');
 
-    registry = {};
-    (vehicleRows||[]).forEach(v => { registry[v.plate] = { typ:v.type||'', marka:v.brand||'' }; });
-    records = (recordRows||[]).map(cfMapRecord);
-    cfRemoteVehiclePlates = new Set((vehicleRows||[]).map(v=>v.plate));
-    cfRemoteRecordIds = new Set((recordRows||[]).map(r=>r.id));
-    cfLastSync = new Date();
-    localStorage.setItem('cf-last-sync', cfLastSync.toISOString());
-    renderPlateList();
-    renderRecords();
-    const session = (await cfSupabase.auth.getSession()).data.session;
-    const userText = document.getElementById('cfUserText');
-    if(userText) userText.textContent = session?.user?.email ? 'Zalogowano: '+session.user.email : '';
-    cfSetSync('Dane aktualne · '+cfFormatSyncTime(cfLastSync),'ok');
+      registry = {};
+      vehicleRows.forEach(v => { registry[v.plate] = { typ:v.type||'', marka:v.brand||'' }; });
+      records = recordRows.map(cfMapRecord);
+      cfRemoteVehiclePlates = new Set(vehicleRows.map(v=>v.plate));
+      cfRemoteRecordIds = new Set(recordRows.map(r=>r.id));
+      cfLastSync = new Date();
+      localStorage.setItem('cf-last-sync', cfLastSync.toISOString());
+      renderPlateList();
+      renderRecords();
+      const userText = document.getElementById('cfUserText');
+      if(userText) userText.textContent = session.user?.email ? 'Zalogowano: '+session.user.email : '';
+      cfSetSync('Dane aktualne · '+vehicleRows.length+' pojazdów · '+recordRows.length+' wpisów · '+cfFormatSyncTime(cfLastSync),'ok');
+    } catch(err) {
+      console.error('CleanFleet loadAll error:', err);
+      cfSetSync('BŁĄD: '+(err?.message || String(err)),'err');
+      showToast('Błąd pobierania danych — szczegóły pokazane powyżej');
+    }
   }
 
   async function saveRecords(){

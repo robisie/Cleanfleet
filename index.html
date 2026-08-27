@@ -2706,30 +2706,41 @@ window.FLEET_DATA = {
   function showSearchResults(query, matches){
     const rowsHtml = matches.map(plate => {
       const info = registry[plate] || {};
-      // Jeżeli istnieje wpis tego pojazdu bez daty prania, traktujemy go
-      // jako niedokończony i kliknięcie otwiera go do edycji.
-      // Jeżeli wszystkie istniejące wpisy mają datę prania, kliknięcie
-      // rozpoczyna nowy wpis — dzięki temu historia kolejnych prań pozostaje osobna.
-      const activeExisting = records.find(r => r.tablica === plate && !r.data_prania);
-      const approved = lastApprovedRecordFor(plate);
+      const history = records
+        .filter(r => r.tablica === plate)
+        .sort((a,b) => (b.data_prania||'').localeCompare(a.data_prania||'') || b.created_at - a.created_at);
 
-      let statusHtml, whoLine;
-      if(approved){
-        statusHtml = `<div class="record-badge" style="background:var(--green-bg);color:var(--green-ink);">wyprane ${fmtDate(approved.data_prania)}</div>`;
-        whoLine = approved.kto_wykonal ? ` · wykonał: ${escapeHtml(approved.kto_wykonal)}` : '';
-      } else {
-        statusHtml = `<div class="record-badge" style="background:var(--red-bg);color:var(--red);">nie wyprane</div>`;
-        whoLine = activeExisting ? ' · ma wpis oczekujący na wykonanie' : '';
-      }
+      // Każde pranie jest osobnym wpisem. Wyszukanie pojazdu pokazuje więc
+      // całą jego historię, a nie tylko ostatni rekord.
+      const historyHtml = history.length
+        ? history.map((r, idx) => {
+            const pending = !r.data_prania;
+            const label = pending
+              ? `Oczekuje na wykonanie${r.zatwierdzone ? ' · zatwierdzone' : ''}`
+              : `Pranie: ${fmtDate(r.data_prania)} · wykonał: ${escapeHtml(r.kto_wykonal||'—')}`;
+            const border = pending ? 'border-left:4px solid var(--orange);' : 'border-left:4px solid var(--green);';
+            return `<div class="record-card search-history-item" data-pick-id="${escapeHtml(r.id)}" style="cursor:pointer;${border}margin-top:8px;">
+              <div class="record-top">
+                <div>
+                  <div class="record-meta"><strong>${label}</strong></div>
+                  <div class="record-meta">${escapeHtml(r.uwagi||'—')}</div>
+                </div>
+                <div style="text-align:right;white-space:nowrap;">${fmtMoney(r.koszt)}</div>
+              </div>
+            </div>`;
+          }).join('')
+        : `<div class="confirm-text" style="margin-top:8px;">Brak historii prania — można utworzyć pierwszy wpis.</div>`;
 
       return `
-        <div class="record-card" data-pick="${escapeHtml(plate)}" style="cursor:pointer;">
+        <div class="record-card" style="margin-bottom:10px;">
           <div class="record-top">
             <div>
               <div class="record-plate">${escapeHtml(plate)}</div>
-              <div class="record-meta">${escapeHtml(info.typ||'—')} · ${escapeHtml(info.marka||'—')}${whoLine}</div>
+              <div class="record-meta">${escapeHtml(info.typ||'—')} · ${escapeHtml(info.marka||'—')}</div>
             </div>
-            ${statusHtml}
+          </div>
+          <div style="margin-top:8px;">
+            ${historyHtml}
           </div>
         </div>`;
     }).join('');
@@ -2748,15 +2759,19 @@ window.FLEET_DATA = {
     reportShell('Wynik wyszukiwania', '', body);
     document.getElementById('searchInput').value = '';
 
-    document.querySelectorAll('[data-pick]').forEach(el => {
+    document.querySelectorAll('[data-pick-id]').forEach(el => {
       el.addEventListener('click', () => {
-        const plate = el.getAttribute('data-pick');
-        // Priorytet ma niedokończony wpis bez daty prania.
-        // Jeśli go nie ma, tworzymy nowy wpis dla tego samego pojazdu.
-        const existingWithoutWashDate = records.find(r => r.tablica === plate && !r.data_prania);
+        const id = el.getAttribute('data-pick-id');
+        const rec = records.find(r => r.id === id);
         closeModal();
-        window.__pendingPlate = plate;
-        openForm(existingWithoutWashDate ? existingWithoutWashDate.id : null);
+        if(rec && !rec.data_prania){
+          // Niedokończony wpis — edycja istniejącego rekordu.
+          openForm(rec.id);
+        } else {
+          // Wpis zakończony datą prania — nowe pranie, nigdy edycja starego.
+          window.__pendingPlate = rec ? rec.tablica : '';
+          openForm(null);
+        }
       });
     });
     const addBtn = document.getElementById('addNewAnyway');
@@ -2768,11 +2783,6 @@ window.FLEET_DATA = {
       });
     }
   }
-
-  document.getElementById('btnMonth').addEventListener('click', showMonthReport);
-  document.getElementById('btnYear').addEventListener('click', showYearReport);
-  document.getElementById('btnAll').addEventListener('click', showAllOutstanding);
-  document.getElementById('btnPending').addEventListener('click', showPendingOrders);
 
   function reportShell(title, controlsHtml, bodyHtml){
     const html = `

@@ -2301,14 +2301,14 @@ window.FLEET_DATA = {
   }
 
   function cfMapVehicle(row){ return { plate: row.plate, type: row.type || '', brand: row.brand || '' }; }
-  function cfMapRecord(row){ return { id: row.id, tablica: row.plate, typ: row.type || '', marka: row.brand || '', zlecone: !!row.ordered, kto_zlecil: row.ordered_by || '', data_zlecenia: row.order_date || '', uwagi: row.notes || '', data_prania: row.wash_date || '', kto_wykonal: row.performed_by || '', koszt: Number(row.cost)||0, zatwierdzone: !!row.approved, zaplacone: !!row.paid, created_at: new Date(row.created_at).getTime() || Date.now() }; }
-  function cfRecordToDb(r){ return { id:r.id, plate:r.tablica, type:r.typ||'', brand:r.marka||'', ordered:!!r.zlecone, ordered_by:r.kto_zlecil||'', order_date:r.data_zlecenia||null, notes:r.uwagi||'', wash_date:r.data_prania||null, performed_by:r.kto_wykonal||'', cost:Number(r.koszt)||0, approved:!!r.zatwierdzone, paid:!!r.zaplacone, created_at:new Date(r.created_at||Date.now()).toISOString() }; }
+  function cfMapRecord(row){ return { id: row.id, tablica: row.plate, typ: row.type || '', marka: row.brand || '', billing_category: row.billing_category || '', zlecone: !!row.ordered, kto_zlecil: row.ordered_by || '', data_zlecenia: row.order_date || '', uwagi: row.notes || '', data_prania: row.wash_date || '', kto_wykonal: row.performed_by || '', koszt: Number(row.cost)||0, zatwierdzone: !!row.approved, zaplacone: !!row.paid, created_at: new Date(row.created_at).getTime() || Date.now() }; }
+  function cfRecordToDb(r){ return { id:r.id, plate:r.tablica, type:r.typ||'', brand:r.marka||'', billing_category:r.billing_category||null, ordered:!!r.zlecone, ordered_by:r.kto_zlecil||'', order_date:r.data_zlecenia||null, notes:r.uwagi||'', wash_date:r.data_prania||null, performed_by:r.kto_wykonal||'', cost:Number(r.koszt)||0, approved:!!r.zatwierdzone, paid:!!r.zaplacone, created_at:new Date(r.created_at||Date.now()).toISOString() }; }
 
   async function loadAll(){
     cfSetSync('Pobieranie aktualnych danych…');
     const { data: vehicleRows, error: ve } = await cfSupabase.from('vehicles').select('plate,type,brand').order('plate');
     if(ve){ cfSetSync('Błąd bazy: '+ve.message,'err'); showToast('Nie udało się pobrać pojazdów'); return; }
-    const { data: recordRows, error: re } = await cfSupabase.from('wash_records').select('id,plate,type,brand,ordered,ordered_by,order_date,notes,wash_date,performed_by,cost,approved,paid,created_at').order('created_at',{ascending:false});
+    const { data: recordRows, error: re } = await cfSupabase.from('wash_records').select('id,plate,type,brand,billing_category,ordered,ordered_by,order_date,notes,wash_date,performed_by,cost,approved,paid,created_at').order('created_at',{ascending:false});
     if(re){ cfSetSync('Błąd bazy: '+re.message,'err'); showToast('Nie udało się pobrać wpisów'); return; }
 
     registry = {};

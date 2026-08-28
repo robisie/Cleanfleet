@@ -3181,6 +3181,17 @@ window.FLEET_DATA = {
         <select id="yearPicker" style="padding:9px 10px;border:1px solid var(--line-strong);border-radius:8px;font-size:14px;">
           ${years.map(y => `<option value="${y}" ${y===String(now.getFullYear())?'selected':''}>${y}</option>`).join('')}
         </select>
+      <div class="form-row">
+        <label for="billingCategory">Grupa rozliczeniowa</label>
+        <select id="billingCategory">
+          <option value="">— wybierz —</option>
+          <option value="osobowe">Osobowe</option>
+          <option value="ciezarowe">Ciężarowe</option>
+          <option value="busy">Busy</option>
+        </select>
+      </div>
+      <div class="form-hint">Grupa rozliczeniowa może być inna niż typ pojazdu.</div>
+
       </div>`;
     reportShell('Podsumowanie roku (zatwierdzone i zapłacone)', controls, '');
     const update = () => {
@@ -3425,6 +3436,28 @@ window.FLEET_DATA = {
       showToast('Nie udało się załadować połączenia z Supabase. Odśwież stronę.');
     }
   }
+
+  function defaultBillingCategory(type){
+    const t = String(type || '').trim().toLowerCase();
+    if(!t) return '';
+    if(t.includes('bus')) return 'busy';
+    if(t.includes('osob')) return 'osobowe';
+    if(t.includes('zestaw') || t.includes('cięż') || t.includes('cież') ||
+       t.includes('ciezar') || t.includes('dostaw')) return 'ciezarowe';
+    return '';
+  }
+
+  const billingCategory = document.getElementById('billingCategory');
+  const billingType = document.getElementById('yearPicker');
+  if(billingCategory && billingType){
+    billingType.addEventListener('change', () => {
+      if(!billingCategory.value || billingCategory.dataset.autoDefault === '1'){
+        billingCategory.value = defaultBillingCategory(billingType.value);
+        billingCategory.dataset.autoDefault = '1';
+      }
+    });
+  }
+
   cfBoot();
 })();
 </script>

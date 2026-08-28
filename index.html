@@ -2301,14 +2301,14 @@ window.FLEET_DATA = {
   }
 
   function cfMapVehicle(row){ return { plate: row.plate, type: row.type || '', brand: row.brand || '' }; }
-  function cfMapRecord(row){ return { id: row.id, tablica: row.plate, typ: row.type || '', marka: row.brand || '', zlecone: !!row.ordered, kto_zlecil: row.ordered_by || '', data_zlecenia: row.order_date || '', termin_zlecenia: row.order_due_date || '', uwagi: row.notes || '', data_prania: row.wash_date || '', kto_wykonal: row.performed_by || '', koszt: Number(row.cost)||0, zatwierdzone: !!row.approved, zaplacone: !!row.paid, created_at: new Date(row.created_at).getTime() || Date.now() }; }
-  function cfRecordToDb(r){ return { id:r.id, plate:r.tablica, type:r.typ||'', brand:r.marka||'', ordered:!!r.zlecone, ordered_by:r.kto_zlecil||'', order_date:r.data_zlecenia||null, order_due_date:r.termin_zlecenia||null, notes:r.uwagi||'', wash_date:r.data_prania||null, performed_by:r.kto_wykonal||'', cost:Number(r.koszt)||0, approved:!!r.zatwierdzone, paid:!!r.zaplacone, created_at:new Date(r.created_at||Date.now()).toISOString() }; }
+  function cfMapRecord(row){ return { id: row.id, tablica: row.plate, typ: row.type || '', marka: row.brand || '', zlecone: !!row.ordered, kto_zlecil: row.ordered_by || '', data_zlecenia: row.order_date || '', uwagi: row.notes || '', data_prania: row.wash_date || '', kto_wykonal: row.performed_by || '', koszt: Number(row.cost)||0, zatwierdzone: !!row.approved, zaplacone: !!row.paid, created_at: new Date(row.created_at).getTime() || Date.now() }; }
+  function cfRecordToDb(r){ return { id:r.id, plate:r.tablica, type:r.typ||'', brand:r.marka||'', ordered:!!r.zlecone, ordered_by:r.kto_zlecil||'', order_date:r.data_zlecenia||null, notes:r.uwagi||'', wash_date:r.data_prania||null, performed_by:r.kto_wykonal||'', cost:Number(r.koszt)||0, approved:!!r.zatwierdzone, paid:!!r.zaplacone, created_at:new Date(r.created_at||Date.now()).toISOString() }; }
 
   async function loadAll(){
     cfSetSync('Pobieranie aktualnych danych…');
     const { data: vehicleRows, error: ve } = await cfSupabase.from('vehicles').select('plate,type,brand').order('plate');
     if(ve){ cfSetSync('Błąd bazy: '+ve.message,'err'); showToast('Nie udało się pobrać pojazdów'); return; }
-    const { data: recordRows, error: re } = await cfSupabase.from('wash_records').select('id,plate,type,brand,ordered,ordered_by,order_date,order_due_date,notes,wash_date,performed_by,cost,approved,paid,created_at').order('created_at',{ascending:false});
+    const { data: recordRows, error: re } = await cfSupabase.from('wash_records').select('id,plate,type,brand,ordered,ordered_by,order_date,notes,wash_date,performed_by,cost,approved,paid,created_at').order('created_at',{ascending:false});
     if(re){ cfSetSync('Błąd bazy: '+re.message,'err'); showToast('Nie udało się pobrać wpisów'); return; }
 
     registry = {};
@@ -2409,7 +2409,7 @@ window.FLEET_DATA = {
   }
 
   function activeRecords(){
-    const active = records.filter(r => !(r.zatwierdzone && r.zaplacone));
+    const active = records.filter(r => !r.zaplacone);
     const statusRank = r => r.zatwierdzone ? 1 : (r.zlecone ? 0 : 2);
     return active.sort((a,b) => {
       const rankDiff = statusRank(a) - statusRank(b);
@@ -2451,7 +2451,7 @@ window.FLEET_DATA = {
         <div class="record-top" data-open="${r.id}">
           <div>
             <div class="record-plate">${escapeHtml(r.tablica)}</div>
-            <div class="record-meta">${r.zlecone && !r.zatwierdzone ? `Zlecono: ${fmtDate(r.data_zlecenia)} · Na: ${fmtDate(r.termin_zlecenia)} · Opis: ${escapeHtml(r.uwagi||'—')}` : `Pranie: ${fmtDate(r.data_prania)} · Wykonał: ${escapeHtml(r.kto_wykonal||'—')}`}</div>
+            <div class="record-meta">${r.zlecone && !r.zatwierdzone ? `Data: ${fmtDate(r.data_zlecenia)} · Opis: ${escapeHtml(r.uwagi||'—')}` : `Pranie: ${fmtDate(r.data_prania)} · Wykonał: ${escapeHtml(r.kto_wykonal||'—')}`}</div>
           </div>
           <div style="text-align:right;">
             <div class="record-cost">${fmtMoney(r.koszt)}</div>
@@ -2531,6 +2531,17 @@ window.FLEET_DATA = {
               <input type="text" id="f_marka" list="opt_marka" value="${escapeHtml(marka)}">
               <datalist id="opt_marka">${options.marka.map(o=>`<option value="${escapeHtml(o)}">`).join('')}</datalist>
             </div>
+
+          <div class="field">
+            <label for="f_grupa_rozliczeniowa">Grupa rozliczeniowa</label>
+            <select id="f_grupa_rozliczeniowa">
+              <option value="">— wybierz —</option>
+              <option value="osobowe">Osobowe</option>
+              <option value="ciezarowe">Ciężarowe</option>
+              <option value="busy">Busy</option>
+            </select>
+          </div>
+
           </div>
 
           <div class="field-check">
@@ -2538,21 +2549,15 @@ window.FLEET_DATA = {
             <label for="f_zlecone">Zlecone</label>
           </div>
 
-          <div id="orderFields" style="display:${rec && rec.zlecone ? 'block' : 'none'};">
-            <div class="field-row">
-              <div class="field">
-                <label>Kto zlecił</label>
-                <input type="text" id="f_kto_zlecil" list="opt_kz" value="${escapeHtml(rec?rec.kto_zlecil:'')}">
-                <datalist id="opt_kz">${options.kto_zlecil.map(o=>`<option value="${escapeHtml(o)}">`).join('')}</datalist>
-              </div>
-              <div class="field">
-                <label>Data zlecenia</label>
-                <input type="date" id="f_data_zlecenia" value="${rec&&rec.data_zlecenia?rec.data_zlecenia:''}">
-              </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Kto zlecił</label>
+              <input type="text" id="f_kto_zlecil" list="opt_kz" value="${escapeHtml(rec?rec.kto_zlecil:'')}">
+              <datalist id="opt_kz">${options.kto_zlecil.map(o=>`<option value="${escapeHtml(o)}">`).join('')}</datalist>
             </div>
             <div class="field">
-              <label>Na kiedy zlecone</label>
-              <input type="date" id="f_termin_zlecenia" value="${rec&&rec.termin_zlecenia?rec.termin_zlecenia:''}">
+              <label>Data zlecenia</label>
+              <input type="date" id="f_data_zlecenia" value="${rec&&rec.data_zlecenia?rec.data_zlecenia:''}">
             </div>
           </div>
 
@@ -2588,16 +2593,6 @@ window.FLEET_DATA = {
         </div>
       </div>`;
     document.getElementById('modalRoot').innerHTML = html;
-    const zleconeCheckbox = document.getElementById('f_zlecone');
-    const orderFields = document.getElementById('orderFields');
-    const syncOrderFields = () => {
-      if(orderFields) orderFields.style.display = zleconeCheckbox && zleconeCheckbox.checked ? 'block' : 'none';
-    };
-    if(zleconeCheckbox){
-      zleconeCheckbox.addEventListener('change', syncOrderFields);
-      syncOrderFields();
-    }
-
     const clearWashDateBtn = document.getElementById('clearWashDateBtn');
     if(clearWashDateBtn){
       clearWashDateBtn.addEventListener('click', () => {
@@ -2630,7 +2625,6 @@ window.FLEET_DATA = {
     const zlecone = document.getElementById('f_zlecone').checked;
     const kto_zlecil = document.getElementById('f_kto_zlecil').value.trim();
     const data_zlecenia = document.getElementById('f_data_zlecenia').value;
-    const termin_zlecenia = document.getElementById('f_termin_zlecenia').value;
     const uwagi = document.getElementById('f_uwagi').value.trim();
     const data_prania = document.getElementById('f_data_prania').value;
     const kto_wykonal = document.getElementById('f_kto_wykonal').value.trim();
@@ -2649,12 +2643,12 @@ window.FLEET_DATA = {
 
     if(editingId){
       const rec = records.find(x => x.id === editingId);
-      Object.assign(rec, { tablica: plate, typ, marka, zlecone, kto_zlecil, data_zlecenia, termin_zlecenia, uwagi, data_prania, kto_wykonal, koszt });
+      Object.assign(rec, { tablica: plate, typ, marka, zlecone, kto_zlecil, data_zlecenia, uwagi, data_prania, kto_wykonal, koszt });
     } else {
       records.push({
         id: uid(),
         tablica: plate,
-        typ, marka, zlecone, kto_zlecil, data_zlecenia, termin_zlecenia, uwagi, data_prania, kto_wykonal, koszt,
+        typ, marka, zlecone, kto_zlecil, data_zlecenia, uwagi, data_prania, kto_wykonal, koszt,
         zatwierdzone: false,
         zaplacone: false,
         created_at: Date.now()
@@ -2744,10 +2738,6 @@ window.FLEET_DATA = {
                 </div>
                 <div style="text-align:right;white-space:nowrap;">${fmtMoney(r.koszt)}</div>
               </div>
-              <div class="sheet-actions" style="margin-top:8px;">
-                <button type="button" class="btn btn-outline history-details" data-history-id="${escapeHtml(r.id)}">Szczegóły</button>
-                <button type="button" class="btn btn-danger history-delete" data-history-id="${escapeHtml(r.id)}">Usuń</button>
-              </div>
             </div>`;
           }).join('')
         : `<div class="confirm-text" style="margin-top:8px;">Brak historii prania — można utworzyć pierwszy wpis.</div>`;
@@ -2762,9 +2752,6 @@ window.FLEET_DATA = {
           </div>
           <div style="margin-top:8px;">
             ${historyHtml}
-          </div>
-          <div class="sheet-actions" style="margin-top:8px;">
-            <button type="button" class="btn btn-solid history-new-wash" data-new-plate="${escapeHtml(plate)}">Nowe pranie</button>
           </div>
         </div>`;
     }).join('');
@@ -2783,15 +2770,6 @@ window.FLEET_DATA = {
     reportShell('Wynik wyszukiwania', '', body);
     document.getElementById('searchInput').value = '';
 
-    document.querySelectorAll('.history-new-wash').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation();
-        closeModal();
-        window.__pendingPlate = btn.getAttribute('data-new-plate') || '';
-        openForm(null);
-      });
-    });
-
     document.querySelectorAll('[data-pick-id]').forEach(el => {
       el.addEventListener('click', () => {
         const id = el.getAttribute('data-pick-id');
@@ -2807,29 +2785,6 @@ window.FLEET_DATA = {
         }
       });
     });
-    document.querySelectorAll('.history-details').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation();
-        const id = btn.getAttribute('data-history-id');
-        if(records.some(r => r.id === id)){ closeModal(); openForm(id); }
-      });
-    });
-    document.querySelectorAll('.history-delete').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation();
-        const id = btn.getAttribute('data-history-id');
-        const rec = records.find(r => r.id === id);
-        if(!rec) return;
-        showConfirm('Usunąć wpis?', `Wpis prania dla ${rec.tablica} zostanie trwale usunięty.`, async () => {
-          records = records.filter(x => x.id !== id);
-          await saveRecords();
-          closeModal();
-          renderRecords();
-          showToast('Wpis usunięty');
-        });
-      });
-    });
-
     const addBtn = document.getElementById('addNewAnyway');
     if(addBtn){
       addBtn.addEventListener('click', () => {
@@ -2888,7 +2843,6 @@ window.FLEET_DATA = {
     {key:'tablica', label:'Tablica'},
     {key:'data', label:'Data prania'},
     {key:'kwota', label:'Kwota'},
-    {key:'opis_uslugi', label:'Opis usługi'},
     {key:'rozliczone', label:'Rozliczone'}
   ];
 
@@ -2922,14 +2876,6 @@ window.FLEET_DATA = {
           <div class="field">
             <label>Kolumny w tabeli</label>
             ${columnCheckboxes}
-          </div>
-
-          <div class="field">
-            <label>Opis usługi</label>
-            <label class="field-check" style="margin-top:8px;">
-              <input type="checkbox" id="pdfIncludeServiceDescription">
-              <label style="margin:0;">Dodaj kolumnę „Opis usługi”</label>
-            </label>
           </div>
 
           <div class="field">
@@ -2999,7 +2945,6 @@ window.FLEET_DATA = {
     tablica: {header:'Tablica', cell:r => r.tablica},
     data: {header:'Data prania', cell:r => fmtDate(r.data_prania)},
     kwota: {header:'Kwota', cell:r => fmtMoney(r.koszt)},
-    opis_uslugi: {header:'Opis usługi', cell:r => Number(r.koszt) >= 400 ? 'usługa czyszczenia i prania wnętrza' : 'usługa dodatkowa'},
     rozliczone: {header:'Rozliczone', cell:r => r.zaplacone ? 'TAK' : 'NIE'}
   };
 
@@ -3025,10 +2970,7 @@ window.FLEET_DATA = {
       return;
     }
 
-    let selectedCols = Array.from(document.querySelectorAll('.pdf-col-check:checked')).map(el => el.value);
-    const includeServiceDescription = document.getElementById('pdfIncludeServiceDescription')?.checked;
-    selectedCols = selectedCols.filter(key => key !== 'opis_uslugi');
-    if(includeServiceDescription) selectedCols.push('opis_uslugi');
+    const selectedCols = Array.from(document.querySelectorAll('.pdf-col-check:checked')).map(el => el.value);
     if(selectedCols.length === 0){
       showToast('Wybierz co najmniej jedną kolumnę');
       return;
@@ -3181,17 +3123,6 @@ window.FLEET_DATA = {
         <select id="yearPicker" style="padding:9px 10px;border:1px solid var(--line-strong);border-radius:8px;font-size:14px;">
           ${years.map(y => `<option value="${y}" ${y===String(now.getFullYear())?'selected':''}>${y}</option>`).join('')}
         </select>
-      <div class="form-row">
-        <label for="billingCategory">Grupa rozliczeniowa</label>
-        <select id="billingCategory">
-          <option value="">— wybierz —</option>
-          <option value="osobowe">Osobowe</option>
-          <option value="ciezarowe">Ciężarowe</option>
-          <option value="busy">Busy</option>
-        </select>
-      </div>
-      <div class="form-hint">Grupa rozliczeniowa może być inna niż typ pojazdu.</div>
-
       </div>`;
     reportShell('Podsumowanie roku (zatwierdzone i zapłacone)', controls, '');
     const update = () => {
@@ -3447,9 +3378,9 @@ window.FLEET_DATA = {
     return '';
   }
 
-  const billingCategory = document.getElementById('billingCategory');
-  const billingType = document.getElementById('yearPicker');
-  if(billingCategory && billingType){
+  const billingType = document.getElementById('f_typ');
+  const billingCategory = document.getElementById('f_grupa_rozliczeniowa');
+  if(billingType && billingCategory){
     billingType.addEventListener('change', () => {
       if(!billingCategory.value || billingCategory.dataset.autoDefault === '1'){
         billingCategory.value = defaultBillingCategory(billingType.value);

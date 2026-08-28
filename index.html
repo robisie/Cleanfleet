@@ -2891,7 +2891,7 @@ window.FLEET_DATA = {
           </div>
 
           <div class="field">
-            <label>Typy pojazdów w raporcie</label>
+            <label>Grupy rozliczeniowe w raporcie</label>
             <label class="field-check" style="margin-top:8px;">
               <input type="checkbox" class="pdf-type-check" value="personal" checked>
               <label style="margin:0;">Osobowe</label>
@@ -2960,11 +2960,24 @@ window.FLEET_DATA = {
     rozliczone: {header:'Rozliczone', cell:r => r.zaplacone ? 'TAK' : 'NIE'}
   };
 
-  function pdfVehicleType(r){
-    const t = String(r.typ || '').trim().toUpperCase();
+  function pdfBillingCategoryKey(r){
+    const c = String(r?.billing_category || '').trim().toLowerCase();
+    if(c === 'osobowe') return 'personal';
+    if(c === 'ciezarowe' || c === 'ciężarowe') return 'heavy';
+    if(c === 'busy' || c === 'bus') return 'bus';
+
+    // Backward compatibility for old records without billing_category.
+    const t = String(r?.typ || '').trim().toUpperCase();
     if(t.includes('BUS')) return 'bus';
     if(t === 'OSOBOWY' || t === 'OSOBOWE' || t.includes('OSOBOW')) return 'personal';
     return 'heavy';
+  }
+
+  function pdfBillingCategory(r){
+    const key = pdfBillingCategoryKey(r);
+    if(key === 'personal') return 'Osobowe';
+    if(key === 'heavy') return 'Ciężarowe';
+    return 'Busy';
   }
 
   async function generateMonthPdf(){
@@ -3003,7 +3016,7 @@ window.FLEET_DATA = {
 
     const rows = records
       .filter(r => r.zatwierdzone && r.data_prania && r.data_prania.slice(0,7) === val)
-      .filter(r => selectedVehicleTypes.includes(pdfVehicleType(r)))
+      .filter(r => selectedVehicleTypes.includes(pdfBillingCategoryKey(r)))
       .sort((a,b) => a.data_prania.localeCompare(b.data_prania));
 
     const activeCols = PDF_COLUMNS.filter(c => selectedCols.includes(c.key));
@@ -3011,16 +3024,18 @@ window.FLEET_DATA = {
     showToast('Generuję PDF…');
 
     const headerCells = activeCols.map(c => `<th style="text-align:left;padding:8px 10px;background:#16150F;color:#F5F4EE;font-size:13px;">${escapeHtml(colDefs[c.key].header)}</th>`).join('');
+    const includeServiceDescription = document.getElementById('pdfIncludeServiceDescription')?.checked;
     const bodyRows = rows.map((r,i) => `
       <tr style="background:${i % 2 ? '#F7F6F1' : '#FFFFFF'};">
         ${activeCols.map(c => `<td style="padding:7px 10px;font-size:12.5px;border-bottom:1px solid #E5E3D8;">${escapeHtml(String(colDefs[c.key].cell(r)))}</td>`).join('')}
+        ${includeServiceDescription ? `<td style="padding:7px 10px;font-size:12.5px;border-bottom:1px solid #E5E3D8;">${escapeHtml(pdfServiceDescription(r))}</td>` : ''}
       </tr>`).join('');
 
     let sumHtml = '';
     if(!noSummary){
       const summaryLabels = {personal:'Osobowe', heavy:'Ciężarowe', bus:'Busy'};
       const summaryLines = selectedSummaryTypes.map(type => {
-        const total = rows.filter(r => pdfVehicleType(r) === type).reduce((sum,r) => sum + (Number(r.koszt)||0), 0);
+        const total = rows.filter(r => pdfBillingCategoryKey(r) === type).reduce((sum,r) => sum + (Number(r.koszt)||0), 0);
         return `<div style="display:flex;justify-content:space-between;gap:20px;margin-top:5px;"><span>${summaryLabels[type]}</span><span>${fmtMoney(total)}</span></div>`;
       }).join('');
       sumHtml = `<div style="margin-top:18px;font-size:14px;font-weight:700;border-top:1px solid #D9D6C9;padding-top:10px;">${summaryLines}</div>`;
@@ -3037,7 +3052,7 @@ window.FLEET_DATA = {
         <div style="font-size:16px;margin-top:3px;">${escapeHtml(invoiceNumber)}</div>
       </div>
       <table style="width:100%;border-collapse:collapse;">
-        <thead><tr>${headerCells}${document.getElementById('pdfIncludeServiceDescription')?.checked ? '<th>Opis usługi</th>' : ''}</tr></thead>
+        <thead><tr>${headerCells}${includeServiceDescription ? '<th style="text-align:left;padding:8px 10px;background:#16150F;color:#F5F4EE;font-size:13px;">Opis usługi</th>' : ''}</tr></thead>
         <tbody>${bodyRows}</tbody>
       </table>
       ${sumHtml}
@@ -3416,6 +3431,11 @@ window.FLEET_DATA = {
       ? 'usługa czyszczenia i prania wnętrza'
       : 'usługa dodatkowa';
   }
+
+  document.getElementById('btnMonth').addEventListener('click', showMonthReport);
+  document.getElementById('btnYear').addEventListener('click', showYearReport);
+  document.getElementById('btnAll').addEventListener('click', showAllOutstanding);
+  document.getElementById('btnPending').addEventListener('click', showPendingOrders);
 
   cfBoot();
 })();

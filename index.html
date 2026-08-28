@@ -2509,6 +2509,7 @@ window.FLEET_DATA = {
 
     const typ = rec ? rec.typ : (reg.typ || '');
     const marka = rec ? rec.marka : (reg.marka || '');
+    const billing_category = rec ? (rec.billing_category || '') : '';
 
     const html = `
       <div class="overlay" id="formOverlay">
@@ -2593,6 +2594,11 @@ window.FLEET_DATA = {
         </div>
       </div>`;
     document.getElementById('modalRoot').innerHTML = html;
+    const billingCategoryField = document.getElementById('f_grupa_rozliczeniowa');
+    if(billingCategoryField){
+      billingCategoryField.value = billing_category || defaultBillingCategory(typ) || '';
+      billingCategoryField.dataset.autoDefault = billing_category ? '0' : '1';
+    }
     const clearWashDateBtn = document.getElementById('clearWashDateBtn');
     if(clearWashDateBtn){
       clearWashDateBtn.addEventListener('click', () => {
@@ -2629,6 +2635,7 @@ window.FLEET_DATA = {
     const data_prania = document.getElementById('f_data_prania').value;
     const kto_wykonal = document.getElementById('f_kto_wykonal').value.trim();
     const koszt = parseFloat(document.getElementById('f_koszt').value) || 0;
+    const billing_category = document.getElementById('f_grupa_rozliczeniowa')?.value || '';
 
     if(!plate){ showToast('Podaj numer tablicy'); return; }
 
@@ -2643,12 +2650,12 @@ window.FLEET_DATA = {
 
     if(editingId){
       const rec = records.find(x => x.id === editingId);
-      Object.assign(rec, { tablica: plate, typ, marka, zlecone, kto_zlecil, data_zlecenia, uwagi, data_prania, kto_wykonal, koszt });
+      Object.assign(rec, { tablica: plate, typ, marka, billing_category, zlecone, kto_zlecil, data_zlecenia, uwagi, data_prania, kto_wykonal, koszt });
     } else {
       records.push({
         id: uid(),
         tablica: plate,
-        typ, marka, zlecone, kto_zlecil, data_zlecenia, uwagi, data_prania, kto_wykonal, koszt,
+        typ, marka, billing_category, zlecone, kto_zlecil, data_zlecenia, uwagi, data_prania, kto_wykonal, koszt,
         zatwierdzone: false,
         zaplacone: false,
         created_at: Date.now()

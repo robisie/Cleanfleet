@@ -579,7 +579,21 @@
 <div id="modalRoot"></div>
 <div class="toast" id="toast"></div>
 
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2">
+  // Bottom-bar actions: delegated binding so the buttons work reliably
+  // even after the app re-renders its content.
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('#btnMonth, #btnYear, #btnAll, #btnPending');
+    if(!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if(btn.id === 'btnMonth') showMonthReport();
+    else if(btn.id === 'btnYear') showYearReport();
+    else if(btn.id === 'btnAll') showAllOutstanding();
+    else if(btn.id === 'btnPending') showPendingOrders();
+  });
+
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>

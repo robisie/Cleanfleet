@@ -2635,7 +2635,7 @@ window.FLEET_DATA = {
     const data_prania = document.getElementById('f_data_prania').value;
     const kto_wykonal = document.getElementById('f_kto_wykonal').value.trim();
     const koszt = parseFloat(document.getElementById('f_koszt').value) || 0;
-    const billing_category = document.getElementById('f_grupa_rozliczeniowa')?.value || '';
+    const billing_category = document.getElementById('f_grupa_rozliczeniowa')?.value || null;
 
     if(!plate){ showToast('Podaj numer tablicy'); return; }
 
@@ -2872,6 +2872,11 @@ window.FLEET_DATA = {
           <div class="confirm-text">Wybierz miesiąc i ustaw zawartość raportu.</div>
 
           <div class="report-controls">
+        <label class="field-check" style="margin-top:10px;">
+          <input type="checkbox" id="pdfIncludeServiceDescription">
+          <span>Opis usługi</span>
+        </label>
+
             <input type="month" id="pdfMonthPicker" value="${defaultMonth}">
           </div>
 
@@ -3032,7 +3037,7 @@ window.FLEET_DATA = {
         <div style="font-size:16px;margin-top:3px;">${escapeHtml(invoiceNumber)}</div>
       </div>
       <table style="width:100%;border-collapse:collapse;">
-        <thead><tr>${headerCells}</tr></thead>
+        <thead><tr>${headerCells}${document.getElementById('pdfIncludeServiceDescription')?.checked ? '<th>Opis usługi</th>' : ''}</tr></thead>
         <tbody>${bodyRows}</tbody>
       </table>
       ${sumHtml}
@@ -3394,6 +3399,22 @@ window.FLEET_DATA = {
         billingCategory.dataset.autoDefault = '1';
       }
     });
+  }
+
+
+  function pdfBillingCategory(rec){
+    const c = String(rec?.billing_category || '').toLowerCase();
+    if(c === 'ciezarowe') return 'Ciężarowe';
+    if(c === 'busy') return 'Busy';
+    if(c === 'osobowe') return 'Osobowe';
+    return pdfVehicleType(rec?.typ);
+  }
+
+  function pdfServiceDescription(rec){
+    const amount = Number(rec?.koszt || 0);
+    return amount >= 400
+      ? 'usługa czyszczenia i prania wnętrza'
+      : 'usługa dodatkowa';
   }
 
   cfBoot();

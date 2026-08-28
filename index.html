@@ -579,21 +579,7 @@
 <div id="modalRoot"></div>
 <div class="toast" id="toast"></div>
 
-<script src="https://unpkg.com/@supabase/supabase-js@2">
-  // Bottom-bar actions: delegated binding so the buttons work reliably
-  // even after the app re-renders its content.
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('#btnMonth, #btnYear, #btnAll, #btnPending');
-    if(!btn) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if(btn.id === 'btnMonth') showMonthReport();
-    else if(btn.id === 'btnYear') showYearReport();
-    else if(btn.id === 'btnAll') showAllOutstanding();
-    else if(btn.id === 'btnPending') showPendingOrders();
-  });
-
-</script>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -2423,9 +2409,7 @@ window.FLEET_DATA = {
   }
 
   function activeRecords(){
-    // Wpis jest nieaktywny dopiero wtedy, gdy JEDNOCZEŚNIE jest zatwierdzony
-    // i oznaczony jako zapłacony. Każdy pozostały wpis ma być na stronie głównej.
-    const active = records.filter(r => !(r.zatwierdzone && r.zaplacone));
+    const active = records.filter(r => !r.zaplacone);
     const statusRank = r => r.zatwierdzone ? 1 : (r.zlecone ? 0 : 2);
     return active.sort((a,b) => {
       const rankDiff = statusRank(a) - statusRank(b);
@@ -2743,10 +2727,6 @@ window.FLEET_DATA = {
                 </div>
                 <div style="text-align:right;white-space:nowrap;">${fmtMoney(r.koszt)}</div>
               </div>
-              <div class="history-actions" style="display:flex;gap:8px;margin-top:8px;">
-                <button type="button" class="btn btn-secondary history-details" data-history-id="${escapeHtml(r.id)}" style="flex:1;">Szczegóły</button>
-                <button type="button" class="btn btn-danger history-delete" data-history-id="${escapeHtml(r.id)}" style="flex:1;">Usuń</button>
-              </div>
             </div>`;
           }).join('')
         : `<div class="confirm-text" style="margin-top:8px;">Brak historii prania — można utworzyć pierwszy wpis.</div>`;
@@ -2761,9 +2741,6 @@ window.FLEET_DATA = {
           </div>
           <div style="margin-top:8px;">
             ${historyHtml}
-          </div>
-          <div style="margin-top:8px;">
-            <button type="button" class="btn btn-solid history-new-wash" data-new-plate="${escapeHtml(plate)}" style="width:100%;">Nowe pranie</button>
           </div>
         </div>`;
     }).join('');
@@ -2783,8 +2760,7 @@ window.FLEET_DATA = {
     document.getElementById('searchInput').value = '';
 
     document.querySelectorAll('[data-pick-id]').forEach(el => {
-      el.addEventListener('click', (e) => {
-        if(e.target.closest('.history-actions')) return;
+      el.addEventListener('click', () => {
         const id = el.getAttribute('data-pick-id');
         const rec = records.find(r => r.id === id);
         closeModal();
@@ -2792,56 +2768,12 @@ window.FLEET_DATA = {
           // Niedokończony wpis — edycja istniejącego rekordu.
           openForm(rec.id);
         } else {
-          // Wpis zakończony datą prania — kliknięcie karty rozpoczyna nowe pranie.
+          // Wpis zakończony datą prania — nowe pranie, nigdy edycja starego.
           window.__pendingPlate = rec ? rec.tablica : '';
           openForm(null);
         }
       });
     });
-
-    document.querySelectorAll('.history-details').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const id = btn.getAttribute('data-history-id');
-        const rec = records.find(r => r.id === id);
-        if(!rec) return;
-        closeModal();
-        openForm(rec.id);
-      });
-    });
-
-    document.querySelectorAll('.history-delete').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const id = btn.getAttribute('data-history-id');
-        const rec = records.find(r => r.id === id);
-        if(!rec) return;
-        showConfirm(
-          'Usunąć wpis?',
-          `Wpis prania dla ${rec.tablica} zostanie trwale usunięty.`,
-          async () => {
-            records = records.filter(x => x.id !== id);
-            await saveRecords();
-            closeModal();
-            renderRecords();
-            showToast('Wpis usunięty');
-          }
-        );
-      });
-    });
-    document.querySelectorAll('.history-new-wash').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const plate = btn.getAttribute('data-new-plate') || '';
-        closeModal();
-        window.__pendingPlate = plate;
-        openForm(null);
-      });
-    });
-
     const addBtn = document.getElementById('addNewAnyway');
     if(addBtn){
       addBtn.addEventListener('click', () => {
@@ -3424,6 +3356,12 @@ window.FLEET_DATA = {
       showToast('Nie udało się załadować połączenia z Supabase. Odśwież stronę.');
     }
   }
+  // --- dolne przyciski raportów ---
+  document.getElementById('btnMonth').addEventListener('click', showMonthReport);
+  document.getElementById('btnYear').addEventListener('click', showYearReport);
+  document.getElementById('btnAll').addEventListener('click', showAllOutstanding);
+  document.getElementById('btnPending').addEventListener('click', showPendingOrders);
+
   cfBoot();
 })();
 </script>

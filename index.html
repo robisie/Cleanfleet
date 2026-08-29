@@ -714,10 +714,10 @@ async function cfEnableNotifications(){
     cfSetNotificationsStatus('Powiadomienia są aktywne na tym urządzeniu.', true);
     showToast('Powiadomienia zostały włączone');
   }catch(error){
-    console.error('CleanFleet notifications error:', error);
-    cfSetNotificationsStatus('Nie udało się włączyć: '+(error?.message || 'nieznany błąd'));
-    showToast('Nie udało się włączyć powiadomień');
-  }finally{
+  console.error('CleanFleet notifications error:', error);
+  cfSetNotificationsStatus('Nie udało się włączyć: '+(error?.message || 'nieznany błąd'));
+  console.error('CleanFleet notifications error:', error);
+}finally{
     if(btn) btn.disabled = false;
   }
 }

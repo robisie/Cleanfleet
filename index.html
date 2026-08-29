@@ -589,7 +589,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
-// CleanFleet — wersja 36
+// CleanFleet — wersja 38
 // CleanFleet — Supabase connection
 const CF_SUPABASE_URL = 'https://nxmrobbhfqijmbjjzbof.supabase.co';
 const CF_SUPABASE_KEY = 'sb_publishable_9lz7NUv2-MloX7MEcH2-vQ_AZS8IIHz';
@@ -641,9 +641,17 @@ async function cfGetVapidPublicKey(){
 
 async function cfRegisterServiceWorker(){
   if(!('serviceWorker' in navigator)) throw new Error('Ta przeglądarka nie obsługuje Service Workera.');
-  cfPushRegistration = await navigator.serviceWorker.register('/sw.js');
+  cfPushRegistration = await navigator.serviceWorker.register('./sw.js');
   await navigator.serviceWorker.ready;
   return cfPushRegistration;
+}
+
+function cfShowToast(msg){
+  const t = document.getElementById('toast');
+  if(!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
 }
 
 function cfSetNotificationsStatus(text, enabled=false){
@@ -712,11 +720,10 @@ async function cfEnableNotifications(){
     }
     await cfSavePushSubscription(subscription);
     cfSetNotificationsStatus('Powiadomienia są aktywne na tym urządzeniu.', true);
-    showToast('Powiadomienia zostały włączone');
+    cfShowToast('Powiadomienia zostały włączone');
   }catch(error){
     console.error('CleanFleet notifications error:', error);
     cfSetNotificationsStatus('Nie udało się włączyć: '+(error?.message || 'nieznany błąd'));
-    console.error('CleanFleet notifications error:', error);
   }finally{
     if(btn) btn.disabled = false;
   }

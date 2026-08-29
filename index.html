@@ -106,8 +106,10 @@
     cursor:pointer;
     display:flex;flex-direction:column;gap:3px;
   }
+  .menu-item:disabled{opacity:.72;cursor:default;}
   .menu-item:active{background:var(--paper-alt);}
-  .menu-item-title{font-size:14px;font-weight:600;color:var(--ink);}
+  .menu-item-title{font-size:14px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:7px;}
+  .cf-bell-icon{font-size:17px;line-height:1;display:inline-flex;align-items:center;justify-content:center;}
   .menu-item-sub{font-size:12px;color:var(--ink-soft);}
   header .sub{font-size:12px;color:var(--ink-soft);margin-top:2px;}
 
@@ -551,9 +553,9 @@
       <button class="close" id="menuClose">&times;</button>
     </div>
     <div class="menu-list">
-      <button class="menu-item" id="cfNotificationsBtn">
-        <span class="menu-item-title">Włącz powiadomienia</span>
-        <span class="menu-item-sub" id="cfNotificationsSub">Powiadomienia o zleceniach i praniach</span>
+      <button class="menu-item" id="cfNotificationsBtn" disabled>
+        <span class="menu-item-title"><span class="cf-bell-icon" aria-hidden="true">🔔</span><span id="cfNotificationsTitle">Sprawdzanie powiadomień…</span></span>
+        <span class="menu-item-sub" id="cfNotificationsSub">Sprawdzanie stanu tego urządzenia…</span>
       </button>
       <button class="menu-item" id="importBtn">
         <span class="menu-item-title">Importuj listę pojazdów</span>
@@ -659,8 +661,8 @@ function cfSetNotificationsStatus(text, enabled=false){
   if(el) el.textContent = text;
   const btn = document.getElementById('cfNotificationsBtn');
   if(btn){
-    const title = btn.querySelector('.menu-item-title');
-    if(title) title.textContent = enabled ? 'Powiadomienia włączone' : 'Włącz powiadomienia';
+    const title = document.getElementById('cfNotificationsTitle');
+    if(title) title.textContent = enabled ? 'Wyłącz powiadomienia' : 'Włącz powiadomienia';
   }
 }
 
@@ -729,18 +731,76 @@ async function cfEnableNotifications(){
   }
 }
 
-async function cfPrepareNotifications(){
+async function cfDisableNotifications(){
+  const btn = document.getElementById('cfNotificationsBtn');
+  if(btn) btn.disabled = true;
   try{
-    if(!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if(!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      throw new Error('Ta przeglądarka nie obsługuje powiadomień push.');
+    }
+
     await cfRegisterServiceWorker();
     const subscription = await cfPushRegistration.pushManager.getSubscription();
-    if(!subscription) return;
+    if(!subscription){
+      cfSetNotificationsStatus('Powiadomienia są wyłączone.', false);
+      cfShowToast('Powiadomienia są już wyłączone');
+      return;
+    }
+
     const session = (await cfSupabase.auth.getSession()).data.session;
-    if(!session?.user?.id) return;
+    const userId = session?.user?.id;
+    const endpoint = subscription.endpoint;
+
+    if(userId && endpoint){
+      const { error } = await cfSupabase
+        .from('push_subscriptions')
+        .update({
+          enabled:false,
+          updated_at:new Date().toISOString()
+        })
+        .eq('user_id', userId)
+        .eq('endpoint', endpoint);
+      if(error) throw error;
+    }
+
+    const unsubscribed = await subscription.unsubscribe();
+    if(!unsubscribed) throw new Error('Nie udało się wyłączyć subskrypcji push.');
+
+    cfSetNotificationsStatus('Powiadomienia są wyłączone na tym urządzeniu.', false);
+    cfShowToast('Powiadomienia zostały wyłączone');
+  }catch(error){
+    console.error('CleanFleet notifications disable error:', error);
+    cfSetNotificationsStatus('Nie udało się wyłączyć: '+(error?.message || 'nieznany błąd'), true);
+  }finally{
+    if(btn) btn.disabled = false;
+  }
+}
+
+async function cfPrepareNotifications(){
+  const btn = document.getElementById('cfNotificationsBtn');
+  try{
+    if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+      cfSetNotificationsStatus('Ta przeglądarka nie obsługuje powiadomień.', false);
+      return;
+    }
+    await cfRegisterServiceWorker();
+    const subscription = await cfPushRegistration.pushManager.getSubscription();
+    if(!subscription){
+      cfSetNotificationsStatus('Powiadomienia są wyłączone na tym urządzeniu.', false);
+      return;
+    }
+    const session = (await cfSupabase.auth.getSession()).data.session;
+    if(!session?.user?.id){
+      cfSetNotificationsStatus('Zaloguj się, aby zarządzać powiadomieniami.', false);
+      return;
+    }
     await cfSavePushSubscription(subscription);
     cfSetNotificationsStatus('Powiadomienia są aktywne na tym urządzeniu.', true);
   }catch(error){
     console.warn('CleanFleet notifications prepare:', error);
+    cfSetNotificationsStatus('Nie udało się sprawdzić stanu: '+(error?.message || 'nieznany błąd'), false);
+  }finally{
+    if(btn) btn.disabled = false;
   }
 }
 
@@ -3510,7 +3570,21 @@ window.FLEET_DATA = {
     await cfSignIn(email,password);
   });
   document.getElementById('cfRefreshBtn').addEventListener('click', cfRefresh);
-  document.getElementById('cfNotificationsBtn').addEventListener('click', cfEnableNotifications);
+  document.getElementById('cfNotificationsBtn').addEventListener('click', async ()=>{
+    try{
+      if(!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        await cfEnableNotifications();
+        return;
+      }
+      await cfRegisterServiceWorker();
+      const subscription = await cfPushRegistration.pushManager.getSubscription();
+      if(subscription) await cfDisableNotifications();
+      else await cfEnableNotifications();
+    }catch(error){
+      console.error('CleanFleet notifications toggle error:', error);
+      cfSetNotificationsStatus('Nie udało się zmienić ustawienia: '+(error?.message || 'nieznany błąd'));
+    }
+  });
 
   async function cfBoot(){
     cfSetSync('Ładowanie połączenia z bazą…');

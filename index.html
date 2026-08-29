@@ -641,7 +641,7 @@ async function cfGetVapidPublicKey(){
 
 async function cfRegisterServiceWorker(){
   if(!('serviceWorker' in navigator)) throw new Error('Ta przeglądarka nie obsługuje Service Workera.');
-  cfPushRegistration = await navigator.serviceWorker.register('/sw.js');
+  cfPushRegistration = await navigator.serviceWorker.register('./sw.js');
   await navigator.serviceWorker.ready;
   return cfPushRegistration;
 }

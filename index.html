@@ -641,7 +641,7 @@ async function cfGetVapidPublicKey(){
 
 async function cfRegisterServiceWorker(){
   if(!('serviceWorker' in navigator)) throw new Error('Ta przeglądarka nie obsługuje Service Workera.');
-  cfPushRegistration = await navigator.serviceWorker.register('./sw.js');
+  cfPushRegistration = await navigator.serviceWorker.register('/sw.js');
   await navigator.serviceWorker.ready;
   return cfPushRegistration;
 }
@@ -714,10 +714,10 @@ async function cfEnableNotifications(){
     cfSetNotificationsStatus('Powiadomienia są aktywne na tym urządzeniu.', true);
     showToast('Powiadomienia zostały włączone');
   }catch(error){
-  console.error('CleanFleet notifications error:', error);
-  cfSetNotificationsStatus('Nie udało się włączyć: '+(error?.message || 'nieznany błąd'));
-  console.error('CleanFleet notifications error:', error);
-}finally{
+    console.error('CleanFleet notifications error:', error);
+    cfSetNotificationsStatus('Nie udało się włączyć: '+(error?.message || 'nieznany błąd'));
+    console.error('CleanFleet notifications error:', error);
+  }finally{
     if(btn) btn.disabled = false;
   }
 }

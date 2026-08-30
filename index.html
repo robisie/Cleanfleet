@@ -2948,8 +2948,9 @@ window.FLEET_DATA = {
   });
 
   // CleanFleet — wyszukiwanie tablicy ze zdjęcia (OCR)
-  // v43: wieloprzebiegowy OCR + automatyczne wycinanie obszaru tablicy.
-  // Dzięki temu pojedynczy błędny odczyt nie decyduje o wyniku wyszukiwania.
+  // v44: OCR ukierunkowany na tablicę + automatyczne wykrywanie jasnego
+  // prostokątnego obszaru + analiza słów i ich pozycji. Nie ufamy jednemu
+  // przebiegowi OCR.
   let cfTesseractPromise = null;
 
   function cfLoadTesseract(){
@@ -2967,10 +2968,10 @@ window.FLEET_DATA = {
   }
 
   function cfCanvasFromImage(img, sx, sy, sw, sh, mode='gray'){
-    const maxW=1900;
-    const scale=Math.min(3.2, maxW/Math.max(1,sw));
-    const w=Math.max(900,Math.round(sw*scale));
-    const h=Math.max(220,Math.round(sh*scale));
+    const maxW=2200;
+    const scale=Math.min(4.0, maxW/Math.max(1,sw));
+    const w=Math.max(1000,Math.round(sw*scale));
+    const h=Math.max(240,Math.round(sh*scale));
     const canvas=document.createElement('canvas');
     canvas.width=w; canvas.height=h;
     const ctx=canvas.getContext('2d',{willReadFrequently:true});
@@ -2983,16 +2984,76 @@ window.FLEET_DATA = {
       const y=0.299*data.data[i]+0.587*data.data[i+1]+0.114*data.data[i+2];
       let v=y;
       if(mode==='contrast'){
-        v=Math.max(0,Math.min(255,(y-128)*1.75+128));
+        v=Math.max(0,Math.min(255,(y-128)*2.05+128));
       }else if(mode==='threshold'){
-        v=y>155 ? 255 : 0;
+        v=y>150 ? 255 : 0;
+      }else if(mode==='adaptive'){
+        // Lekka binaryzacja lokalna bez bibliotek CV. Działa dobrze na
+        // białej tablicy z ciemnymi znakami.
+        v=y>175 ? 255 : (y<95 ? 0 : y);
       }else if(mode==='soft'){
-        v=Math.max(0,Math.min(255,(y-128)*1.35+128));
+        v=Math.max(0,Math.min(255,(y-128)*1.45+128));
       }
       data.data[i]=data.data[i+1]=data.data[i+2]=v;
     }
     ctx.putImageData(data,0,0);
     return canvas;
+  }
+
+  function cfFindPlateCrop(img){
+    // Szukamy poziomego, jasnego pasa z dużą zmiennością (ciemne znaki
+    // na jasnym tle). To jest dużo bardziej użyteczne dla tablic niż
+    // zakładanie, że tablica zawsze leży dokładnie w środku zdjęcia.
+    const W=img.naturalWidth, H=img.naturalHeight;
+    const sampleW=Math.min(420,W);
+    const sampleH=Math.min(900,H);
+    const tmp=document.createElement('canvas');
+    tmp.width=sampleW; tmp.height=sampleH;
+    const ctx=tmp.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(img,0,0,W,H,0,0,sampleW,sampleH);
+    const d=ctx.getImageData(0,0,sampleW,sampleH).data;
+
+    const scores=[];
+    for(let y=0;y<sampleH;y+=4){
+      let bright=0, dark=0, sum=0, sum2=0, n=0;
+      for(let x=0;x<sampleW;x+=4){
+        const i=(y*sampleW+x)*4;
+        const g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+        sum+=g; sum2+=g*g; n++;
+        if(g>170) bright++;
+        if(g<105) dark++;
+      }
+      const mean=sum/n;
+      const variance=Math.max(0,sum2/n-mean*mean);
+      const std=Math.sqrt(variance);
+      const score=(bright/n)*0.55+(Math.min(std,80)/80)*0.25+(Math.min(dark/n,0.30)/0.30)*0.20;
+      scores.push({y,score});
+    }
+
+    let best=null;
+    const bandH=Math.max(80,Math.round(sampleH*0.14));
+    for(let i=0;i<scores.length;i++){
+      let s=0,c=0;
+      for(let j=i;j<scores.length && scores[j].y<scores[i].y+bandH;j++){
+        s+=scores[j].score; c++;
+      }
+      const avg=s/Math.max(1,c);
+      if(!best || avg>best.score) best={y:scores[i].y,score:avg};
+    }
+
+    if(!best || best.score<0.30) return null;
+
+    const yRatio=best.y/sampleH;
+    const hRatio=Math.min(0.30,Math.max(0.14,bandH/sampleH*1.55));
+    let y=H*(yRatio-hRatio*0.22);
+    let h=H*hRatio;
+    y=Math.max(0,Math.min(H-h,y));
+
+    // Zostawiamy niewielki margines po bokach — tablica nie zawsze zajmuje
+    // 100% szerokości zdjęcia.
+    const x=W*0.05;
+    const w=W*0.90;
+    return {x,y,w,h};
   }
 
   function cfBuildOCRImages(file){
@@ -3002,16 +3063,22 @@ window.FLEET_DATA = {
       img.onload=()=>{
         try{
           const W=img.naturalWidth, H=img.naturalHeight;
-          // Kilka kadrów. Tablica zwykle znajduje się w środkowej części zdjęcia,
-          // ale zachowujemy też pełne zdjęcie dla nietypowych ujęć.
+          const found=cfFindPlateCrop(img);
+
           const crops=[
-            {name:'full',  x:0,       y:0,       w:W,       h:H},
-            {name:'middle',x:W*.02,   y:H*.18,   w:W*.96,   h:H*.60},
-            {name:'plate', x:W*.01,  y:H*.28,   w:W*.98,   h:H*.40}
+            {name:'full',   x:0,      y:0,       w:W,      h:H},
+            {name:'center', x:W*.05,  y:H*.20,   w:W*.90,  h:H*.60},
+            {name:'lower',  x:W*.02,  y:H*.30,   w:W*.96,  h:H*.48}
           ];
-          const modes=['gray','soft','threshold'];
+          if(found) crops.unshift({name:'detected',...found});
+
+          // Najpierw najlepsze warianty dla wykrytego obszaru, potem
+          // bezpieczne kadry zapasowe.
           const out=[];
           crops.forEach(c=>{
+            const modes=c.name==='detected'
+              ? ['gray','contrast','adaptive','soft']
+              : ['gray','contrast'];
             modes.forEach(mode=>{
               out.push({
                 name:c.name+'-'+mode,
@@ -3034,39 +3101,96 @@ window.FLEET_DATA = {
     });
   }
 
-  function cfExtractPlateCandidates(text){
-    const raw=(text||'').toUpperCase()
+  function cfCleanOCRToken(s){
+    return (s||'').toUpperCase()
       .replace(/Ą/g,'A').replace(/Ć/g,'C').replace(/Ę/g,'E')
       .replace(/Ł/g,'L').replace(/Ń/g,'N').replace(/Ó/g,'O')
-      .replace(/Ś/g,'S').replace(/Ź/g,'Z').replace(/Ż/g,'Z');
+      .replace(/Ś/g,'S').replace(/Ź/g,'Z').replace(/Ż/g,'Z')
+      .replace(/[^A-Z0-9]/g,'');
+  }
 
-    // OCR często rozdziela prefiks literowy i cyfry na osobne linie.
-    // Dlatego analizujemy także tekst po usunięciu spacji i znaków.
-    const compact=raw.replace(/[^A-Z0-9]/g,'');
-    const candidates=[];
-    const add=(value)=>{
-      const n=normalizePlate(value);
+  function cfVariantsForPlate(value){
+    const s=cfCleanOCRToken(value);
+    const out=new Set([s]);
+    if(s.length<6 || s.length>8) return [...out];
+
+    // Typowe pomyłki OCR. Generujemy warianty tylko tam, gdzie znak
+    // występuje w części literowej albo cyfrowej.
+    for(let split=2;split<=3;split++){
+      if(split>=s.length) continue;
+      let a=s.slice(0,split), b=s.slice(split);
+      a=a.replace(/[0158]/g,m=>({0:'O',1:'I',5:'S',8:'B'}[m]||m));
+      b=b.replace(/[OQDIILSBZG]/g,m=>({O:'0',Q:'0',D:'0',I:'1',L:'1',S:'5',B:'8',Z:'2',G:'6'}[m]||m));
+      out.add(a+b);
+    }
+    return [...out];
+  }
+
+  function cfAddCandidate(scores, value, weight){
+    const raw=cfCleanOCRToken(value);
+    if(!raw) return;
+    cfVariantsForPlate(raw).forEach(v=>{
+      const n=normalizePlate(v);
       if(n.length>=6 && n.length<=8 && /^[A-Z]{2,3}[0-9]{4,5}$/.test(n)){
-        if(!candidates.includes(n)) candidates.push(n);
+        scores.set(n,(scores.get(n)||0)+weight);
       }
-    };
+    });
+  }
 
-    // Szukamy wszystkich poprawnych polskich układów tablic, również jako
-    // fragmentu dłuższego, błędnego odczytu (np. BDLE64649 -> DLE64649).
+  function cfExtractPlateCandidates(data){
+    const candidates=new Map();
+    const text=typeof data==='string' ? data : (data?.text||'');
+    const raw=text.toUpperCase();
+    const compact=cfCleanOCRToken(raw);
+
+    // 1. Pełne odczyty.
     for(let i=0;i<compact.length;i++){
       for(let len=6;len<=8;len++){
         const part=compact.slice(i,i+len);
-        if(/^[A-Z]{2,3}[0-9]{4,5}$/.test(part)) add(part);
+        if(/^[A-Z]{2,3}[0-9]{4,5}$/.test(part)) cfAddCandidate(candidates,part,2);
       }
     }
 
-    // Dodatkowo łączymy sąsiednie fragmenty OCR, np. "DLE" + "64649".
-    const lines=raw.split(/\n+/).map(x=>x.replace(/[^A-Z0-9]/g,'')).filter(Boolean);
-    for(let i=0;i<lines.length;i++){
-      add(lines[i]);
-      if(i+1<lines.length) add(lines[i]+lines[i+1]);
-      if(i+2<lines.length) add(lines[i]+lines[i+1]+lines[i+2]);
+    // 2. Tokeny z OCR. Szczególnie ważne, gdy Tesseract zwróci:
+    // "DLE" oraz w następnej linii "64649".
+    const tokens=raw.split(/[\s\n\r]+/)
+      .map(cfCleanOCRToken).filter(Boolean);
+
+    tokens.forEach(t=>{
+      if(/^[A-Z]{2,3}[0-9]{4,5}$/.test(t)) cfAddCandidate(candidates,t,5);
+    });
+
+    for(let i=0;i<tokens.length;i++){
+      for(let j=i+1;j<Math.min(tokens.length,i+5);j++){
+        const a=tokens[i], b=tokens[j];
+        const joined=a+b;
+        if(/^[A-Z]{2,3}[0-9]{4,5}$/.test(joined)) cfAddCandidate(candidates,joined,6);
+        const joined2=b+a;
+        if(/^[A-Z]{2,3}[0-9]{4,5}$/.test(joined2)) cfAddCandidate(candidates,joined2,3);
+      }
     }
+
+    // 3. Jeżeli mamy dane word-level, łączymy literę/prefiks z cyframi
+    // niezależnie od tego, czy OCR umieścił je w osobnych liniach.
+    const words=Array.isArray(data?.words) ? data.words : [];
+    for(let i=0;i<words.length;i++){
+      const wi=words[i];
+      const a=cfCleanOCRToken(wi.text);
+      if(!a) continue;
+      for(let j=i+1;j<words.length;j++){
+        const wj=words[j];
+        const b=cfCleanOCRToken(wj.text);
+        if(!b) continue;
+        const joined=a+b;
+        const joined2=b+a;
+        const dx=Math.abs((wi.bbox?.x0||0)-(wj.bbox?.x0||0));
+        const dy=Math.abs((wi.bbox?.y0||0)-(wj.bbox?.y0||0));
+        const near=dx<1600 && dy<500;
+        if(near && /^[A-Z]{2,3}[0-9]{4,5}$/.test(joined)) cfAddCandidate(candidates,joined,8);
+        if(near && /^[A-Z]{2,3}[0-9]{4,5}$/.test(joined2)) cfAddCandidate(candidates,joined2,4);
+      }
+    }
+
     return candidates;
   }
 
@@ -3083,7 +3207,7 @@ window.FLEET_DATA = {
       tessedit_pageseg_mode:String(psm),
       preserve_interword_spaces:'1'
     });
-    return result?.data?.text || '';
+    return result?.data || {};
   }
 
   async function cfSearchPlateFromPhoto(file){
@@ -3099,20 +3223,25 @@ window.FLEET_DATA = {
       const images=await cfBuildOCRImages(file);
       const scores=new Map();
 
-      // PSM 13 dobrze radzi sobie z samą linią tablicy, a PSM 11
-      // dobrze odczytuje sytuacje, w których OCR dzieli tablicę na fragmenty.
       for(let i=0;i<images.length;i++){
         const item=images[i];
-        const psms=item.name.endsWith('-gray') || item.name.endsWith('-soft') ? [13,11] : [13];
+
+        // PSM 11 — swobodny tekst; PSM 7 — jedna linia; PSM 13 —
+        // pojedynczy blok. Dla wykrytej tablicy sprawdzamy wszystkie trzy.
+        let psms;
+        if(item.name.startsWith('detected-')) psms=[11,7,13];
+        else if(item.name.startsWith('full-')) psms=[11];
+        else psms=[11,7];
+
         for(const psm of psms){
           try{
-            const ocrText=await cfRecognizeOne(Tesseract,item.canvas,psm);
-            const candidates=cfExtractPlateCandidates(ocrText);
-            candidates.forEach(c=>{
-              const old=scores.get(c) || 0;
-              // Powtarzający się odczyt jest znacznie bardziej wiarygodny
-              // niż pojedynczy wynik z jednego przetworzenia obrazu.
-              scores.set(c,old+1);
+            const data=await cfRecognizeOne(Tesseract,item.canvas,psm);
+            const found=cfExtractPlateCandidates(data);
+            found.forEach((score,candidate)=>{
+              // Wykryty kadr i poprawne word-level połączenie dostają
+              // dodatkową wagę. Wielokrotny zgodny odczyt wygrywa.
+              const bonus=item.name.startsWith('detected-') ? 2 : 0;
+              scores.set(candidate,(scores.get(candidate)||0)+score+bonus);
             });
           }catch(e){
             console.warn('CleanFleet OCR pass failed:',item.name,psm,e);
@@ -3120,26 +3249,20 @@ window.FLEET_DATA = {
         }
       }
 
+      const registryPlates=Object.keys(registry);
       const all=Array.from(scores.entries())
         .map(([plate,score])=>({plate,score}))
-        .sort((a,b)=>b.score-a.score);
+        .sort((a,b)=>b.score-a.score || a.plate.length-b.plate.length);
 
-      if(!all.length){
+      // Najważniejsza zasada: jeżeli OCR poda wariant, który odpowiada
+      // istniejącej tablicy w rejestrze, wybieramy ją przed nowym numerem.
+      const exact=all.find(x=>registryPlates.some(p=>normalizePlate(p)===x.plate));
+      const best=exact || all[0];
+
+      if(!best){
         showToast('Nie rozpoznano tablicy. Zrób zdjęcie bliżej i wyraźniej.');
         return;
       }
-
-      // Jeżeli tablica istnieje już w rejestrze, zawsze wybieramy ją ponad
-      // inne warianty OCR. To eliminuje typowe pomyłki pojedynczych znaków.
-      const registryPlates=Object.keys(registry);
-      const exact=all.find(x=>registryPlates.some(p=>normalizePlate(p)===x.plate));
-
-      // Dla nowych tablic wybieramy wariant z największą liczbą zgodnych
-      // przebiegów OCR. Przy remisie preferujemy krótszy, standardowy zapis.
-      const best=exact || all.sort((a,b)=>{
-        if(b.score!==a.score) return b.score-a.score;
-        return a.plate.length-b.plate.length;
-      })[0];
 
       document.getElementById('searchInput').value=best.plate;
       document.getElementById('searchInput').placeholder='np. 7765 lub ST7765X';

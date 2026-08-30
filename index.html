@@ -2795,15 +2795,17 @@ window.FLEET_DATA = {
             <label for="f_zlecone">Zlecone</label>
           </div>
 
-          <div class="field-row">
-            <div class="field">
-              <label>Kto zlecił</label>
-              <input type="text" id="f_kto_zlecil" list="opt_kz" value="${escapeHtml(rec?rec.kto_zlecil:'')}">
-              <datalist id="opt_kz">${options.kto_zlecil.map(o=>`<option value="${escapeHtml(o)}">`).join('')}</datalist>
-            </div>
-            <div class="field">
-              <label>Data zlecenia</label>
-              <input type="date" id="f_data_zlecenia" value="${rec&&rec.data_zlecenia?rec.data_zlecenia:''}">
+          <div id="orderFields" style="display:${rec && rec.zlecone ? 'block':'none'}">
+            <div class="field-row">
+              <div class="field">
+                <label>Kto zlecił</label>
+                <input type="text" id="f_kto_zlecil" list="opt_kz" value="${escapeHtml(rec?rec.kto_zlecil:'')}">
+                <datalist id="opt_kz">${options.kto_zlecil.map(o=>`<option value="${escapeHtml(o)}">`).join('')}</datalist>
+              </div>
+              <div class="field">
+                <label>Kiedy zlecił</label>
+                <input type="date" id="f_data_zlecenia" value="${rec&&rec.data_zlecenia?rec.data_zlecenia:''}">
+              </div>
             </div>
           </div>
 
@@ -2814,7 +2816,7 @@ window.FLEET_DATA = {
 
           <div class="field-row">
             <div class="field">
-              <label>Data prania</label>
+              <label id="dataPraniaLabel">${rec && rec.zlecone ? 'Na kiedy zlecił' : 'Data prania'}</label>
               <div style="display:flex;gap:8px;align-items:center">
                 <input type="date" id="f_data_prania" value="${rec&&rec.data_prania?rec.data_prania:''}" style="flex:1;min-width:0">
                 <button type="button" class="btn btn-secondary" id="clearWashDateBtn" style="white-space:nowrap">Wyczyść</button>
@@ -2850,6 +2852,17 @@ window.FLEET_DATA = {
         document.getElementById('f_data_prania').value = '';
       });
     }
+
+    const zleconeToggle = document.getElementById('f_zlecone');
+    const orderFields = document.getElementById('orderFields');
+    const dataPraniaLabel = document.getElementById('dataPraniaLabel');
+    const syncOrderFields = () => {
+      const on = !!zleconeToggle?.checked;
+      if(orderFields) orderFields.style.display = on ? 'block' : 'none';
+      if(dataPraniaLabel) dataPraniaLabel.textContent = on ? 'Na kiedy zlecił' : 'Data prania';
+    };
+    zleconeToggle?.addEventListener('change', syncOrderFields);
+    syncOrderFields();
 
     document.getElementById('formOverlay').addEventListener('click', (e) => {
       if(e.target.id === 'formOverlay') closeModal();

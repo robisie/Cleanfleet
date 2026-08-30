@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v55 -->
+<!-- CleanFleet v57 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -359,7 +359,14 @@
   .pill-no{background:var(--red-bg);color:var(--red);}
 
   .report-controls{display:flex;gap:10px;align-items:center;margin-top:14px;}
-  .active-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;}
+  .active-section-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    width:100%;
+    margin:28px 0 12px;
+  }
   .active-section-head .section-title{margin:0;}
   .main-filters{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:0;flex:0 0 auto;}
   .main-filters select{padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:#fff;color:var(--ink);font-size:13px;}
@@ -3254,90 +3261,38 @@ window.FLEET_DATA = {
   function showFinanceQueue(){
     menuOverlay.classList.remove('open');
 
-    // Statystyki finansowe dotyczą wybranego miesiąca faktur.
-    const now = new Date();
-    const defaultMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-    const monthOptions = [];
-    for(let i=0;i<24;i++){
-      const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
-      const value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      monthOptions.push(`<option value="${value}">${d.toLocaleDateString('pl-PL',{month:'long',year:'numeric'})}</option>`);
-    }
-
-    const monthInvoices = invoices.filter(i => (i.invoice_date||'').slice(0,7) === defaultMonth);
-    const pending = monthInvoices.filter(i=>i.status!=='paid');
-    const paid = monthInvoices.filter(i=>i.status==='paid');
-
-    // WAŻNE: „Oczekuje” jest sumą niezapłaconych FAKTUR.
-    // Ręczne oznaczenie pojedynczego prania jako zapłacone nie zmniejsza tej wartości,
-    // jeśli nie jest powiązane z opłaconą fakturą.
-    const pendingAmount = pending.reduce((s,i)=>s+Number(i.amount||0),0);
-    const paidRowsAmount = records.filter(r => r.data_prania && r.data_prania.slice(0,7) === defaultMonth && r.zaplacone).reduce((s,r)=>s+Number(r.koszt||0),0);
-    const allInvoiced = monthInvoices.reduce((s,i)=>s+Number(i.amount||0),0);
-
-    const controls = `<div class="finance-month-row" style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-bottom:12px;">
-      <label for="financeMonthPicker" style="font-size:12px;color:var(--ink-soft);">Miesiąc:</label>
-      <select id="financeMonthPicker" style="min-width:175px;">
-        ${monthOptions.join('')}
-      </select>
-    </div>`;
-
-    const summary = `<div class="finance-summary">
-      <div class="finance-card"><div class="finance-card-label">Zafakturowane</div><div class="finance-card-value">${fmtMoney(allInvoiced)}</div></div>
-      <div class="finance-card"><div class="finance-card-label">Oczekuje</div><div class="finance-card-value">${fmtMoney(pendingAmount)}</div></div>
-      <div class="finance-card"><div class="finance-card-label">Zapłacone</div><div class="finance-card-value">${fmtMoney(paidRowsAmount)}</div></div>
-    </div>`;
-
-    const renderInvoiceRows = (list) => list.map(inv=>{
-      const count = invoiceItems.filter(x=>x.invoice_id===inv.id).length;
-      const paid = inv.status==='paid';
-      return `<div class="invoice-row" data-invoice-open="${escapeHtml(inv.id)}">
-        <div class="invoice-row-top">
-          <div>
-            <div class="invoice-number">${escapeHtml(inv.invoice_number)}</div>
-            <div class="invoice-meta">${inv.invoice_date ? fmtDate(inv.invoice_date) : '—'} · ${count} pojazdów · ${fmtMoney(inv.amount)}</div>
+    const renderInvoiceRows = (list) => {
+      if(!list.length){
+        return '<div class="empty-state" style="margin-top:14px;">Brak faktur w kolejce oczekujących płatności.</div>';
+      }
+      return list.map(inv=>{
+        const count = invoiceItems.filter(x=>x.invoice_id===inv.id).length;
+        const paid = inv.status === 'paid';
+        return `<div class="invoice-row" data-invoice-open="${escapeHtml(inv.id)}">
+          <div class="invoice-row-top">
+            <div>
+              <div class="invoice-number">${escapeHtml(inv.invoice_number)}</div>
+              <div class="invoice-meta">${inv.invoice_date ? fmtDate(inv.invoice_date) : '—'} · ${count} pojazdów · ${fmtMoney(inv.amount)}</div>
+            </div>
+            <span class="invoice-status ${paid?'invoice-paid':'invoice-pending'}">${paid?'OPŁACONA':'OCZEKUJE'}</span>
           </div>
-          <span class="invoice-status ${paid?'invoice-paid':'invoice-pending'}">${paid?'OPŁACONA':'OCZEKUJE'}</span>
-        </div>
-      </div>`;
-    }).join('');
-
-    const initialInvoiceHtml = rows || '<div class="empty-state" style="margin-top:14px;">Brak faktur w wybranym miesiącu.</div>';
-    reportShell('Statystyki finansowe', controls + summary + `<div id="financeInvoiceList">${initialInvoiceHtml}</div>`, '');
-
-    const attachInvoiceHandlers = () => {
-      document.querySelectorAll('#financeInvoiceList [data-invoice-open]').forEach(el=>{
-        el.addEventListener('click',()=>showInvoiceDetails(el.getAttribute('data-invoice-open')));
-      });
+        </div>`;
+      }).join('');
     };
 
-    const picker = document.getElementById('financeMonthPicker');
-    if(picker){
-      picker.value = defaultMonth;
-      picker.addEventListener('change', ()=>{
-        const selected = picker.value;
-        const selectedInvoices = invoices.filter(i => (i.invoice_date||'').slice(0,7) === selected);
-        const selectedPending = selectedInvoices.filter(i=>i.status!=='paid');
+    const sorted = [...invoices].sort((a,b)=>{
+      if(a.status !== b.status) return a.status === 'paid' ? 1 : -1;
+      return String(b.invoice_date||b.created_at||'').localeCompare(String(a.invoice_date||a.created_at||''));
+    });
 
-        const setCard = (label, value) => {
-          const card = [...document.querySelectorAll('.finance-card')].find(c => c.querySelector('.finance-card-label')?.textContent.trim() === label);
-          if(card) card.querySelector('.finance-card-value').textContent = fmtMoney(value);
-        };
+    const body = `<div class="confirm-text">Tutaj znajdują się faktury zapisane przy generowaniu załącznika. Otwórz fakturę, aby zobaczyć przypisane pojazdy i oznaczyć całą fakturę jako opłaconą.</div>
+      <div id="financeQueueList">${renderInvoiceRows(sorted)}</div>`;
 
-        setCard('Zafakturowane', selectedInvoices.reduce((sum,i)=>sum+Number(i.amount||0),0));
-        setCard('Oczekuje', selectedPending.reduce((sum,i)=>sum+Number(i.amount||0),0));
-        setCard('Zapłacone', records.filter(r => r.data_prania && r.data_prania.slice(0,7) === selected && r.zaplacone).reduce((sum,r)=>sum+Number(r.koszt||0),0));
+    reportShell('Rozliczenia / oczekujące płatności', '', body);
 
-        const list = document.getElementById('financeInvoiceList');
-        if(list){
-          list.innerHTML = renderInvoiceRows(selectedInvoices) ||
-            '<div class="empty-state" style="margin-top:14px;">Brak faktur w wybranym miesiącu.</div>';
-          attachInvoiceHandlers();
-        }
-      });
-    }
-
-    attachInvoiceHandlers();
+    document.querySelectorAll('#financeQueueList [data-invoice-open]').forEach(el=>{
+      el.addEventListener('click',()=>showInvoiceDetails(el.getAttribute('data-invoice-open')));
+    });
   }
 
   function showInvoiceDetails(invoiceId){
@@ -3386,27 +3341,47 @@ window.FLEET_DATA = {
       monthOptions.push(`<option value="${value}">${d.toLocaleDateString('pl-PL',{month:'long',year:'numeric'})}</option>`);
     }
 
-    const footer = `
-      <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:14px;">
-        <label for="statsMonthPicker" style="font-size:12px;color:var(--ink-soft);">Miesiąc:</label>
-        <select id="statsMonthPicker" style="min-width:175px;">
-          ${monthOptions.join('')}
-        </select>
-      </div>`;
+    const controls = `<div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin:4px 0 14px;">
+      <label for="statsMonthPicker" style="font-size:12px;color:var(--ink-soft);">Miesiąc:</label>
+      <select id="statsMonthPicker" style="min-width:175px;">
+        ${monthOptions.join('')}
+      </select>
+    </div>`;
 
-    reportShell('Statystyki finansowe', '', footer);
+    reportShell('Statystyki finansowe', controls, '<div id="statsContent"></div>');
 
     const updateStats = () => {
       const picker = document.getElementById('statsMonthPicker');
       const month = picker?.value || defaultMonth;
-      const rows = records.filter(r=>r.data_prania && r.data_prania.slice(0,7)===month);
-      const paidRows = rows.filter(r=>r.zaplacone);
 
-      document.getElementById('reportBody').innerHTML = `
+      // Zafakturowane i Oczekuje liczymy z faktur wystawionych w wybranym miesiącu.
+      const monthInvoices = invoices.filter(i => (i.invoice_date||'').slice(0,7) === month);
+      const invoicedAmount = monthInvoices.reduce((sum,i)=>sum+Number(i.amount||0),0);
+      const pendingAmount = monthInvoices
+        .filter(i=>i.status!=='paid')
+        .reduce((sum,i)=>sum+Number(i.amount||0),0);
+
+      // Zapłacone = wszystkie wpisy oznaczone przez użytkownika jako Zapłacone
+      // w wybranym miesiącu, niezależnie od tego, czy były przypisane do faktury.
+      const paidAmount = records
+        .filter(r => r.data_prania && r.data_prania.slice(0,7) === month && r.zaplacone)
+        .reduce((sum,r)=>sum+Number(r.koszt||0),0);
+
+      const paidCount = records
+        .filter(r => r.data_prania && r.data_prania.slice(0,7) === month && r.zaplacone).length;
+      const invoiceCount = monthInvoices.length;
+
+      const content = document.getElementById('statsContent');
+      if(!content) return;
+      content.innerHTML = `
         <div class="finance-summary">
-          <div class="finance-card"><div class="finance-card-label">Prania w miesiącu</div><div class="finance-card-value">${rows.length}</div></div>
-          <div class="finance-card"><div class="finance-card-label">Wartość prania</div><div class="finance-card-value">${fmtMoney(rows.reduce((s,r)=>s+Number(r.koszt||0),0))}</div></div>
-          <div class="finance-card"><div class="finance-card-label">Zapłacone</div><div class="finance-card-value">${fmtMoney(paidRows.reduce((s,r)=>s+Number(r.koszt||0),0))}</div></div>
+          <div class="finance-card"><div class="finance-card-label">Zafakturowane</div><div class="finance-card-value">${fmtMoney(invoicedAmount)}</div></div>
+          <div class="finance-card"><div class="finance-card-label">Oczekuje</div><div class="finance-card-value">${fmtMoney(pendingAmount)}</div></div>
+          <div class="finance-card"><div class="finance-card-label">Zapłacone</div><div class="finance-card-value">${fmtMoney(paidAmount)}</div></div>
+        </div>
+        <div class="confirm-text" style="margin-top:14px;">
+          ${invoiceCount ? `Faktur w miesiącu: <strong>${invoiceCount}</strong>` : 'Brak faktur w wybranym miesiącu.'}
+          · wpisów oznaczonych jako zapłacone: <strong>${paidCount}</strong>
         </div>`;
     };
 

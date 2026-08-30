@@ -96,7 +96,7 @@
     display:flex;align-items:center;justify-content:space-between;
     padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:14px;
   }
-  .menu-list{display:flex;flex-direction:column;gap:8px;}
+  .menu-list{display:flex;flex-direction:column;gap:8px;flex:1;}
   .menu-item{
     text-align:left;
     background:#fff;
@@ -108,6 +108,8 @@
   }
   .menu-item:disabled{opacity:.72;cursor:default;}
   .menu-item:active{background:var(--paper-alt);}
+  .menu-logout{margin-top:auto;border-color:rgba(194,75,63,0.35);}
+  .menu-logout .menu-item-title{color:var(--red);}
   .menu-item-title{font-size:14px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:7px;}
   .cf-bell-icon{font-size:17px;line-height:1;display:inline-flex;align-items:center;justify-content:center;}
   .menu-item-sub{font-size:12px;color:var(--ink-soft);}
@@ -568,6 +570,14 @@
       <button class="menu-item" id="exportPdfBtn">
         <span class="menu-item-title">Eksportuj PDF (miesiąc)</span>
         <span class="menu-item-sub">Wygeneruj plik PDF z zatwierdzonymi pojazdami z wybranego miesiąca</span>
+      </button>
+      <button class="menu-item" id="exportXmlBtn">
+        <span class="menu-item-title">Eksportuj XML (wszystkie dane)</span>
+        <span class="menu-item-sub">Eksportuj wszystkie pojazdy oraz powiązane wpisy z bazy danych do pliku XML</span>
+      </button>
+      <button class="menu-item menu-logout" id="cfLogoutBtn">
+        <span class="menu-item-title">Wyloguj</span>
+        <span class="menu-item-sub">Wyloguj z konta CleanFleet na tym urządzeniu</span>
       </button>
     </div>
     <input type="file" id="importFile" accept=".csv,.txt,.xlsx,.xls" style="display:none;">
@@ -3422,6 +3432,21 @@ window.FLEET_DATA = {
   }
 
   document.getElementById('exportPdfBtn').addEventListener('click', showPdfExportModal);
+  document.getElementById('exportXmlBtn').addEventListener('click', cfExportXml);
+  document.getElementById('cfLogoutBtn').addEventListener('click', async ()=>{
+    const btn = document.getElementById('cfLogoutBtn');
+    if(btn) btn.disabled = true;
+    try{
+      await cfSignOut();
+      menuOverlay.classList.remove('open');
+      showToast('Wylogowano');
+    }catch(error){
+      console.error('CleanFleet sign out error:', error);
+      showToast('Nie udało się wylogować: '+(error?.message || 'nieznany błąd'));
+    }finally{
+      if(btn) btn.disabled = false;
+    }
+  });
 
   const PDF_COLUMNS = [
     {key:'typ', label:'Typ'},
@@ -3809,6 +3834,138 @@ window.FLEET_DATA = {
         <thead><tr><th>Typ</th><th>Tablica</th><th>Marka</th><th>Ostatnie pranie</th><th>Zatw.</th><th>Zapł.</th></tr></thead>
         <tbody>${body}</tbody>
       </table>`;
+  }
+
+  // --- XML export: all vehicles + all wash records ---
+  function cfXmlEscape(value){
+    if(value === null || value === undefined) return '';
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  function cfXmlTag(name, value, indent){
+    const safe = cfXmlEscape(value);
+    return `${indent}<${name}>${safe}</${name}>`;
+  }
+
+  function cfXmlObject(object, tagName, indent){
+    const lines = [`${indent}<${tagName}>`];
+    Object.entries(object || {}).forEach(([key, value]) => {
+      const safeKey = String(key).replace(/[^A-Za-z0-9_.-]/g, '_') || 'field';
+      if(value !== null && typeof value === 'object'){
+        lines.push(cfXmlObject(value, safeKey, indent + '  '));
+      } else {
+        lines.push(cfXmlTag(safeKey, value, indent + '  '));
+      }
+    });
+    lines.push(`${indent}</${tagName}>`);
+    return lines.join('\n');
+  }
+
+  async function cfFetchAllRows(tableName, orderColumn){
+    const pageSize = 1000;
+    const all = [];
+    for(let from = 0;; from += pageSize){
+      let query = cfSupabase.from(tableName).select('*').range(from, from + pageSize - 1);
+      if(orderColumn) query = query.order(orderColumn, {ascending:true, nullsFirst:false});
+      const { data, error } = await query;
+      if(error) throw error;
+      const page = data || [];
+      all.push(...page);
+      if(page.length < pageSize) break;
+    }
+    return all;
+  }
+
+  async function cfExportXml(){
+    const btn = document.getElementById('exportXmlBtn');
+    if(btn) btn.disabled = true;
+    try{
+      cfSetSync('Przygotowywanie eksportu XML…');
+      const [{ data:{session} }, vehicles, washRecords] = await Promise.all([
+        cfSupabase.auth.getSession(),
+        cfFetchAllRows('vehicles', 'plate'),
+        cfFetchAllRows('wash_records', 'created_at')
+      ]);
+
+      const recordsByPlate = new Map();
+      washRecords.forEach(record => {
+        const plate = String(record?.plate || '').trim();
+        if(!recordsByPlate.has(plate)) recordsByPlate.set(plate, []);
+        recordsByPlate.get(plate).push(record);
+      });
+
+      const lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<CleanFleetExport>',
+        '  <ExportInfo>',
+        cfXmlTag('ExportedAt', new Date().toISOString(), '    '),
+        cfXmlTag('UserEmail', session?.user?.email || '', '    '),
+        cfXmlTag('VehicleCount', vehicles.length, '    '),
+        cfXmlTag('WashRecordCount', washRecords.length, '    '),
+        '  </ExportInfo>',
+        '  <Vehicles>'
+      ];
+
+      vehicles.forEach(vehicle => {
+        const plate = String(vehicle?.plate || '').trim();
+        lines.push('    <Vehicle>');
+        Object.entries(vehicle || {}).forEach(([key, value]) => {
+          const safeKey = String(key).replace(/[^A-Za-z0-9_.-]/g, '_') || 'field';
+          if(value !== null && typeof value === 'object') lines.push(cfXmlObject(value, safeKey, '      '));
+          else lines.push(cfXmlTag(safeKey, value, '      '));
+        });
+        lines.push('      <WashRecords>');
+        (recordsByPlate.get(plate) || []).forEach(record => {
+          lines.push('        <WashRecord>');
+          Object.entries(record || {}).forEach(([key, value]) => {
+            const safeKey = String(key).replace(/[^A-Za-z0-9_.-]/g, '_') || 'field';
+            if(value !== null && typeof value === 'object') lines.push(cfXmlObject(value, safeKey, '          '));
+            else lines.push(cfXmlTag(safeKey, value, '          '));
+          });
+          lines.push('        </WashRecord>');
+        });
+        lines.push('      </WashRecords>');
+        lines.push('    </Vehicle>');
+      });
+
+      // Keep wash records whose plate is not currently present in vehicles.
+      const vehiclePlates = new Set(vehicles.map(v => String(v?.plate || '').trim()));
+      const orphanRecords = washRecords.filter(r => !vehiclePlates.has(String(r?.plate || '').trim()));
+      if(orphanRecords.length){
+        lines.push('  </Vehicles>');
+        lines.push('  <WashRecordsWithoutVehicle>');
+        orphanRecords.forEach(record => lines.push(cfXmlObject(record, 'WashRecord', '    ')));
+        lines.push('  </WashRecordsWithoutVehicle>');
+      } else {
+        lines.push('  </Vehicles>');
+      }
+      lines.push('</CleanFleetExport>');
+
+      const blob = new Blob([lines.join('\n')], {type:'application/xml;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const stamp = new Date().toISOString().slice(0,19).replace(/[T:]/g,'-');
+      a.href = url;
+      a.download = `CleanFleet-export-${stamp}.xml`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      cfSetSync(`Eksport XML gotowy · ${vehicles.length} pojazdów · ${washRecords.length} wpisów`,'ok');
+      showToast('Wyeksportowano wszystkie dane do XML');
+      menuOverlay.classList.remove('open');
+    } catch(error){
+      console.error('CleanFleet XML export error:', error);
+      cfSetSync('Błąd eksportu XML','err');
+      showToast('Nie udało się wyeksportować danych do XML: '+(error?.message || 'nieznany błąd'));
+    } finally {
+      if(btn) btn.disabled = false;
+    }
   }
 
   // --- hamburger menu ---

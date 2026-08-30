@@ -407,6 +407,8 @@
 .cf-dot.err{background:#c0392b;}
 .cf-syncbar button{border:0;background:transparent;color:var(--ink-soft);border-radius:0;padding:2px 0;font-size:11px;cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
 .search-box{display:flex;gap:8px;margin-top:16px;}
+.cf-camera-btn{flex:0 0 48px!important;width:48px!important;padding:10px 0!important;font-size:20px;line-height:1;}
+.cf-camera-btn:disabled{opacity:.6;cursor:wait;}
 @media (max-width:520px){
   header{padding:16px 14px 14px;}
   .header-top{gap:12px;}
@@ -541,7 +543,9 @@
     <div class="search-box">
       <input type="text" id="searchInput" placeholder="np. 7765 lub ST7765X" list="plateList" autocomplete="off" autocapitalize="characters">
       <datalist id="plateList"></datalist>
+      <button class="btn btn-outline cf-camera-btn" id="plateCameraBtn" type="button" aria-label="Wyszukaj tablicę ze zdjęcia" title="Wyszukaj tablicę ze zdjęcia">📷</button>
       <button class="btn btn-solid" id="searchBtn">Szukaj</button>
+      <input type="file" id="plateCameraInput" accept="image/*" capture="environment" style="display:none;">
     </div>
   </div>
 </header>
@@ -666,6 +670,16 @@ function cfSetNotificationsStatus(text, enabled=false){
   }
 }
 
+function cfGetDeviceId(){
+  const key = 'cleanfleet-push-device-id';
+  let id = localStorage.getItem(key);
+  if(!id){
+    id = (crypto?.randomUUID ? crypto.randomUUID() : Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));
+    localStorage.setItem(key, id);
+  }
+  return id;
+}
+
 async function cfSavePushSubscription(subscription){
   const session = (await cfSupabase.auth.getSession()).data.session;
   const userId = session?.user?.id;
@@ -678,25 +692,50 @@ async function cfSavePushSubscription(subscription){
   if(!endpoint || !p256dh || !auth) throw new Error('Nie udało się odczytać danych subskrypcji push.');
 
   const userAgent = navigator.userAgent || '';
-  const { data: existing, error: findError } = await cfSupabase
+  const deviceId = cfGetDeviceId();
+
+  // Najpierw szukamy po stałym identyfikatorze urządzenia. Dzięki temu
+  // ponowne włączenie po zmianie endpointu aktualizuje istniejący rekord
+  // zamiast tworzyć kolejny. Endpoint pozostaje aktualnym adresem Apple Push.
+  const { data: byDevice, error: deviceError } = await cfSupabase
+    .from('push_subscriptions')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('device_id', deviceId)
+    .limit(1)
+    .maybeSingle();
+  if(deviceError) throw deviceError;
+
+  if(byDevice?.id){
+    const { error } = await cfSupabase.from('push_subscriptions').update({
+      endpoint, p256dh, auth, user_agent:userAgent, enabled:true, updated_at:new Date().toISOString()
+    }).eq('id', byDevice.id);
+    if(error) throw error;
+    return;
+  }
+
+  // Migracja istniejącego rekordu v40: jeśli endpoint już jest w bazie,
+  // przypisujemy mu stały device_id zamiast tworzyć nowy wpis.
+  const { data: byEndpoint, error: endpointError } = await cfSupabase
     .from('push_subscriptions')
     .select('id')
     .eq('endpoint', endpoint)
     .limit(1)
     .maybeSingle();
-  if(findError) throw findError;
+  if(endpointError) throw endpointError;
 
-  if(existing?.id){
+  if(byEndpoint?.id){
     const { error } = await cfSupabase.from('push_subscriptions').update({
-      user_id:userId, p256dh, auth, user_agent:userAgent, enabled:true, updated_at:new Date().toISOString()
-    }).eq('id', existing.id);
+      user_id:userId, device_id:deviceId, p256dh, auth, user_agent:userAgent, enabled:true, updated_at:new Date().toISOString()
+    }).eq('id', byEndpoint.id);
     if(error) throw error;
-  } else {
-    const { error } = await cfSupabase.from('push_subscriptions').insert({
-      user_id:userId, endpoint, p256dh, auth, user_agent:userAgent, enabled:true
-    });
-    if(error) throw error;
+    return;
   }
+
+  const { error } = await cfSupabase.from('push_subscriptions').insert({
+    user_id:userId, device_id:deviceId, endpoint, p256dh, auth, user_agent:userAgent, enabled:true
+  });
+  if(error) throw error;
 }
 
 async function cfEnableNotifications(){
@@ -750,8 +789,9 @@ async function cfDisableNotifications(){
     const session = (await cfSupabase.auth.getSession()).data.session;
     const userId = session?.user?.id;
     const endpoint = subscription.endpoint;
+    const deviceId = cfGetDeviceId();
 
-    if(userId && endpoint){
+    if(userId){
       const { error } = await cfSupabase
         .from('push_subscriptions')
         .update({
@@ -759,7 +799,7 @@ async function cfDisableNotifications(){
           updated_at:new Date().toISOString()
         })
         .eq('user_id', userId)
-        .eq('endpoint', endpoint);
+        .eq('device_id', deviceId);
       if(error) throw error;
     }
 
@@ -2895,10 +2935,123 @@ window.FLEET_DATA = {
     });
   }
 
+  document.getElementById('plateCameraBtn').addEventListener('click', ()=>{
+    document.getElementById('plateCameraInput').click();
+  });
+  document.getElementById('plateCameraInput').addEventListener('change', (e)=>{
+    const file=e.target.files?.[0];
+    if(file) cfSearchPlateFromPhoto(file);
+  });
   document.getElementById('searchBtn').addEventListener('click', doSearch);
   document.getElementById('searchInput').addEventListener('keydown', (e) => {
     if(e.key === 'Enter') doSearch();
   });
+
+  // CleanFleet — wyszukiwanie tablicy ze zdjęcia (OCR)
+  let cfTesseractPromise = null;
+
+  function cfLoadTesseract(){
+    if(cfTesseractPromise) return cfTesseractPromise;
+    cfTesseractPromise = new Promise((resolve,reject)=>{
+      if(window.Tesseract){ resolve(window.Tesseract); return; }
+      const script=document.createElement('script');
+      script.src='https://unpkg.com/tesseract.js@5.1.0/dist/tesseract.min.js';
+      script.async=true;
+      script.onload=()=>window.Tesseract ? resolve(window.Tesseract) : reject(new Error('Nie udało się załadować modułu OCR.'));
+      script.onerror=()=>reject(new Error('Nie udało się załadować modułu OCR. Sprawdź połączenie z internetem.'));
+      document.head.appendChild(script);
+    });
+    return cfTesseractPromise;
+  }
+
+  function cfPreparePlateImage(file){
+    return new Promise((resolve,reject)=>{
+      const img=new Image();
+      const url=URL.createObjectURL(file);
+      img.onload=()=>{
+        try{
+          const scale=Math.min(2.5, 1800/Math.max(img.width,img.height));
+          const w=Math.max(900, Math.round(img.width*scale));
+          const h=Math.max(600, Math.round(img.height*scale));
+          const canvas=document.createElement('canvas');
+          canvas.width=w; canvas.height=h;
+          const ctx=canvas.getContext('2d',{willReadFrequently:true});
+          ctx.drawImage(img,0,0,w,h);
+          const image=ctx.getImageData(0,0,w,h);
+          for(let i=0;i<image.data.length;i+=4){
+            const y=0.299*image.data[i]+0.587*image.data[i+1]+0.114*image.data[i+2];
+            const v=Math.max(0,Math.min(255,(y-128)*1.65+128));
+            image.data[i]=image.data[i+1]=image.data[i+2]=v;
+          }
+          ctx.putImageData(image,0,0);
+          canvas.toBlob(blob=>{
+            URL.revokeObjectURL(url);
+            if(blob) resolve(blob); else reject(new Error('Nie udało się przygotować zdjęcia.'));
+          },'image/jpeg',0.92);
+        }catch(e){ URL.revokeObjectURL(url); reject(e); }
+      };
+      img.onerror=()=>{URL.revokeObjectURL(url); reject(new Error('Nie udało się odczytać zdjęcia.'));};
+      img.src=url;
+    });
+  }
+
+  function cfExtractPlateCandidates(text){
+    const clean=(text||'').toUpperCase().replace(/[^A-Z0-9\n ]/g,' ');
+    const lines=clean.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+    const candidates=[];
+    const add=(value)=>{
+      const n=normalizePlate(value);
+      if(n.length>=4 && n.length<=9 && /[A-Z]/.test(n) && /\d/.test(n) && !candidates.includes(n)) candidates.push(n);
+    };
+    lines.forEach(line=>{
+      const compact=normalizePlate(line);
+      if(compact.length>=4 && compact.length<=9) add(compact);
+      (line.match(/[A-Z]{1,4}[0-9]{2,6}/g)||[]).forEach(add);
+      (line.match(/[A-Z]{1,4}\s*[0-9]{2,6}/g)||[]).forEach(add);
+    });
+    return candidates;
+  }
+
+  async function cfSearchPlateFromPhoto(file){
+    const btn=document.getElementById('plateCameraBtn');
+    const input=document.getElementById('plateCameraInput');
+    if(btn) btn.disabled=true;
+    try{
+      if(!file) return;
+      showToast('Rozpoznawanie tablicy…');
+      const Tesseract=await cfLoadTesseract();
+      const image=await cfPreparePlateImage(file);
+      const result=await Tesseract.recognize(image,'eng',{
+        logger:m=>{
+          if(m && m.status==='recognizing text' && typeof m.progress==='number'){
+            const pct=Math.round(m.progress*100);
+            const t=document.getElementById('searchInput');
+            if(t) t.placeholder='Rozpoznawanie… '+pct+'%';
+          }
+        },
+        tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+      });
+      const candidates=cfExtractPlateCandidates(result?.data?.text||'');
+      if(!candidates.length){
+        showToast('Nie rozpoznano tablicy. Zrób zdjęcie bliżej i wyraźniej.');
+        return;
+      }
+      // Najpierw próbujemy dokładnego dopasowania do istniejącej floty.
+      const exact=candidates.find(c=>Object.keys(registry).some(p=>normalizePlate(p)===c));
+      const value=exact || candidates[0];
+      document.getElementById('searchInput').value=value;
+      document.getElementById('searchInput').placeholder='np. 7765 lub ST7765X';
+      doSearch();
+    }catch(error){
+      console.error('CleanFleet plate OCR error:',error);
+      showToast(error?.message || 'Nie udało się rozpoznać tablicy.');
+    }finally{
+      if(btn) btn.disabled=false;
+      if(input) input.value='';
+      const t=document.getElementById('searchInput');
+      if(t) t.placeholder='np. 7765 lub ST7765X';
+    }
+  }
 
   function normalizePlate(s){
     return (s||'').toUpperCase().replace(/[\s-]/g, '');

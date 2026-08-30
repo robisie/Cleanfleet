@@ -245,8 +245,21 @@
     gap:8px;
     z-index:30;
   }
+  .bottom-mobile-menu{display:none;}
+  @media(max-width:639px){
+    .bottom-bar{
+      grid-template-columns:1fr;
+      padding:8px 16px calc(8px + env(safe-area-inset-bottom));
+    }
+    .bottom-bar > button:not(#btnBottomMenu){display:none;}
+    .bottom-bar #btnBottomMenu{
+      display:flex;align-items:center;justify-content:center;
+      min-height:46px;width:100%;font-size:13px;
+    }
+  }
   @media(min-width:640px){
     .bottom-bar{grid-template-columns:repeat(4,1fr);}
+    .bottom-bar #btnBottomMenu{display:none;}
   }
   .bottom-bar button{
     background:transparent;
@@ -262,6 +275,17 @@
     line-height:1.3;
   }
   .bottom-bar button:active{background:rgba(245,244,238,0.12);}
+
+  .bottom-mobile-menu{position:fixed;inset:0;z-index:55;}
+  .bottom-mobile-menu.open{display:block;}
+  .bottom-mobile-menu-backdrop{position:absolute;inset:0;background:rgba(22,21,15,0.5);}
+  .bottom-mobile-menu-sheet{position:absolute;left:0;right:0;bottom:0;background:var(--paper);border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -8px 24px rgba(22,21,15,0.18);}
+  .bottom-mobile-menu-head{display:flex;align-items:center;justify-content:space-between;padding:0 2px 12px;border-bottom:1px solid var(--line);margin-bottom:12px;}
+  .bottom-mobile-menu-head h3{font-size:19px;margin:0;}
+  .bottom-mobile-menu-head button{background:none;border:0;font-size:28px;line-height:1;color:var(--ink-soft);cursor:pointer;padding:2px 6px;}
+  .bottom-mobile-menu-list{display:flex;flex-direction:column;gap:8px;}
+  .bottom-mobile-menu-list button{width:100%;background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;text-align:left;color:var(--ink);font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.3;text-transform:uppercase;cursor:pointer;}
+  .bottom-mobile-menu-list button:active{background:var(--paper-alt);}
 
   .overlay{
     position:fixed;inset:0;
@@ -637,6 +661,20 @@
   <button id="btnYear">Podsumowanie<br>roku</button>
   <button id="btnAll">Lista wszystkich<br>samochodów</button>
   <button id="btnPending">Zlecone<br>do zrobienia</button>
+  <button id="btnBottomMenu" aria-label="Otwórz menu dolne" aria-expanded="false">☰&nbsp;&nbsp;MENU</button>
+</div>
+
+<div class="bottom-mobile-menu" id="bottomMobileMenu" aria-hidden="true">
+  <div class="bottom-mobile-menu-backdrop" id="bottomMobileMenuBackdrop"></div>
+  <div class="bottom-mobile-menu-sheet" role="dialog" aria-label="Menu dolne">
+    <div class="bottom-mobile-menu-head"><h3>MENU</h3><button type="button" id="closeBottomMenu" aria-label="Zamknij">×</button></div>
+    <div class="bottom-mobile-menu-list">
+      <button type="button" data-bottom-action="month">Podsumowanie<br>miesiąca</button>
+      <button type="button" data-bottom-action="year">Podsumowanie<br>roku</button>
+      <button type="button" data-bottom-action="all">Lista wszystkich<br>samochodów</button>
+      <button type="button" data-bottom-action="pending">Zlecone<br>do zrobienia</button>
+    </div>
+  </div>
 </div>
 
 <div id="modalRoot"></div>
@@ -4190,6 +4228,35 @@ window.FLEET_DATA = {
   document.getElementById('btnYear').addEventListener('click', showYearReport);
   document.getElementById('btnAll').addEventListener('click', showAllOutstanding);
   document.getElementById('btnPending').addEventListener('click', showPendingOrders);
+
+  // Na telefonie cztery dolne akcje są dostępne z jednego menu.
+  const bottomMobileMenu = document.getElementById('bottomMobileMenu');
+  const btnBottomMenu = document.getElementById('btnBottomMenu');
+  const closeBottomMenu = document.getElementById('closeBottomMenu');
+  const bottomMobileMenuBackdrop = document.getElementById('bottomMobileMenuBackdrop');
+  const closeBottomMobileMenu = () => {
+    bottomMobileMenu?.classList.remove('open');
+    bottomMobileMenu?.setAttribute('aria-hidden','true');
+    btnBottomMenu?.setAttribute('aria-expanded','false');
+  };
+  btnBottomMenu?.addEventListener('click', () => {
+    bottomMobileMenu?.classList.add('open');
+    bottomMobileMenu?.setAttribute('aria-hidden','false');
+    btnBottomMenu?.setAttribute('aria-expanded','true');
+  });
+  closeBottomMenu?.addEventListener('click', closeBottomMobileMenu);
+  bottomMobileMenuBackdrop?.addEventListener('click', closeBottomMobileMenu);
+  bottomMobileMenu?.querySelectorAll('[data-bottom-action]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const action = btn.dataset.bottomAction;
+      closeBottomMobileMenu();
+      if(action === 'month') showMonthReport();
+      else if(action === 'year') showYearReport();
+      else if(action === 'all') showAllOutstanding();
+      else if(action === 'pending') showPendingOrders();
+    });
+  });
+  document.addEventListener('keydown', e => { if(e.key === 'Escape') closeBottomMobileMenu(); });
 
   cfBoot();
 })();

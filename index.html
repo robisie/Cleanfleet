@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v54 -->
+<!-- CleanFleet v55 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -359,7 +359,9 @@
   .pill-no{background:var(--red-bg);color:var(--red);}
 
   .report-controls{display:flex;gap:10px;align-items:center;margin-top:14px;}
-  .main-filters{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 2px;}
+  .active-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;}
+  .active-section-head .section-title{margin:0;}
+  .main-filters{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:0;flex:0 0 auto;}
   .main-filters select{padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:#fff;color:var(--ink);font-size:13px;}
   .finance-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;}
   .finance-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;}
@@ -608,15 +610,17 @@
 </div>
 
 <div class="wrap">
-  <div class="section-title">Aktywne wpisy</div>
-  <div class="main-filters">
-    <select id="mainStatusFilter" aria-label="Filtr wpisów">
-      <option value="all">Wszystkie</option>
-      <option value="ordered">Zlecone</option>
-      <option value="todo">Do wykonania</option>
-      <option value="done">Wykonane</option>
-      <option value="unpaid">Niezapłacone</option>
-    </select>
+  <div class="active-section-head">
+    <div class="section-title">Aktywne wpisy</div>
+    <div class="main-filters">
+      <select id="mainStatusFilter" aria-label="Filtr wpisów">
+        <option value="all">Wszystkie</option>
+        <option value="ordered">Zlecone</option>
+        <option value="todo">Do wykonania</option>
+        <option value="done">Wykonane</option>
+        <option value="unpaid">Niezapłacone</option>
+      </select>
+    </div>
   </div>
   <div class="records" id="recordsList"></div>
 </div>

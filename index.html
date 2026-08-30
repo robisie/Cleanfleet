@@ -2948,6 +2948,8 @@ window.FLEET_DATA = {
   });
 
   // CleanFleet — wyszukiwanie tablicy ze zdjęcia (OCR)
+  // v43: wieloprzebiegowy OCR + automatyczne wycinanie obszaru tablicy.
+  // Dzięki temu pojedynczy błędny odczyt nie decyduje o wyniku wyszukiwania.
   let cfTesseractPromise = null;
 
   function cfLoadTesseract(){
@@ -2964,84 +2966,185 @@ window.FLEET_DATA = {
     return cfTesseractPromise;
   }
 
-  function cfPreparePlateImage(file){
+  function cfCanvasFromImage(img, sx, sy, sw, sh, mode='gray'){
+    const maxW=1900;
+    const scale=Math.min(3.2, maxW/Math.max(1,sw));
+    const w=Math.max(900,Math.round(sw*scale));
+    const h=Math.max(220,Math.round(sh*scale));
+    const canvas=document.createElement('canvas');
+    canvas.width=w; canvas.height=h;
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});
+    ctx.imageSmoothingEnabled=true;
+    ctx.imageSmoothingQuality='high';
+    ctx.drawImage(img,sx,sy,sw,sh,0,0,w,h);
+
+    const data=ctx.getImageData(0,0,w,h);
+    for(let i=0;i<data.data.length;i+=4){
+      const y=0.299*data.data[i]+0.587*data.data[i+1]+0.114*data.data[i+2];
+      let v=y;
+      if(mode==='contrast'){
+        v=Math.max(0,Math.min(255,(y-128)*1.75+128));
+      }else if(mode==='threshold'){
+        v=y>155 ? 255 : 0;
+      }else if(mode==='soft'){
+        v=Math.max(0,Math.min(255,(y-128)*1.35+128));
+      }
+      data.data[i]=data.data[i+1]=data.data[i+2]=v;
+    }
+    ctx.putImageData(data,0,0);
+    return canvas;
+  }
+
+  function cfBuildOCRImages(file){
     return new Promise((resolve,reject)=>{
       const img=new Image();
       const url=URL.createObjectURL(file);
       img.onload=()=>{
         try{
-          const scale=Math.min(2.5, 1800/Math.max(img.width,img.height));
-          const w=Math.max(900, Math.round(img.width*scale));
-          const h=Math.max(600, Math.round(img.height*scale));
-          const canvas=document.createElement('canvas');
-          canvas.width=w; canvas.height=h;
-          const ctx=canvas.getContext('2d',{willReadFrequently:true});
-          ctx.drawImage(img,0,0,w,h);
-          const image=ctx.getImageData(0,0,w,h);
-          for(let i=0;i<image.data.length;i+=4){
-            const y=0.299*image.data[i]+0.587*image.data[i+1]+0.114*image.data[i+2];
-            const v=Math.max(0,Math.min(255,(y-128)*1.65+128));
-            image.data[i]=image.data[i+1]=image.data[i+2]=v;
-          }
-          ctx.putImageData(image,0,0);
-          canvas.toBlob(blob=>{
-            URL.revokeObjectURL(url);
-            if(blob) resolve(blob); else reject(new Error('Nie udało się przygotować zdjęcia.'));
-          },'image/jpeg',0.92);
-        }catch(e){ URL.revokeObjectURL(url); reject(e); }
+          const W=img.naturalWidth, H=img.naturalHeight;
+          // Kilka kadrów. Tablica zwykle znajduje się w środkowej części zdjęcia,
+          // ale zachowujemy też pełne zdjęcie dla nietypowych ujęć.
+          const crops=[
+            {name:'full',  x:0,       y:0,       w:W,       h:H},
+            {name:'middle',x:W*.02,   y:H*.18,   w:W*.96,   h:H*.60},
+            {name:'plate', x:W*.01,  y:H*.28,   w:W*.98,   h:H*.40}
+          ];
+          const modes=['gray','soft','threshold'];
+          const out=[];
+          crops.forEach(c=>{
+            modes.forEach(mode=>{
+              out.push({
+                name:c.name+'-'+mode,
+                canvas:cfCanvasFromImage(img,c.x,c.y,c.w,c.h,mode)
+              });
+            });
+          });
+          URL.revokeObjectURL(url);
+          resolve(out);
+        }catch(e){
+          URL.revokeObjectURL(url);
+          reject(e);
+        }
       };
-      img.onerror=()=>{URL.revokeObjectURL(url); reject(new Error('Nie udało się odczytać zdjęcia.'));};
+      img.onerror=()=>{
+        URL.revokeObjectURL(url);
+        reject(new Error('Nie udało się odczytać zdjęcia.'));
+      };
       img.src=url;
     });
   }
 
   function cfExtractPlateCandidates(text){
-    const clean=(text||'').toUpperCase().replace(/[^A-Z0-9\n ]/g,' ');
-    const lines=clean.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+    const raw=(text||'').toUpperCase()
+      .replace(/Ą/g,'A').replace(/Ć/g,'C').replace(/Ę/g,'E')
+      .replace(/Ł/g,'L').replace(/Ń/g,'N').replace(/Ó/g,'O')
+      .replace(/Ś/g,'S').replace(/Ź/g,'Z').replace(/Ż/g,'Z');
+
+    // OCR często rozdziela prefiks literowy i cyfry na osobne linie.
+    // Dlatego analizujemy także tekst po usunięciu spacji i znaków.
+    const compact=raw.replace(/[^A-Z0-9]/g,'');
     const candidates=[];
     const add=(value)=>{
       const n=normalizePlate(value);
-      if(n.length>=4 && n.length<=9 && /[A-Z]/.test(n) && /\d/.test(n) && !candidates.includes(n)) candidates.push(n);
+      if(n.length>=6 && n.length<=8 && /^[A-Z]{2,3}[0-9]{4,5}$/.test(n)){
+        if(!candidates.includes(n)) candidates.push(n);
+      }
     };
-    lines.forEach(line=>{
-      const compact=normalizePlate(line);
-      if(compact.length>=4 && compact.length<=9) add(compact);
-      (line.match(/[A-Z]{1,4}[0-9]{2,6}/g)||[]).forEach(add);
-      (line.match(/[A-Z]{1,4}\s*[0-9]{2,6}/g)||[]).forEach(add);
-    });
+
+    // Szukamy wszystkich poprawnych polskich układów tablic, również jako
+    // fragmentu dłuższego, błędnego odczytu (np. BDLE64649 -> DLE64649).
+    for(let i=0;i<compact.length;i++){
+      for(let len=6;len<=8;len++){
+        const part=compact.slice(i,i+len);
+        if(/^[A-Z]{2,3}[0-9]{4,5}$/.test(part)) add(part);
+      }
+    }
+
+    // Dodatkowo łączymy sąsiednie fragmenty OCR, np. "DLE" + "64649".
+    const lines=raw.split(/\n+/).map(x=>x.replace(/[^A-Z0-9]/g,'')).filter(Boolean);
+    for(let i=0;i<lines.length;i++){
+      add(lines[i]);
+      if(i+1<lines.length) add(lines[i]+lines[i+1]);
+      if(i+2<lines.length) add(lines[i]+lines[i+1]+lines[i+2]);
+    }
     return candidates;
+  }
+
+  async function cfRecognizeOne(Tesseract, canvas, psm){
+    const result=await Tesseract.recognize(canvas,'eng',{
+      logger:m=>{
+        if(m && m.status==='recognizing text' && typeof m.progress==='number'){
+          const pct=Math.round(m.progress*100);
+          const t=document.getElementById('searchInput');
+          if(t) t.placeholder='Rozpoznawanie… '+pct+'%';
+        }
+      },
+      tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+      tessedit_pageseg_mode:String(psm),
+      preserve_interword_spaces:'1'
+    });
+    return result?.data?.text || '';
   }
 
   async function cfSearchPlateFromPhoto(file){
     const btn=document.getElementById('plateCameraBtn');
     const input=document.getElementById('plateCameraInput');
     if(btn) btn.disabled=true;
+
     try{
       if(!file) return;
-      showToast('Rozpoznawanie tablicy…');
+      showToast('Analizuję zdjęcie tablicy…');
+
       const Tesseract=await cfLoadTesseract();
-      const image=await cfPreparePlateImage(file);
-      const result=await Tesseract.recognize(image,'eng',{
-        logger:m=>{
-          if(m && m.status==='recognizing text' && typeof m.progress==='number'){
-            const pct=Math.round(m.progress*100);
-            const t=document.getElementById('searchInput');
-            if(t) t.placeholder='Rozpoznawanie… '+pct+'%';
+      const images=await cfBuildOCRImages(file);
+      const scores=new Map();
+
+      // PSM 13 dobrze radzi sobie z samą linią tablicy, a PSM 11
+      // dobrze odczytuje sytuacje, w których OCR dzieli tablicę na fragmenty.
+      for(let i=0;i<images.length;i++){
+        const item=images[i];
+        const psms=item.name.endsWith('-gray') || item.name.endsWith('-soft') ? [13,11] : [13];
+        for(const psm of psms){
+          try{
+            const ocrText=await cfRecognizeOne(Tesseract,item.canvas,psm);
+            const candidates=cfExtractPlateCandidates(ocrText);
+            candidates.forEach(c=>{
+              const old=scores.get(c) || 0;
+              // Powtarzający się odczyt jest znacznie bardziej wiarygodny
+              // niż pojedynczy wynik z jednego przetworzenia obrazu.
+              scores.set(c,old+1);
+            });
+          }catch(e){
+            console.warn('CleanFleet OCR pass failed:',item.name,psm,e);
           }
-        },
-        tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-      });
-      const candidates=cfExtractPlateCandidates(result?.data?.text||'');
-      if(!candidates.length){
+        }
+      }
+
+      const all=Array.from(scores.entries())
+        .map(([plate,score])=>({plate,score}))
+        .sort((a,b)=>b.score-a.score);
+
+      if(!all.length){
         showToast('Nie rozpoznano tablicy. Zrób zdjęcie bliżej i wyraźniej.');
         return;
       }
-      // Najpierw próbujemy dokładnego dopasowania do istniejącej floty.
-      const exact=candidates.find(c=>Object.keys(registry).some(p=>normalizePlate(p)===c));
-      const value=exact || candidates[0];
-      document.getElementById('searchInput').value=value;
+
+      // Jeżeli tablica istnieje już w rejestrze, zawsze wybieramy ją ponad
+      // inne warianty OCR. To eliminuje typowe pomyłki pojedynczych znaków.
+      const registryPlates=Object.keys(registry);
+      const exact=all.find(x=>registryPlates.some(p=>normalizePlate(p)===x.plate));
+
+      // Dla nowych tablic wybieramy wariant z największą liczbą zgodnych
+      // przebiegów OCR. Przy remisie preferujemy krótszy, standardowy zapis.
+      const best=exact || all.sort((a,b)=>{
+        if(b.score!==a.score) return b.score-a.score;
+        return a.plate.length-b.plate.length;
+      })[0];
+
+      document.getElementById('searchInput').value=best.plate;
       document.getElementById('searchInput').placeholder='np. 7765 lub ST7765X';
       doSearch();
+
     }catch(error){
       console.error('CleanFleet plate OCR error:',error);
       showToast(error?.message || 'Nie udało się rozpoznać tablicy.');

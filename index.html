@@ -3493,6 +3493,33 @@ window.FLEET_DATA = {
       </table>`;
   }
 
+  // --- Supabase: pobieranie całej tabeli stronicami ---
+  // Supabase/PostgREST może zwracać maksymalnie ograniczoną liczbę rekordów
+  // w jednym żądaniu. Eksport musi więc pobrać dane partiami.
+  async function cfFetchAllRows(tableName, orderColumn){
+    if(!cfSupabase) throw new Error('Supabase nie jest jeszcze gotowe.');
+
+    const pageSize = 1000;
+    const allRows = [];
+    let from = 0;
+
+    while(true){
+      let query = cfSupabase.from(tableName).select('*');
+      if(orderColumn) query = query.order(orderColumn, {ascending:true, nullsFirst:false});
+
+      const {data, error} = await query.range(from, from + pageSize - 1);
+      if(error) throw new Error(`Nie udało się pobrać tabeli ${tableName}: ${error.message}`);
+
+      const rows = Array.isArray(data) ? data : [];
+      allRows.push(...rows);
+
+      if(rows.length < pageSize) break;
+      from += pageSize;
+    }
+
+    return allRows;
+  }
+
   // --- Excel export: all vehicles + all wash records ---
   function cfExcelCellValue(value){
     if(value === null || value === undefined) return '';

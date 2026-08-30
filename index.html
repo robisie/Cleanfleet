@@ -201,6 +201,7 @@
     letter-spacing:0.03em;
   }
   .record-meta{font-size:12.5px;color:var(--ink-soft);margin-top:3px;}
+  .record-description{margin-top:4px;line-height:1.35;}
   .record-badge{
     font-family:'JetBrains Mono',monospace;
     font-size:10.5px;
@@ -357,6 +358,27 @@
   .pill-no{background:var(--red-bg);color:var(--red);}
 
   .report-controls{display:flex;gap:10px;align-items:center;margin-top:14px;}
+  .main-filters{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 2px;}
+  .active-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:28px 0 12px;}
+  .active-section-head .section-title{margin:0;}
+  .active-section-head .main-filters{margin:0;}
+  .active-section-head .main-filters select{min-width:145px;}
+  .main-filters select{padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:#fff;color:var(--ink);font-size:13px;}
+  .finance-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;}
+  .finance-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;}
+  .finance-card-label{font-size:10px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;color:var(--ink-soft);}
+  .finance-card-value{font-size:18px;font-weight:700;margin-top:4px;}
+  .invoice-row{border:1px solid var(--line);background:#fff;border-radius:10px;padding:13px;margin-top:10px;cursor:pointer;}
+  .invoice-row-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}
+  .invoice-number{font-weight:700;font-size:15px;}
+  .invoice-status{font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 7px;border-radius:5px;text-transform:uppercase;}
+  .invoice-pending{background:#FFF0D7;color:#8A5A00;}
+  .invoice-paid{background:var(--green-bg);color:var(--green-ink);}
+  .invoice-meta{font-size:12px;color:var(--ink-soft);margin-top:4px;line-height:1.45;}
+  .invoice-actions{display:flex;gap:8px;margin-top:12px;}
+  .invoice-actions .btn{flex:1;}
+  .vehicle-last-wash{font-size:12px;color:var(--ink-soft);}
+
   .report-controls input{
     padding:9px 10px;border:1px solid var(--line-strong);border-radius:8px;font-size:14px;
   }
@@ -506,18 +528,6 @@
 }
 </style>
 
-
-<style id="v52-cosmetic">
-.active-header-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.active-header-row .active-filter{margin-left:auto;min-width:145px}
-.finance-month-row{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-bottom:12px}
-.finance-month-row select{min-width:170px}
-@media(max-width:520px){
-  .active-header-row{gap:8px}
-  .active-header-row .active-filter{min-width:125px}
-}
-</style>
-
 </head>
 <body>
 
@@ -583,6 +593,14 @@
         <span class="menu-item-title">Eksportuj Excel (wszystkie dane)</span>
         <span class="menu-item-sub">Eksportuj wszystkie pojazdy i wszystkie wpisy z bazy danych do pliku Excel</span>
       </button>
+      <button class="menu-item" id="financeBtn">
+        <span class="menu-item-title">💰 Rozliczenia / oczekujące płatności</span>
+        <span class="menu-item-sub">Faktury, pojazdy przypisane do faktur i płatności</span>
+      </button>
+      <button class="menu-item" id="statsBtn">
+        <span class="menu-item-title">📊 Statystyki finansowe</span>
+        <span class="menu-item-sub">Szybkie podsumowanie bieżącego miesiąca</span>
+      </button>
       <button class="menu-item menu-logout" id="cfLogoutBtn">
         <span class="menu-item-title">Wyloguj</span>
         <span class="menu-item-sub">Wyloguj z konta CleanFleet na tym urządzeniu</span>
@@ -593,7 +611,18 @@
 </div>
 
 <div class="wrap">
-  <div class="section-title">Aktywne wpisy</div>
+  <div class="active-section-head">
+    <div class="section-title">Aktywne wpisy</div>
+    <div class="main-filters">
+    <select id="mainStatusFilter" aria-label="Filtr wpisów">
+      <option value="all">Wszystkie</option>
+      <option value="ordered">Zlecone</option>
+      <option value="todo">Do wykonania</option>
+      <option value="done">Wykonane</option>
+      <option value="unpaid">Niezapłacone</option>
+    </select>
+    </div>
+  </div>
   <div class="records" id="recordsList"></div>
 </div>
 
@@ -613,7 +642,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
-// CleanFleet — wersja 49
+// CleanFleet — wersja 51
 // CleanFleet — Supabase connection
 const CF_SUPABASE_URL = 'https://nxmrobbhfqijmbjjzbof.supabase.co';
 const CF_SUPABASE_KEY = 'sb_publishable_9lz7NUv2-MloX7MEcH2-vQ_AZS8IIHz';
@@ -2533,6 +2562,9 @@ window.FLEET_DATA = {
   let registry = {};
   let options = JSON.parse(JSON.stringify(DEFAULT_OPTIONS));
   let editingId = null;
+  let invoices = [];
+  let invoiceItems = [];
+  let mainStatusFilter = 'all';
 
   function uid(){
     if(window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
@@ -2573,6 +2605,7 @@ window.FLEET_DATA = {
     records = (recordRows||[]).map(cfMapRecord);
     cfRemoteVehiclePlates = new Set((vehicleRows||[]).map(v=>v.plate));
     cfRemoteRecordIds = new Set((recordRows||[]).map(r=>r.id));
+    await cfLoadInvoices();
     cfLastSync = new Date();
     localStorage.setItem('cf-last-sync', cfLastSync.toISOString());
     renderPlateList();
@@ -2683,7 +2716,16 @@ window.FLEET_DATA = {
 
   function renderRecords(){
     const list = document.getElementById('recordsList');
-    const active = activeRecords();
+    let active = activeRecords();
+    active = active.filter(r => {
+      switch(mainStatusFilter){
+        case 'ordered': return r.zlecone;
+        case 'todo': return r.zlecone && !r.data_prania;
+        case 'done': return !!r.data_prania;
+        case 'unpaid': return !r.zaplacone;
+        default: return true;
+      }
+    });
     if(active.length === 0){
       list.innerHTML = `<div class="empty-state">Brak aktywnych wpisów.<br>Wyszukaj tablicę powyżej, aby dodać pranie.</div>`;
       return;
@@ -2708,7 +2750,12 @@ window.FLEET_DATA = {
         <div class="record-top" data-open="${r.id}">
           <div>
             <div class="record-plate">${escapeHtml(r.tablica)}</div>
-            <div class="record-meta">${r.zlecone && !r.zatwierdzone ? `Data: ${fmtDate(r.data_zlecenia)} · Opis: ${escapeHtml(r.uwagi||'—')}` : `Pranie: ${fmtDate(r.data_prania)} · Wykonał: ${escapeHtml(r.kto_wykonal||'—')}`}</div>
+            ${r.zlecone && !r.zatwierdzone ? `
+              <div class="record-meta">Zlecono: ${r.data_zlecenia ? fmtDate(r.data_zlecenia) : '—'} · Na: ${r.data_zlecenia_do ? fmtDate(r.data_zlecenia_do) : '—'} · Przez: ${escapeHtml(r.kto_zlecil||'—')}</div>
+              <div class="record-meta record-description">${escapeHtml(r.uwagi||'—')}</div>
+            ` : `
+              <div class="record-meta">Pranie: ${fmtDate(r.data_prania)} · Wykonał: ${escapeHtml(r.kto_wykonal||'—')}</div>
+            `}
           </div>
           <div style="text-align:right;">
             <div class="record-cost">${fmtMoney(r.koszt)}</div>
@@ -2832,7 +2879,7 @@ window.FLEET_DATA = {
 
           <div class="field-row">
             <div class="field">
-              <label id="dataPraniaLabel">${rec && rec.zlecone ? 'Na kiedy zlecił' : 'Data prania'}</label>
+              <label>Data prania</label>
               <div style="display:flex;gap:8px;align-items:center">
                 <input type="date" id="f_data_prania" value="${rec&&rec.data_prania?rec.data_prania:''}" style="flex:1;min-width:0">
                 <button type="button" class="btn btn-secondary" id="clearWashDateBtn" style="white-space:nowrap">Wyczyść</button>
@@ -2871,11 +2918,9 @@ window.FLEET_DATA = {
 
     const zleconeToggle = document.getElementById('f_zlecone');
     const orderFields = document.getElementById('orderFields');
-    const dataPraniaLabel = document.getElementById('dataPraniaLabel');
     const syncOrderFields = () => {
       const on = !!zleconeToggle?.checked;
       if(orderFields) orderFields.style.display = on ? 'block' : 'none';
-      if(dataPraniaLabel) dataPraniaLabel.textContent = on ? 'Na kiedy zlecił' : 'Data prania';
     };
     zleconeToggle?.addEventListener('change', syncOrderFields);
     syncOrderFields();
@@ -2948,7 +2993,7 @@ window.FLEET_DATA = {
     editingId = null;
   }
 
-  function showConfirm(title, text, onConfirm){
+  function showConfirm(title, text, onConfirm, onCancel){
     const html = `
       <div class="overlay" id="confirmOverlay">
         <div class="sheet" style="max-width:420px;">
@@ -2964,7 +3009,7 @@ window.FLEET_DATA = {
     document.getElementById('confirmOverlay').addEventListener('click', (e) => {
       if(e.target.id === 'confirmOverlay') closeModal();
     });
-    document.getElementById('confirmCancel').addEventListener('click', closeModal);
+    document.getElementById('confirmCancel').addEventListener('click', async () => { closeModal(); if(onCancel) await onCancel(); });
     document.getElementById('confirmOk').addEventListener('click', async () => {
       closeModal();
       await onConfirm();
@@ -3118,8 +3163,208 @@ window.FLEET_DATA = {
       <div class="report-sum"><span>Suma — pozostałe</span><span>${fmtMoney(otherSum)}</span></div>`;
   }
 
+
+  // --- Rozliczenia / faktury ---
+  async function cfLoadInvoices(){
+    invoices = [];
+    invoiceItems = [];
+    if(!cfSupabase) return;
+    try{
+      const {data:{session}} = await cfSupabase.auth.getSession();
+      if(!session) return;
+      const {data: inv, error: ie} = await cfSupabase
+        .from('invoices')
+        .select('id,invoice_number,invoice_date,period,amount,status,paid_at,created_at')
+        .order('created_at',{ascending:false});
+      if(ie){
+        console.warn('CleanFleet invoices unavailable:', ie.message);
+        return;
+      }
+      invoices = inv || [];
+      if(invoices.length){
+        const ids = invoices.map(x=>x.id);
+        const {data: items, error: ii} = await cfSupabase
+          .from('invoice_items')
+          .select('id,invoice_id,wash_record_id,plate,cost')
+          .in('invoice_id', ids);
+        if(!ii) invoiceItems = items || [];
+      }
+    }catch(e){
+      console.warn('CleanFleet invoice load error:', e);
+    }
+  }
+
+  async function cfCreateInvoiceFromRows(invoiceNumber, period, rows){
+    const {data:{session}} = await cfSupabase.auth.getSession();
+    if(!session?.user?.id) throw new Error('Brak zalogowanego użytkownika.');
+    const amount = rows.reduce((sum,r)=>sum+(Number(r.koszt)||0),0);
+    const existing = invoices.find(i => i.invoice_number === invoiceNumber);
+    if(existing){
+      return {existing:true, invoice:existing};
+    }
+    const {data: invoice, error: ie} = await cfSupabase.from('invoices').insert({
+      user_id: session.user.id,
+      invoice_number: invoiceNumber,
+      invoice_date: todayISO(),
+      period,
+      amount,
+      status:'pending'
+    }).select('id,invoice_number,invoice_date,period,amount,status,paid_at,created_at').single();
+    if(ie) throw new Error('Nie udało się zapisać faktury: '+ie.message);
+
+    const itemRows = rows.map(r=>({
+      invoice_id: invoice.id,
+      wash_record_id: r.id,
+      plate: r.tablica,
+      cost: Number(r.koszt)||0
+    }));
+    if(itemRows.length){
+      const {error: ii} = await cfSupabase.from('invoice_items').insert(itemRows);
+      if(ii){
+        await cfSupabase.from('invoices').delete().eq('id',invoice.id);
+        throw new Error('Nie udało się przypisać pojazdów do faktury: '+ii.message);
+      }
+    }
+    invoices.unshift(invoice);
+    invoiceItems.push(...itemRows.map((x,i)=>({...x,id: invoice.id+'-'+i})));
+    return {existing:false, invoice};
+  }
+
+  function invoiceRowsFor(invoiceId){
+    const ids = new Set(invoiceItems.filter(x=>x.invoice_id===invoiceId).map(x=>x.wash_record_id));
+    return records.filter(r=>ids.has(r.id));
+  }
+
+  async function cfMarkInvoicePaid(invoiceId){
+    const invoice = invoices.find(i=>i.id===invoiceId);
+    if(!invoice) return;
+    const rows = invoiceRowsFor(invoiceId);
+    const ids = rows.map(r=>r.id);
+    if(ids.length){
+      const {error} = await cfSupabase.from('wash_records').update({paid:true}).in('id',ids);
+      if(error) throw new Error('Nie udało się oznaczyć pojazdów jako zapłacone: '+error.message);
+      rows.forEach(r=>r.zaplacone=true);
+    }
+    const paidAt = new Date().toISOString();
+    const {error: ie} = await cfSupabase.from('invoices').update({status:'paid',paid_at:paidAt}).eq('id',invoiceId);
+    if(ie) throw new Error('Nie udało się oznaczyć faktury jako opłaconej: '+ie.message);
+    invoice.status='paid'; invoice.paid_at=paidAt;
+    await saveRecords();
+  }
+
+  function showFinanceQueue(){
+    menuOverlay.classList.remove('open');
+    const pending = invoices.filter(i=>i.status!=='paid');
+    const paid = invoices.filter(i=>i.status==='paid');
+    const pendingAmount = pending.reduce((s,i)=>s+Number(i.amount||0),0);
+    const paidAmount = paid.reduce((s,i)=>s+Number(i.amount||0),0);
+    const allInvoiced = invoices.reduce((s,i)=>s+Number(i.amount||0),0);
+
+    const summary = `<div class="finance-summary">
+      <div class="finance-card"><div class="finance-card-label">Zafakturowane</div><div class="finance-card-value">${fmtMoney(allInvoiced)}</div></div>
+      <div class="finance-card"><div class="finance-card-label">Oczekuje</div><div class="finance-card-value">${fmtMoney(pendingAmount)}</div></div>
+      <div class="finance-card"><div class="finance-card-label">Zapłacone</div><div class="finance-card-value">${fmtMoney(paidAmount)}</div></div>
+    </div>`;
+
+    const rows = invoices.map(inv=>{
+      const count = invoiceItems.filter(x=>x.invoice_id===inv.id).length;
+      const paid = inv.status==='paid';
+      return `<div class="invoice-row" data-invoice-open="${escapeHtml(inv.id)}">
+        <div class="invoice-row-top">
+          <div>
+            <div class="invoice-number">${escapeHtml(inv.invoice_number)}</div>
+            <div class="invoice-meta">${inv.invoice_date ? fmtDate(inv.invoice_date) : '—'} · ${count} pojazdów · ${fmtMoney(inv.amount)}</div>
+          </div>
+          <span class="invoice-status ${paid?'invoice-paid':'invoice-pending'}">${paid?'OPŁACONA':'OCZEKUJE'}</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    reportShell('Rozliczenia / faktury', summary + (rows || '<div class="empty-state" style="margin-top:14px;">Brak faktur.</div>'), '');
+    // reportShell puts body into #reportBody; summary is intentionally passed as controls.
+    document.querySelectorAll('[data-invoice-open]').forEach(el=>{
+      el.addEventListener('click',()=>showInvoiceDetails(el.getAttribute('data-invoice-open')));
+    });
+  }
+
+  function showInvoiceDetails(invoiceId){
+    const inv = invoices.find(i=>i.id===invoiceId);
+    if(!inv) return;
+    const rows = invoiceRowsFor(invoiceId);
+    const body = rows.length ? rows.map(r=>`<tr>
+      <td class="mono">${escapeHtml(r.tablica)}</td>
+      <td>${escapeHtml(r.typ||'—')}</td>
+      <td>${fmtDate(r.data_prania)}</td>
+      <td>${fmtMoney(r.koszt)}</td>
+      <td><span class="pill ${r.zaplacone?'pill-yes':'pill-no'}">${r.zaplacone?'TAK':'NIE'}</span></td>
+    </tr>`).join('') : '<tr><td colspan="5">Brak przypisanych wpisów.</td></tr>';
+    const paid = inv.status==='paid';
+    const bodyHtml = `<div class="confirm-text">Faktura <strong>${escapeHtml(inv.invoice_number)}</strong> · ${fmtMoney(inv.amount)} · ${rows.length} pojazdów</div>
+      <table class="report"><thead><tr><th>Tablica</th><th>Typ</th><th>Data prania</th><th>Kwota</th><th>Zapł.</th></tr></thead><tbody>${body}</tbody></table>
+      <div class="sheet-actions">
+        ${paid ? '<button class="btn btn-solid" disabled>✓ Faktura opłacona</button>' : '<button class="btn btn-solid" id="markInvoicePaidBtn">Faktura opłacona</button>'}
+        <button class="btn btn-outline" id="backFinanceBtn">Wróć</button>
+      </div>`;
+    reportShell('Szczegóły faktury', '', bodyHtml);
+    document.getElementById('backFinanceBtn').addEventListener('click', showFinanceQueue);
+    if(!paid){
+      document.getElementById('markInvoicePaidBtn').addEventListener('click',()=>{
+        showConfirm('Oznaczyć fakturę jako opłaconą?', `Wszystkie ${rows.length} przypisane pojazdy zostaną oznaczone jako zapłacone.`, async()=>{
+          try{
+            await cfMarkInvoicePaid(invoiceId);
+            showToast('Faktura opłacona — pojazdy oznaczone jako zapłacone');
+            showFinanceQueue();
+            renderRecords();
+          }catch(e){ showToast(e.message || 'Nie udało się oznaczyć faktury'); }
+        });
+      });
+    }
+  }
+
+  function showStatsReport(selectedMonth){
+    const now = new Date();
+    const defaultMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const month = selectedMonth || defaultMonth;
+    const rows = records.filter(r=>r.data_prania && r.data_prania.slice(0,7)===month);
+    const invoicedRows = rows.filter(r=>invoices.some(i=>invoiceItems.some(x=>x.invoice_id===i.id && x.wash_record_id===r.id)));
+    const paidRows = rows.filter(r=>r.zaplacone);
+    const invoicedAmount = invoicedRows.reduce((s,r)=>s+Number(r.koszt||0),0);
+    const paidAmount = paidRows.reduce((s,r)=>s+Number(r.koszt||0),0);
+    const pendingAmount = Math.max(0, invoicedAmount - paidAmount);
+    const controls = `<div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:4px 0 14px;">
+      <label for="statsMonthPicker" style="font-size:13px;color:var(--ink-soft);">Miesiąc</label>
+      <select id="statsMonthPicker" style="padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:#fff;color:var(--ink);font-size:13px;min-width:170px;">${cfMonthOptions(month)}</select>
+    </div>`;
+    const html=`<div class="finance-summary">
+      <div class="finance-card"><div class="finance-card-label">Prania w miesiącu</div><div class="finance-card-value">${rows.length}</div></div>
+      <div class="finance-card"><div class="finance-card-label">Zafakturowane</div><div class="finance-card-value">${fmtMoney(invoicedAmount)}</div></div>
+      <div class="finance-card"><div class="finance-card-label">Oczekuje</div><div class="finance-card-value">${fmtMoney(pendingAmount)}</div></div>
+      <div class="finance-card"><div class="finance-card-label">Zapłacone</div><div class="finance-card-value">${fmtMoney(paidAmount)}</div></div>
+    </div>`;
+    reportShell('Statystyki finansowe', controls, html);
+    document.getElementById('statsMonthPicker').addEventListener('change', e=>showStatsReport(e.target.value));
+  }
+
+  function cfMonthOptions(selected){
+    const now=new Date();
+    let html='';
+    for(let i=0;i<24;i++){
+      const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+      const value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      const label=d.toLocaleDateString('pl-PL',{month:'long',year:'numeric'});
+      html += `<option value="${value}" ${value===selected?'selected':''}>${label}</option>`;
+    }
+    return html;
+  }
+
   document.getElementById('exportPdfBtn').addEventListener('click', showPdfExportModal);
   document.getElementById('exportExcelBtn').addEventListener('click', cfExportExcel);
+  document.getElementById('financeBtn').addEventListener('click', showFinanceQueue);
+  document.getElementById('statsBtn').addEventListener('click', showStatsReport);
+  document.getElementById('mainStatusFilter').addEventListener('change', (e)=>{
+    mainStatusFilter = e.target.value;
+    renderRecords();
+  });
   document.getElementById('cfLogoutBtn').addEventListener('click', async ()=>{
     const btn = document.getElementById('cfLogoutBtn');
     if(btn) btn.disabled = true;
@@ -3309,6 +3554,11 @@ window.FLEET_DATA = {
       .filter(r => selectedVehicleTypes.includes(pdfBillingCategoryKey(r)))
       .sort((a,b) => a.data_prania.localeCompare(b.data_prania));
 
+    if(rows.length === 0){
+      showToast('Brak zatwierdzonych prań dla wybranych ustawień');
+      return;
+    }
+
     const activeCols = PDF_COLUMNS.filter(c => selectedCols.includes(c.key));
 
     showToast('Generuję PDF…');
@@ -3389,10 +3639,10 @@ window.FLEET_DATA = {
     const safeInvoice = invoiceNumber.replace(/[^a-zA-Z0-9._-]+/g,'_');
     const filename = `zalacznik-do-faktury-${safeInvoice}-${val}.pdf`;
     const blobUrl = doc.output('bloburl');
-    showPdfPreview(blobUrl, filename);
+    showPdfPreview(blobUrl, filename, {invoiceNumber, period:val, rows});
   }
 
-  function showPdfPreview(blobUrl, filename){
+  function showPdfPreview(blobUrl, filename, invoiceContext){
     const html = `
       <div class="overlay" id="pdfPreviewOverlay" style="align-items:center;">
         <div class="sheet" style="max-width:760px;width:96%;height:88vh;display:flex;flex-direction:column;padding-bottom:16px;">
@@ -3402,7 +3652,7 @@ window.FLEET_DATA = {
           </div>
           <iframe src="${blobUrl}" title="Podgląd PDF" style="flex:1;width:100%;border:1px solid var(--line-strong);border-radius:8px;background:#fff;"></iframe>
           <div class="sheet-actions">
-            <a class="btn btn-solid" href="${blobUrl}" download="${escapeHtml(filename)}" style="flex:1;text-align:center;text-decoration:none;">Pobierz plik</a>
+            <a class="btn btn-solid" id="pdfDownloadBtn" href="${blobUrl}" download="${escapeHtml(filename)}" style="flex:1;text-align:center;text-decoration:none;">Pobierz plik</a>
             <a class="btn btn-outline" href="${blobUrl}" target="_blank" rel="noopener" style="flex:1;text-align:center;text-decoration:none;">Otwórz w nowej karcie</a>
           </div>
         </div>
@@ -3410,6 +3660,36 @@ window.FLEET_DATA = {
     document.getElementById('modalRoot').innerHTML = html;
     document.getElementById('pdfPreviewOverlay').addEventListener('click', (e) => { if(e.target.id === 'pdfPreviewOverlay') closeModal(); });
     document.querySelector('[data-close]').addEventListener('click', closeModal);
+    const downloadBtn = document.getElementById('pdfDownloadBtn');
+    downloadBtn.addEventListener('click', (e)=>{
+      e.preventDefault();
+      const count = invoiceContext.rows.length;
+      const amount = invoiceContext.rows.reduce((sum,r)=>sum+(Number(r.koszt)||0),0);
+      const downloadFile = () => {
+        const a = document.createElement('a');
+        a.href = blobUrl; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+      };
+      showConfirm(
+        'Zapisać fakturę do płatności?',
+        `Faktura ${invoiceContext.invoiceNumber} · ${count} pojazdów · ${fmtMoney(amount)}. Zapisz ją w kolejce „Oczekuje na płatność”?`,
+        async ()=>{
+          try{
+            const result = await cfCreateInvoiceFromRows(invoiceContext.invoiceNumber, invoiceContext.period, invoiceContext.rows);
+            if(result.existing) showToast('Ta faktura jest już w kolejce');
+            else showToast('Faktura dodana do kolejki „Oczekuje na płatność”');
+          }catch(err){
+            console.error('CleanFleet invoice save error:', err);
+            showToast(err?.message || 'Nie udało się zapisać faktury');
+          }finally{
+            downloadFile();
+          }
+        },
+        async ()=>{
+          downloadFile();
+        }
+      );
+    });
   }
 
   function showMonthReport(){
@@ -3424,7 +3704,14 @@ window.FLEET_DATA = {
       const val = document.getElementById('monthPicker').value;
       const rows = records.filter(r => r.zatwierdzone && r.data_prania && r.data_prania.slice(0,7) === val)
         .sort((a,b) => a.data_prania.localeCompare(b.data_prania));
-      document.getElementById('reportBody').innerHTML = tableHtml(rows);
+      const total = rows.reduce((s,r)=>s+Number(r.koszt||0),0);
+      const paid = rows.filter(r=>r.zaplacone).reduce((s,r)=>s+Number(r.koszt||0),0);
+      const outstanding = total-paid;
+      document.getElementById('reportBody').innerHTML = `<div class="finance-summary">
+        <div class="finance-card"><div class="finance-card-label">Liczba prań</div><div class="finance-card-value">${rows.length}</div></div>
+        <div class="finance-card"><div class="finance-card-label">Wartość</div><div class="finance-card-value">${fmtMoney(total)}</div></div>
+        <div class="finance-card"><div class="finance-card-label">Do zapłaty</div><div class="finance-card-value">${fmtMoney(outstanding)}</div></div>
+      </div>${tableHtml(rows)}`;
     };
     document.getElementById('monthPicker').addEventListener('change', update);
     update();
@@ -3446,7 +3733,13 @@ window.FLEET_DATA = {
       const val = document.getElementById('yearPicker').value;
       const rows = records.filter(r => r.zatwierdzone && r.zaplacone && r.data_prania && r.data_prania.slice(0,4) === val)
         .sort((a,b) => a.data_prania.localeCompare(b.data_prania));
-      document.getElementById('reportBody').innerHTML = tableHtml(rows);
+      const total = rows.reduce((s,r)=>s+Number(r.koszt||0),0);
+      const paid = rows.filter(r=>r.zaplacone).reduce((s,r)=>s+Number(r.koszt||0),0);
+      document.getElementById('reportBody').innerHTML = `<div class="finance-summary">
+        <div class="finance-card"><div class="finance-card-label">Liczba prań</div><div class="finance-card-value">${rows.length}</div></div>
+        <div class="finance-card"><div class="finance-card-label">Wartość</div><div class="finance-card-value">${fmtMoney(total)}</div></div>
+        <div class="finance-card"><div class="finance-card-label">Zapłacone</div><div class="finance-card-value">${fmtMoney(paid)}</div></div>
+      </div>${tableHtml(rows)}`;
     };
     document.getElementById('yearPicker').addEventListener('change', update);
     update();
@@ -3512,7 +3805,7 @@ window.FLEET_DATA = {
         <td>${escapeHtml(r.typ)}</td>
         <td class="mono">${escapeHtml(r.tablica)}</td>
         <td>${escapeHtml(r.marka)}</td>
-        <td>${r.data_prania ? fmtDate(r.data_prania) : '<span class="record-badge">brak wpisu</span>'}</td>
+        <td>${r.data_prania ? `<span class="vehicle-last-wash">${fmtDate(r.data_prania)}${(() => { const days=Math.floor((Date.now()-new Date(r.data_prania+'T00:00:00').getTime())/86400000); return days>=30 ? ` · ⚠️ ${days} dni` : ''; })()}</span>` : '<span class="record-badge">brak wpisu</span>'}</td>
         <td>${r.zatwierdzone===null ? '—' : `<span class="pill ${r.zatwierdzone?'pill-yes':'pill-no'}">${r.zatwierdzone?'TAK':'NIE'}</span>`}</td>
         <td>${r.zaplacone===null ? '—' : `<span class="pill ${r.zaplacone?'pill-yes':'pill-no'}">${r.zaplacone?'TAK':'NIE'}</span>`}</td>
       </tr>`).join('');
@@ -3861,61 +4154,6 @@ window.FLEET_DATA = {
 
   cfBoot();
 })();
-</script>
-
-
-<script id="v52-ui">
-document.addEventListener('DOMContentLoaded', () => {
-  // Move the active-entry filter to the same line as the heading.
-  const headings = [...document.querySelectorAll('h1,h2,h3,.section-title')];
-  const heading = headings.find(el => /aktywne wpisy/i.test(el.textContent || ''));
-  if (heading) {
-    let filter = document.querySelector('#activeFilter, #statusFilter, select[data-active-filter]');
-    if (!filter) {
-      filter = [...document.querySelectorAll('select')].find(s => {
-        const t = [...s.options].map(o => o.textContent).join(' ');
-        return /zlecone|wykonane|niezapłacone|wszystkie/i.test(t);
-      });
-    }
-    if (filter) {
-      const row = document.createElement('div');
-      row.className = 'active-header-row';
-      const parent = heading.parentElement;
-      parent.insertBefore(row, heading);
-      row.appendChild(heading);
-      row.appendChild(filter);
-      filter.classList.add('active-filter');
-    }
-  }
-
-  // Add month selector to the finance statistics section if one isn't present.
-  const financeHeading = [...document.querySelectorAll('h1,h2,h3,.section-title')]
-    .find(el => /statystyki finansowe/i.test(el.textContent || ''));
-  if (financeHeading && !document.getElementById('financeMonthV52')) {
-    const row = document.createElement('div');
-    row.className = 'finance-month-row';
-    const label = document.createElement('label');
-    label.textContent = 'Miesiąc:';
-    label.htmlFor = 'financeMonthV52';
-    const select = document.createElement('select');
-    select.id = 'financeMonthV52';
-    row.append(label, select);
-    financeHeading.parentElement.insertBefore(row, financeHeading.nextSibling);
-
-    const now = new Date();
-    for (let i=0; i<24; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
-      const opt = document.createElement('option');
-      opt.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      opt.textContent = d.toLocaleDateString('pl-PL',{month:'long',year:'numeric'});
-      select.appendChild(opt);
-    }
-    select.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-    select.addEventListener('change', () => {
-      document.dispatchEvent(new CustomEvent('cleanfleet:finance-month-change',{detail:{month:select.value}}));
-    });
-  }
-});
 </script>
 
 </body>

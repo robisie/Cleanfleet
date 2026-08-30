@@ -601,7 +601,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
-// CleanFleet — wersja 38
+// CleanFleet — wersja 49
 // CleanFleet — Supabase connection
 const CF_SUPABASE_URL = 'https://nxmrobbhfqijmbjjzbof.supabase.co';
 const CF_SUPABASE_KEY = 'sb_publishable_9lz7NUv2-MloX7MEcH2-vQ_AZS8IIHz';
@@ -2546,14 +2546,14 @@ window.FLEET_DATA = {
   }
 
   function cfMapVehicle(row){ return { plate: row.plate, type: row.type || '', brand: row.brand || '' }; }
-  function cfMapRecord(row){ return { id: row.id, tablica: row.plate, typ: row.type || '', marka: row.brand || '', billing_category: row.billing_category || '', zlecone: !!row.ordered, kto_zlecil: row.ordered_by || '', data_zlecenia: row.order_date || '', uwagi: row.notes || '', data_prania: row.wash_date || '', kto_wykonal: row.performed_by || '', koszt: Number(row.cost)||0, zatwierdzone: !!row.approved, zaplacone: !!row.paid, created_at: new Date(row.created_at).getTime() || Date.now() }; }
-  function cfRecordToDb(r){ return { id:r.id, plate:r.tablica, type:r.typ||'', brand:r.marka||'', billing_category:r.billing_category||null, ordered:!!r.zlecone, ordered_by:r.kto_zlecil||'', order_date:r.data_zlecenia||null, notes:r.uwagi||'', wash_date:r.data_prania||null, performed_by:r.kto_wykonal||'', cost:Number(r.koszt)||0, approved:!!r.zatwierdzone, paid:!!r.zaplacone, created_at:new Date(r.created_at||Date.now()).toISOString() }; }
+  function cfMapRecord(row){ return { id: row.id, tablica: row.plate, typ: row.type || '', marka: row.brand || '', billing_category: row.billing_category || '', zlecone: !!row.ordered, kto_zlecil: row.ordered_by || '', data_zlecenia: row.order_date || '', data_zlecenia_do: row.order_due_date || '', uwagi: row.notes || '', data_prania: row.wash_date || '', kto_wykonal: row.performed_by || '', koszt: Number(row.cost)||0, zatwierdzone: !!row.approved, zaplacone: !!row.paid, created_at: new Date(row.created_at).getTime() || Date.now() }; }
+  function cfRecordToDb(r){ return { id:r.id, plate:r.tablica, type:r.typ||'', brand:r.marka||'', billing_category:r.billing_category||null, ordered:!!r.zlecone, ordered_by:r.kto_zlecil||'', order_date:r.data_zlecenia||null, order_due_date:r.data_zlecenia_do||null, notes:r.uwagi||'', wash_date:r.data_prania||null, performed_by:r.kto_wykonal||'', cost:Number(r.koszt)||0, approved:!!r.zatwierdzone, paid:!!r.zaplacone, created_at:new Date(r.created_at||Date.now()).toISOString() }; }
 
   async function loadAll(){
     cfSetSync('Pobieranie aktualnych danych…');
     const { data: vehicleRows, error: ve } = await cfSupabase.from('vehicles').select('plate,type,brand').order('plate');
     if(ve){ cfSetSync('Błąd bazy: '+ve.message,'err'); showToast('Nie udało się pobrać pojazdów'); return; }
-    const { data: recordRows, error: re } = await cfSupabase.from('wash_records').select('id,plate,type,brand,billing_category,ordered,ordered_by,order_date,notes,wash_date,performed_by,cost,approved,paid,created_at').order('created_at',{ascending:false});
+    const { data: recordRows, error: re } = await cfSupabase.from('wash_records').select('id,plate,type,brand,billing_category,ordered,ordered_by,order_date,order_due_date,notes,wash_date,performed_by,cost,approved,paid,created_at').order('created_at',{ascending:false});
     if(re){ cfSetSync('Błąd bazy: '+re.message,'err'); showToast('Nie udało się pobrać wpisów'); return; }
 
     registry = {};
@@ -2806,6 +2806,10 @@ window.FLEET_DATA = {
                 <label>Kiedy zlecił</label>
                 <input type="date" id="f_data_zlecenia" value="${rec&&rec.data_zlecenia?rec.data_zlecenia:''}">
               </div>
+              <div class="field">
+                <label>Na kiedy zlecił</label>
+                <input type="date" id="f_data_zlecenia_do" value="${rec&&rec.data_zlecenia_do?rec.data_zlecenia_do:''}">
+              </div>
             </div>
           </div>
 
@@ -2889,6 +2893,7 @@ window.FLEET_DATA = {
     const zlecone = document.getElementById('f_zlecone').checked;
     const kto_zlecil = document.getElementById('f_kto_zlecil').value.trim();
     const data_zlecenia = document.getElementById('f_data_zlecenia').value;
+    const data_zlecenia_do = document.getElementById('f_data_zlecenia_do')?.value || '';
     const uwagi = document.getElementById('f_uwagi').value.trim();
     const data_prania = document.getElementById('f_data_prania').value;
     const kto_wykonal = document.getElementById('f_kto_wykonal').value.trim();
@@ -2908,12 +2913,12 @@ window.FLEET_DATA = {
 
     if(editingId){
       const rec = records.find(x => x.id === editingId);
-      Object.assign(rec, { tablica: plate, typ, marka, billing_category, zlecone, kto_zlecil, data_zlecenia, uwagi, data_prania, kto_wykonal, koszt });
+      Object.assign(rec, { tablica: plate, typ, marka, billing_category, zlecone, kto_zlecil, data_zlecenia, data_zlecenia_do, uwagi, data_prania, kto_wykonal, koszt });
     } else {
       records.push({
         id: uid(),
         tablica: plate,
-        typ, marka, billing_category, zlecone, kto_zlecil, data_zlecenia, uwagi, data_prania, kto_wykonal, koszt,
+        typ, marka, billing_category, zlecone, kto_zlecil, data_zlecenia, data_zlecenia_do, uwagi, data_prania, kto_wykonal, koszt,
         zatwierdzone: false,
         zaplacone: false,
         created_at: Date.now()

@@ -201,6 +201,7 @@
     letter-spacing:0.03em;
   }
   .record-meta{font-size:12.5px;color:var(--ink-soft);margin-top:3px;}
+  .record-description{margin-top:4px;line-height:1.35;}
   .record-badge{
     font-family:'JetBrains Mono',monospace;
     font-size:10.5px;
@@ -2696,7 +2697,12 @@ window.FLEET_DATA = {
         <div class="record-top" data-open="${r.id}">
           <div>
             <div class="record-plate">${escapeHtml(r.tablica)}</div>
-            <div class="record-meta">${r.zlecone && !r.zatwierdzone ? `Data: ${fmtDate(r.data_zlecenia)} · Opis: ${escapeHtml(r.uwagi||'—')}` : `Pranie: ${fmtDate(r.data_prania)} · Wykonał: ${escapeHtml(r.kto_wykonal||'—')}`}</div>
+            ${r.zlecone && !r.zatwierdzone ? `
+              <div class="record-meta">Zlecono: ${r.data_zlecenia ? fmtDate(r.data_zlecenia) : '—'} · Na: ${r.data_zlecenia_do ? fmtDate(r.data_zlecenia_do) : '—'} · Przez: ${escapeHtml(r.kto_zlecil||'—')}</div>
+              <div class="record-meta record-description">${escapeHtml(r.uwagi||'—')}</div>
+            ` : `
+              <div class="record-meta">Pranie: ${fmtDate(r.data_prania)} · Wykonał: ${escapeHtml(r.kto_wykonal||'—')}</div>
+            `}
           </div>
           <div style="text-align:right;">
             <div class="record-cost">${fmtMoney(r.koszt)}</div>
@@ -2820,7 +2826,7 @@ window.FLEET_DATA = {
 
           <div class="field-row">
             <div class="field">
-              <label id="dataPraniaLabel">${rec && rec.zlecone ? 'Na kiedy zlecił' : 'Data prania'}</label>
+              <label>Data prania</label>
               <div style="display:flex;gap:8px;align-items:center">
                 <input type="date" id="f_data_prania" value="${rec&&rec.data_prania?rec.data_prania:''}" style="flex:1;min-width:0">
                 <button type="button" class="btn btn-secondary" id="clearWashDateBtn" style="white-space:nowrap">Wyczyść</button>
@@ -2859,11 +2865,9 @@ window.FLEET_DATA = {
 
     const zleconeToggle = document.getElementById('f_zlecone');
     const orderFields = document.getElementById('orderFields');
-    const dataPraniaLabel = document.getElementById('dataPraniaLabel');
     const syncOrderFields = () => {
       const on = !!zleconeToggle?.checked;
       if(orderFields) orderFields.style.display = on ? 'block' : 'none';
-      if(dataPraniaLabel) dataPraniaLabel.textContent = on ? 'Na kiedy zlecił' : 'Data prania';
     };
     zleconeToggle?.addEventListener('change', syncOrderFields);
     syncOrderFields();

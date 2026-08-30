@@ -358,11 +358,7 @@
   .pill-no{background:var(--red-bg);color:var(--red);}
 
   .report-controls{display:flex;gap:10px;align-items:center;margin-top:14px;}
-  .main-filters{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 2px;}
-  .active-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:28px 0 12px;}
-  .active-section-head .section-title{margin:0;}
-  .active-section-head .main-filters{margin:0;}
-  .active-section-head .main-filters select{min-width:145px;}
+  .main-filters{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 2px;}
   .main-filters select{padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:#fff;color:var(--ink);font-size:13px;}
   .finance-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;}
   .finance-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;}
@@ -611,9 +607,8 @@
 </div>
 
 <div class="wrap">
-  <div class="active-section-head">
-    <div class="section-title">Aktywne wpisy</div>
-    <div class="main-filters">
+  <div class="section-title">Aktywne wpisy</div>
+  <div class="main-filters">
     <select id="mainStatusFilter" aria-label="Filtr wpisów">
       <option value="all">Wszystkie</option>
       <option value="ordered">Zlecone</option>
@@ -621,7 +616,6 @@
       <option value="done">Wykonane</option>
       <option value="unpaid">Niezapłacone</option>
     </select>
-    </div>
   </div>
   <div class="records" id="recordsList"></div>
 </div>
@@ -3254,19 +3248,42 @@ window.FLEET_DATA = {
 
   function showFinanceQueue(){
     menuOverlay.classList.remove('open');
-    const pending = invoices.filter(i=>i.status!=='paid');
-    const paid = invoices.filter(i=>i.status==='paid');
+
+    // Statystyki finansowe dotyczą wybranego miesiąca faktur.
+    const now = new Date();
+    const defaultMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const monthOptions = [];
+    for(let i=0;i<24;i++){
+      const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+      const value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      monthOptions.push(`<option value="${value}">${d.toLocaleDateString('pl-PL',{month:'long',year:'numeric'})}</option>`);
+    }
+
+    const monthInvoices = invoices.filter(i => (i.invoice_date||'').slice(0,7) === defaultMonth);
+    const pending = monthInvoices.filter(i=>i.status!=='paid');
+    const paid = monthInvoices.filter(i=>i.status==='paid');
+
+    // WAŻNE: „Oczekuje” jest sumą niezapłaconych FAKTUR.
+    // Ręczne oznaczenie pojedynczego prania jako zapłacone nie zmniejsza tej wartości,
+    // jeśli nie jest powiązane z opłaconą fakturą.
     const pendingAmount = pending.reduce((s,i)=>s+Number(i.amount||0),0);
-    const paidAmount = paid.reduce((s,i)=>s+Number(i.amount||0),0);
-    const allInvoiced = invoices.reduce((s,i)=>s+Number(i.amount||0),0);
+    const paidRowsAmount = records.filter(r => r.data_prania && r.data_prania.slice(0,7) === defaultMonth && r.zaplacone).reduce((s,r)=>s+Number(r.koszt||0),0);
+    const allInvoiced = monthInvoices.reduce((s,i)=>s+Number(i.amount||0),0);
+
+    const controls = `<div class="finance-month-row" style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-bottom:12px;">
+      <label for="financeMonthPicker" style="font-size:12px;color:var(--ink-soft);">Miesiąc:</label>
+      <select id="financeMonthPicker" style="min-width:175px;">
+        ${monthOptions.join('')}
+      </select>
+    </div>`;
 
     const summary = `<div class="finance-summary">
       <div class="finance-card"><div class="finance-card-label">Zafakturowane</div><div class="finance-card-value">${fmtMoney(allInvoiced)}</div></div>
       <div class="finance-card"><div class="finance-card-label">Oczekuje</div><div class="finance-card-value">${fmtMoney(pendingAmount)}</div></div>
-      <div class="finance-card"><div class="finance-card-label">Zapłacone</div><div class="finance-card-value">${fmtMoney(paidAmount)}</div></div>
+      <div class="finance-card"><div class="finance-card-label">Zapłacone</div><div class="finance-card-value">${fmtMoney(paidRowsAmount)}</div></div>
     </div>`;
 
-    const rows = invoices.map(inv=>{
+    const rows = monthInvoices.map(inv=>{
       const count = invoiceItems.filter(x=>x.invoice_id===inv.id).length;
       const paid = inv.status==='paid';
       return `<div class="invoice-row" data-invoice-open="${escapeHtml(inv.id)}">
@@ -3280,8 +3297,42 @@ window.FLEET_DATA = {
       </div>`;
     }).join('');
 
-    reportShell('Rozliczenia / faktury', summary + (rows || '<div class="empty-state" style="margin-top:14px;">Brak faktur.</div>'), '');
-    // reportShell puts body into #reportBody; summary is intentionally passed as controls.
+    reportShell('Statystyki finansowe', controls + summary + (rows || '<div class="empty-state" style="margin-top:14px;">Brak faktur w wybranym miesiącu.</div>'), '');
+
+    const picker = document.getElementById('financeMonthPicker');
+    if(picker){
+      picker.value = defaultMonth;
+      picker.addEventListener('change', ()=>{
+        const selected = picker.value;
+        const selectedInvoices = invoices.filter(i => (i.invoice_date||'').slice(0,7) === selected);
+        const selectedPending = selectedInvoices.filter(i=>i.status!=='paid');
+        const selectedPaid = selectedInvoices.filter(i=>i.status==='paid');
+        const setCard = (label, value) => {
+          const card = [...document.querySelectorAll('.finance-card')].find(c => c.querySelector('.finance-card-label')?.textContent.trim() === label);
+          if(card) card.querySelector('.finance-card-value').textContent = fmtMoney(value);
+        };
+        setCard('Zafakturowane', selectedInvoices.reduce((sum,i)=>sum+Number(i.amount||0),0));
+        setCard('Oczekuje', selectedPending.reduce((sum,i)=>sum+Number(i.amount||0),0));
+        setCard('Zapłacone', records.filter(r => r.data_prania && r.data_prania.slice(0,7) === selected && r.zaplacone).reduce((sum,r)=>sum+Number(r.koszt||0),0));
+        document.querySelectorAll('[data-invoice-open]').forEach(el=>el.style.display='none');
+        const targetRows = selectedInvoices.map(inv=>{
+          const count = invoiceItems.filter(x=>x.invoice_id===inv.id).length;
+          const paid = inv.status==='paid';
+          return `<div class="invoice-row" data-invoice-open="${escapeHtml(inv.id)}">
+            <div class="invoice-row-top"><div><div class="invoice-number">${escapeHtml(inv.invoice_number)}</div>
+            <div class="invoice-meta">${inv.invoice_date ? fmtDate(inv.invoice_date) : '—'} · ${count} pojazdów · ${fmtMoney(inv.amount)}</div></div>
+            <span class="invoice-status ${paid?'invoice-paid':'invoice-pending'}">${paid?'OPŁACONA':'OCZEKUJE'}</span></div></div>`;
+        }).join('');
+        const marker = document.querySelector('.finance-summary');
+        if(marker){
+          marker.insertAdjacentHTML('afterend', targetRows || '<div class="empty-state" style="margin-top:14px;">Brak faktur w wybranym miesiącu.</div>');
+          // Remove old invoice rows, which were hidden above.
+        }
+        document.querySelectorAll('[data-invoice-open]').forEach(el=>{
+          if(el.style.display!=='none') el.addEventListener('click',()=>showInvoiceDetails(el.getAttribute('data-invoice-open')));
+        });
+      });
+    }
     document.querySelectorAll('[data-invoice-open]').forEach(el=>{
       el.addEventListener('click',()=>showInvoiceDetails(el.getAttribute('data-invoice-open')));
     });
@@ -3321,40 +3372,18 @@ window.FLEET_DATA = {
     }
   }
 
-  function showStatsReport(selectedMonth){
+  function showStatsReport(){
     const now = new Date();
-    const defaultMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-    const month = selectedMonth || defaultMonth;
+    const month = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
     const rows = records.filter(r=>r.data_prania && r.data_prania.slice(0,7)===month);
-    const invoicedRows = rows.filter(r=>invoices.some(i=>invoiceItems.some(x=>x.invoice_id===i.id && x.wash_record_id===r.id)));
+    const invoicedRows = rows.filter(r=>r.zatwierdzone && invoices.some(i=>invoiceItems.some(x=>x.invoice_id===i.id && x.wash_record_id===r.id)));
     const paidRows = rows.filter(r=>r.zaplacone);
-    const invoicedAmount = invoicedRows.reduce((s,r)=>s+Number(r.koszt||0),0);
-    const paidAmount = paidRows.reduce((s,r)=>s+Number(r.koszt||0),0);
-    const pendingAmount = Math.max(0, invoicedAmount - paidAmount);
-    const controls = `<div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:4px 0 14px;">
-      <label for="statsMonthPicker" style="font-size:13px;color:var(--ink-soft);">Miesiąc</label>
-      <select id="statsMonthPicker" style="padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:#fff;color:var(--ink);font-size:13px;min-width:170px;">${cfMonthOptions(month)}</select>
-    </div>`;
     const html=`<div class="finance-summary">
       <div class="finance-card"><div class="finance-card-label">Prania w miesiącu</div><div class="finance-card-value">${rows.length}</div></div>
-      <div class="finance-card"><div class="finance-card-label">Zafakturowane</div><div class="finance-card-value">${fmtMoney(invoicedAmount)}</div></div>
-      <div class="finance-card"><div class="finance-card-label">Oczekuje</div><div class="finance-card-value">${fmtMoney(pendingAmount)}</div></div>
-      <div class="finance-card"><div class="finance-card-label">Zapłacone</div><div class="finance-card-value">${fmtMoney(paidAmount)}</div></div>
+      <div class="finance-card"><div class="finance-card-label">Wartość prania</div><div class="finance-card-value">${fmtMoney(rows.reduce((s,r)=>s+Number(r.koszt||0),0))}</div></div>
+      <div class="finance-card"><div class="finance-card-label">Zapłacone</div><div class="finance-card-value">${fmtMoney(paidRows.reduce((s,r)=>s+Number(r.koszt||0),0))}</div></div>
     </div>`;
-    reportShell('Statystyki finansowe', controls, html);
-    document.getElementById('statsMonthPicker').addEventListener('change', e=>showStatsReport(e.target.value));
-  }
-
-  function cfMonthOptions(selected){
-    const now=new Date();
-    let html='';
-    for(let i=0;i<24;i++){
-      const d=new Date(now.getFullYear(),now.getMonth()-i,1);
-      const value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      const label=d.toLocaleDateString('pl-PL',{month:'long',year:'numeric'});
-      html += `<option value="${value}" ${value===selected?'selected':''}>${label}</option>`;
-    }
-    return html;
+    reportShell('Statystyki finansowe', html, `<div class="confirm-text" style="margin-top:14px;">Bieżący miesiąc · ${fmtDate(month+'-01').slice(3)}</div>`);
   }
 
   document.getElementById('exportPdfBtn').addEventListener('click', showPdfExportModal);

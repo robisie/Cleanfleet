@@ -2,6 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
+<!-- CleanFleet v54 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -3283,7 +3284,7 @@ window.FLEET_DATA = {
       <div class="finance-card"><div class="finance-card-label">Zapłacone</div><div class="finance-card-value">${fmtMoney(paidRowsAmount)}</div></div>
     </div>`;
 
-    const rows = monthInvoices.map(inv=>{
+    const renderInvoiceRows = (list) => list.map(inv=>{
       const count = invoiceItems.filter(x=>x.invoice_id===inv.id).length;
       const paid = inv.status==='paid';
       return `<div class="invoice-row" data-invoice-open="${escapeHtml(inv.id)}">
@@ -3297,7 +3298,14 @@ window.FLEET_DATA = {
       </div>`;
     }).join('');
 
-    reportShell('Statystyki finansowe', controls + summary + (rows || '<div class="empty-state" style="margin-top:14px;">Brak faktur w wybranym miesiącu.</div>'), '');
+    const initialInvoiceHtml = rows || '<div class="empty-state" style="margin-top:14px;">Brak faktur w wybranym miesiącu.</div>';
+    reportShell('Statystyki finansowe', controls + summary + `<div id="financeInvoiceList">${initialInvoiceHtml}</div>`, '');
+
+    const attachInvoiceHandlers = () => {
+      document.querySelectorAll('#financeInvoiceList [data-invoice-open]').forEach(el=>{
+        el.addEventListener('click',()=>showInvoiceDetails(el.getAttribute('data-invoice-open')));
+      });
+    };
 
     const picker = document.getElementById('financeMonthPicker');
     if(picker){
@@ -3306,36 +3314,26 @@ window.FLEET_DATA = {
         const selected = picker.value;
         const selectedInvoices = invoices.filter(i => (i.invoice_date||'').slice(0,7) === selected);
         const selectedPending = selectedInvoices.filter(i=>i.status!=='paid');
-        const selectedPaid = selectedInvoices.filter(i=>i.status==='paid');
+
         const setCard = (label, value) => {
           const card = [...document.querySelectorAll('.finance-card')].find(c => c.querySelector('.finance-card-label')?.textContent.trim() === label);
           if(card) card.querySelector('.finance-card-value').textContent = fmtMoney(value);
         };
+
         setCard('Zafakturowane', selectedInvoices.reduce((sum,i)=>sum+Number(i.amount||0),0));
         setCard('Oczekuje', selectedPending.reduce((sum,i)=>sum+Number(i.amount||0),0));
         setCard('Zapłacone', records.filter(r => r.data_prania && r.data_prania.slice(0,7) === selected && r.zaplacone).reduce((sum,r)=>sum+Number(r.koszt||0),0));
-        document.querySelectorAll('[data-invoice-open]').forEach(el=>el.style.display='none');
-        const targetRows = selectedInvoices.map(inv=>{
-          const count = invoiceItems.filter(x=>x.invoice_id===inv.id).length;
-          const paid = inv.status==='paid';
-          return `<div class="invoice-row" data-invoice-open="${escapeHtml(inv.id)}">
-            <div class="invoice-row-top"><div><div class="invoice-number">${escapeHtml(inv.invoice_number)}</div>
-            <div class="invoice-meta">${inv.invoice_date ? fmtDate(inv.invoice_date) : '—'} · ${count} pojazdów · ${fmtMoney(inv.amount)}</div></div>
-            <span class="invoice-status ${paid?'invoice-paid':'invoice-pending'}">${paid?'OPŁACONA':'OCZEKUJE'}</span></div></div>`;
-        }).join('');
-        const marker = document.querySelector('.finance-summary');
-        if(marker){
-          marker.insertAdjacentHTML('afterend', targetRows || '<div class="empty-state" style="margin-top:14px;">Brak faktur w wybranym miesiącu.</div>');
-          // Remove old invoice rows, which were hidden above.
+
+        const list = document.getElementById('financeInvoiceList');
+        if(list){
+          list.innerHTML = renderInvoiceRows(selectedInvoices) ||
+            '<div class="empty-state" style="margin-top:14px;">Brak faktur w wybranym miesiącu.</div>';
+          attachInvoiceHandlers();
         }
-        document.querySelectorAll('[data-invoice-open]').forEach(el=>{
-          if(el.style.display!=='none') el.addEventListener('click',()=>showInvoiceDetails(el.getAttribute('data-invoice-open')));
-        });
       });
     }
-    document.querySelectorAll('[data-invoice-open]').forEach(el=>{
-      el.addEventListener('click',()=>showInvoiceDetails(el.getAttribute('data-invoice-open')));
-    });
+
+    attachInvoiceHandlers();
   }
 
   function showInvoiceDetails(invoiceId){
@@ -3373,23 +3371,56 @@ window.FLEET_DATA = {
   }
 
   function showStatsReport(){
+    menuOverlay.classList.remove('open');
+
     const now = new Date();
-    const month = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-    const rows = records.filter(r=>r.data_prania && r.data_prania.slice(0,7)===month);
-    const invoicedRows = rows.filter(r=>r.zatwierdzone && invoices.some(i=>invoiceItems.some(x=>x.invoice_id===i.id && x.wash_record_id===r.id)));
-    const paidRows = rows.filter(r=>r.zaplacone);
-    const html=`<div class="finance-summary">
-      <div class="finance-card"><div class="finance-card-label">Prania w miesiącu</div><div class="finance-card-value">${rows.length}</div></div>
-      <div class="finance-card"><div class="finance-card-label">Wartość prania</div><div class="finance-card-value">${fmtMoney(rows.reduce((s,r)=>s+Number(r.koszt||0),0))}</div></div>
-      <div class="finance-card"><div class="finance-card-label">Zapłacone</div><div class="finance-card-value">${fmtMoney(paidRows.reduce((s,r)=>s+Number(r.koszt||0),0))}</div></div>
-    </div>`;
-    reportShell('Statystyki finansowe', html, `<div class="confirm-text" style="margin-top:14px;">Bieżący miesiąc · ${fmtDate(month+'-01').slice(3)}</div>`);
+    const defaultMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const monthOptions = [];
+    for(let i=0;i<24;i++){
+      const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+      const value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      monthOptions.push(`<option value="${value}">${d.toLocaleDateString('pl-PL',{month:'long',year:'numeric'})}</option>`);
+    }
+
+    const footer = `
+      <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:14px;">
+        <label for="statsMonthPicker" style="font-size:12px;color:var(--ink-soft);">Miesiąc:</label>
+        <select id="statsMonthPicker" style="min-width:175px;">
+          ${monthOptions.join('')}
+        </select>
+      </div>`;
+
+    reportShell('Statystyki finansowe', '', footer);
+
+    const updateStats = () => {
+      const picker = document.getElementById('statsMonthPicker');
+      const month = picker?.value || defaultMonth;
+      const rows = records.filter(r=>r.data_prania && r.data_prania.slice(0,7)===month);
+      const paidRows = rows.filter(r=>r.zaplacone);
+
+      document.getElementById('reportBody').innerHTML = `
+        <div class="finance-summary">
+          <div class="finance-card"><div class="finance-card-label">Prania w miesiącu</div><div class="finance-card-value">${rows.length}</div></div>
+          <div class="finance-card"><div class="finance-card-label">Wartość prania</div><div class="finance-card-value">${fmtMoney(rows.reduce((s,r)=>s+Number(r.koszt||0),0))}</div></div>
+          <div class="finance-card"><div class="finance-card-label">Zapłacone</div><div class="finance-card-value">${fmtMoney(paidRows.reduce((s,r)=>s+Number(r.koszt||0),0))}</div></div>
+        </div>`;
+    };
+
+    const picker = document.getElementById('statsMonthPicker');
+    if(picker){
+      picker.value = defaultMonth;
+      picker.addEventListener('change', updateStats);
+    }
+    updateStats();
   }
 
   document.getElementById('exportPdfBtn').addEventListener('click', showPdfExportModal);
   document.getElementById('exportExcelBtn').addEventListener('click', cfExportExcel);
   document.getElementById('financeBtn').addEventListener('click', showFinanceQueue);
-  document.getElementById('statsBtn').addEventListener('click', showStatsReport);
+  document.getElementById('statsBtn').addEventListener('click', ()=>{
+    menuOverlay.classList.remove('open');
+    showStatsReport();
+  });
   document.getElementById('mainStatusFilter').addEventListener('change', (e)=>{
     mainStatusFilter = e.target.value;
     renderRecords();

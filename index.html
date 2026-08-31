@@ -507,6 +507,12 @@
   white-space:nowrap;
 }
 
+
+  .finance-type-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+  .finance-type-grid .finance-card{min-width:0;}
+  @media(max-width:639px){
+    .finance-type-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+  }
 </style>
 
 <style id="mobile-user-header-fix">
@@ -3976,10 +3982,12 @@ window.FLEET_DATA = {
         if(type) vehicleTypeCounts[type] = (vehicleTypeCounts[type] || 0) + 1;
       });
 
-      const typeSummaryCards = Object.entries(vehicleTypeCounts)
-        .map(([type, count]) =>
-          `<div class="finance-card"><div class="finance-card-label">${escapeHtml(type)}</div><div class="finance-card-value">${count}</div></div>`
-        ).join('');
+      const typeSummaryCards = `<div class="finance-type-grid">${
+        Object.entries(vehicleTypeCounts)
+          .map(([type, count]) =>
+            `<div class="finance-card"><div class="finance-card-label">${escapeHtml(type)}</div><div class="finance-card-value">${count}</div></div>`
+          ).join('')
+      }</div>`;
       document.getElementById('reportBody').innerHTML = `<div class="finance-summary">
         <div class="finance-card"><div class="finance-card-label">Liczba prań</div><div class="finance-card-value">${rows.length}</div></div>
         ${typeSummaryCards}

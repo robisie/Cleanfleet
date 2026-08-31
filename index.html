@@ -475,6 +475,23 @@
 }
 /* v17 — typ pojazdu jako drugi badge, w zieleni logo */
 .record-badges{display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap;}
+.record-old-days{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:34px;
+  height:22px;
+  padding:3px 8px;
+  border-radius:4px;
+  background:#c94b42;
+  color:#fff;
+  font-family:'JetBrains Mono',monospace;
+  font-size:10.5px;
+  font-weight:700;
+  letter-spacing:0.06em;
+  white-space:nowrap;
+}
+
 .record-type-badge{
   font-family:'JetBrains Mono',monospace;
   font-size:10.5px;
@@ -2800,15 +2817,12 @@ window.FLEET_DATA = {
       [0] || null;
   }
 
-  function lastWashMetaHtml(r){
-    if(r.data_prania){
-      return `<div class="record-meta">Pranie: ${fmtDate(r.data_prania)} · Wykonał: ${escapeHtml(r.kto_wykonal||'—')}</div>`;
-    }
+  function lastWashDaysBadgeHtml(r){
+    if(r.data_prania) return '';
     const last = getLastWashForPlate(r.tablica, r.id);
-    if(!last) return '';
+    if(!last || !last.data_prania) return '';
     const days = Math.max(0, Math.floor((Date.now() - new Date(last.data_prania+'T00:00:00').getTime()) / 86400000));
-    const ageText = days === 0 ? 'dzisiaj' : (days === 1 ? '1 dzień temu' : `${days} dni temu`);
-    return `<div class="record-meta">Ostatnie pranie: ${fmtDate(last.data_prania)} · ${ageText}</div>`;
+    return `<span class="record-old-days" title="Dni od ostatniego prania">${days}</span>`;
   }
 
   function daysSinceLastWashForRecord(r){
@@ -2828,10 +2842,8 @@ window.FLEET_DATA = {
             <div class="record-plate">${escapeHtml(r.tablica)}</div>
             ${r.zlecone && !r.zatwierdzone ? `
               <div class="record-meta">Zlecono: ${r.data_zlecenia ? fmtDate(r.data_zlecenia) : '—'} · Na: ${r.data_zlecenia_do ? fmtDate(r.data_zlecenia_do) : '—'} · Przez: ${escapeHtml(r.kto_zlecil||'—')}</div>
-              ${lastWashMetaHtml(r)}
               <div class="record-meta record-description">${escapeHtml(r.uwagi||'—')}</div>
             ` : `
-              ${lastWashMetaHtml(r)}
             `}
           </div>
           <div style="text-align:right;">
@@ -2839,6 +2851,7 @@ window.FLEET_DATA = {
             <div class="record-badges">
               <div class="record-type-badge">${escapeHtml(r.typ||'—')}</div>
               <div class="record-badge">${escapeHtml(r.marka||'----')}</div>
+              ${lastWashDaysBadgeHtml(r)}
             </div>
           </div>
         </div>

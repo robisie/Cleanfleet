@@ -2719,7 +2719,7 @@ window.FLEET_DATA = {
 
   async function cfRefresh(){
     const btn=document.getElementById('cfRefreshBtn'); if(btn) btn.disabled=true;
-    try{ await loadAll(); } finally { if(btn) btn.disabled=false; }
+    try{ await loadAll(); await cfCheckStaleVehicleNotifications(); renderRecords(); } finally { if(btn) btn.disabled=false; }
   }
 
   function addOptionIfNew(list, value){
@@ -2754,6 +2754,9 @@ window.FLEET_DATA = {
     return num.toLocaleString('pl-PL') + ' zł';
   }
 
+  const CF_STALE_DAYS = 200;
+  const CF_STALE_ALERTS_KEY = 'cleanfleet-stale-notifications-v2';
+
   function cfDaysSinceWash(dateIso){
     if(!dateIso) return null;
     const t = new Date(dateIso + 'T00:00:00').getTime();
@@ -2762,49 +2765,96 @@ window.FLEET_DATA = {
   }
 
   function cfLatestWashForPlate(plate){
-    const rows = records.filter(r => r.tablica === plate && r.data_prania)
-      .sort((a,b) => (b.data_prania||'').localeCompare(a.data_prania||''));
+    const p = String(plate || '').trim().toUpperCase();
+    const rows = (records || []).filter(r =>
+      String(r.tablica || '').trim().toUpperCase() === p && r.data_prania
+    );
+    rows.sort((a,b) => String(b.data_prania).localeCompare(String(a.data_prania)));
     return rows[0] || null;
   }
 
   function cfStaleVehicles(){
-    return Object.keys(registry).map(plate => {
+    return Object.keys(registry || {}).map(rawPlate => {
+      const plate = String(rawPlate || '').trim().toUpperCase();
       const latest = cfLatestWashForPlate(plate);
-      if(!latest?.data_prania) return null;
+      if(!latest || !latest.data_prania) return null;
+
       const days = cfDaysSinceWash(latest.data_prania);
-      if(days === null || days <= 200) return null;
-      const info = registry[plate] || {};
-      return { plate, days, typ: latest.typ || info.typ || '—', marka: latest.marka || info.marka || '—', data_prania: latest.data_prania };
-    }).filter(Boolean).sort((a,b) => b.days-a.days);
+      if(days === null || days <= CF_STALE_DAYS) return null;
+
+      const info = registry[rawPlate] || {};
+      return {
+        plate,
+        days,
+        typ: latest.typ || info.typ || '—',
+        marka: latest.marka || info.marka || '—',
+        data_prania: latest.data_prania
+      };
+    }).filter(Boolean).sort((a,b) => b.days - a.days);
+  }
+
+  function cfReadStaleAlerts(){
+    try {
+      return JSON.parse(localStorage.getItem(CF_STALE_ALERTS_KEY) || '{}') || {};
+    } catch(e) {
+      return {};
+    }
+  }
+
+  function cfWriteStaleAlerts(value){
+    try {
+      localStorage.setItem(CF_STALE_ALERTS_KEY, JSON.stringify(value || {}));
+    } catch(e) {}
   }
 
   async function cfCheckStaleVehicleNotifications(){
     const stale = cfStaleVehicles();
     if(!stale.length) return;
-    const key = 'cleanfleet-stale-notifications-v1';
-    let sent = {};
-    try { sent = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch(e) { sent = {}; }
+
+    const sent = cfReadStaleAlerts();
     let changed = false;
+
     for(const v of stale){
+      // One alert per stale cycle. The state is cleared automatically
+      // when a newer wash date makes the vehicle no longer stale.
       if(sent[v.plate]) continue;
+
       try {
-        if('serviceWorker' in navigator && Notification.permission === 'granted'){
+        if('serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted'){
           const reg = await navigator.serviceWorker.ready;
-          await reg.showNotification('CleanFleet — samochód dawno nie robiony', {
-            body: `${v.plate} — ${v.days} dni od ostatniego prania.`,
-            icon: '/icon-192.png',
-            badge: '/icon-192.png',
-            tag: `cleanfleet-stale-${v.plate}`,
-            data: { url: './' }
-          });
-          sent[v.plate] = new Date().toISOString();
-          changed = true;
+
+          if(reg?.showNotification){
+            await reg.showNotification('CleanFleet — samochód dawno nie robiony', {
+              body: `${v.plate} — ${v.days} dni od ostatniego prania.`,
+              icon: '/icon-192.png',
+              badge: '/icon-192.png',
+              tag: `cleanfleet-stale-${v.plate}`,
+              data: { url: '' }
+            });
+
+            sent[v.plate] = {
+              sentAt: new Date().toISOString(),
+              daysAtAlert: v.days
+            };
+            changed = true;
+          }
         }
       } catch(error) {
+        // If the notification could not be sent, do NOT mark it as sent.
         console.warn('CleanFleet stale vehicle notification:', error);
       }
     }
-    if(changed) localStorage.setItem(key, JSON.stringify(sent));
+
+    // Remove old alert states after the vehicle has been washed again.
+    Object.keys(sent).forEach(plate => {
+      const current = cfStaleVehicles().some(v => v.plate === plate);
+      if(!current){
+        delete sent[plate];
+        changed = true;
+      }
+    });
+
+    if(changed) cfWriteStaleAlerts(sent);
   }
 
   function staleVehiclesHtml(rows){
@@ -2894,7 +2944,7 @@ window.FLEET_DATA = {
               <div class="record-meta">Zlecono: ${r.data_zlecenia ? fmtDate(r.data_zlecenia) : '—'} · Na: ${r.data_zlecenia_do ? fmtDate(r.data_zlecenia_do) : '—'} · Przez: ${escapeHtml(r.kto_zlecil||'—')}</div>
               <div class="record-meta record-description">${escapeHtml(r.uwagi||'—')}</div>
             ` : `
-              <div class="record-meta">Pranie: ${fmtDate(r.data_prania)} · Wykonał: ${escapeHtml(r.kto_wykonal||'—')}${cfDaysSinceWash(r.data_prania) !== null ? ` · ${cfDaysSinceWash(r.data_prania)} dni temu` : ''}</div>
+              <div class="record-meta">Pranie: ${fmtDate(r.data_prania)} · Wykonał: ${escapeHtml(r.kto_wykonal||'—')}${cfDaysSinceWash((cfLatestWashForPlate(r.tablica)||{}).data_prania) !== null ? ` · ${cfDaysSinceWash((cfLatestWashForPlate(r.tablica)||{}).data_prania)} dni od ostatniego prania` : ''}</div>
             `}
           </div>
           <div style="text-align:right;">
@@ -2917,81 +2967,6 @@ window.FLEET_DATA = {
   }
 
 
-  const CF_STALE_DAYS = 200;
-  const CF_STALE_ALERTS_KEY = 'cleanfleet-stale-wash-alerts-v1';
-
-  function cfReadStaleAlerts(){
-    try { return JSON.parse(localStorage.getItem(CF_STALE_ALERTS_KEY) || '{}') || {}; }
-    catch(e){ return {}; }
-  }
-  function cfWriteStaleAlerts(v){
-    try { localStorage.setItem(CF_STALE_ALERTS_KEY, JSON.stringify(v || {})); } catch(e){}
-  }
-  function cfDaysSince(value){
-    if(!value) return null;
-    const d = new Date(String(value).length <= 10 ? value+'T00:00:00' : value);
-    if(Number.isNaN(d.getTime())) return null;
-    const now = new Date();
-    const a = new Date(now.getFullYear(),now.getMonth(),now.getDate());
-    const b = new Date(d.getFullYear(),d.getMonth(),d.getDate());
-    return Math.max(0,Math.floor((a-b)/86400000));
-  }
-  function cfLatestWashDateForPlate(plate){
-    const p = String(plate||'').trim().toUpperCase();
-    const dates = (records||[]).filter(r => String(r.tablica||'').trim().toUpperCase()===p && r.data_prania)
-      .map(r=>r.data_prania).sort();
-    return dates.length ? dates[dates.length-1] : null;
-  }
-  function cfDaysForPlate(plate){
-    const d = cfLatestWashDateForPlate(plate);
-    return d ? cfDaysSince(d) : null;
-  }
-  function cfKnownVehicles(){
-    const map = new Map();
-    Object.entries(registry||{}).forEach(([p,v])=>{
-      const plate=String(p).trim().toUpperCase();
-      if(plate) map.set(plate,{...v,tablica:plate});
-    });
-    (records||[]).forEach(r=>{
-      const plate=String(r.tablica||'').trim().toUpperCase();
-      if(plate && !map.has(plate)) map.set(plate,{...r,tablica:plate});
-    });
-    return [...map.values()];
-  }
-  function cfStaleVehicles(){
-    const alerts=cfReadStaleAlerts();
-    return cfKnownVehicles().map(v=>{
-      const days=cfDaysForPlate(v.tablica);
-      return {...v,staleDays:days,staleAlerted:!!alerts[v.tablica]};
-    }).filter(v=>Number.isFinite(v.staleDays)&&v.staleDays>CF_STALE_DAYS&&v.staleAlerted)
-      .sort((a,b)=>b.staleDays-a.staleDays);
-  }
-  async function cfCheckStaleVehicles(){
-    const alerts=cfReadStaleAlerts();
-    let changed=false;
-    for(const v of cfKnownVehicles()){
-      const days=cfDaysForPlate(v.tablica);
-      if(!Number.isFinite(days) || days<=CF_STALE_DAYS){
-        if(alerts[v.tablica]){ delete alerts[v.tablica]; changed=true; }
-        continue;
-      }
-      if(!alerts[v.tablica]){
-        alerts[v.tablica]={alertedAt:new Date().toISOString(),daysAtAlert:days};
-        changed=true;
-        try{
-          if('Notification' in window && Notification.permission==='granted'){
-            const reg=await navigator.serviceWorker?.ready;
-            if(reg?.showNotification) await reg.showNotification('CleanFleet — samochód dawno nie robiony',{
-              body:`${v.tablica} — ${days} dni od ostatniego prania`,
-              icon:'/icon-192.png',badge:'/icon-192.png',
-              tag:`cleanfleet-stale-${v.tablica}`,data:{url:''}
-            });
-          }
-        }catch(e){ console.warn('CleanFleet stale notification error:',e); }
-      }
-    }
-    if(changed) cfWriteStaleAlerts(alerts);
-  }
   function cfStaleSectionHtml(){
     const stale=cfStaleVehicles();
     if(!stale.length) return '';
@@ -4532,11 +4507,11 @@ window.FLEET_DATA = {
       await cfInitSupabase();
       const { data:{session} } = await cfSupabase.auth.getSession();
       if(!session){ cfShowLogin(true); cfSetSync('Wymagane logowanie'); }
-      else { cfShowLogin(false); await loadAll(); await cfPrepareNotifications(); await cfCheckStaleVehicles(); renderRecords(); }
+      else { cfShowLogin(false); await loadAll(); await cfPrepareNotifications(); await cfCheckStaleVehicleNotifications(); renderRecords(); }
       cfSupabase.auth.onAuthStateChange((_event, session)=>{
         if(session){
           cfShowLogin(false);
-          setTimeout(async ()=>{ await loadAll(); await cfPrepareNotifications(); await cfCheckStaleVehicles(); renderRecords(); },0);
+          setTimeout(async ()=>{ await loadAll(); await cfPrepareNotifications(); await cfCheckStaleVehicleNotifications(); renderRecords(); },0);
         } else {
           cfShowLogin(true);
           cfSetSync('Wymagane logowanie');

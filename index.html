@@ -3966,30 +3966,14 @@ window.FLEET_DATA = {
       const total = rows.reduce((s,r)=>s+Number(r.koszt||0),0);
       const paid = rows.filter(r=>r.zaplacone).reduce((s,r)=>s+Number(r.koszt||0),0);
       const outstanding = total-paid;
-      // Liczenie typów odbywa się wyłącznie według kategorii
-      // przypisanej w formularzu „Grupa rozliczeniowa”.
-      // Liczymy wyłącznie według zapisanej „Grupy rozliczeniowej”.
-      // Obsługujemy także starsze warianty zapisów (np. „BUS”, „OSOBOWY”)
-      // oraz polskie znaki, ale NIE używamy pola „Typ” jako zastępstwa.
-      const normalizeBillingCategory = (value) => String(value || '')
-        .trim()
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\\u0300-\\u036f]/g, '');
-
-      const getBillingCategoryKey = (row) => {
-        const c = normalizeBillingCategory(row?.billing_category);
-        if (!c) return '';
-        if (c === 'osobowe' || c === 'osobowy' || c === 'osobowa' || c.startsWith('osobow')) return 'personal';
-        if (c === 'busy' || c === 'bus') return 'bus';
-        if (c === 'ciezarowe' || c === 'ciezarowy' || c === 'ciezarowa' || c.startsWith('ciezarow')) return 'heavy';
-        return '';
-      };
+      // Licznik = bezpośrednio zapisane billing_category.
+      // Nie używamy pola „Typ” ani żadnego automatycznego zgadywania kategorii.
+      const billingCategory = (row) => String(row?.billing_category ?? '').trim().toLowerCase();
 
       const typeCounts = {
-        personal: rows.filter(r=>getBillingCategoryKey(r)==='personal').length,
-        heavy: rows.filter(r=>getBillingCategoryKey(r)==='heavy').length,
-        bus: rows.filter(r=>getBillingCategoryKey(r)==='bus').length
+        personal: rows.filter(r => billingCategory(r) === 'osobowe').length,
+        bus: rows.filter(r => billingCategory(r) === 'busy').length,
+        heavy: rows.filter(r => billingCategory(r) === 'ciezarowe').length
       };
       document.getElementById('reportBody').innerHTML = `<div class="finance-summary">
         <div class="finance-card"><div class="finance-card-label">Liczba prań</div><div class="finance-card-value">${rows.length}</div></div>

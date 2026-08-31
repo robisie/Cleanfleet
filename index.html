@@ -487,6 +487,16 @@
   white-space:nowrap;
 }
 
+
+  .stale-vehicles-section{margin:18px 0 0;}
+  .stale-vehicles-title{font-size:13px;font-weight:800;letter-spacing:.04em;margin:0 0 9px;}
+  .stale-vehicle-list{display:grid;gap:8px;}
+  .stale-vehicle-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid var(--line-strong);border-radius:12px;background:var(--panel);cursor:pointer;}
+  .stale-vehicle-plate{font-family:'JetBrains Mono',monospace;font-weight:800;letter-spacing:.04em;}
+  .stale-vehicle-meta{font-size:12px;color:var(--ink-soft);margin-top:3px;}
+  .stale-vehicle-days{font-weight:800;white-space:nowrap;}
+  .last-wash-age{display:inline-flex;align-items:center;margin-top:5px;padding:3px 7px;border-radius:7px;background:var(--bg);border:1px solid var(--line);font-size:11px;color:var(--ink-soft);}
+
 </style>
 
 <style id="mobile-user-header-fix">
@@ -2906,6 +2916,112 @@ window.FLEET_DATA = {
       </div>`;
   }
 
+
+  const CF_STALE_DAYS = 200;
+  const CF_STALE_ALERTS_KEY = 'cleanfleet-stale-wash-alerts-v1';
+
+  function cfReadStaleAlerts(){
+    try { return JSON.parse(localStorage.getItem(CF_STALE_ALERTS_KEY) || '{}') || {}; }
+    catch(e){ return {}; }
+  }
+  function cfWriteStaleAlerts(v){
+    try { localStorage.setItem(CF_STALE_ALERTS_KEY, JSON.stringify(v || {})); } catch(e){}
+  }
+  function cfDaysSince(value){
+    if(!value) return null;
+    const d = new Date(String(value).length <= 10 ? value+'T00:00:00' : value);
+    if(Number.isNaN(d.getTime())) return null;
+    const now = new Date();
+    const a = new Date(now.getFullYear(),now.getMonth(),now.getDate());
+    const b = new Date(d.getFullYear(),d.getMonth(),d.getDate());
+    return Math.max(0,Math.floor((a-b)/86400000));
+  }
+  function cfLatestWashDateForPlate(plate){
+    const p = String(plate||'').trim().toUpperCase();
+    const dates = (records||[]).filter(r => String(r.tablica||'').trim().toUpperCase()===p && r.data_prania)
+      .map(r=>r.data_prania).sort();
+    return dates.length ? dates[dates.length-1] : null;
+  }
+  function cfDaysForPlate(plate){
+    const d = cfLatestWashDateForPlate(plate);
+    return d ? cfDaysSince(d) : null;
+  }
+  function cfKnownVehicles(){
+    const map = new Map();
+    Object.entries(registry||{}).forEach(([p,v])=>{
+      const plate=String(p).trim().toUpperCase();
+      if(plate) map.set(plate,{...v,tablica:plate});
+    });
+    (records||[]).forEach(r=>{
+      const plate=String(r.tablica||'').trim().toUpperCase();
+      if(plate && !map.has(plate)) map.set(plate,{...r,tablica:plate});
+    });
+    return [...map.values()];
+  }
+  function cfStaleVehicles(){
+    const alerts=cfReadStaleAlerts();
+    return cfKnownVehicles().map(v=>{
+      const days=cfDaysForPlate(v.tablica);
+      return {...v,staleDays:days,staleAlerted:!!alerts[v.tablica]};
+    }).filter(v=>Number.isFinite(v.staleDays)&&v.staleDays>CF_STALE_DAYS&&v.staleAlerted)
+      .sort((a,b)=>b.staleDays-a.staleDays);
+  }
+  async function cfCheckStaleVehicles(){
+    const alerts=cfReadStaleAlerts();
+    let changed=false;
+    for(const v of cfKnownVehicles()){
+      const days=cfDaysForPlate(v.tablica);
+      if(!Number.isFinite(days) || days<=CF_STALE_DAYS){
+        if(alerts[v.tablica]){ delete alerts[v.tablica]; changed=true; }
+        continue;
+      }
+      if(!alerts[v.tablica]){
+        alerts[v.tablica]={alertedAt:new Date().toISOString(),daysAtAlert:days};
+        changed=true;
+        try{
+          if('Notification' in window && Notification.permission==='granted'){
+            const reg=await navigator.serviceWorker?.ready;
+            if(reg?.showNotification) await reg.showNotification('CleanFleet — samochód dawno nie robiony',{
+              body:`${v.tablica} — ${days} dni od ostatniego prania`,
+              icon:'/icon-192.png',badge:'/icon-192.png',
+              tag:`cleanfleet-stale-${v.tablica}`,data:{url:''}
+            });
+          }
+        }catch(e){ console.warn('CleanFleet stale notification error:',e); }
+      }
+    }
+    if(changed) cfWriteStaleAlerts(alerts);
+  }
+  function cfStaleSectionHtml(){
+    const stale=cfStaleVehicles();
+    if(!stale.length) return '';
+    return `<section class="stale-vehicles-section">
+      <div class="stale-vehicles-title">SAMOCHODY DAWNO NIE ROBIONE</div>
+      <div class="stale-vehicle-list">${stale.map(v=>`
+        <div class="stale-vehicle-card" data-stale-plate="${escapeHtml(v.tablica)}">
+          <div><div class="stale-vehicle-plate">${escapeHtml(v.tablica)}</div>
+          <div class="stale-vehicle-meta">${escapeHtml(v.typ||'')}${v.marka?' · '+escapeHtml(v.marka):''}</div></div>
+          <div class="stale-vehicle-days">${v.staleDays} dni</div>
+        </div>`).join('')}</div>
+    </section>`;
+  }
+  function cfBindStaleSection(){
+    document.querySelectorAll('[data-stale-plate]').forEach(el=>{
+      el.addEventListener('click',()=>{
+        const plate=el.dataset.stalePlate;
+        const v=cfKnownVehicles().find(x=>x.tablica===plate)||{};
+        window.__pendingPlate=plate;
+        openForm(null);
+        setTimeout(()=>{
+          const t=document.getElementById('f_typ');
+          const m=document.getElementById('f_marka');
+          if(t && v.typ) t.value=v.typ;
+          if(m && v.marka) m.value=v.marka;
+        },0);
+      });
+    });
+  }
+
   async function toggleZatwierdzone(id){
     const rec = records.find(x => x.id === id);
     if(!rec) return;
@@ -4004,6 +4120,14 @@ window.FLEET_DATA = {
       const total = rows.reduce((s,r)=>s+Number(r.koszt||0),0);
       const paid = rows.filter(r=>r.zaplacone).reduce((s,r)=>s+Number(r.koszt||0),0);
       const outstanding = total-paid;
+      const typeCounts = { ciezarowe:0, busy:0, osobowe:0, pozostale:0 };
+      rows.forEach(r => {
+        const c = String(r.billing_category || '').toLowerCase();
+        if(c === 'ciezarowe') typeCounts.ciezarowe++;
+        else if(c === 'busy') typeCounts.busy++;
+        else if(c === 'osobowe') typeCounts.osobowe++;
+        else typeCounts.pozostale++;
+      });
       const counts = { ciezarowe:0, busy:0, osobowe:0, pozostale:0 };
       rows.forEach(r => {
         const c = String(r.billing_category || '').toLowerCase();
@@ -4014,6 +4138,10 @@ window.FLEET_DATA = {
       });
       document.getElementById('reportBody').innerHTML = `<div class="finance-summary">
         <div class="finance-card"><div class="finance-card-label">Liczba prań</div><div class="finance-card-value">${rows.length}</div></div>
+        <div class="finance-card"><div class="finance-card-label">Ciężarowe</div><div class="finance-card-value">${typeCounts.ciezarowe}</div></div>
+        <div class="finance-card"><div class="finance-card-label">Busy</div><div class="finance-card-value">${typeCounts.busy}</div></div>
+        <div class="finance-card"><div class="finance-card-label">Osobowe</div><div class="finance-card-value">${typeCounts.osobowe}</div></div>
+        <div class="finance-card"><div class="finance-card-label">Pozostałe</div><div class="finance-card-value">${typeCounts.pozostale}</div></div>
         <div class="finance-card"><div class="finance-card-label">Wartość</div><div class="finance-card-value">${fmtMoney(total)}</div></div>
         <div class="finance-card"><div class="finance-card-label">Do zapłaty</div><div class="finance-card-value">${fmtMoney(outstanding)}</div></div>
       </div>
@@ -4404,11 +4532,11 @@ window.FLEET_DATA = {
       await cfInitSupabase();
       const { data:{session} } = await cfSupabase.auth.getSession();
       if(!session){ cfShowLogin(true); cfSetSync('Wymagane logowanie'); }
-      else { cfShowLogin(false); await loadAll(); await cfPrepareNotifications(); }
+      else { cfShowLogin(false); await loadAll(); await cfPrepareNotifications(); await cfCheckStaleVehicles(); renderRecords(); }
       cfSupabase.auth.onAuthStateChange((_event, session)=>{
         if(session){
           cfShowLogin(false);
-          setTimeout(async ()=>{ await loadAll(); await cfPrepareNotifications(); },0);
+          setTimeout(async ()=>{ await loadAll(); await cfPrepareNotifications(); await cfCheckStaleVehicles(); renderRecords(); },0);
         } else {
           cfShowLogin(true);
           cfSetSync('Wymagane logowanie');

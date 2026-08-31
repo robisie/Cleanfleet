@@ -3533,15 +3533,15 @@ window.FLEET_DATA = {
           <button class="close" data-close>&times;</button>
           <h2>Załącz fakturę</h2>
           <div class="confirm-text">
-            Najpierw wybierz fakturę PDF z urządzenia. CleanFleet odczyta z niej numer faktury, a następnie otworzy formularz raportu.
+            Faktura PDF jest opcjonalna. Możesz ją wybrać, aby CleanFleet odczytał numer faktury i dołączył plik do wiadomości, albo przejść dalej bez faktury.
           </div>
           <div class="sheet-actions" style="margin-top:18px;">
             <button class="btn btn-solid" id="chooseInvoiceBtn" style="width:100%;">Wybierz plik PDF</button>
           </div>
           <input id="invoicePdfInput" type="file" accept="application/pdf,.pdf" style="display:none;">
-          <div id="invoiceReadStatus" class="confirm-text" style="margin-top:12px;">Nie wybrano faktury.</div>
+          <div id="invoiceReadStatus" class="confirm-text" style="margin-top:12px;">Faktura nie została wybrana — możesz przejść dalej.</div>
           <div class="sheet-actions" style="margin-top:16px;">
-            <button class="btn btn-solid" id="continueInvoiceBtn" disabled style="width:100%;">Przejdź do raportu</button>
+            <button class="btn btn-solid" id="continueInvoiceBtn" style="width:100%;">Przejdź do raportu</button>
           </div>
         </div>
       </div>`;
@@ -3684,12 +3684,8 @@ window.FLEET_DATA = {
     const invoiceNumber = document.getElementById('pdfInvoiceNumber').value.trim();
     if(!val){ showToast('Wybierz miesiąc'); return; }
     if(!invoiceNumber){
-      showToast('Nie udało się odczytać numeru faktury. Wpisz go ręcznie.');
+      showToast('Wpisz numer faktury, aby umieścić go w nagłówku raportu.');
       document.getElementById('pdfInvoiceNumber').focus();
-      return;
-    }
-    if(!cfInvoiceAttachment){
-      showToast('Najpierw załącz fakturę PDF.');
       return;
     }
 
@@ -3837,8 +3833,13 @@ window.FLEET_DATA = {
       return names[Number(m)-1] ? `${names[Number(m)-1]} ${y}` : period;
     })();
 
-    const subject = `faktura nr ${invoiceNumber} + załącznik z wykazem`;
-    const body = `dzień dobry, w załączniku przesyłam fakturę nr ${invoiceNumber} za miesiąc ${monthLabel} wraz z załącznikiem z wykazem wypranych samochodów.`;
+    const invoiceLabel = invoiceNumber ? `fakturę nr ${invoiceNumber}` : 'załącznik z wykazem wypranych samochodów';
+    const subject = invoiceNumber
+      ? `faktura nr ${invoiceNumber} + załącznik z wykazem`
+      : 'załącznik z wykazem wypranych samochodów';
+    const body = invoiceNumber
+      ? `dzień dobry, w załączniku przesyłam fakturę nr ${invoiceNumber} za miesiąc ${monthLabel} wraz z załącznikiem z wykazem wypranych samochodów.`
+      : `dzień dobry, w załączniku przesyłam załącznik z wykazem wypranych samochodów za miesiąc ${monthLabel}.`;
 
     const html=`
       <div class="overlay" id="mailOverlay">
@@ -3847,7 +3848,7 @@ window.FLEET_DATA = {
           <h2>Wyślij e-mailem</h2>
           <div class="field">
             <label>Temat</label>
-            <input id="mailSubject" value="${escapeHtml(subject)}" autocomplete="off">
+            <input id="mailSubject" value="${escapeHtml(subject)}" autocomplete="off" style="display:block;width:100%;min-height:78px;height:78px;font-size:20px;font-weight:600;padding:18px 16px;box-sizing:border-box;">
           </div>
           <div class="field">
             <label>Treść wiadomości</label>
@@ -3855,10 +3856,10 @@ window.FLEET_DATA = {
           </div>
           <div class="confirm-text">
             Załączniki:<br>
-            📎 ${escapeHtml(reportName)}<br>
-            📎 ${escapeHtml(invoiceName)}
+            📎 ${escapeHtml(reportName)}${invoiceFile ? `<br>📎 ${escapeHtml(invoiceName)}` : ''}
           </div>
           <div class="confirm-text" style="margin-top:10px;">
+            ${invoiceFile ? 'Faktura PDF została dołączona. ' : 'Wiadomość zostanie wysłana bez pliku faktury. '}
             Adres odbiorcy wpiszesz już bezpośrednio w aplikacji Mail.
           </div>
           <div class="sheet-actions">
@@ -3871,14 +3872,12 @@ window.FLEET_DATA = {
     document.querySelector('[data-mail-close]').addEventListener('click',close);
 
     document.getElementById('openMailShare').addEventListener('click',async()=>{
-      if(!invoiceFile){
-        showToast('Brak załączonego pliku faktury.');
-        return;
-      }
-
       const reportFile=new File([reportBlob],reportName,{type:'application/pdf'});
-      const invoiceShareFile=new File([invoiceFile],invoiceName,{type:'application/pdf'});
-      const files=[reportFile,invoiceShareFile];
+      const files=[reportFile];
+      if(invoiceFile){
+        const invoiceShareFile=new File([invoiceFile],invoiceName,{type:'application/pdf'});
+        files.push(invoiceShareFile);
+      }
 
       try{
         if(!navigator.share || (navigator.canShare && !navigator.canShare({files}))){

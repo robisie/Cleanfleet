@@ -488,15 +488,22 @@
 }
 
 
-  .stale-vehicles-section{margin:18px 0 0;}
-  .stale-vehicles-title{font-size:13px;font-weight:800;letter-spacing:.04em;margin:0 0 9px;}
+  .stale-vehicles-section{margin:16px 0 12px;}
+  .stale-vehicles-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 14px;border:1px solid var(--line-strong);border-radius:12px;background:var(--panel);color:var(--ink);text-align:left;cursor:pointer;font:inherit;}
+  .stale-vehicles-toggle-title{display:block;font-size:13px;font-weight:800;letter-spacing:.04em;}
+  .stale-vehicles-toggle-subtitle{display:block;margin-top:3px;font-size:11px;color:var(--ink-soft);}
+  .stale-vehicles-toggle-right{display:flex;align-items:center;gap:9px;flex:0 0 auto;}
+  .stale-count{min-width:24px;height:24px;padding:0 7px;display:flex;align-items:center;justify-content:center;border-radius:999px;background:var(--bg);border:1px solid var(--line);font-size:12px;font-weight:800;}
+  .stale-chevron{font-size:18px;line-height:1;transition:transform .18s ease;}
+  .stale-vehicles-toggle.is-open .stale-chevron{transform:rotate(180deg);}
+  .stale-vehicles-panel{padding:8px 0 0;}
   .stale-vehicle-list{display:grid;gap:8px;}
   .stale-vehicle-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid var(--line-strong);border-radius:12px;background:var(--panel);cursor:pointer;}
   .stale-vehicle-plate{font-family:'JetBrains Mono',monospace;font-weight:800;letter-spacing:.04em;}
   .stale-vehicle-meta{font-size:12px;color:var(--ink-soft);margin-top:3px;}
   .stale-vehicle-days{font-weight:800;white-space:nowrap;}
+  .stale-empty{padding:14px;border:1px dashed var(--line-strong);border-radius:10px;color:var(--ink-soft);font-size:12px;background:var(--panel);}
   .last-wash-age{display:inline-flex;align-items:center;margin-top:5px;padding:3px 7px;border-radius:7px;background:var(--bg);border:1px solid var(--line);font-size:11px;color:var(--ink-soft);}
-
 </style>
 
 <style id="mobile-user-header-fix">
@@ -2853,40 +2860,63 @@ window.FLEET_DATA = {
   }
 
   function staleVehiclesHtml(rows){
-    if(!rows.length) return '';
-    const body = rows.map(v => `
-      <div class="record-card status-pending" data-stale-open="${escapeHtml(v.plate)}" style="cursor:pointer;">
-        <div class="record-top">
-          <div>
-            <div class="record-plate">${escapeHtml(v.plate)}</div>
-            <div class="record-meta">Ostatnie pranie: ${fmtDate(v.data_prania)} · ${v.days} dni temu</div>
+    const stale = Array.isArray(rows) ? rows : [];
+    const content = stale.length
+      ? stale.map(v => `
+          <div class="stale-vehicle-card" data-stale-plate="${escapeHtml(v.plate)}">
+            <div>
+              <div class="stale-vehicle-plate">${escapeHtml(v.plate)}</div>
+              <div class="stale-vehicle-meta">${escapeHtml(v.typ||'—')}${v.marka ? ' · '+escapeHtml(v.marka) : ''}</div>
+            </div>
+            <div class="stale-vehicle-days">${v.days} dni</div>
           </div>
-          <div style="text-align:right;">
-            <div class="record-type-badge">${escapeHtml(v.typ)}</div>
-            <div class="record-badge">${escapeHtml(v.marka)}</div>
-          </div>
+        `).join('')
+      : `<div class="stale-empty">Brak samochodów, dla których minęło więcej niż 200 dni od ostatniego prania.</div>`;
+
+    return `
+      <section class="stale-vehicles-section" id="staleVehiclesSection">
+        <button type="button" class="stale-vehicles-toggle" id="staleVehiclesToggle" aria-expanded="false">
+          <span>
+            <span class="stale-vehicles-toggle-title">SAMOCHODY DAWNO NIE ROBIONE</span>
+            <span class="stale-vehicles-toggle-subtitle">${stale.length ? stale.length+' samochodów powyżej 200 dni' : 'Sprawdź samochody powyżej 200 dni'}</span>
+          </span>
+          <span class="stale-vehicles-toggle-right">
+            <span class="stale-count">${stale.length}</span>
+            <span class="stale-chevron">⌄</span>
+          </span>
+        </button>
+        <div class="stale-vehicles-panel" id="staleVehiclesPanel" hidden>
+          <div class="stale-vehicle-list">${content}</div>
         </div>
-      </div>`).join('');
-    return `<div style="margin-top:22px;">
-      <h3 style="margin:0 0 10px;font-size:15px;letter-spacing:.02em;">SAMOCHODY DAWNO NIE ROBIONE</h3>
-      <div class="confirm-text" style="margin-bottom:10px;">Pojazdy, dla których minęło więcej niż 200 dni od ostatniego prania. Dotknij samochodu, aby dodać go jako aktywny wpis.</div>
-      ${body}
-    </div>`;
+      </section>`;
   }
 
-  function activeRecords(){
-    const active = records.filter(r => !r.zaplacone);
-    const statusRank = r => r.zatwierdzone ? 1 : (r.zlecone ? 0 : 2);
-    return active.sort((a,b) => {
-      const rankDiff = statusRank(a) - statusRank(b);
-      if(rankDiff !== 0) return rankDiff;
-      if(!a.zatwierdzone && a.zlecone && !b.zatwierdzone && b.zlecone){
-        return (b.data_zlecenia||'').localeCompare(a.data_zlecenia||'') || (b.created_at-a.created_at);
-      }
-      if(a.zatwierdzone && b.zatwierdzone){
-        return (b.data_prania||'').localeCompare(a.data_prania||'') || (b.created_at-a.created_at);
-      }
-      return b.created_at-a.created_at;
+  function bindStaleVehiclesPanel(){
+    const toggle = document.getElementById('staleVehiclesToggle');
+    const panel = document.getElementById('staleVehiclesPanel');
+    if(toggle && panel){
+      toggle.addEventListener('click', () => {
+        const open = toggle.getAttribute('aria-expanded') === 'true';
+        toggle.setAttribute('aria-expanded', String(!open));
+        panel.hidden = open;
+        toggle.classList.toggle('is-open', !open);
+      });
+    }
+
+    document.querySelectorAll('[data-stale-plate]').forEach(el => {
+      el.addEventListener('click', () => {
+        const plate = el.dataset.stalePlate;
+        const v = cfKnownVehicles().find(x => x.tablica === plate) || {};
+        window.__pendingPlate = plate;
+        openForm(null);
+
+        setTimeout(() => {
+          const t = document.getElementById('f_typ');
+          const m = document.getElementById('f_marka');
+          if(t && v.typ) t.value = v.typ;
+          if(m && v.marka) m.value = v.marka;
+        }, 0);
+      });
     });
   }
 
@@ -2953,6 +2983,11 @@ window.FLEET_DATA = {
       </div>`;
   }
 
+
+    const oldStale = document.getElementById('staleVehiclesSection');
+    if(oldStale) oldStale.remove();
+    list.insertAdjacentHTML('beforebegin', staleVehiclesHtml(stale));
+    bindStaleVehiclesPanel();
 
 
   async function toggleZatwierdzone(id){

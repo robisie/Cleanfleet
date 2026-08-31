@@ -305,6 +305,24 @@
   @media(min-width:640px){
     .overlay{align-items:center;}
   }
+  @media(max-width:639px){
+    /* iPhone/iPad: every modal must stop above the fixed bottom navigation. */
+    .overlay{
+      z-index:1001;
+      background:linear-gradient(
+        to bottom,
+        rgba(22,21,15,0.5) 0,
+        rgba(22,21,15,0.5) calc(100% - 70px - env(safe-area-inset-bottom)),
+        transparent calc(100% - 70px - env(safe-area-inset-bottom)),
+        transparent 100%
+      );
+    }
+    .overlay .sheet{
+      margin-bottom:calc(70px + env(safe-area-inset-bottom));
+      max-height:calc(90vh - 70px - env(safe-area-inset-bottom));
+      border-radius:16px 16px 0 0;
+    }
+  }
   .sheet{
     background:var(--paper);
     width:100%;

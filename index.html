@@ -3002,7 +3002,7 @@ window.FLEET_DATA = {
     document.getElementById('modalRoot').innerHTML = html;
     const billingCategoryField = document.getElementById('f_grupa_rozliczeniowa');
     if(billingCategoryField){
-      billingCategoryField.value = billing_category || defaultBillingCategory(typ) || '';
+      billingCategoryField.value = billing_category || '';
       billingCategoryField.dataset.autoDefault = billing_category ? '0' : '1';
     }
     const clearWashDateBtn = document.getElementById('clearWashDateBtn');
@@ -3968,19 +3968,15 @@ window.FLEET_DATA = {
       const outstanding = total-paid;
       // Licznik = bezpośrednio zapisane billing_category.
       // Nie używamy pola „Typ” ani żadnego automatycznego zgadywania kategorii.
-      const normalizeBillingCategory = (value) => String(value ?? '')
-        .trim()
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '');
-
-      const billingCategory = (row) => normalizeBillingCategory(row?.billing_category);
-
-      const typeCounts = {
-        personal: rows.filter(r => billingCategory(r) === 'osobowe').length,
-        bus: rows.filter(r => billingCategory(r) === 'busy').length,
-        heavy: rows.filter(r => billingCategory(r) === 'ciezarowe').length
-      };
+      // Statystyka korzysta wyłącznie z zapisanej wartości billing_category.
+      // Nie używamy pola „Typ” ani automatycznego przypisywania kategorii.
+      const typeCounts = rows.reduce((acc, row) => {
+        const category = String(row.billing_category ?? '').trim().toLowerCase();
+        if(category === 'osobowe') acc.personal++;
+        else if(category === 'busy') acc.bus++;
+        else if(category === 'ciezarowe') acc.heavy++;
+        return acc;
+      }, { personal: 0, bus: 0, heavy: 0 });
       document.getElementById('reportBody').innerHTML = `<div class="finance-summary">
         <div class="finance-card"><div class="finance-card-label">Liczba prań</div><div class="finance-card-value">${rows.length}</div></div>
         <div class="finance-card"><div class="finance-card-label">Osobowe</div><div class="finance-card-value">${typeCounts.personal}</div></div>

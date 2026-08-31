@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v57 -->
+<!-- CleanFleet v59 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -558,14 +558,6 @@
 }
 </style>
 
-
-<style id="v59-mail-style">
-.cf-mail-modal .mail-field{margin-top:12px}
-.cf-mail-modal input,.cf-mail-modal textarea{width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line-strong);border-radius:8px;font:inherit}
-.cf-mail-modal textarea{min-height:110px;resize:vertical}
-.cf-mail-files{font-size:12px;color:var(--ink-soft);margin-top:10px;line-height:1.5}
-</style>
-
 </head>
 <body>
 
@@ -691,6 +683,7 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
@@ -3473,83 +3466,163 @@ window.FLEET_DATA = {
     {key:'rozliczone', label:'Rozliczone'}
   ];
 
+  let cfInvoiceAttachment = null;
+  let cfInvoiceNumberDetected = '';
+
+  function cfInvoiceNumberCandidates(text){
+    const normalized = String(text || '').replace(/\u00a0/g,' ').replace(/\r/g,'\n');
+    const patterns = [
+      /(?:faktura\s*(?:vat|nr|numer)?|nr\s*faktury|numer\s*faktury)\s*[:#]?\s*([A-Z]{0,5}\s*[A-Z0-9._\/-]{2,30})/ig,
+      /\b(?:FV|FVS|FS|FA|FVT)[\s\/._-]*[A-Z0-9]{1,10}(?:[\s\/._-]+[A-Z0-9]{1,15}){0,5}\b/ig
+    ];
+    const found = [];
+    patterns.forEach((p, idx) => {
+      let m;
+      while((m=p.exec(normalized))){
+        const value = (idx===0 ? m[1] : m[0]).trim().replace(/\s+/g,' ');
+        if(value && !found.includes(value)) found.push(value);
+      }
+    });
+    return found;
+  }
+
+  async function cfExtractPdfText(file){
+    if(!file) return '';
+    const arrayBuffer = await file.arrayBuffer();
+    const pdfjs = window.pdfjsLib;
+    if(!pdfjs) return '';
+    const pdf = await pdfjs.getDocument({data:arrayBuffer}).promise;
+    let text = '';
+    const maxPages = Math.min(pdf.numPages, 8);
+    for(let pageNo=1; pageNo<=maxPages; pageNo++){
+      const page = await pdf.getPage(pageNo);
+      const content = await page.getTextContent();
+      text += content.items.map(item=>item.str || '').join(' ') + '\n';
+    }
+    return text;
+  }
+
+  async function cfReadInvoiceFile(file){
+    cfInvoiceAttachment = file;
+    cfInvoiceNumberDetected = '';
+    const status = document.getElementById('invoiceReadStatus');
+    if(status) status.textContent = 'Analizuję fakturę…';
+    try{
+      const extracted = await cfExtractPdfText(file);
+      const candidates = cfInvoiceNumberCandidates(extracted);
+      if(candidates.length){
+        cfInvoiceNumberDetected = candidates[0];
+        if(status) status.textContent = `Odczytano numer faktury: ${cfInvoiceNumberDetected}`;
+      }else{
+        if(status) status.textContent = 'Nie udało się automatycznie odczytać numeru. Możesz wpisać go ręcznie.';
+      }
+    }catch(err){
+      console.error('CleanFleet invoice PDF read error:', err);
+      if(status) status.textContent = 'Nie udało się odczytać tekstu faktury. Numer można wpisać ręcznie.';
+    }
+  }
+
   function showPdfExportModal(){
     menuOverlay.classList.remove('open');
+    cfInvoiceAttachment = null;
+    cfInvoiceNumberDetected = '';
+
+    const html = `
+      <div class="overlay" id="invoiceAttachOverlay">
+        <div class="sheet" style="max-width:520px;">
+          <button class="close" data-close>&times;</button>
+          <h2>Załącz fakturę</h2>
+          <div class="confirm-text">
+            Najpierw wybierz fakturę PDF z urządzenia. CleanFleet odczyta z niej numer faktury, a następnie otworzy formularz raportu.
+          </div>
+          <div class="sheet-actions" style="margin-top:18px;">
+            <button class="btn btn-solid" id="chooseInvoiceBtn" style="width:100%;">Wybierz plik PDF</button>
+          </div>
+          <input id="invoicePdfInput" type="file" accept="application/pdf,.pdf" style="display:none;">
+          <div id="invoiceReadStatus" class="confirm-text" style="margin-top:12px;">Nie wybrano faktury.</div>
+          <div class="sheet-actions" style="margin-top:16px;">
+            <button class="btn btn-solid" id="continueInvoiceBtn" disabled style="width:100%;">Przejdź do raportu</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('modalRoot').innerHTML = html;
+    document.querySelector('[data-close]').addEventListener('click', closeModal);
+
+    const input = document.getElementById('invoicePdfInput');
+    const choose = document.getElementById('chooseInvoiceBtn');
+    const cont = document.getElementById('continueInvoiceBtn');
+
+    choose.addEventListener('click', ()=>input.click());
+    input.addEventListener('change', async ()=>{
+      const file = input.files?.[0];
+      if(!file) return;
+      if(file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')){
+        showToast('Wybierz plik PDF.');
+        input.value='';
+        return;
+      }
+      await cfReadInvoiceFile(file);
+      cont.disabled = false;
+      const status = document.getElementById('invoiceReadStatus');
+      if(cfInvoiceNumberDetected){
+        status.innerHTML = `Odczytano numer faktury: <strong>${escapeHtml(cfInvoiceNumberDetected)}</strong><br>Możesz przejść dalej.`;
+      }
+    });
+
+    cont.addEventListener('click', ()=>{
+      const invoiceNumber = cfInvoiceNumberDetected || '';
+      showPdfConfigurationModal(invoiceNumber);
+    });
+  }
+
+  function showPdfConfigurationModal(invoiceNumber=''){
     const now = new Date();
     const defaultMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
 
     const columnCheckboxes = PDF_COLUMNS.map(c => `
       <label class="field-check" style="margin-top:8px;">
         <input type="checkbox" class="pdf-col-check" value="${c.key}" checked>
-        <label style="margin:0;">${c.label}</label>
+        <span>${c.label}</span>
       </label>`).join('');
 
     const html = `
       <div class="overlay" id="pdfOverlay">
         <div class="sheet" style="max-width:420px;">
           <button class="close" data-close>&times;</button>
-          <h2>Eksportuj PDF</h2>
-          <div class="confirm-text">Wybierz miesiąc i ustaw zawartość raportu.</div>
-
+          <h2>Generuj załącznik PDF</h2>
+          <div class="confirm-text">Faktura: <strong>${escapeHtml(invoiceNumber || 'numer do uzupełnienia')}</strong></div>
           <div class="report-controls">
-        <label class="field-check" style="margin-top:10px;">
-          <input type="checkbox" id="pdfIncludeServiceDescription">
-          <span>Opis usługi</span>
-        </label>
-
+            <label class="field-check" style="margin-top:10px;">
+              <input type="checkbox" id="pdfIncludeServiceDescription">
+              <span>Opis usługi</span>
+            </label>
             <input type="month" id="pdfMonthPicker" value="${defaultMonth}">
           </div>
-
           <div class="field">
             <label>Numer faktury</label>
-            <input id="pdfInvoiceNumber" type="text" placeholder="np. FV/08/2026/123" autocomplete="off">
+            <input id="pdfInvoiceNumber" type="text" value="${escapeHtml(invoiceNumber)}" placeholder="np. FV/08/2026/123" autocomplete="off">
           </div>
-
           <div class="field">
             <label>Kolumny w tabeli</label>
             ${columnCheckboxes}
           </div>
-
           <div class="field">
             <label>Grupy rozliczeniowe w raporcie</label>
-            <label class="field-check" style="margin-top:8px;">
-              <input type="checkbox" class="pdf-type-check" value="personal" checked>
-              <label style="margin:0;">Osobowe</label>
-            </label>
-            <label class="field-check" style="margin-top:8px;">
-              <input type="checkbox" class="pdf-type-check" value="heavy" checked>
-              <label style="margin:0;">Ciężarowe</label>
-            </label>
-            <label class="field-check" style="margin-top:8px;">
-              <input type="checkbox" class="pdf-type-check" value="bus" checked>
-              <label style="margin:0;">Busy</label>
-            </label>
+            <label class="field-check" style="margin-top:8px;"><input type="checkbox" class="pdf-type-check" value="personal" checked><span>Osobowe</span></label>
+            <label class="field-check" style="margin-top:8px;"><input type="checkbox" class="pdf-type-check" value="heavy" checked><span>Ciężarowe</span></label>
+            <label class="field-check" style="margin-top:8px;"><input type="checkbox" class="pdf-type-check" value="bus" checked><span>Busy</span></label>
           </div>
-
           <div class="field">
             <label>Podsumowanie</label>
-            <label class="field-check" style="margin-top:8px;">
-              <input type="checkbox" id="pdfNoSummary">
-              <label style="margin:0;">Bez podsumowania</label>
-            </label>
+            <label class="field-check" style="margin-top:8px;"><input type="checkbox" id="pdfNoSummary"><span>Bez podsumowania</span></label>
             <div id="pdfSummaryTypes">
-              <label class="field-check" style="margin-top:8px;">
-                <input type="checkbox" class="pdf-summary-type" value="personal" checked>
-                <label style="margin:0;">Osobowe</label>
-              </label>
-              <label class="field-check" style="margin-top:8px;">
-                <input type="checkbox" class="pdf-summary-type" value="heavy" checked>
-                <label style="margin:0;">Ciężarowe</label>
-              </label>
-              <label class="field-check" style="margin-top:8px;">
-                <input type="checkbox" class="pdf-summary-type" value="bus" checked>
-                <label style="margin:0;">Busy</label>
-              </label>
+              <label class="field-check" style="margin-top:8px;"><input type="checkbox" class="pdf-summary-type" value="personal" checked><span>Osobowe</span></label>
+              <label class="field-check" style="margin-top:8px;"><input type="checkbox" class="pdf-summary-type" value="heavy" checked><span>Ciężarowe</span></label>
+              <label class="field-check" style="margin-top:8px;"><input type="checkbox" class="pdf-summary-type" value="bus" checked><span>Busy</span></label>
             </div>
           </div>
-
           <div class="sheet-actions">
-            <button class="btn btn-solid" id="pdfGenerateBtn" style="width:100%;">Generuj PDF</button>
+            <button class="btn btn-solid" id="pdfGenerateBtn" style="width:100%;">Generuj raport</button>
           </div>
         </div>
       </div>`;
@@ -3571,6 +3644,7 @@ window.FLEET_DATA = {
 
     document.getElementById('pdfGenerateBtn').addEventListener('click', generateMonthPdf);
   }
+
 
   const colDefs = {
     typ: {header:'Typ', cell:r => r.typ || '—'},
@@ -3608,85 +3682,81 @@ window.FLEET_DATA = {
 
     const val = document.getElementById('pdfMonthPicker').value;
     const invoiceNumber = document.getElementById('pdfInvoiceNumber').value.trim();
-    if(!val) return;
+    if(!val){ showToast('Wybierz miesiąc'); return; }
     if(!invoiceNumber){
-      showToast('Wpisz numer faktury');
+      showToast('Nie udało się odczytać numeru faktury. Wpisz go ręcznie.');
       document.getElementById('pdfInvoiceNumber').focus();
       return;
     }
-
-    const selectedCols = Array.from(document.querySelectorAll('.pdf-col-check:checked')).map(el => el.value);
-    if(selectedCols.length === 0){
-      showToast('Wybierz co najmniej jedną kolumnę');
+    if(!cfInvoiceAttachment){
+      showToast('Najpierw załącz fakturę PDF.');
       return;
     }
 
-    const selectedVehicleTypes = Array.from(document.querySelectorAll('.pdf-type-check:checked')).map(el => el.value);
-    if(selectedVehicleTypes.length === 0){
-      showToast('Wybierz co najmniej jeden typ pojazdu');
-      return;
-    }
+    const selectedCols = Array.from(document.querySelectorAll('.pdf-col-check:checked')).map(el=>el.value);
+    if(!selectedCols.length){ showToast('Wybierz co najmniej jedną kolumnę'); return; }
+
+    const selectedVehicleTypes = Array.from(document.querySelectorAll('.pdf-type-check:checked')).map(el=>el.value);
+    if(!selectedVehicleTypes.length){ showToast('Wybierz co najmniej jeden typ pojazdu'); return; }
 
     const noSummary = document.getElementById('pdfNoSummary').checked;
-    const selectedSummaryTypes = noSummary ? [] : Array.from(document.querySelectorAll('.pdf-summary-type:checked')).map(el => el.value);
-    if(!noSummary && selectedSummaryTypes.length === 0){
+    const selectedSummaryTypes = noSummary ? [] : Array.from(document.querySelectorAll('.pdf-summary-type:checked')).map(el=>el.value);
+    if(!noSummary && !selectedSummaryTypes.length){
       showToast('Wybierz typ podsumowania albo zaznacz „Bez podsumowania”');
       return;
     }
 
     const rows = records
-      .filter(r => r.zatwierdzone && r.data_prania && r.data_prania.slice(0,7) === val)
-      .filter(r => selectedVehicleTypes.includes(pdfBillingCategoryKey(r)))
-      .sort((a,b) => a.data_prania.localeCompare(b.data_prania));
+      .filter(r=>r.zatwierdzone && r.data_prania && r.data_prania.slice(0,7)===val)
+      .filter(r=>selectedVehicleTypes.includes(pdfBillingCategoryKey(r)))
+      .sort((a,b)=>a.data_prania.localeCompare(b.data_prania));
 
-    if(rows.length === 0){
+    if(!rows.length){
       showToast('Brak zatwierdzonych prań dla wybranych ustawień');
       return;
     }
 
-    const activeCols = PDF_COLUMNS.filter(c => selectedCols.includes(c.key));
+    const activeCols = PDF_COLUMNS.filter(c=>selectedCols.includes(c.key));
+    showToast('Generuję raport PDF…');
 
-    showToast('Generuję PDF…');
-
-    const headerCells = activeCols.map(c => `<th style="text-align:left;padding:8px 10px;background:#16150F;color:#F5F4EE;font-size:13px;">${escapeHtml(colDefs[c.key].header)}</th>`).join('');
+    const headerCells = activeCols.map(c=>`<th style="text-align:left;padding:8px 10px;background:#16150F;color:#F5F4EE;font-size:13px;">${escapeHtml(colDefs[c.key].header)}</th>`).join('');
     const includeServiceDescription = document.getElementById('pdfIncludeServiceDescription')?.checked;
-    const bodyRows = rows.map((r,i) => `
-      <tr style="background:${i % 2 ? '#F7F6F1' : '#FFFFFF'};">
-        ${activeCols.map(c => `<td style="padding:7px 10px;font-size:12.5px;border-bottom:1px solid #E5E3D8;">${escapeHtml(String(colDefs[c.key].cell(r)))}</td>`).join('')}
-        ${includeServiceDescription ? `<td style="padding:7px 10px;font-size:12.5px;border-bottom:1px solid #E5E3D8;">${escapeHtml(pdfServiceDescription(r))}</td>` : ''}
+    const bodyRows = rows.map((r,i)=>`
+      <tr style="background:${i%2?'#F7F6F1':'#FFFFFF'};">
+        ${activeCols.map(c=>`<td style="padding:7px 10px;font-size:12.5px;border-bottom:1px solid #E5E3D8;">${escapeHtml(String(colDefs[c.key].cell(r)))}</td>`).join('')}
+        ${includeServiceDescription?`<td style="padding:7px 10px;font-size:12.5px;border-bottom:1px solid #E5E3D8;">${escapeHtml(pdfServiceDescription(r))}</td>`:''}
       </tr>`).join('');
 
-    let sumHtml = '';
+    let sumHtml='';
     if(!noSummary){
-      const summaryLabels = {personal:'Osobowe', heavy:'Ciężarowe', bus:'Busy'};
-      const summaryLines = selectedSummaryTypes.map(type => {
-        const total = rows.filter(r => pdfBillingCategoryKey(r) === type).reduce((sum,r) => sum + (Number(r.koszt)||0), 0);
+      const summaryLabels={personal:'Osobowe',heavy:'Ciężarowe',bus:'Busy'};
+      const summaryLines=selectedSummaryTypes.map(type=>{
+        const total=rows.filter(r=>pdfBillingCategoryKey(r)===type).reduce((sum,r)=>sum+(Number(r.koszt)||0),0);
         return `<div style="display:flex;justify-content:space-between;gap:20px;margin-top:5px;"><span>${summaryLabels[type]}</span><span>${fmtMoney(total)}</span></div>`;
       }).join('');
-      sumHtml = `<div style="margin-top:18px;font-size:14px;font-weight:700;border-top:1px solid #D9D6C9;padding-top:10px;">${summaryLines}</div>`;
+      sumHtml=`<div style="margin-top:18px;font-size:14px;font-weight:700;border-top:1px solid #D9D6C9;padding-top:10px;">${summaryLines}</div>`;
     }
 
-    const logoImg = document.querySelector('.app-logo');
-    const logoSrc = logoImg ? logoImg.src : '';
-    const container = document.createElement('div');
-    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;background:#ffffff;color:#16150F;font-family:Arial,Helvetica,sans-serif;padding:32px;';
-    container.innerHTML = `
+    const logoImg=document.querySelector('.app-logo');
+    const logoSrc=logoImg?logoImg.src:'';
+    const container=document.createElement('div');
+    container.style.cssText='position:fixed;left:-9999px;top:0;width:900px;background:#ffffff;color:#16150F;font-family:Arial,Helvetica,sans-serif;padding:32px;';
+    container.innerHTML=`
       <div style="margin-bottom:22px;">
-        ${logoSrc ? `<img src="${logoSrc}" style="height:58px;width:auto;display:block;margin-bottom:18px;">` : ''}
+        ${logoSrc?`<img src="${logoSrc}" style="height:58px;width:auto;display:block;margin-bottom:18px;">`:''}
         <div style="font-size:17px;font-weight:700;line-height:1.35;">Załącznik do faktury</div>
         <div style="font-size:16px;margin-top:3px;">${escapeHtml(invoiceNumber)}</div>
       </div>
       <table style="width:100%;border-collapse:collapse;">
-        <thead><tr>${headerCells}${includeServiceDescription ? '<th style="text-align:left;padding:8px 10px;background:#16150F;color:#F5F4EE;font-size:13px;">Opis usługi</th>' : ''}</tr></thead>
+        <thead><tr>${headerCells}${includeServiceDescription?'<th style="text-align:left;padding:8px 10px;background:#16150F;color:#F5F4EE;font-size:13px;">Opis usługi</th>':''}</tr></thead>
         <tbody>${bodyRows}</tbody>
       </table>
-      ${sumHtml}
-    `;
+      ${sumHtml}`;
     document.body.appendChild(container);
 
     let canvas;
     try{
-      canvas = await html2canvas(container, {scale:2, backgroundColor:'#ffffff', useCORS:true});
+      canvas=await html2canvas(container,{scale:2,backgroundColor:'#ffffff',useCORS:true});
     }catch(e){
       document.body.removeChild(container);
       showToast('Nie udało się wygenerować PDF');
@@ -3694,88 +3764,145 @@ window.FLEET_DATA = {
     }
     document.body.removeChild(container);
 
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({unit:'mm', format:'a4'});
-    const marginMM = 10;
-    const imgWidthMM = 210 - marginMM * 2;
-    const pageHeightMM = 297 - marginMM * 2;
-    const pxPerMM = canvas.width / imgWidthMM;
-    const pageHeightPx = pageHeightMM * pxPerMM;
-
-    let renderedPx = 0;
-    let firstPage = true;
-    while(renderedPx < canvas.height){
-      const sliceHeightPx = Math.min(pageHeightPx, canvas.height - renderedPx);
-      const sliceCanvas = document.createElement('canvas');
-      sliceCanvas.width = canvas.width;
-      sliceCanvas.height = sliceHeightPx;
-      sliceCanvas.getContext('2d').drawImage(
-        canvas, 0, renderedPx, canvas.width, sliceHeightPx,
-        0, 0, canvas.width, sliceHeightPx
-      );
-      const sliceDataUrl = sliceCanvas.toDataURL('image/png');
-      const sliceHeightMM = sliceHeightPx / pxPerMM;
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({unit:'mm',format:'a4'});
+    const marginMM=10, imgWidthMM=190, pageHeightMM=277;
+    const pxPerMM=canvas.width/imgWidthMM, pageHeightPx=pageHeightMM*pxPerMM;
+    let renderedPx=0, firstPage=true;
+    while(renderedPx<canvas.height){
+      const sliceHeightPx=Math.min(pageHeightPx,canvas.height-renderedPx);
+      const sliceCanvas=document.createElement('canvas');
+      sliceCanvas.width=canvas.width; sliceCanvas.height=sliceHeightPx;
+      sliceCanvas.getContext('2d').drawImage(canvas,0,renderedPx,canvas.width,sliceHeightPx,0,0,canvas.width,sliceHeightPx);
       if(!firstPage) doc.addPage();
-      doc.addImage(sliceDataUrl, 'PNG', marginMM, marginMM, imgWidthMM, sliceHeightMM);
-      renderedPx += sliceHeightPx;
-      firstPage = false;
+      doc.addImage(sliceCanvas.toDataURL('image/png'),'PNG',marginMM,marginMM,imgWidthMM,sliceHeightPx/pxPerMM);
+      renderedPx+=sliceHeightPx; firstPage=false;
     }
 
-    const safeInvoice = invoiceNumber.replace(/[^a-zA-Z0-9._-]+/g,'_');
-    const filename = `zalacznik-do-faktury-${safeInvoice}-${val}.pdf`;
-    const blobUrl = doc.output('bloburl');
-    showPdfPreview(blobUrl, filename, {invoiceNumber, period:val, rows});
+    const safeInvoice=invoiceNumber.replace(/[^a-zA-Z0-9._-]+/g,'_');
+    const filename=`zalacznik-do-faktury-${safeInvoice}-${val}.pdf`;
+    const blob=doc.output('blob');
+    showPdfPreview(blob,filename,{invoiceNumber,period:val,rows,invoiceFile:cfInvoiceAttachment});
   }
 
-  function showPdfPreview(blobUrl, filename, invoiceContext){
-    const html = `
+  function showPdfPreview(reportBlob,filename,invoiceContext){
+    const blobUrl=URL.createObjectURL(reportBlob);
+    const html=`
       <div class="overlay" id="pdfPreviewOverlay" style="align-items:center;">
         <div class="sheet" style="max-width:760px;width:96%;height:88vh;display:flex;flex-direction:column;padding-bottom:16px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-            <h2 style="margin:0;font-size:18px;">Podgląd PDF</h2>
+            <h2 style="margin:0;font-size:18px;">Podgląd raportu</h2>
             <button class="close" data-close>&times;</button>
           </div>
           <iframe src="${blobUrl}" title="Podgląd PDF" style="flex:1;width:100%;border:1px solid var(--line-strong);border-radius:8px;background:#fff;"></iframe>
-          <div class="sheet-actions">
-            <a class="btn btn-solid" id="pdfDownloadBtn" href="${blobUrl}" download="${escapeHtml(filename)}" style="flex:1;text-align:center;text-decoration:none;">Pobierz plik</a>
-            <a class="btn btn-outline" href="${blobUrl}" target="_blank" rel="noopener" style="flex:1;text-align:center;text-decoration:none;">Otwórz w nowej karcie</a>
+          <div class="sheet-actions" style="gap:8px;">
+            <button class="btn btn-solid" id="pdfDownloadBtn" style="flex:1;">Pobierz PDF</button>
+            <button class="btn btn-outline" id="pdfMailBtn" style="flex:1;">Wyślij mailem</button>
+            <button class="btn btn-outline" id="pdfBackBtn" style="flex:1;">Wróć</button>
           </div>
         </div>
       </div>`;
-    document.getElementById('modalRoot').innerHTML = html;
-    document.getElementById('pdfPreviewOverlay').addEventListener('click', (e) => { if(e.target.id === 'pdfPreviewOverlay') closeModal(); });
-    document.querySelector('[data-close]').addEventListener('click', closeModal);
-    const downloadBtn = document.getElementById('pdfDownloadBtn');
-    downloadBtn.addEventListener('click', (e)=>{
-      e.preventDefault();
-      const count = invoiceContext.rows.length;
-      const amount = invoiceContext.rows.reduce((sum,r)=>sum+(Number(r.koszt)||0),0);
-      const downloadFile = () => {
-        const a = document.createElement('a');
-        a.href = blobUrl; a.download = filename;
-        document.body.appendChild(a); a.click(); a.remove();
+    document.getElementById('modalRoot').innerHTML=html;
+
+    document.querySelector('[data-close]').addEventListener('click',()=>{
+      URL.revokeObjectURL(blobUrl);
+      showPdfConfigurationModal(invoiceContext.invoiceNumber);
+    });
+    document.getElementById('pdfBackBtn').addEventListener('click',()=>{
+      URL.revokeObjectURL(blobUrl);
+      showPdfConfigurationModal(invoiceContext.invoiceNumber);
+    });
+
+    document.getElementById('pdfDownloadBtn').addEventListener('click',async()=>{
+      const saveInvoice=async()=>{
+        try{
+          const result=await cfCreateInvoiceFromRows(invoiceContext.invoiceNumber,invoiceContext.period,invoiceContext.rows);
+          showToast(result.existing?'Ta faktura jest już w kolejce':'Faktura dodana do kolejki „Oczekuje na płatność”');
+        }catch(err){ console.error(err); showToast(err?.message||'Nie udało się zapisać faktury'); }
       };
-      showConfirm(
-        'Zapisać fakturę do płatności?',
-        `Faktura ${invoiceContext.invoiceNumber} · ${count} pojazdów · ${fmtMoney(amount)}. Zapisz ją w kolejce „Oczekuje na płatność”?`,
-        async ()=>{
-          try{
-            const result = await cfCreateInvoiceFromRows(invoiceContext.invoiceNumber, invoiceContext.period, invoiceContext.rows);
-            if(result.existing) showToast('Ta faktura jest już w kolejce');
-            else showToast('Faktura dodana do kolejki „Oczekuje na płatność”');
-          }catch(err){
-            console.error('CleanFleet invoice save error:', err);
-            showToast(err?.message || 'Nie udało się zapisać faktury');
-          }finally{
-            downloadFile();
-          }
-        },
-        async ()=>{
-          downloadFile();
-        }
-      );
+      await saveInvoice();
+      const a=document.createElement('a'); a.href=blobUrl; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
+    });
+
+    document.getElementById('pdfMailBtn').addEventListener('click',()=>{
+      showMailDialog(reportBlob,filename,invoiceContext.invoiceFile,invoiceContext.invoiceFile?.name || `faktura-${invoiceContext.invoiceNumber}.pdf`,invoiceContext.invoiceNumber);
     });
   }
+
+  function showMailDialog(reportBlob,reportName,invoiceFile,invoiceName,invoiceNumber){
+    const html=`
+      <div class="overlay" id="mailOverlay">
+        <div class="sheet" style="max-width:560px;">
+          <button class="close" data-mail-close>&times;</button>
+          <h2>Wyślij e-mailem</h2>
+          <div class="field">
+            <label>Adres e-mail</label>
+            <input id="mailTo" type="email" placeholder="np. ksiegowosc@firma.pl" autocomplete="email">
+          </div>
+          <div class="field">
+            <label>Temat</label>
+            <input id="mailSubject" value="${escapeHtml(`Załącznik do faktury ${invoiceNumber}`)}">
+          </div>
+          <div class="field">
+            <label>Treść wiadomości</label>
+            <textarea id="mailBody" style="min-height:120px;">Dzień dobry,
+
+w załączeniu przesyłam raport wykonanych usług wraz z fakturą.
+
+Pozdrawiam
+CleanFleet</textarea>
+          </div>
+          <div class="confirm-text">
+            Załączniki:<br>
+            📎 ${escapeHtml(reportName)}<br>
+            📎 ${escapeHtml(invoiceName)}
+          </div>
+          <div class="sheet-actions">
+            <button class="btn btn-solid" id="openMailShare" style="width:100%;">Otwórz w Mail</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('modalRoot').insertAdjacentHTML('beforeend',html);
+    const close=()=>document.getElementById('mailOverlay')?.remove();
+    document.querySelector('[data-mail-close]').addEventListener('click',close);
+
+    document.getElementById('openMailShare').addEventListener('click',async()=>{
+      const to=document.getElementById('mailTo').value.trim();
+      const subject=document.getElementById('mailSubject').value.trim();
+      const body=document.getElementById('mailBody').value;
+      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)){
+        showToast('Wpisz prawidłowy adres e-mail.');
+        return;
+      }
+      if(!invoiceFile){
+        showToast('Brak załączonego pliku faktury.');
+        return;
+      }
+
+      const reportFile=new File([reportBlob],reportName,{type:'application/pdf'});
+      const invoiceShareFile=new File([invoiceFile],invoiceName,{type:'application/pdf'});
+      const files=[reportFile,invoiceShareFile];
+
+      try{
+        if(!navigator.share || (navigator.canShare && !navigator.canShare({files}))){
+          showToast('To urządzenie nie obsługuje udostępniania dwóch załączników PDF przez systemowe menu.');
+          return;
+        }
+        await navigator.share({
+          title:subject,
+          text:`Do: ${to}\n\n${body}`,
+          files
+        });
+        close();
+      }catch(err){
+        if(err?.name!=='AbortError'){
+          console.error('CleanFleet mail share error:',err);
+          showToast('Nie udało się otworzyć systemowego wysyłania.');
+        }
+      }
+    });
+  }
+
 
   function showMonthReport(){
     const now = new Date();
@@ -4267,111 +4394,6 @@ window.FLEET_DATA = {
   document.addEventListener('keydown', e => { if(e.key === 'Escape') closeBottomMobileMenu(); });
 
   cfBoot();
-})();
-</script>
-
-
-<script id="v59-mail">
-(() => {
-  function cfV59Escape(s){
-    const d=document.createElement('div'); d.textContent=String(s??''); return d.innerHTML;
-  }
-
-  async function cfV59ShareMail(reportBlob, reportName, invoiceBlob, invoiceName, invoiceNumber){
-    const files = [
-      new File([reportBlob], reportName, {type:'application/pdf'}),
-      new File([invoiceBlob], invoiceName, {type:'application/pdf'})
-    ];
-    const subject = `Załącznik do faktury ${invoiceNumber || ''}`.trim();
-    const body = `Dzień dobry,\n\nw załączeniu przesyłam raport wykonanych usług wraz z fakturą.\n\nPozdrawiam\nCleanFleet`;
-
-    if(navigator.share && (!navigator.canShare || navigator.canShare({files}))){
-      await navigator.share({title:subject, text:body, files});
-      return true;
-    }
-
-    // On environments without file sharing, give a clear message rather than
-    // pretending the attachments were attached.
-    showToast('To urządzenie/przeglądarka nie obsługuje wysyłania PDF z załącznikami przez systemowe menu udostępniania.');
-    return false;
-  }
-
-  window.cfV59ShowMailDialog = function(reportBlob, reportName, invoiceBlob, invoiceName, invoiceNumber){
-    const root=document.getElementById('modalRoot');
-    const existing=root.querySelector('#cfV59MailOverlay');
-    if(existing) existing.remove();
-
-    const defaultSubject=`Załącznik do faktury ${invoiceNumber || ''}`.trim();
-    const html=`
-      <div class="overlay cf-mail-modal" id="cfV59MailOverlay">
-        <div class="sheet" style="max-width:560px;">
-          <button class="close" data-mail-close>&times;</button>
-          <h2>Wyślij e-mailem</h2>
-          <div class="mail-field">
-            <label>Adres e-mail</label>
-            <input id="cfV59MailTo" type="email" placeholder="np. ksiegowosc@firma.pl" autocomplete="email">
-          </div>
-          <div class="mail-field">
-            <label>Temat</label>
-            <input id="cfV59MailSubject" value="${cfV59Escape(defaultSubject)}">
-          </div>
-          <div class="mail-field">
-            <label>Treść</label>
-            <textarea id="cfV59MailBody">Dzień dobry,
-
-w załączeniu przesyłam raport wykonanych usług wraz z fakturą.
-
-Pozdrawiam
-CleanFleet</textarea>
-          </div>
-          <div class="cf-mail-files">
-            📎 ${cfV59Escape(reportName)}<br>
-            📎 ${cfV59Escape(invoiceName)}
-          </div>
-          <div class="sheet-actions">
-            <button class="btn btn-solid" id="cfV59MailOpen">Otwórz w Mail</button>
-            <button class="btn btn-outline" id="cfV59MailCancel">Anuluj</button>
-          </div>
-        </div>
-      </div>`;
-    root.insertAdjacentHTML('beforeend',html);
-
-    const close=()=>document.getElementById('cfV59MailOverlay')?.remove();
-    document.querySelector('[data-mail-close]').addEventListener('click',close);
-    document.getElementById('cfV59MailCancel').addEventListener('click',close);
-    document.getElementById('cfV59MailOpen').addEventListener('click',async()=>{
-      const to=document.getElementById('cfV59MailTo').value.trim();
-      const subject=document.getElementById('cfV59MailSubject').value.trim() || defaultSubject;
-      const body=document.getElementById('cfV59MailBody').value;
-      if(!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)){
-        showToast('Wpisz prawidłowy adres e-mail.');
-        return;
-      }
-
-      const files = [
-        new File([reportBlob], reportName, {type:'application/pdf'}),
-        new File([invoiceBlob], invoiceName, {type:'application/pdf'})
-      ];
-
-      // Native share sheet gets the files. The recipient/subject/body are retained
-      // in the UI, but Web Share cannot reliably force Mail to prefill all mail
-      // fields on every Apple OS/browser version.
-      try{
-        if(navigator.share && (!navigator.canShare || navigator.canShare({files}))){
-          await navigator.share({title:subject,text:`Do: ${to}\n\n${body}`,files});
-          close();
-          return;
-        }
-      }catch(err){
-        if(err?.name==='AbortError') return;
-      }
-      showToast('Nie udało się otworzyć systemowego wysyłania z załącznikami.');
-    });
-  };
-
-  // Enhance the final PDF preview by adding a mail button if the current report
-  // page exposes a "Pobierz PDF" action and an invoice file is available in the
-  // current export flow. This hook is intentionally non-destructive.
 })();
 </script>
 

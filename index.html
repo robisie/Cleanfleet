@@ -2818,10 +2818,11 @@ window.FLEET_DATA = {
   }
 
   function lastWashDaysBadgeHtml(r){
-    if(r.data_prania) return '';
-    const last = getLastWashForPlate(r.tablica, r.id);
+    const last = r.data_prania ? r : getLastWashForPlate(r.tablica, r.id);
     if(!last || !last.data_prania) return '';
-    const days = Math.max(0, Math.floor((Date.now() - new Date(last.data_prania+'T00:00:00').getTime()) / 86400000));
+    const t = new Date(last.data_prania+'T00:00:00').getTime();
+    if(!Number.isFinite(t)) return '';
+    const days = Math.max(0, Math.floor((Date.now() - t) / 86400000));
     return `<span class="record-old-days" title="Dni od ostatniego prania">${days} dni</span>`;
   }
 

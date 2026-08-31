@@ -2822,7 +2822,7 @@ window.FLEET_DATA = {
     const last = getLastWashForPlate(r.tablica, r.id);
     if(!last || !last.data_prania) return '';
     const days = Math.max(0, Math.floor((Date.now() - new Date(last.data_prania+'T00:00:00').getTime()) / 86400000));
-    return `<span class="record-old-days" title="Dni od ostatniego prania">${days}</span>`;
+    return `<span class="record-old-days" title="Dni od ostatniego prania">${days} dni</span>`;
   }
 
   function daysSinceLastWashForRecord(r){

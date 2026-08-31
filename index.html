@@ -2788,7 +2788,7 @@ window.FLEET_DATA = {
         case 'unpaid': return !r.zaplacone;
         case 'old': {
           const days = daysSinceLastWashForRecord(r);
-          return days !== null && days >= 30;
+          return days !== null && days >= (365 / 2);
         }
         default: return true;
       }
@@ -4058,7 +4058,7 @@ window.FLEET_DATA = {
         <td>${escapeHtml(r.typ)}</td>
         <td class="mono">${escapeHtml(r.tablica)}</td>
         <td>${escapeHtml(r.marka)}</td>
-        <td>${r.data_prania ? `<span class="vehicle-last-wash">${fmtDate(r.data_prania)}${(() => { const days=Math.floor((Date.now()-new Date(r.data_prania+'T00:00:00').getTime())/86400000); return days>=30 ? ` · ⚠️ ${days} dni` : ''; })()}</span>` : '<span class="record-badge">brak wpisu</span>'}</td>
+        <td>${r.data_prania ? `<span class="vehicle-last-wash">${fmtDate(r.data_prania)}${(() => { const days=Math.floor((Date.now()-new Date(r.data_prania+'T00:00:00').getTime())/86400000); return days>=(365 / 2) ? ` · ⚠️ ${days} dni` : ''; })()}</span>` : '<span class="record-badge">brak wpisu</span>'}</td>
         <td>${r.zatwierdzone===null ? '—' : `<span class="pill ${r.zatwierdzone?'pill-yes':'pill-no'}">${r.zatwierdzone?'TAK':'NIE'}</span>`}</td>
         <td>${r.zaplacone===null ? '—' : `<span class="pill ${r.zaplacone?'pill-yes':'pill-no'}">${r.zaplacone?'TAK':'NIE'}</span>`}</td>
       </tr>`).join('');

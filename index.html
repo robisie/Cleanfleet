@@ -2847,9 +2847,10 @@ window.FLEET_DATA = {
             <div class="record-plate">${escapeHtml(r.tablica)}</div>
             ${r.zlecone && !r.zatwierdzone ? `
               <div class="record-meta">Zlecono: ${r.data_zlecenia ? fmtDate(r.data_zlecenia) : '—'} · Na: ${r.data_zlecenia_do ? fmtDate(r.data_zlecenia_do) : '—'} · Przez: ${escapeHtml(r.kto_zlecil||'—')}</div>
-              <div class="record-meta record-description">${escapeHtml(r.uwagi||'—')}</div>
-            ` : `
-            `}
+            ` : r.data_prania ? `
+              <div class="record-meta">Pranie: ${fmtDate(r.data_prania)} · Wykonał: ${escapeHtml(r.kto_wykonal||'—')}</div>
+            ` : ''}
+            <div class="record-meta record-description">${escapeHtml(r.uwagi||'—')}</div>
           </div>
           <div style="text-align:right;">
             <div class="record-cost">${fmtMoney(r.koszt)}</div>

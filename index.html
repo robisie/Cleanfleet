@@ -513,6 +513,16 @@
   @media(max-width:639px){
     .finance-type-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
   }
+
+  .finance-summary-row{display:flex;gap:12px;margin-bottom:12px;}
+  .finance-summary-types{flex-wrap:nowrap;overflow-x:auto;}
+  .finance-summary-types .finance-card{flex:1 0 0;min-width:120px;}
+  .finance-summary-money{margin-bottom:0;}
+  .finance-summary-money .finance-card{flex:1 1 0;}
+  @media(max-width:639px){
+    .finance-summary-types{gap:8px;}
+    .finance-summary-types .finance-card{min-width:112px;}
+  }
 </style>
 
 <style id="mobile-user-header-fix">
@@ -3988,11 +3998,20 @@ window.FLEET_DATA = {
             `<div class="finance-card"><div class="finance-card-label">${escapeHtml(type)}</div><div class="finance-card-value">${count}</div></div>`
           ).join('')
       }</div>`;
+      const typeCards = Object.entries(vehicleTypeCounts)
+        .map(([type, count]) =>
+          `<div class="finance-card"><div class="finance-card-label">${escapeHtml(type)}</div><div class="finance-card-value">${count}</div></div>`
+        ).join('');
+
       document.getElementById('reportBody').innerHTML = `<div class="finance-summary">
-        <div class="finance-card"><div class="finance-card-label">Liczba prań</div><div class="finance-card-value">${rows.length}</div></div>
-        ${typeSummaryCards}
-        <div class="finance-card"><div class="finance-card-label">Wartość</div><div class="finance-card-value">${fmtMoney(total)}</div></div>
-        <div class="finance-card"><div class="finance-card-label">Do zapłaty</div><div class="finance-card-value">${fmtMoney(outstanding)}</div></div>
+        <div class="finance-summary-row finance-summary-types">
+          <div class="finance-card"><div class="finance-card-label">Liczba prań</div><div class="finance-card-value">${rows.length}</div></div>
+          ${typeCards}
+        </div>
+        <div class="finance-summary-row finance-summary-money">
+          <div class="finance-card"><div class="finance-card-label">Wartość</div><div class="finance-card-value">${fmtMoney(total)}</div></div>
+          <div class="finance-card"><div class="finance-card-label">Do zapłaty</div><div class="finance-card-value">${fmtMoney(outstanding)}</div></div>
+        </div>
       </div>${tableHtml(rows)}`;
     };
     document.getElementById('monthPicker').addEventListener('change', update);

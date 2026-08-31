@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v59 -->
+<!-- CleanFleet v60 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -3825,37 +3825,41 @@ window.FLEET_DATA = {
     });
 
     document.getElementById('pdfMailBtn').addEventListener('click',()=>{
-      showMailDialog(reportBlob,filename,invoiceContext.invoiceFile,invoiceContext.invoiceFile?.name || `faktura-${invoiceContext.invoiceNumber}.pdf`,invoiceContext.invoiceNumber);
+      showMailDialog(reportBlob,filename,invoiceContext.invoiceFile,invoiceContext.invoiceFile?.name || `faktura-${invoiceContext.invoiceNumber}.pdf`,invoiceContext.invoiceNumber,invoiceContext.period);
     });
   }
 
-  function showMailDialog(reportBlob,reportName,invoiceFile,invoiceName,invoiceNumber){
+  function showMailDialog(reportBlob,reportName,invoiceFile,invoiceName,invoiceNumber,period){
+    const monthLabel = (() => {
+      const [y,m] = String(period || '').split('-');
+      if(!y || !m) return period || '';
+      const names = ['styczeń','luty','marzec','kwiecień','maj','czerwiec','lipiec','sierpień','wrzesień','październik','listopad','grudzień'];
+      return names[Number(m)-1] ? `${names[Number(m)-1]} ${y}` : period;
+    })();
+
+    const subject = `faktura nr ${invoiceNumber} + załącznik z wykazem`;
+    const body = `dzień dobry, w załączniku przesyłam fakturę nr ${invoiceNumber} za miesiąc ${monthLabel} wraz z załącznikiem z wykazem wypranych samochodów.`;
+
     const html=`
       <div class="overlay" id="mailOverlay">
         <div class="sheet" style="max-width:560px;">
           <button class="close" data-mail-close>&times;</button>
           <h2>Wyślij e-mailem</h2>
           <div class="field">
-            <label>Adres e-mail</label>
-            <input id="mailTo" type="email" placeholder="np. ksiegowosc@firma.pl" autocomplete="email">
-          </div>
-          <div class="field">
             <label>Temat</label>
-            <input id="mailSubject" value="${escapeHtml(`Załącznik do faktury ${invoiceNumber}`)}">
+            <input id="mailSubject" value="${escapeHtml(subject)}" readonly>
           </div>
           <div class="field">
             <label>Treść wiadomości</label>
-            <textarea id="mailBody" style="min-height:120px;">Dzień dobry,
-
-w załączeniu przesyłam raport wykonanych usług wraz z fakturą.
-
-Pozdrawiam
-CleanFleet</textarea>
+            <textarea id="mailBody" style="min-height:150px;" readonly>${escapeHtml(body)}</textarea>
           </div>
           <div class="confirm-text">
             Załączniki:<br>
             📎 ${escapeHtml(reportName)}<br>
             📎 ${escapeHtml(invoiceName)}
+          </div>
+          <div class="confirm-text" style="margin-top:10px;">
+            Adres odbiorcy wpiszesz już bezpośrednio w aplikacji Mail.
           </div>
           <div class="sheet-actions">
             <button class="btn btn-solid" id="openMailShare" style="width:100%;">Otwórz w Mail</button>
@@ -3867,13 +3871,6 @@ CleanFleet</textarea>
     document.querySelector('[data-mail-close]').addEventListener('click',close);
 
     document.getElementById('openMailShare').addEventListener('click',async()=>{
-      const to=document.getElementById('mailTo').value.trim();
-      const subject=document.getElementById('mailSubject').value.trim();
-      const body=document.getElementById('mailBody').value;
-      if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)){
-        showToast('Wpisz prawidłowy adres e-mail.');
-        return;
-      }
       if(!invoiceFile){
         showToast('Brak załączonego pliku faktury.');
         return;
@@ -3890,7 +3887,7 @@ CleanFleet</textarea>
         }
         await navigator.share({
           title:subject,
-          text:`Do: ${to}\n\n${body}`,
+          text:`${subject}\n\n${body}`,
           files
         });
         close();
@@ -3902,7 +3899,6 @@ CleanFleet</textarea>
       }
     });
   }
-
 
   function showMonthReport(){
     const now = new Date();

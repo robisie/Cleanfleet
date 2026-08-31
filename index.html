@@ -3968,10 +3968,28 @@ window.FLEET_DATA = {
       const outstanding = total-paid;
       // Liczenie typów odbywa się wyłącznie według kategorii
       // przypisanej w formularzu „Grupa rozliczeniowa”.
+      // Liczymy wyłącznie według zapisanej „Grupy rozliczeniowej”.
+      // Obsługujemy także starsze warianty zapisów (np. „BUS”, „OSOBOWY”)
+      // oraz polskie znaki, ale NIE używamy pola „Typ” jako zastępstwa.
+      const normalizeBillingCategory = (value) => String(value || '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\\u0300-\\u036f]/g, '');
+
+      const getBillingCategoryKey = (row) => {
+        const c = normalizeBillingCategory(row?.billing_category);
+        if (!c) return '';
+        if (c === 'osobowe' || c === 'osobowy' || c === 'osobowa' || c.startsWith('osobow')) return 'personal';
+        if (c === 'busy' || c === 'bus') return 'bus';
+        if (c === 'ciezarowe' || c === 'ciezarowy' || c === 'ciezarowa' || c.startsWith('ciezarow')) return 'heavy';
+        return '';
+      };
+
       const typeCounts = {
-        personal: rows.filter(r=>String(r.billing_category||'').trim().toLowerCase()==='osobowe').length,
-        heavy: rows.filter(r=>String(r.billing_category||'').trim().toLowerCase()==='ciezarowe').length,
-        bus: rows.filter(r=>String(r.billing_category||'').trim().toLowerCase()==='busy').length
+        personal: rows.filter(r=>getBillingCategoryKey(r)==='personal').length,
+        heavy: rows.filter(r=>getBillingCategoryKey(r)==='heavy').length,
+        bus: rows.filter(r=>getBillingCategoryKey(r)==='bus').length
       };
       document.getElementById('reportBody').innerHTML = `<div class="finance-summary">
         <div class="finance-card"><div class="finance-card-label">Liczba prań</div><div class="finance-card-value">${rows.length}</div></div>

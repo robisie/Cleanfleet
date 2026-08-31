@@ -3968,20 +3968,21 @@ window.FLEET_DATA = {
       const outstanding = total-paid;
       // Licznik = bezpośrednio zapisane billing_category.
       // Nie używamy pola „Typ” ani żadnego automatycznego zgadywania kategorii.
-      // Statystyka korzysta wyłącznie z zapisanej wartości billing_category.
-      // Nie używamy pola „Typ” ani automatycznego przypisywania kategorii.
-      const typeCounts = rows.reduce((acc, row) => {
-        const category = String(row.billing_category ?? '').trim().toLowerCase();
-        if(category === 'osobowe') acc.personal++;
-        else if(category === 'busy') acc.bus++;
-        else if(category === 'ciezarowe') acc.heavy++;
-        return acc;
-      }, { personal: 0, bus: 0, heavy: 0 });
+      // Każdy wpis jest liczony dokładnie według wartości pola „Typ”.
+      // Każda różna wartość typu jest osobną kategorią — np. BUS i BUS C.
+      const vehicleTypeCounts = {};
+      rows.forEach(r => {
+        const type = String(r?.typ ?? '').trim();
+        if(type) vehicleTypeCounts[type] = (vehicleTypeCounts[type] || 0) + 1;
+      });
+
+      const typeSummaryCards = Object.entries(vehicleTypeCounts)
+        .map(([type, count]) =>
+          `<div class="finance-card"><div class="finance-card-label">${escapeHtml(type)}</div><div class="finance-card-value">${count}</div></div>`
+        ).join('');
       document.getElementById('reportBody').innerHTML = `<div class="finance-summary">
         <div class="finance-card"><div class="finance-card-label">Liczba prań</div><div class="finance-card-value">${rows.length}</div></div>
-        <div class="finance-card"><div class="finance-card-label">Osobowe</div><div class="finance-card-value">${typeCounts.personal}</div></div>
-        <div class="finance-card"><div class="finance-card-label">Busy</div><div class="finance-card-value">${typeCounts.bus}</div></div>
-        <div class="finance-card"><div class="finance-card-label">Ciężarowe</div><div class="finance-card-value">${typeCounts.heavy}</div></div>
+        ${typeSummaryCards}
         <div class="finance-card"><div class="finance-card-label">Wartość</div><div class="finance-card-value">${fmtMoney(total)}</div></div>
         <div class="finance-card"><div class="finance-card-label">Do zapłaty</div><div class="finance-card-value">${fmtMoney(outstanding)}</div></div>
       </div>${tableHtml(rows)}`;

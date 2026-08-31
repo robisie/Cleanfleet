@@ -487,14 +487,6 @@
   white-space:nowrap;
 }
 
-
-  .stale-vehicle-list{display:grid;gap:8px;}
-  .stale-vehicle-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid var(--line-strong);border-radius:12px;background:var(--panel);cursor:pointer;}
-  .stale-vehicle-plate{font-family:'JetBrains Mono',monospace;font-weight:800;letter-spacing:.04em;}
-  .stale-vehicle-meta{font-size:12px;color:var(--ink-soft);margin-top:3px;}
-  .stale-vehicle-days{font-weight:800;white-space:nowrap;}
-  .stale-empty{padding:14px;border:1px dashed var(--line-strong);border-radius:10px;color:var(--ink-soft);font-size:12px;background:var(--panel);}
-
 </style>
 
 <style id="mobile-user-header-fix">
@@ -652,14 +644,14 @@
   <div class="active-section-head">
     <div class="section-title">Aktywne wpisy</div>
     <div class="main-filters">
-      <select id="mainStatusFilter">
-          <option value="all">Wszystkie</option>
-          <option value="ordered">Zlecone</option>
-          <option value="todo">Do zrobienia</option>
-          <option value="done">Wykonane</option>
-          <option value="unpaid">Niezapłacone</option>
-          <option value="stale">Dawno nie robione &gt;200 dni</option>
-        </select>
+      <select id="mainStatusFilter" aria-label="Filtr wpisów">
+        <option value="all">Wszystkie</option>
+        <option value="ordered">Zlecone</option>
+        <option value="todo">Do wykonania</option>
+        <option value="done">Wykonane</option>
+        <option value="unpaid">Niezapłacone</option>
+        <option value="old">Dawno nie prane</option>
+      </select>
     </div>
   </div>
   <div class="records" id="recordsList"></div>
@@ -2717,7 +2709,7 @@ window.FLEET_DATA = {
 
   async function cfRefresh(){
     const btn=document.getElementById('cfRefreshBtn'); if(btn) btn.disabled=true;
-    try{ await loadAll(); void cfCheckStaleVehicleNotifications(); renderRecords(); } finally { if(btn) btn.disabled=false; }
+    try{ await loadAll(); } finally { if(btn) btn.disabled=false; }
   }
 
   function addOptionIfNew(list, value){
@@ -2768,213 +2760,63 @@ window.FLEET_DATA = {
     });
   }
 
-
-  // ===== Samochody dawno nie robione (>200 dni) =====
-  const CF_STALE_DAYS = 200;
-  const CF_STALE_ALERTS_KEY = 'cleanfleet-stale-notifications-v1';
-
-  function cfDaysSinceWash(dateIso){
-    if(!dateIso) return null;
-    const d = new Date(String(dateIso) + 'T00:00:00');
-    if(Number.isNaN(d.getTime())) return null;
-    const today = new Date();
-    const a = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const b = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    return Math.max(0, Math.floor((a.getTime()-b.getTime())/86400000));
-  }
-
-  function cfLatestWashForPlate(plate){
-    const p = String(plate||'').trim().toUpperCase();
-    return (records||[])
-      .filter(r => String(r.tablica||'').trim().toUpperCase() === p && r.data_prania)
-      .sort((a,b) => String(b.data_prania).localeCompare(String(a.data_prania)))[0] || null;
-  }
-
-  function cfStaleVehicles(){
-    const plates = new Set();
-
-    Object.keys(registry||{}).forEach(p => {
-      const plate = String(p||'').trim().toUpperCase();
-      if(plate) plates.add(plate);
-    });
-
-    (records||[]).forEach(r => {
-      const plate = String(r.tablica||'').trim().toUpperCase();
-      if(plate) plates.add(plate);
-    });
-
-    return [...plates].map(plate => {
-      const latest = cfLatestWashForPlate(plate);
-      if(!latest || !latest.data_prania) return null;
-
-      const days = cfDaysSinceWash(latest.data_prania);
-      if(!Number.isFinite(days) || days <= CF_STALE_DAYS) return null;
-
-      const reg = registry[plate] || {};
-      return {
-        plate,
-        days,
-        typ: latest.typ || reg.typ || '—',
-        marka: latest.marka || reg.marka || '—',
-        data_prania: latest.data_prania
-      };
-    }).filter(Boolean).sort((a,b) => b.days-a.days);
-  }
-
-  function cfReadStaleAlerts(){
-    try {
-      return JSON.parse(localStorage.getItem(CF_STALE_ALERTS_KEY) || '{}') || {};
-    } catch(e) {
-      return {};
-    }
-  }
-
-  function cfWriteStaleAlerts(v){
-    try { localStorage.setItem(CF_STALE_ALERTS_KEY, JSON.stringify(v||{})); } catch(e) {}
-  }
-
-  async function cfCheckStaleVehicleNotifications(){
-    try {
-      const stale = cfStaleVehicles();
-      const sent = cfReadStaleAlerts();
-      let changed = false;
-
-      // Clear an old alert cycle after the vehicle has been washed again.
-      Object.keys(sent).forEach(plate => {
-        const latest = cfLatestWashForPlate(plate);
-        const days = latest ? cfDaysSinceWash(latest.data_prania) : null;
-        if(days === null || days <= CF_STALE_DAYS){
-          delete sent[plate];
-          changed = true;
-        }
-      });
-
-      for(const v of stale){
-        if(sent[v.plate]) continue;
-
-        // This is a local notification only when the browser is allowed to show it.
-        // It never blocks the database loading.
-        try {
-          if('Notification' in window && Notification.permission === 'granted' &&
-             'serviceWorker' in navigator){
-            const reg = await navigator.serviceWorker.ready;
-            if(reg && reg.showNotification){
-              await reg.showNotification('CleanFleet — samochód dawno nie robiony', {
-                body: `${v.plate} — ${v.days} dni od ostatniego prania.`,
-                icon: './icon-192.png',
-                badge: './icon-192.png',
-                tag: `cleanfleet-stale-${v.plate}`,
-                data: { url: './' }
-              });
-            }
-          }
-        } catch(e) {
-          console.warn('Nie udało się wysłać lokalnego alertu 200 dni:', e);
-        }
-
-        // Mark as handled even when notifications are disabled, so the same
-        // vehicle does not become a repeated alert on every refresh.
-        sent[v.plate] = {
-          handledAt: new Date().toISOString(),
-          daysAtAlert: v.days
-        };
-        changed = true;
-      }
-
-      if(changed) cfWriteStaleAlerts(sent);
-    } catch(e) {
-      console.warn('Sprawdzanie samochodów >200 dni:', e);
-    }
-  }
-
-  function staleVehiclesHtml(rows){
-    const stale = Array.isArray(rows) ? rows : [];
-    const content = stale.length
-      ? stale.map(v => `
-          <div class="stale-vehicle-card" data-stale-plate="${escapeHtml(v.plate)}">
-            <div>
-              <div class="stale-vehicle-plate">${escapeHtml(v.plate)}</div>
-              <div class="stale-vehicle-meta">${escapeHtml(v.typ||'—')}${v.marka && v.marka !== '—' ? ' · '+escapeHtml(v.marka) : ''}</div>
-            </div>
-            <div class="stale-vehicle-days">${v.days} dni</div>
-          </div>`).join('')
-      : `<div class="stale-empty">Brak samochodów, dla których minęło więcej niż 200 dni od ostatniego prania.</div>`;
-
-    return ``;
-  }
-
-  function bindStaleVehiclesPanel(){
-    document.querySelectorAll('[data-stale-plate]').forEach(el => {
-      el.onclick = () => {
-        const plate = String(el.dataset.stalePlate || '').toUpperCase();
-        window.__pendingPlate = plate;
-        openForm(null);
-      };
-    });
-  }
-
-
   function renderRecords(){
     const list = document.getElementById('recordsList');
-    const filter = mainStatusFilter;
-
-    if(filter === 'stale'){
-      const stale = cfStaleVehicles();
-
-      if(!stale.length){
-        list.innerHTML = `<div class="empty-state">
-          Brak samochodów, dla których minęło więcej niż 200 dni od ostatniego prania.
-        </div>`;
-        return;
-      }
-
-      list.innerHTML = stale.map(v => `
-        <div class="stale-vehicle-card" data-stale-plate="${escapeHtml(v.plate)}">
-          <div>
-            <div class="stale-vehicle-plate">${escapeHtml(v.plate)}</div>
-            <div class="stale-vehicle-meta">${escapeHtml(v.typ||'—')}${v.marka && v.marka !== '—' ? ' · '+escapeHtml(v.marka) : ''}</div>
-          </div>
-          <div class="stale-vehicle-days">${v.days} dni</div>
-        </div>
-      `).join('');
-
-      bindStaleVehiclesPanel();
-      return;
-    }
-
     let active = activeRecords();
-
     active = active.filter(r => {
-      switch(filter){
+      switch(mainStatusFilter){
         case 'ordered': return r.zlecone;
         case 'todo': return r.zlecone && !r.data_prania;
         case 'done': return !!r.data_prania;
         case 'unpaid': return !r.zaplacone;
+        case 'old': {
+          const days = daysSinceLastWashForRecord(r);
+          return days !== null && days >= 30;
+        }
         default: return true;
       }
     });
-
-    list.innerHTML = active.length
-      ? active.map(r => recordCardHtml(r)).join('')
-      : `<div class="empty-state">Brak aktywnych wpisów.<br>Wyszukaj tablicę powyżej, aby dodać pranie.</div>`;
+    if(active.length === 0){
+      list.innerHTML = `<div class="empty-state">Brak aktywnych wpisów.<br>Wyszukaj tablicę powyżej, aby dodać pranie.</div>`;
+      return;
+    }
+    list.innerHTML = active.map(r => recordCardHtml(r)).join('');
 
     list.querySelectorAll('[data-open]').forEach(el => {
       el.addEventListener('click', () => openForm(el.getAttribute('data-open')));
     });
     list.querySelectorAll('[data-toggle-zatw]').forEach(el => {
-      el.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        toggleZatwierdzone(el.getAttribute('data-toggle-zatw'));
-      });
+      el.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); toggleZatwierdzone(el.getAttribute('data-toggle-zatw')); });
     });
     list.querySelectorAll('[data-toggle-zapl]').forEach(el => {
-      el.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        requestMarkPaid(el.getAttribute('data-toggle-zapl'));
-      });
+      el.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); requestMarkPaid(el.getAttribute('data-toggle-zapl')); });
     });
+  }
+
+  function getLastWashForPlate(plate, currentId){
+    return records
+      .filter(x => x.id !== currentId && x.tablica === plate && x.data_prania)
+      .sort((a,b) => (b.data_prania||'').localeCompare(a.data_prania||''))
+      [0] || null;
+  }
+
+  function lastWashMetaHtml(r){
+    if(r.data_prania){
+      return `<div class="record-meta">Pranie: ${fmtDate(r.data_prania)} · Wykonał: ${escapeHtml(r.kto_wykonal||'—')}</div>`;
+    }
+    const last = getLastWashForPlate(r.tablica, r.id);
+    if(!last) return '';
+    const days = Math.max(0, Math.floor((Date.now() - new Date(last.data_prania+'T00:00:00').getTime()) / 86400000));
+    const ageText = days === 0 ? 'dzisiaj' : (days === 1 ? '1 dzień temu' : `${days} dni temu`);
+    return `<div class="record-meta">Ostatnie pranie: ${fmtDate(last.data_prania)} · ${ageText}</div>`;
+  }
+
+  function daysSinceLastWashForRecord(r){
+    const last = r.data_prania ? r : getLastWashForPlate(r.tablica, r.id);
+    if(!last || !last.data_prania) return null;
+    const t = new Date(last.data_prania+'T00:00:00').getTime();
+    if(!Number.isFinite(t)) return null;
+    return Math.floor((Date.now()-t)/86400000);
   }
 
   function recordCardHtml(r){
@@ -2986,9 +2828,10 @@ window.FLEET_DATA = {
             <div class="record-plate">${escapeHtml(r.tablica)}</div>
             ${r.zlecone && !r.zatwierdzone ? `
               <div class="record-meta">Zlecono: ${r.data_zlecenia ? fmtDate(r.data_zlecenia) : '—'} · Na: ${r.data_zlecenia_do ? fmtDate(r.data_zlecenia_do) : '—'} · Przez: ${escapeHtml(r.kto_zlecil||'—')}</div>
+              ${lastWashMetaHtml(r)}
               <div class="record-meta record-description">${escapeHtml(r.uwagi||'—')}</div>
             ` : `
-              <div class="record-meta">Pranie: ${fmtDate(r.data_prania)} · Wykonał: ${escapeHtml(r.kto_wykonal||'—')}${cfDaysSinceWash(r.data_prania) !== null ? ` · ${cfDaysSinceWash(r.data_prania)} dni od prania` : ''}</div>
+              ${lastWashMetaHtml(r)}
             `}
           </div>
           <div style="text-align:right;">
@@ -4089,20 +3932,6 @@ window.FLEET_DATA = {
     });
   }
 
-  function cfReportVehicleCategory(r){
-    const explicit = String(r.billing_category || '').trim().toLowerCase();
-    if(explicit === 'busy' || explicit === 'osobowe' || explicit === 'ciezarowe') return explicit;
-
-    const type = String(r.typ || '').trim().toLowerCase();
-    if(type.includes('bus')) return 'busy';
-    if(type.includes('osob')) return 'osobowe';
-    if(type.includes('solów') || type.includes('solow') || type.includes('zestaw') ||
-       type.includes('cięż') || type.includes('cież') || type.includes('ciezar') ||
-       type.includes('dostaw')) return 'ciezarowe';
-
-    return 'pozostale';
-  }
-
   function showMonthReport(){
     const now = new Date();
     const defaultMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
@@ -4118,16 +3947,8 @@ window.FLEET_DATA = {
       const total = rows.reduce((s,r)=>s+Number(r.koszt||0),0);
       const paid = rows.filter(r=>r.zaplacone).reduce((s,r)=>s+Number(r.koszt||0),0);
       const outstanding = total-paid;
-
-      const counts = { ciezarowe:0, busy:0, osobowe:0, pozostale:0 };
-      rows.forEach(r => counts[cfReportVehicleCategory(r)]++);
-
       document.getElementById('reportBody').innerHTML = `<div class="finance-summary">
         <div class="finance-card"><div class="finance-card-label">Liczba prań</div><div class="finance-card-value">${rows.length}</div></div>
-        <div class="finance-card"><div class="finance-card-label">Ciężarowe</div><div class="finance-card-value">${counts.ciezarowe}</div></div>
-        <div class="finance-card"><div class="finance-card-label">Busy</div><div class="finance-card-value">${counts.busy}</div></div>
-        <div class="finance-card"><div class="finance-card-label">Osobowe</div><div class="finance-card-value">${counts.osobowe}</div></div>
-        <div class="finance-card"><div class="finance-card-label">Pozostałe</div><div class="finance-card-value">${counts.pozostale}</div></div>
         <div class="finance-card"><div class="finance-card-label">Wartość</div><div class="finance-card-value">${fmtMoney(total)}</div></div>
         <div class="finance-card"><div class="finance-card-label">Do zapłaty</div><div class="finance-card-value">${fmtMoney(outstanding)}</div></div>
       </div>${tableHtml(rows)}`;
@@ -4512,11 +4333,11 @@ window.FLEET_DATA = {
       await cfInitSupabase();
       const { data:{session} } = await cfSupabase.auth.getSession();
       if(!session){ cfShowLogin(true); cfSetSync('Wymagane logowanie'); }
-      else { cfShowLogin(false); await loadAll(); await cfPrepareNotifications(); void cfCheckStaleVehicleNotifications(); renderRecords(); }
+      else { cfShowLogin(false); await loadAll(); await cfPrepareNotifications(); }
       cfSupabase.auth.onAuthStateChange((_event, session)=>{
         if(session){
           cfShowLogin(false);
-          setTimeout(async ()=>{ await loadAll(); await cfPrepareNotifications(); void cfCheckStaleVehicleNotifications(); renderRecords(); },0);
+          setTimeout(async ()=>{ await loadAll(); await cfPrepareNotifications(); },0);
         } else {
           cfShowLogin(true);
           cfSetSync('Wymagane logowanie');

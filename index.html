@@ -3847,11 +3847,11 @@ window.FLEET_DATA = {
           <h2>Wyślij e-mailem</h2>
           <div class="field">
             <label>Temat</label>
-            <input id="mailSubject" value="${escapeHtml(subject)}" readonly>
+            <input id="mailSubject" value="${escapeHtml(subject)}" autocomplete="off">
           </div>
           <div class="field">
             <label>Treść wiadomości</label>
-            <textarea id="mailBody" style="min-height:150px;" readonly>${escapeHtml(body)}</textarea>
+            <textarea id="mailBody" style="min-height:150px;" autocomplete="off">${escapeHtml(body)}</textarea>
           </div>
           <div class="confirm-text">
             Załączniki:<br>
@@ -3885,9 +3885,14 @@ window.FLEET_DATA = {
           showToast('To urządzenie nie obsługuje udostępniania dwóch załączników PDF przez systemowe menu.');
           return;
         }
+        // Temat przekazujemy przez `title`, a w `text` wysyłamy wyłącznie
+        // treść wiadomości. Dzięki temu temat nie pojawia się drugi raz w treści Mail.
+        const currentSubject = document.getElementById('mailSubject')?.value ?? subject;
+        const currentBody = document.getElementById('mailBody')?.value ?? body;
+
         await navigator.share({
-          title:subject,
-          text:`${subject}\n\n${body}`,
+          title: currentSubject,
+          text: currentBody,
           files
         });
         close();

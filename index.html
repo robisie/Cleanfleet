@@ -3968,7 +3968,13 @@ window.FLEET_DATA = {
       const outstanding = total-paid;
       // Licznik = bezpośrednio zapisane billing_category.
       // Nie używamy pola „Typ” ani żadnego automatycznego zgadywania kategorii.
-      const billingCategory = (row) => String(row?.billing_category ?? '').trim().toLowerCase();
+      const normalizeBillingCategory = (value) => String(value ?? '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+
+      const billingCategory = (row) => normalizeBillingCategory(row?.billing_category);
 
       const typeCounts = {
         personal: rows.filter(r => billingCategory(r) === 'osobowe').length,

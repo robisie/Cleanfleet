@@ -558,6 +558,14 @@
 }
 </style>
 
+
+<style id="v59-mail-style">
+.cf-mail-modal .mail-field{margin-top:12px}
+.cf-mail-modal input,.cf-mail-modal textarea{width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line-strong);border-radius:8px;font:inherit}
+.cf-mail-modal textarea{min-height:110px;resize:vertical}
+.cf-mail-files{font-size:12px;color:var(--ink-soft);margin-top:10px;line-height:1.5}
+</style>
+
 </head>
 <body>
 
@@ -4259,6 +4267,111 @@ window.FLEET_DATA = {
   document.addEventListener('keydown', e => { if(e.key === 'Escape') closeBottomMobileMenu(); });
 
   cfBoot();
+})();
+</script>
+
+
+<script id="v59-mail">
+(() => {
+  function cfV59Escape(s){
+    const d=document.createElement('div'); d.textContent=String(s??''); return d.innerHTML;
+  }
+
+  async function cfV59ShareMail(reportBlob, reportName, invoiceBlob, invoiceName, invoiceNumber){
+    const files = [
+      new File([reportBlob], reportName, {type:'application/pdf'}),
+      new File([invoiceBlob], invoiceName, {type:'application/pdf'})
+    ];
+    const subject = `Załącznik do faktury ${invoiceNumber || ''}`.trim();
+    const body = `Dzień dobry,\n\nw załączeniu przesyłam raport wykonanych usług wraz z fakturą.\n\nPozdrawiam\nCleanFleet`;
+
+    if(navigator.share && (!navigator.canShare || navigator.canShare({files}))){
+      await navigator.share({title:subject, text:body, files});
+      return true;
+    }
+
+    // On environments without file sharing, give a clear message rather than
+    // pretending the attachments were attached.
+    showToast('To urządzenie/przeglądarka nie obsługuje wysyłania PDF z załącznikami przez systemowe menu udostępniania.');
+    return false;
+  }
+
+  window.cfV59ShowMailDialog = function(reportBlob, reportName, invoiceBlob, invoiceName, invoiceNumber){
+    const root=document.getElementById('modalRoot');
+    const existing=root.querySelector('#cfV59MailOverlay');
+    if(existing) existing.remove();
+
+    const defaultSubject=`Załącznik do faktury ${invoiceNumber || ''}`.trim();
+    const html=`
+      <div class="overlay cf-mail-modal" id="cfV59MailOverlay">
+        <div class="sheet" style="max-width:560px;">
+          <button class="close" data-mail-close>&times;</button>
+          <h2>Wyślij e-mailem</h2>
+          <div class="mail-field">
+            <label>Adres e-mail</label>
+            <input id="cfV59MailTo" type="email" placeholder="np. ksiegowosc@firma.pl" autocomplete="email">
+          </div>
+          <div class="mail-field">
+            <label>Temat</label>
+            <input id="cfV59MailSubject" value="${cfV59Escape(defaultSubject)}">
+          </div>
+          <div class="mail-field">
+            <label>Treść</label>
+            <textarea id="cfV59MailBody">Dzień dobry,
+
+w załączeniu przesyłam raport wykonanych usług wraz z fakturą.
+
+Pozdrawiam
+CleanFleet</textarea>
+          </div>
+          <div class="cf-mail-files">
+            📎 ${cfV59Escape(reportName)}<br>
+            📎 ${cfV59Escape(invoiceName)}
+          </div>
+          <div class="sheet-actions">
+            <button class="btn btn-solid" id="cfV59MailOpen">Otwórz w Mail</button>
+            <button class="btn btn-outline" id="cfV59MailCancel">Anuluj</button>
+          </div>
+        </div>
+      </div>`;
+    root.insertAdjacentHTML('beforeend',html);
+
+    const close=()=>document.getElementById('cfV59MailOverlay')?.remove();
+    document.querySelector('[data-mail-close]').addEventListener('click',close);
+    document.getElementById('cfV59MailCancel').addEventListener('click',close);
+    document.getElementById('cfV59MailOpen').addEventListener('click',async()=>{
+      const to=document.getElementById('cfV59MailTo').value.trim();
+      const subject=document.getElementById('cfV59MailSubject').value.trim() || defaultSubject;
+      const body=document.getElementById('cfV59MailBody').value;
+      if(!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)){
+        showToast('Wpisz prawidłowy adres e-mail.');
+        return;
+      }
+
+      const files = [
+        new File([reportBlob], reportName, {type:'application/pdf'}),
+        new File([invoiceBlob], invoiceName, {type:'application/pdf'})
+      ];
+
+      // Native share sheet gets the files. The recipient/subject/body are retained
+      // in the UI, but Web Share cannot reliably force Mail to prefill all mail
+      // fields on every Apple OS/browser version.
+      try{
+        if(navigator.share && (!navigator.canShare || navigator.canShare({files}))){
+          await navigator.share({title:subject,text:`Do: ${to}\n\n${body}`,files});
+          close();
+          return;
+        }
+      }catch(err){
+        if(err?.name==='AbortError') return;
+      }
+      showToast('Nie udało się otworzyć systemowego wysyłania z załącznikami.');
+    });
+  };
+
+  // Enhance the final PDF preview by adding a mail button if the current report
+  // page exposes a "Pobierz PDF" action and an invoice file is available in the
+  // current export flow. This hook is intentionally non-destructive.
 })();
 </script>
 

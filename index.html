@@ -240,13 +240,17 @@
 
   .bottom-bar{
     position:fixed;
-    bottom:0;left:0;right:0;
+    left:0;right:0;bottom:0;
+    width:100%;
     background:var(--panel);
     padding:12px 16px calc(12px + env(safe-area-inset-bottom));
     display:grid;
     grid-template-columns:repeat(2,1fr);
     gap:8px;
-    z-index:30;
+    z-index:1000;
+    transform:translateZ(0);
+    -webkit-transform:translateZ(0);
+    will-change:transform;
   }
   .bottom-mobile-menu{display:none;}
   @media(max-width:639px){
@@ -4458,6 +4462,22 @@ window.FLEET_DATA = {
   const btnBottomMenu = document.getElementById('btnBottomMenu');
   const closeBottomMenu = document.getElementById('closeBottomMenu');
   const bottomMobileMenuBackdrop = document.getElementById('bottomMobileMenuBackdrop');
+  // iOS Safari/PWA: keep the bottom navigation pinned to the visible viewport
+  // when the visual viewport changes while scrolling.
+  (function keepBottomBarAtVisualViewport(){
+    const bar = document.querySelector('.bottom-bar');
+    if(!bar || !window.visualViewport) return;
+    const sync = () => {
+      const vv = window.visualViewport;
+      const offset = Math.max(0, (window.innerHeight - vv.height - vv.offsetTop));
+      bar.style.bottom = offset + 'px';
+    };
+    sync();
+    window.visualViewport.addEventListener('resize', sync, {passive:true});
+    window.visualViewport.addEventListener('scroll', sync, {passive:true});
+    window.addEventListener('resize', sync, {passive:true});
+  })();
+
   const closeBottomMobileMenu = () => {
     bottomMobileMenu?.classList.remove('open');
     bottomMobileMenu?.setAttribute('aria-hidden','true');

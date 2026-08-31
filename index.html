@@ -488,15 +488,6 @@
 }
 
 
-  .stale-vehicles-section{margin:14px 0 12px;}
-  .stale-vehicles-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 14px;border:1px solid var(--line-strong);border-radius:12px;background:var(--panel);color:var(--ink);text-align:left;cursor:pointer;font:inherit;}
-  .stale-vehicles-toggle-title{display:block;font-size:13px;font-weight:800;letter-spacing:.04em;}
-  .stale-vehicles-toggle-subtitle{display:block;margin-top:3px;font-size:11px;color:var(--ink-soft);}
-  .stale-vehicles-toggle-right{display:flex;align-items:center;gap:9px;flex:0 0 auto;}
-  .stale-count{min-width:24px;height:24px;padding:0 7px;display:flex;align-items:center;justify-content:center;border-radius:999px;background:var(--bg);border:1px solid var(--line);font-size:12px;font-weight:800;}
-  .stale-chevron{font-size:18px;line-height:1;transition:transform .18s ease;}
-  .stale-vehicles-toggle.is-open .stale-chevron{transform:rotate(180deg);}
-  .stale-vehicles-panel{padding:8px 0 0;}
   .stale-vehicle-list{display:grid;gap:8px;}
   .stale-vehicle-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid var(--line-strong);border-radius:12px;background:var(--panel);cursor:pointer;}
   .stale-vehicle-plate{font-family:'JetBrains Mono',monospace;font-weight:800;letter-spacing:.04em;}
@@ -661,13 +652,14 @@
   <div class="active-section-head">
     <div class="section-title">Aktywne wpisy</div>
     <div class="main-filters">
-      <select id="mainStatusFilter" aria-label="Filtr wpisów">
-        <option value="all">Wszystkie</option>
-        <option value="ordered">Zlecone</option>
-        <option value="todo">Do wykonania</option>
-        <option value="done">Wykonane</option>
-        <option value="unpaid">Niezapłacone</option>
-      </select>
+      <select id="mainStatusFilter">
+          <option value="all">Wszystkie</option>
+          <option value="ordered">Zlecone</option>
+          <option value="todo">Do zrobienia</option>
+          <option value="done">Wykonane</option>
+          <option value="unpaid">Niezapłacone</option>
+          <option value="stale">Dawno nie robione &gt;200 dni</option>
+        </select>
     </div>
   </div>
   <div class="records" id="recordsList"></div>
@@ -2908,52 +2900,52 @@ window.FLEET_DATA = {
           </div>`).join('')
       : `<div class="stale-empty">Brak samochodów, dla których minęło więcej niż 200 dni od ostatniego prania.</div>`;
 
-    return `
-      <section class="stale-vehicles-section" id="staleVehiclesSection">
-        <button type="button" class="stale-vehicles-toggle" id="staleVehiclesToggle" aria-expanded="false">
-          <span>
-            <span class="stale-vehicles-toggle-title">SAMOCHODY DAWNO NIE ROBIONE</span>
-            <span class="stale-vehicles-toggle-subtitle">${stale.length ? stale.length+' samochodów powyżej 200 dni' : 'Sprawdź samochody powyżej 200 dni'}</span>
-          </span>
-          <span class="stale-vehicles-toggle-right">
-            <span class="stale-count">${stale.length}</span>
-            <span class="stale-chevron">⌄</span>
-          </span>
-        </button>
-        <div class="stale-vehicles-panel" id="staleVehiclesPanel" hidden>
-          <div class="stale-vehicle-list">${content}</div>
-        </div>
-      </section>`;
+    return ``;
   }
 
   function bindStaleVehiclesPanel(){
-    const toggle = document.getElementById('staleVehiclesToggle');
-    const panel = document.getElementById('staleVehiclesPanel');
-
-    if(toggle && panel){
-      toggle.onclick = () => {
-        const open = toggle.getAttribute('aria-expanded') === 'true';
-        toggle.setAttribute('aria-expanded', String(!open));
-        panel.hidden = open;
-        toggle.classList.toggle('is-open', !open);
-      };
-    }
-
     document.querySelectorAll('[data-stale-plate]').forEach(el => {
       el.onclick = () => {
-        const plate = String(el.dataset.stalePlate||'').toUpperCase();
+        const plate = String(el.dataset.stalePlate || '').toUpperCase();
         window.__pendingPlate = plate;
         openForm(null);
       };
     });
   }
 
+
   function renderRecords(){
     const list = document.getElementById('recordsList');
+    const filter = mainStatusFilter;
+
+    if(filter === 'stale'){
+      const stale = cfStaleVehicles();
+
+      if(!stale.length){
+        list.innerHTML = `<div class="empty-state">
+          Brak samochodów, dla których minęło więcej niż 200 dni od ostatniego prania.
+        </div>`;
+        return;
+      }
+
+      list.innerHTML = stale.map(v => `
+        <div class="stale-vehicle-card" data-stale-plate="${escapeHtml(v.plate)}">
+          <div>
+            <div class="stale-vehicle-plate">${escapeHtml(v.plate)}</div>
+            <div class="stale-vehicle-meta">${escapeHtml(v.typ||'—')}${v.marka && v.marka !== '—' ? ' · '+escapeHtml(v.marka) : ''}</div>
+          </div>
+          <div class="stale-vehicle-days">${v.days} dni</div>
+        </div>
+      `).join('');
+
+      bindStaleVehiclesPanel();
+      return;
+    }
+
     let active = activeRecords();
 
     active = active.filter(r => {
-      switch(mainStatusFilter){
+      switch(filter){
         case 'ordered': return r.zlecone;
         case 'todo': return r.zlecone && !r.data_prania;
         case 'done': return !!r.data_prania;
@@ -2962,13 +2954,9 @@ window.FLEET_DATA = {
       }
     });
 
-    const stale = cfStaleVehicles();
-
-    // The stale section is ALWAYS rendered, even when there are zero vehicles.
-    list.innerHTML = staleVehiclesHtml(stale) +
-      (active.length
-        ? active.map(r => recordCardHtml(r)).join('')
-        : `<div class="empty-state">Brak aktywnych wpisów.<br>Wyszukaj tablicę powyżej, aby dodać pranie.</div>`);
+    list.innerHTML = active.length
+      ? active.map(r => recordCardHtml(r)).join('')
+      : `<div class="empty-state">Brak aktywnych wpisów.<br>Wyszukaj tablicę powyżej, aby dodać pranie.</div>`;
 
     list.querySelectorAll('[data-open]').forEach(el => {
       el.addEventListener('click', () => openForm(el.getAttribute('data-open')));
@@ -2987,8 +2975,6 @@ window.FLEET_DATA = {
         requestMarkPaid(el.getAttribute('data-toggle-zapl'));
       });
     });
-
-    bindStaleVehiclesPanel();
   }
 
   function recordCardHtml(r){

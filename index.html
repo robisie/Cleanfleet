@@ -508,20 +508,14 @@
 }
 
 
-  .finance-type-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
-  .finance-type-grid .finance-card{min-width:0;}
-  @media(max-width:639px){
-    .finance-type-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
-  }
-
-  .finance-summary-row{display:flex;gap:12px;margin-bottom:12px;}
-  .finance-summary-types{flex-wrap:nowrap;overflow-x:auto;}
-  .finance-summary-types .finance-card{flex:1 0 0;min-width:120px;}
-  .finance-summary-money{margin-bottom:0;}
-  .finance-summary-money .finance-card{flex:1 1 0;}
-  @media(max-width:639px){
-    .finance-summary-types{gap:8px;}
-    .finance-summary-types .finance-card{min-width:112px;}
+  .finance-summary-row{grid-column:1 / -1;display:grid;gap:8px;margin-bottom:0;}
+  .finance-summary-types{grid-template-columns:repeat(6,minmax(0,1fr));}
+  .finance-summary-types .finance-card{min-width:0;padding:9px;}
+  .finance-summary-money{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:4px;}
+  .finance-summary-money .finance-card{min-width:0;}
+  @media(max-width:760px){
+    .finance-summary-types{grid-template-columns:repeat(6,minmax(92px,1fr));overflow-x:auto;}
+    .finance-summary-types .finance-card{min-width:92px;}
   }
 </style>
 
@@ -3998,9 +3992,15 @@ window.FLEET_DATA = {
             `<div class="finance-card"><div class="finance-card-label">${escapeHtml(type)}</div><div class="finance-card-value">${count}</div></div>`
           ).join('')
       }</div>`;
-      const typeCards = Object.entries(vehicleTypeCounts)
-        .map(([type, count]) =>
-          `<div class="finance-card"><div class="finance-card-label">${escapeHtml(type)}</div><div class="finance-card-value">${count}</div></div>`
+      const typeOrder = ['SOLÓWKA','ZESTAW','BUS','BUS C','OSOBOWE'];
+      const orderedTypes = [
+        ...typeOrder,
+        ...Object.keys(vehicleTypeCounts).filter(type => !typeOrder.includes(type))
+      ];
+      const typeCards = orderedTypes
+        .filter(type => Object.prototype.hasOwnProperty.call(vehicleTypeCounts, type))
+        .map(type =>
+          `<div class="finance-card"><div class="finance-card-label">${escapeHtml(type)}</div><div class="finance-card-value">${vehicleTypeCounts[type]}</div></div>`
         ).join('');
 
       document.getElementById('reportBody').innerHTML = `<div class="finance-summary">

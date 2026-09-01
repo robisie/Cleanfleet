@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v94 -->
+<!-- CleanFleet v96 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -239,8 +239,8 @@
   .toggle.on{color:var(--ink);font-weight:600;}
 
   .bottom-bar{
-    position:fixed;
-    left:0;right:0;bottom:0;
+    position:fixed !important;
+    left:0;right:0;bottom:0 !important;top:auto !important;
     width:100%;
     background:var(--panel);
     padding:12px 16px calc(12px + env(safe-area-inset-bottom));
@@ -3433,7 +3433,7 @@ window.FLEET_DATA = {
     const unapproved=records.filter(r=>r.data_prania && !r.zatwierdzone && !r.zaplacone).length;
     const items=[
       {label:'Do wykonania',value:pendingOrders,filter:'todo',alert:pendingOrders>0},
-      {label:'Dawno nie prane',value:oldVehicles,filter:'old',alert:oldVehicles>0},
+      {label:'Dawno nie prane',value:oldVehicles,action:'old',alert:oldVehicles>0},
       {label:'Niezatwierdzone',value:unapproved,filter:'unapproved',alert:unapproved>0},
       {label:'Faktury do zapłaty',value:unpaidInvoices,action:'finance',alert:unpaidInvoices>0}
     ];
@@ -3443,6 +3443,7 @@ window.FLEET_DATA = {
     panel.querySelectorAll('[data-attention-index]').forEach(btn=>btn.addEventListener('click',()=>{
       const item=items[Number(btn.dataset.attentionIndex)];
       if(item.action==='finance') showFinanceQueue();
+      else if(item.action==='old') showOldVehicles();
       else { mainStatusFilter=item.filter; const sel=document.getElementById('mainStatusFilter'); if(sel) sel.value=item.filter; renderRecords(); document.getElementById('recordsList')?.scrollIntoView({behavior:'smooth',block:'start'}); }
     }));
   }
@@ -4331,6 +4332,46 @@ window.FLEET_DATA = {
       </table>`;
   }
 
+  function showOldVehicles(){
+    const rows = Object.keys(registry).map(plate => {
+      const latest = records
+        .filter(r => r.tablica === plate && r.data_prania)
+        .sort((a,b) => (b.data_prania||'').localeCompare(a.data_prania||''))[0];
+      if(!latest) return null;
+      const days = daysSinceLastWashForRecord(latest);
+      if(days === null || days < (365 / 2)) return null;
+      const info = registry[plate] || {};
+      return {
+        typ: (latest.typ || info.typ || '—'),
+        tablica: plate,
+        marka: (latest.marka || info.marka || '—'),
+        data_prania: latest.data_prania,
+        kto_wykonal: latest.kto_wykonal || '—',
+        dni: days
+      };
+    }).filter(Boolean).sort((a,b) => b.dni - a.dni);
+
+    const body = rows.length ? `
+      <table class="report">
+        <thead><tr><th>Typ</th><th>Tablica</th><th>Marka</th><th>Ostatnie pranie</th><th>Wykonał</th><th>Dni</th></tr></thead>
+        <tbody>${rows.map(r => `
+          <tr>
+            <td>${escapeHtml(r.typ)}</td>
+            <td class="mono">${escapeHtml(r.tablica)}</td>
+            <td>${escapeHtml(r.marka)}</td>
+            <td>${fmtDate(r.data_prania)}</td>
+            <td>${escapeHtml(r.kto_wykonal)}</td>
+            <td><span class="pill pill-no">${r.dni} dni</span></td>
+          </tr>`).join('')}</tbody>
+      </table>` : '<div class="empty-state" style="margin-top:14px;">Brak pojazdów spełniających kryterium 182,5 dnia.</div>';
+
+    reportShell(
+      'Dawno nie prane',
+      `<div class="confirm-text">Pojazdy, których od ostatniego wykonanego prania minęło co najmniej <strong>182,5 dnia</strong>.</div>`,
+      body
+    );
+  }
+
   function showAllOutstanding(){
     const plates = Object.keys(registry).sort();
     const rows = plates.map(plate => {
@@ -4346,7 +4387,44 @@ window.FLEET_DATA = {
         zaplacone: latest ? !!latest.zaplacone : null
       };
     });
-    reportShell('Lista wszystkich samochodów', '<div class="confirm-text">Pełna lista pojazdów na liście — status dotyczy ostatniego wpisu prania.</div>', vehicleTableHtml(rows));
+
+    const typeOrder = ['SOLÓWKA','ZESTAW','BUS','BUS C','OSOBOWE'];
+    const counts = {};
+    rows.forEach(r => {
+      const raw = String(r.typ || '').trim();
+      if(!raw || raw === '—'){
+        counts['BEZ TYPU'] = (counts['BEZ TYPU'] || 0) + 1;
+        return;
+      }
+      const key = raw.toUpperCase();
+      counts[key] = (counts[key] || 0) + 1;
+    });
+
+    const orderedTypes = [
+      ...typeOrder.filter(type => Object.prototype.hasOwnProperty.call(counts, type)),
+      ...Object.keys(counts).filter(type => !typeOrder.includes(type))
+    ];
+
+    const typeCards = orderedTypes.map(type =>
+      `<div class="finance-card"><div class="finance-card-label">${escapeHtml(type)}</div><div class="finance-card-value">${counts[type]}</div></div>`
+    ).join('');
+
+    const summary = `
+      <div class="finance-summary" style="grid-template-columns:1fr;">
+        <div class="finance-summary-row finance-summary-types" style="grid-template-columns:repeat(6,minmax(0,1fr));">
+          <div class="finance-card">
+            <div class="finance-card-label">Liczba pojazdów</div>
+            <div class="finance-card-value">${rows.length}</div>
+          </div>
+          ${typeCards}
+        </div>
+      </div>`;
+
+    reportShell(
+      'Lista wszystkich samochodów',
+      '<div class="confirm-text">Pełna lista pojazdów w bazie. Liczniki pokazują aktualny typ zapisany przy pojeździe.</div>',
+      summary + vehicleTableHtml(rows)
+    );
   }
 
   function vehicleTableHtml(rows){
@@ -4729,7 +4807,7 @@ window.FLEET_DATA = {
           performed_by: r.performed_by || '',
           cost: 0,
           approved: true,
-          paid: false,
+          paid: true,
           created_at: new Date().toISOString()
         }));
 
@@ -4997,22 +5075,6 @@ window.FLEET_DATA = {
   const btnBottomMenu = document.getElementById('btnBottomMenu');
   const closeBottomMenu = document.getElementById('closeBottomMenu');
   const bottomMobileMenuBackdrop = document.getElementById('bottomMobileMenuBackdrop');
-  // iOS Safari/PWA: keep the bottom navigation pinned to the visible viewport
-  // when the visual viewport changes while scrolling.
-  (function keepBottomBarAtVisualViewport(){
-    const bar = document.querySelector('.bottom-bar');
-    if(!bar || !window.visualViewport) return;
-    const sync = () => {
-      const vv = window.visualViewport;
-      const offset = Math.max(0, (window.innerHeight - vv.height - vv.offsetTop));
-      bar.style.bottom = offset + 'px';
-    };
-    sync();
-    window.visualViewport.addEventListener('resize', sync, {passive:true});
-    window.visualViewport.addEventListener('scroll', sync, {passive:true});
-    window.addEventListener('resize', sync, {passive:true});
-  })();
-
   const closeBottomMobileMenu = () => {
     bottomMobileMenu?.classList.remove('open');
     bottomMobileMenu?.setAttribute('aria-hidden','true');

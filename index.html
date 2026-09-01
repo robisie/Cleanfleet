@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v104 -->
+<!-- CleanFleet v105 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -4800,13 +4800,14 @@ window.FLEET_DATA = {
             <strong>Do dodania: ${validNew.length}</strong>
           </div>
           <div class="confirm-text" style="margin-top:8px;">
-            Istniejące tablice nie zostaną zmienione. Nie zostanie podmieniona żadna data prania ani osoba.
+            Istniejące tablice nie zostaną dodane ponownie. Wybrany typ i grupa rozliczeniowa mogą zostać zastosowane do wszystkich tablic z tego pliku.
           </div>
 
           <div class="field-row" style="margin-top:12px;">
             <div class="field">
               <label for="fleetImportType">Typ pojazdu dla nowych</label>
               <select id="fleetImportType">
+                <option value="" selected>— brak / nie ustawiaj —</option>
                 <option value="SOLÓWKA">SOLÓWKA</option>
                 <option value="ZESTAW">ZESTAW</option>
                 <option value="BUS">BUS</option>
@@ -4827,7 +4828,7 @@ window.FLEET_DATA = {
           </div>
 
           <div class="confirm-text" style="margin-top:8px;">
-            Wybrany typ zostanie przypisany do nowych pojazdów. Wybrana grupa rozliczeniowa zostanie przypisana do importowanego wpisu prania, jeżeli wiersz zawiera datę prania. Istniejące pojazdy pozostają bez zmian.
+            Jeżeli wybierzesz typ, zostanie on ustawiony dla wszystkich tablic znajdujących się w tym pliku. Jeżeli wybierzesz grupę rozliczeniową, zostanie ona ustawiona dla wpisów prania tych tablic. Puste pole oznacza: nie zmieniaj.
           </div>
 
           ${listHtml}

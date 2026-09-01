@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v91 -->
+<!-- CleanFleet v92 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -695,7 +695,11 @@
       </button>
       <button class="menu-item" id="importBtn">
         <span class="menu-item-title">Importuj / przywróć dane</span>
-        <span class="menu-item-sub">Pełny backup CleanFleet albo lista pojazdów Excel / CSV</span>
+        <span class="menu-item-sub">Pełny backup CleanFleet</span>
+      </button>
+      <button class="menu-item" id="fleetUpdateBtn">
+        <span class="menu-item-title">🚚 Aktualizuj pojazdy</span>
+        <span class="menu-item-sub">Dodaj tylko brakujące tablice z datą prania i osobą</span>
       </button>
       <button class="menu-item" id="exportPdfBtn">
         <span class="menu-item-title">Eksportuj PDF (miesiąc)</span>
@@ -719,6 +723,7 @@
       </button>
     </div>
     <input type="file" id="importFile" accept=".csv,.txt,.xlsx,.xls" style="display:none;">
+    <input type="file" id="fleetUpdateFile" accept=".xlsx,.xls,.csv" style="display:none;">
   </div>
 </div>
 
@@ -4578,6 +4583,211 @@ window.FLEET_DATA = {
   });
 
   let pendingImportRows = null;
+
+
+  // Aktualizacja pojazdów z pliku floty:
+  // wymagane kolumny: Tablica | Data prania | Kto prał
+  // Istniejących tablic NIE modyfikujemy. Nowe tablice dostają pojazd + historyczny wpis prania.
+  function cfNormalizeImportedDate(value){
+    if(value === null || value === undefined || value === '') return '';
+    if(value instanceof Date && !isNaN(value.getTime())){
+      return value.toISOString().slice(0,10);
+    }
+    if(typeof value === 'number' && typeof XLSX !== 'undefined' && XLSX.SSF){
+      const parsed = XLSX.SSF.parse_date_code(value);
+      if(parsed && parsed.y && parsed.m && parsed.d){
+        return `${String(parsed.y).padStart(4,'0')}-${String(parsed.m).padStart(2,'0')}-${String(parsed.d).padStart(2,'0')}`;
+      }
+    }
+    const raw = String(value).trim();
+    let m = raw.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})$/);
+    if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+    m = raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+    if(m) return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+    return '';
+  }
+
+  function cfExtractFleetUpdateRows(rawRows){
+    if(!rawRows || !rawRows.length) return [];
+    const header = rawRows[0].map(h => String(h ?? '').trim().toLowerCase());
+    const idxPlate = header.findIndex(h => h === 'tablica' || h.includes('tablic') || h === 'plate' || h.includes('rejestrac'));
+    const idxWash = header.findIndex(h => h === 'data prania' || h.includes('data prania') || h === 'wash_date');
+    const idxWho = header.findIndex(h => h === 'kto prał' || h === 'kto pral' || h.includes('kto pra') || h === 'performed_by');
+
+    if(idxPlate < 0 || idxWash < 0 || idxWho < 0){
+      throw new Error('Plik musi mieć kolumny: Tablica, Data prania, Kto prał.');
+    }
+
+    const result = [];
+    const seen = new Set();
+
+    for(let i=1;i<rawRows.length;i++){
+      const row = rawRows[i] || [];
+      const plate = normalizePlate(String(row[idxPlate] ?? '').trim());
+      if(!plate || seen.has(plate)) continue;
+      seen.add(plate);
+      result.push({
+        plate,
+        wash_date: cfNormalizeImportedDate(row[idxWash]),
+        performed_by: String(row[idxWho] ?? '').trim()
+      });
+    }
+    return result;
+  }
+
+  function showFleetUpdatePreview(rows){
+    const existing = [];
+    const incomingNew = [];
+    rows.forEach(r => {
+      if(registry[r.plate]) existing.push(r);
+      else incomingNew.push(r);
+    });
+
+    const invalid = incomingNew.filter(r => !r.wash_date || !r.performed_by);
+    const validNew = incomingNew.filter(r => r.wash_date && r.performed_by);
+
+    const listHtml = validNew.length
+      ? `<div style="max-height:260px;overflow:auto;margin-top:12px;">${
+          validNew.map(r => `<div style="padding:8px 0;border-bottom:1px solid var(--line);">
+            <strong style="font-family:'JetBrains Mono',monospace;">${escapeHtml(r.plate)}</strong>
+            <span style="color:var(--ink-soft);"> · ${escapeHtml(fmtDate(r.wash_date))} · ${escapeHtml(r.performed_by)}</span>
+          </div>`).join('')
+        }</div>`
+      : '<div class="confirm-text">Brak nowych pojazdów gotowych do dodania.</div>';
+
+    const invalidHtml = invalid.length
+      ? `<div class="confirm-text" style="margin-top:12px;"><strong>${invalid.length}</strong> nowych tablic pominięto, ponieważ brakuje daty prania lub osoby, która prała.</div>`
+      : '';
+
+    const html = `
+      <div class="overlay" id="fleetUpdateOverlay">
+        <div class="sheet" style="max-width:560px;">
+          <button class="close" data-close>&times;</button>
+          <h2>Aktualizacja pojazdów</h2>
+          <div class="confirm-text">
+            W pliku: <strong>${rows.length}</strong><br>
+            Już istnieją w CleanFleet: <strong>${existing.length}</strong><br>
+            <strong>Do dodania: ${validNew.length}</strong>
+          </div>
+          <div class="confirm-text" style="margin-top:8px;">
+            Istniejące tablice nie zostaną zmienione. Nie zostanie podmieniona żadna data prania ani osoba.
+          </div>
+          ${listHtml}
+          ${invalidHtml}
+          <div class="sheet-actions">
+            <button class="btn btn-outline" id="cancelFleetUpdate">Anuluj</button>
+            <button class="btn btn-solid" id="confirmFleetUpdate" ${validNew.length ? '' : 'disabled'}>Dodaj ${validNew.length} nowych</button>
+          </div>
+        </div>
+      </div>`;
+
+    document.getElementById('modalRoot').innerHTML = html;
+    document.getElementById('fleetUpdateOverlay').addEventListener('click', e => {
+      if(e.target.id === 'fleetUpdateOverlay') closeModal();
+    });
+    document.querySelector('#fleetUpdateOverlay [data-close]').addEventListener('click', closeModal);
+    document.getElementById('cancelFleetUpdate').addEventListener('click', closeModal);
+    document.getElementById('confirmFleetUpdate').addEventListener('click', () => runFleetUpdate(validNew));
+  }
+
+  async function runFleetUpdate(rows){
+    if(!rows.length){ closeModal(); return; }
+
+    try{
+      // Re-read current vehicle list just before insertion so an existing plate can never be overwritten.
+      const { data: currentVehicles, error: vehicleError } =
+        await cfSupabase.from('vehicles').select('plate');
+      if(vehicleError) throw vehicleError;
+
+      const existing = new Set((currentVehicles || []).map(v => normalizePlate(v.plate)));
+      const newRows = rows.filter(r => !existing.has(r.plate));
+
+      if(!newRows.length){
+        closeModal();
+        await loadAll();
+        showToast('Nie ma nowych pojazdów do dodania');
+        return;
+      }
+
+      // INSERT, never UPSERT: existing vehicles cannot be modified by this import.
+      const vehicleRows = newRows.map(r => ({plate:r.plate, type:'', brand:''}));
+      const { error: insertVehicleError } =
+        await cfSupabase.from('vehicles').insert(vehicleRows);
+      if(insertVehicleError) throw insertVehicleError;
+
+      // Each newly added vehicle gets one historical wash record from the XLS.
+      const washRows = newRows.map(r => ({
+        id: uid(),
+        plate: r.plate,
+        type: '',
+        brand: '',
+        billing_category: null,
+        ordered: false,
+        ordered_by: '',
+        order_date: null,
+        order_due_date: null,
+        notes: 'Import z pliku floty',
+        wash_date: r.wash_date,
+        performed_by: r.performed_by,
+        cost: 0,
+        approved: true,
+        paid: false,
+        created_at: new Date().toISOString()
+      }));
+
+      const { error: insertWashError } =
+        await cfSupabase.from('wash_records').insert(washRows);
+      if(insertWashError){
+        // Best-effort rollback of vehicles added by this operation if wash-record insertion fails.
+        await cfSupabase.from('vehicles').delete().in('plate', newRows.map(r => r.plate));
+        throw insertWashError;
+      }
+
+      closeModal();
+      await loadAll();
+      showToast(`Dodano ${newRows.length} nowych pojazdów z datą ostatniego prania`);
+    }catch(error){
+      console.error('CleanFleet fleet update error:', error);
+      showToast(error?.message || 'Nie udało się zaktualizować bazy pojazdów');
+    }
+  }
+
+  document.getElementById('fleetUpdateBtn').addEventListener('click', () => {
+    document.getElementById('fleetUpdateFile').click();
+  });
+
+  document.getElementById('fleetUpdateFile').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if(!file) return;
+
+    try{
+      let rawRows;
+      const ext = file.name.split('.').pop().toLowerCase();
+
+      if(ext === 'xlsx' || ext === 'xls'){
+        const wb = XLSX.read(await file.arrayBuffer(), {type:'array', cellDates:true});
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        rawRows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:'', raw:true});
+      }else{
+        rawRows = csvToRows(await file.text());
+      }
+
+      const rows = cfExtractFleetUpdateRows(rawRows);
+      e.target.value = '';
+
+      if(!rows.length){
+        showToast('Nie znaleziono pojazdów w pliku');
+        return;
+      }
+
+      menuOverlay.classList.remove('open');
+      showFleetUpdatePreview(rows);
+    }catch(error){
+      e.target.value = '';
+      console.error('CleanFleet fleet update read error:', error);
+      showToast(error?.message || 'Nie udało się odczytać pliku aktualizacji');
+    }
+  });
 
   document.getElementById('importFile').addEventListener('change', async (e) => {
     const file=e.target.files[0];

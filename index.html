@@ -4485,26 +4485,87 @@ window.FLEET_DATA = {
       '<div class="confirm-text">Pełna lista pojazdów w bazie. Liczniki pokazują aktualny typ zapisany przy pojeździe.</div>',
       summary + vehicleTableHtml(rows)
     );
+    bindAllVehiclesTable();
   }
 
   function vehicleTableHtml(rows){
     if(rows.length === 0){
       return '<div class="empty-state" style="margin-top:14px;">Brak pojazdów na liście.</div>';
     }
+
+    const types = [...new Set(rows.map(r => String(r.typ || '').trim().toUpperCase()).filter(Boolean))];
+    const ordered = ['SOLÓWKA','ZESTAW','BUS','BUS C','OSOBOWE'];
+    types.sort((a,b) => {
+      const ai = ordered.indexOf(a), bi = ordered.indexOf(b);
+      if(ai !== -1 || bi !== -1) return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      return a.localeCompare(b, 'pl');
+    });
+
+    const typeOptions = [
+      '<option value="ALL">Wszystkie typy</option>',
+      ...types.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`)
+    ].join('');
+
     const body = rows.map(r => `
-      <tr>
+      <tr data-vehicle-type="${escapeHtml(String(r.typ || '').trim().toUpperCase())}">
         <td>${escapeHtml(r.typ)}</td>
-        <td class="mono">${escapeHtml(r.tablica)}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span class="mono">${escapeHtml(r.tablica)}</span>
+            <button type="button" class="secondary-btn vehicle-history-btn" data-history-plate="${escapeHtml(r.tablica)}">Historia</button>
+          </div>
+        </td>
         <td>${escapeHtml(r.marka)}</td>
         <td>${r.data_prania ? `<span class="vehicle-last-wash">${fmtDate(r.data_prania)}${(() => { const days=Math.floor((Date.now()-new Date(r.data_prania+'T00:00:00').getTime())/86400000); return days>=(365 / 2) ? ` · ⚠️ ${days} dni` : ''; })()}</span>` : '<span class="record-badge">brak wpisu</span>'}</td>
         <td>${r.zatwierdzone===null ? '—' : `<span class="pill ${r.zatwierdzone?'pill-yes':'pill-no'}">${r.zatwierdzone?'TAK':'NIE'}</span>`}</td>
         <td>${r.zaplacone===null ? '—' : `<span class="pill ${r.zaplacone?'pill-yes':'pill-no'}">${r.zaplacone?'TAK':'NIE'}</span>`}</td>
       </tr>`).join('');
-    return `
-      <table class="report">
+
+    const wrapper = `
+      <div class="vehicle-list-toolbar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;margin-bottom:10px;">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+          <span>Typ pojazdu:</span>
+          <select id="vehicleTypeFilter" style="min-width:170px;">${typeOptions}</select>
+        </label>
+        <span id="vehicleTypeFilterCount" class="confirm-text" style="margin:0;">${rows.length} pojazdów</span>
+      </div>`;
+
+    const table = `
+      <table class="report" id="allVehiclesTable">
         <thead><tr><th>Typ</th><th>Tablica</th><th>Marka</th><th>Ostatnie pranie</th><th>Zatw.</th><th>Zapł.</th></tr></thead>
         <tbody>${body}</tbody>
       </table>`;
+
+    return wrapper + table;
+  }
+
+  function bindAllVehiclesTable(){
+    const filter = document.getElementById('vehicleTypeFilter');
+    const table = document.getElementById('allVehiclesTable');
+    const count = document.getElementById('vehicleTypeFilterCount');
+    if(!filter || !table) return;
+
+    const update = () => {
+      const value = filter.value;
+      let visible = 0;
+      table.querySelectorAll('tbody tr').forEach(row => {
+        const show = value === 'ALL' || row.dataset.vehicleType === value;
+        row.style.display = show ? '' : 'none';
+        if(show) visible++;
+      });
+      if(count) count.textContent = `${visible} ${visible === 1 ? 'pojazd' : (visible >= 2 && visible <= 4 ? 'pojazdy' : 'pojazdów')}`;
+    };
+
+    filter.addEventListener('change', update);
+
+    table.querySelectorAll('.vehicle-history-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const plate = btn.getAttribute('data-history-plate') || '';
+        if(plate) showVehicleHistory(plate);
+      });
+    });
+
+    update();
   }
 
   // --- Supabase: pobieranie całej tabeli stronicami ---

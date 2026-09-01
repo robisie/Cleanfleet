@@ -3459,6 +3459,19 @@ window.FLEET_DATA = {
       </div>
       <table class="report"><thead><tr><th>Data prania</th><th>Typ</th><th>Wykonał</th><th>Kwota</th><th>Status</th></tr></thead><tbody>${historyRows}</tbody></table>`;
     reportShell('Historia samochodu', '', body);
+
+    // Powrót do listy wszystkich samochodów
+    const backBtn = document.createElement('button');
+    backBtn.type = 'button';
+    backBtn.className = 'btn btn-outline';
+    backBtn.textContent = 'Wróć';
+    backBtn.style.marginTop = '12px';
+    backBtn.addEventListener('click', showAllOutstanding);
+
+    const reportContent = document.querySelector('#modalRoot .sheet, #modalRoot .report-shell');
+    if(reportContent){
+      reportContent.appendChild(backBtn);
+    }
   }
 
   function renderAttentionPanel(){

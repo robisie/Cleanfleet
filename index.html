@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v86 -->
+<!-- CleanFleet v88 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -937,6 +937,7 @@ async function cfEnableNotifications(){
     }
     await cfSavePushSubscription(subscription);
     cfSetNotificationsStatus('Powiadomienia są aktywne na tym urządzeniu.', true);
+    cfScheduleWashReminders();
     cfShowToast('Powiadomienia zostały włączone');
   }catch(error){
     console.error('CleanFleet notifications error:', error);
@@ -2695,6 +2696,53 @@ window.FLEET_DATA = {
   let invoiceItems = [];
   let mainStatusFilter = 'all';
 
+  // CleanFleet — przypomnienia o zbliżającym się praniu.
+  // Dwa przypomnienia dla aktywnego zlecenia: dzień przed terminem oraz
+  // w dniu terminu, oba o 09:00 czasu urządzenia.
+  const CF_WASH_REMINDER_HOUR = 9;
+  const cfWashReminderTimers = new Map();
+
+  function cfReminderKey(r, offset){
+    return `cleanfleet-wash-reminder:${r.id}:${r.data_zlecenia_do}:${offset}`;
+  }
+
+  function cfScheduleWashReminders(){
+    for(const timer of cfWashReminderTimers.values()) clearTimeout(timer);
+    cfWashReminderTimers.clear();
+    if(!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    const now = new Date();
+    records.forEach(r => {
+      if(!r || !r.zlecone || r.zatwierdzone || r.zaplacone || !r.data_zlecenia_do) return;
+      for(const offset of [1,0]){
+        const target = new Date(`${r.data_zlecenia_do}T${String(CF_WASH_REMINDER_HOUR).padStart(2,'0')}:00:00`);
+        target.setDate(target.getDate() - offset);
+        if(!Number.isFinite(target.getTime()) || target <= now) continue;
+        const key = cfReminderKey(r, offset);
+        if(localStorage.getItem(key)) continue;
+        const delay = target.getTime() - now.getTime();
+        const scheduleNext = (remaining) => {
+          const timer = setTimeout(() => {
+            cfWashReminderTimers.delete(key);
+            if(remaining > 2147483647){ scheduleNext(remaining - 2147483647); return; }
+            try{
+              const current = records.find(x => x.id === r.id);
+              if(!current || !current.zlecone || current.zatwierdzone || current.zaplacone || current.data_zlecenia_do !== r.data_zlecenia_do) return;
+              const title = offset === 1 ? 'Jutro termin prania' : 'Dzisiaj termin prania';
+              const body = `${current.tablica} — zaplanowane na ${fmtDate(current.data_zlecenia_do)}`;
+              const n = new Notification(title, {body, tag:`cleanfleet-wash-${current.id}-${offset}`, renotify:false});
+              localStorage.setItem(key, '1');
+              n.onclick = () => { window.focus(); try{n.close();}catch(e){} openForm(current.id); };
+            }catch(error){ console.warn('CleanFleet wash reminder:', error); }
+          }, Math.max(0, remaining));
+          cfWashReminderTimers.set(key, timer);
+        };
+        scheduleNext(delay);
+      }
+    });
+  }
+
+
   function uid(){
     if(window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
     const bytes = new Uint8Array(16);
@@ -2755,6 +2803,7 @@ window.FLEET_DATA = {
       }
     }
     cfSetSync('Dane aktualne · '+cfFormatSyncTime(cfLastSync),'ok');
+    cfScheduleWashReminders();
   }
 
   async function saveRecords(){
@@ -2772,6 +2821,7 @@ window.FLEET_DATA = {
     cfRemoteRecordIds = currentIds;
     cfLastSync = new Date();
     cfSetSync('Zapisano · '+cfFormatSyncTime(cfLastSync),'ok');
+    cfScheduleWashReminders();
   }
 
   async function saveRegistry(){

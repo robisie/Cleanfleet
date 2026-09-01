@@ -3001,7 +3001,14 @@ window.FLEET_DATA = {
       el.addEventListener('click', () => openForm(el.getAttribute('data-open')));
     });
     list.querySelectorAll('[data-history-plate]').forEach(el => {
-      el.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); showVehicleHistory(el.getAttribute('data-history-plate')); });
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showVehicleHistory(el.getAttribute('data-history-plate'), () => {
+          closeModal();
+          renderRecords();
+        });
+      });
     });
     list.querySelectorAll('[data-toggle-zatw]').forEach(el => {
       el.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); toggleZatwierdzone(el.getAttribute('data-toggle-zatw')); });
@@ -3441,7 +3448,7 @@ window.FLEET_DATA = {
     }
   }
 
-  function showVehicleHistory(plate){
+  function showVehicleHistory(plate, onBack){
     const info = registry[plate] || {};
     const rows = records.filter(r=>r.tablica===plate).sort((a,b)=> (b.data_prania||b.data_zlecenia||'').localeCompare(a.data_prania||a.data_zlecenia||'') || b.created_at-a.created_at);
     const washed = rows.filter(r=>r.data_prania);
@@ -3460,17 +3467,19 @@ window.FLEET_DATA = {
       <table class="report"><thead><tr><th>Data prania</th><th>Typ</th><th>Wykonał</th><th>Kwota</th><th>Status</th></tr></thead><tbody>${historyRows}</tbody></table>`;
     reportShell('Historia samochodu', '', body);
 
-    // Powrót do listy wszystkich samochodów
-    const backBtn = document.createElement('button');
-    backBtn.type = 'button';
-    backBtn.className = 'btn btn-outline';
-    backBtn.textContent = 'Wróć';
-    backBtn.style.marginTop = '12px';
-    backBtn.addEventListener('click', showAllOutstanding);
+    // Powrót zależny od miejsca, z którego otwarto historię.
+    if(onBack){
+      const backBtn = document.createElement('button');
+      backBtn.type = 'button';
+      backBtn.className = 'btn btn-outline';
+      backBtn.textContent = 'Wróć';
+      backBtn.style.marginTop = '12px';
+      backBtn.addEventListener('click', onBack);
 
-    const reportContent = document.querySelector('#modalRoot .sheet, #modalRoot .report-shell');
-    if(reportContent){
-      reportContent.appendChild(backBtn);
+      const reportContent = document.querySelector('#modalRoot .sheet, #modalRoot .report-shell');
+      if(reportContent){
+        reportContent.appendChild(backBtn);
+      }
     }
   }
 
@@ -4574,7 +4583,7 @@ window.FLEET_DATA = {
     table.querySelectorAll('.vehicle-history-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const plate = btn.getAttribute('data-history-plate') || '';
-        if(plate) showVehicleHistory(plate);
+        if(plate) showVehicleHistory(plate, showAllOutstanding);
       });
     });
 

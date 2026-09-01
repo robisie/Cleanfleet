@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v85 -->
+<!-- CleanFleet v86 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -420,7 +420,7 @@
   .attention-card .attention-value{font-size:20px;font-weight:800;margin-top:3px;}
   .attention-card.attention-alert{border-color:rgba(194,75,63,.4);}
   .attention-card.attention-alert .attention-value{color:var(--red);}
-  .history-button{margin-top:8px;padding:6px 9px;border:1px solid var(--line-strong);background:#fff;border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;cursor:pointer;}
+  .history-button{margin-top:0;padding:6px 9px;border:1px solid var(--line-strong);background:#fff;border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;cursor:pointer;}
   .history-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px;}
   .history-stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;}
   .history-stat-label{font-size:10px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;color:var(--ink-soft);}
@@ -565,6 +565,9 @@
     .finance-summary-types{grid-template-columns:repeat(6,minmax(92px,1fr));overflow-x:auto;}
     .finance-summary-types .finance-card{min-width:92px;}
   }
+
+  .record-plate-line{display:flex;align-items:center;gap:8px;}
+  .record-plate-line .history-button{flex:0 0 auto;}
 </style>
 
 <style id="mobile-user-header-fix">
@@ -2909,8 +2912,10 @@ window.FLEET_DATA = {
       <div class="record-card ${statusClass}">
         <div class="record-top" data-open="${r.id}">
           <div>
-            <div class="record-plate">${escapeHtml(r.tablica)}</div>
-            <button type="button" class="history-button" data-history-plate="${escapeHtml(r.tablica)}">Historia</button>
+            <div class="record-plate-line">
+              <div class="record-plate">${escapeHtml(r.tablica)}</div>
+              <button type="button" class="history-button" data-history-plate="${escapeHtml(r.tablica)}">Historia</button>
+            </div>
             ${r.zlecone && !r.zatwierdzone ? `
               <div class="record-meta">Zlecono: ${r.data_zlecenia ? fmtDate(r.data_zlecenia) : '—'} · Na: ${r.data_zlecenia_do ? fmtDate(r.data_zlecenia_do) : '—'} · Przez: ${escapeHtml(r.kto_zlecil||'—')}</div>
             ` : r.data_prania ? `

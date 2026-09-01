@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v96 -->
+<!-- CleanFleet v97 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -689,39 +689,39 @@
       <button class="close" id="menuClose">&times;</button>
     </div>
     <div class="menu-list">
-      <button class="menu-item" id="cfNotificationsBtn" disabled>
-        <span class="menu-item-title"><span class="cf-bell-icon" aria-hidden="true">🔔</span><span id="cfNotificationsTitle">Sprawdzanie powiadomień…</span></span>
-        <span class="menu-item-sub" id="cfNotificationsSub">Sprawdzanie stanu tego urządzenia…</span>
-      </button>
-      <button class="menu-item" id="importBtn">
-        <span class="menu-item-title">Importuj / przywróć dane</span>
-        <span class="menu-item-sub">Pełny backup CleanFleet</span>
-      </button>
-      <button class="menu-item" id="fleetUpdateBtn">
-        <span class="menu-item-title">🚚 Aktualizuj pojazdy</span>
-        <span class="menu-item-sub">Dodaj tylko brakujące tablice z datą prania i osobą</span>
-      </button>
-      <button class="menu-item" id="exportPdfBtn">
-        <span class="menu-item-title">Eksportuj PDF (miesiąc)</span>
-        <span class="menu-item-sub">Wygeneruj plik PDF z zatwierdzonymi pojazdami z wybranego miesiąca</span>
-      </button>
-      <button class="menu-item" id="exportExcelBtn">
-        <span class="menu-item-title">💾 Backup / eksportuj pełną bazę</span>
-        <span class="menu-item-sub">Zapisz pełną kopię pojazdów, prań, faktur i rozliczeń</span>
-      </button>
-      <button class="menu-item" id="financeBtn">
+<button class="menu-item" id="financeBtn">
         <span class="menu-item-title">💰 Rozliczenia / oczekujące płatności</span>
         <span class="menu-item-sub">Faktury, pojazdy przypisane do faktur i płatności</span>
       </button>
-      <button class="menu-item" id="statsBtn">
+<button class="menu-item" id="statsBtn">
         <span class="menu-item-title">📊 Statystyki finansowe</span>
         <span class="menu-item-sub">Finanse, faktury i płatności z wyborem miesiąca</span>
       </button>
-      <button class="menu-item menu-logout" id="cfLogoutBtn">
+<button class="menu-item" id="exportPdfBtn">
+        <span class="menu-item-title">Eksportuj PDF (miesiąc)</span>
+        <span class="menu-item-sub">Wygeneruj plik PDF z zatwierdzonymi pojazdami z wybranego miesiąca</span>
+      </button>
+<button class="menu-item" id="fleetUpdateBtn">
+        <span class="menu-item-title">🚚 Aktualizuj pojazdy</span>
+        <span class="menu-item-sub">Dodaj tylko brakujące tablice z datą prania i osobą</span>
+      </button>
+<button class="menu-item" id="exportExcelBtn">
+        <span class="menu-item-title">💾 Backup / eksportuj pełną bazę</span>
+        <span class="menu-item-sub">Zapisz pełną kopię pojazdów, prań, faktur i rozliczeń</span>
+      </button>
+<button class="menu-item" id="importBtn">
+        <span class="menu-item-title">Importuj / przywróć dane</span>
+        <span class="menu-item-sub">Pełny backup CleanFleet</span>
+      </button>
+<button class="menu-item" id="cfNotificationsBtn" disabled>
+        <span class="menu-item-title"><span class="cf-bell-icon" aria-hidden="true">🔔</span><span id="cfNotificationsTitle">Sprawdzanie powiadomień…</span></span>
+        <span class="menu-item-sub" id="cfNotificationsSub">Sprawdzanie stanu tego urządzenia…</span>
+      </button>
+<button class="menu-item menu-logout" id="cfLogoutBtn">
         <span class="menu-item-title">Wyloguj</span>
         <span class="menu-item-sub">Wyloguj z konta CleanFleet na tym urządzeniu</span>
       </button>
-    </div>
+</div>
     <input type="file" id="importFile" accept=".csv,.txt,.xlsx,.xls" style="display:none;">
     <input type="file" id="fleetUpdateFile" accept=".xlsx,.xls,.csv" style="display:none;">
   </div>
@@ -738,7 +738,6 @@
         <option value="done">Wykonane</option>
         <option value="unapproved">Niezatwierdzone</option>
         <option value="unpaid">Niezapłacone</option>
-        <option value="old">Dawno nie prane</option>
       </select>
     </div>
   </div>
@@ -749,7 +748,6 @@
   <button id="btnMonth">Podsumowanie<br>miesiąca</button>
   <button id="btnYear">Podsumowanie<br>roku</button>
   <button id="btnAll">Lista wszystkich<br>samochodów</button>
-  <button id="btnPending">Zlecone<br>do zrobienia</button>
   <button id="btnBottomMenu" aria-label="Otwórz menu dolne" aria-expanded="false">☰&nbsp;&nbsp;MENU</button>
 </div>
 
@@ -761,7 +759,6 @@
       <button type="button" data-bottom-action="month">Podsumowanie<br>miesiąca</button>
       <button type="button" data-bottom-action="year">Podsumowanie<br>roku</button>
       <button type="button" data-bottom-action="all">Lista wszystkich<br>samochodów</button>
-      <button type="button" data-bottom-action="pending">Zlecone<br>do zrobienia</button>
     </div>
   </div>
 </div>

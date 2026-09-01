@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v103 -->
+<!-- CleanFleet v104 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -4855,54 +4855,51 @@ window.FLEET_DATA = {
     if(!rows.length){ closeModal(); return; }
 
     try{
-      // Re-read current vehicle list just before insertion so an existing plate can never be overwritten.
+      // Aktualizacja floty działa na CAŁEJ liście z importu:
+      // - nowa tablica -> dodaj,
+      // - istniejąca tablica -> nie dodawaj ponownie,
+      // - wybrany typ -> ustaw dla wszystkich importowanych tablic,
+      // - wybrana grupa rozliczeniowa -> ustaw dla wpisów prania tych tablic,
+      // - puste wybory -> nie zmieniaj odpowiedniego pola.
       const { data: currentVehicles, error: vehicleError } =
-        await cfSupabase.from('vehicles').select('plate,type');
+        await cfSupabase.from('vehicles').select('plate,type,brand');
       if(vehicleError) throw vehicleError;
 
       const existing = new Set((currentVehicles || []).map(v => normalizePlate(v.plate)));
+      const importedPlates = [...new Set(rows.map(r => normalizePlate(r.plate)).filter(Boolean))];
       const newRows = rows.filter(r => !existing.has(r.plate));
 
-      if(!newRows.length){
-        closeModal();
-        await loadAll();
-        showToast('Nie ma nowych pojazdów do dodania');
-        return;
+      // 1. Dodaj tylko brakujące pojazdy.
+      if(newRows.length){
+        const vehicleRows = newRows.map(r => ({
+          plate:r.plate,
+          type:selectedType || '',
+          brand:''
+        }));
+        const { error: insertVehicleError } =
+          await cfSupabase.from('vehicles').insert(vehicleRows);
+        if(insertVehicleError) throw insertVehicleError;
       }
 
-      // Nowe pojazdy są zawsze dodawane. Istniejące pojazdy nie są nadpisywane.
-      // Wyjątek: jeżeli istniejący pojazd ma pusty typ, uzupełniamy go wybranym typem.
-      const vehicleRows = newRows.map(r => ({plate:r.plate, type:selectedType || '', brand:''}));
-      const { error: insertVehicleError } =
-        await cfSupabase.from('vehicles').insert(vehicleRows);
-      if(insertVehicleError) throw insertVehicleError;
-
-      const existingBlankTypePlates = (currentVehicles || [])
-        .filter(v => {
-          const plate = normalizePlate(v.plate);
-          return plate && !String(v.type || '').trim() && rows.some(r => r.plate === plate);
-        })
-        .map(v => normalizePlate(v.plate));
-
-      if(selectedType && existingBlankTypePlates.length){
-        const { error: updateBlankTypesError } =
+      // 2. Jeżeli wybrano typ, ustaw go dla WSZYSTKICH pojazdów z importowanej listy.
+      // Dotyczy również pojazdów, które już były w bazie — właśnie po to służy
+      // wybór typu podczas aktualizacji floty.
+      if(selectedType && importedPlates.length){
+        const { error: updateVehicleTypeError } =
           await cfSupabase.from('vehicles')
             .update({type:selectedType})
-            .in('plate', existingBlankTypePlates);
-        if(updateBlankTypesError) throw updateBlankTypesError;
+            .in('plate', importedPlates);
+        if(updateVehicleTypeError) throw updateVehicleTypeError;
 
-        // Uzupełniamy również puste pole typu w istniejących wpisach prania
-        // dotyczących tych pojazdów. Żadnych już wypełnionych typów nie zmieniamy.
-        const { data: blankTypeRecords, error: blankTypeRecordsError } =
+        // Synchronizujemy również typ w istniejących wpisach prania.
+        // Dzięki temu statystyki i historia dla importowanej grupy są spójne.
+        const { data: recordsToUpdate, error: recordsReadError } =
           await cfSupabase.from('wash_records')
-            .select('id,plate,type')
-            .in('plate', existingBlankTypePlates);
-        if(blankTypeRecordsError) throw blankTypeRecordsError;
+            .select('id,plate')
+            .in('plate', importedPlates);
+        if(recordsReadError) throw recordsReadError;
 
-        const blankRecords = (blankTypeRecords || [])
-          .filter(r => !String(r.type || '').trim());
-
-        for(const record of blankRecords){
+        for(const record of (recordsToUpdate || [])){
           const { error: updateRecordTypeError } =
             await cfSupabase.from('wash_records')
               .update({type:selectedType})
@@ -4911,8 +4908,18 @@ window.FLEET_DATA = {
         }
       }
 
-      // Add a historical wash record only when the XLS actually contains a wash date.
-      // A new vehicle without a wash date is still added to the vehicles table.
+      // 3. Jeżeli wybrano grupę rozliczeniową, ustaw ją dla istniejących
+      // wpisów prania wszystkich importowanych tablic.
+      // Pusta grupa = nie zmieniamy istniejących grup.
+      if(selectedBilling && importedPlates.length){
+        const { error: updateBillingError } =
+          await cfSupabase.from('wash_records')
+            .update({billing_category:selectedBilling})
+            .in('plate', importedPlates);
+        if(updateBillingError) throw updateBillingError;
+      }
+
+      // 4. Dla nowych pojazdów utwórz historię tylko wtedy, gdy XLS ma datę prania.
       const washRows = newRows
         .filter(r => r.wash_date)
         .map(r => ({
@@ -4938,16 +4945,29 @@ window.FLEET_DATA = {
         const { error: insertWashError } =
           await cfSupabase.from('wash_records').insert(washRows);
         if(insertWashError){
-          // Best-effort rollback of vehicles added by this operation if wash-record insertion fails.
           await cfSupabase.from('vehicles').delete().in('plate', newRows.map(r => r.plate));
           throw insertWashError;
         }
       }
 
+      // Aktualizacja lokalnego rejestru po pomyślnym zapisie.
+      importedPlates.forEach(plate => {
+        const info = registry[plate] || {};
+        registry[plate] = {
+          typ: selectedType || info.typ || '',
+          marka: info.marka || ''
+        };
+      });
+
       closeModal();
       await loadAll();
-      const filledExisting = existingBlankTypePlates.length;
-      showToast(`Dodano ${newRows.length} nowych${filledExisting ? `, uzupełniono typ w ${filledExisting} istniejących` : ''}`);
+
+      const updatedExisting = importedPlates.filter(p => existing.has(p)).length;
+      const parts = [];
+      if(newRows.length) parts.push(`dodano ${newRows.length}`);
+      if(updatedExisting && selectedType) parts.push(`typ zaktualizowano w ${updatedExisting}`);
+      if(updatedExisting && selectedBilling) parts.push(`grupę rozliczeniową zaktualizowano w ${updatedExisting}`);
+      showToast(parts.length ? parts.join(', ') : 'Nie wybrano pól do aktualizacji');
     }catch(error){
       console.error('CleanFleet fleet update error:', error);
       showToast(error?.message || 'Nie udało się zaktualizować bazy pojazdów');

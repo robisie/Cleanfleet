@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v105 -->
+<!-- CleanFleet v106 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -4797,7 +4797,8 @@ window.FLEET_DATA = {
           <div class="confirm-text">
             W pliku: <strong>${rows.length}</strong><br>
             Już istnieją w CleanFleet: <strong>${existing.length}</strong><br>
-            <strong>Do dodania: ${validNew.length}</strong>
+            <strong>Do dodania: ${validNew.length}</strong><br>
+            <strong>Do aktualizacji typu/grupy: ${existing.length}</strong>
           </div>
           <div class="confirm-text" style="margin-top:8px;">
             Istniejące tablice nie zostaną dodane ponownie. Wybrany typ i grupa rozliczeniowa mogą zostać zastosowane do wszystkich tablic z tego pliku.
@@ -4828,13 +4829,13 @@ window.FLEET_DATA = {
           </div>
 
           <div class="confirm-text" style="margin-top:8px;">
-            Jeżeli wybierzesz typ, zostanie on ustawiony dla wszystkich tablic znajdujących się w tym pliku. Jeżeli wybierzesz grupę rozliczeniową, zostanie ona ustawiona dla wpisów prania tych tablic. Puste pole oznacza: nie zmieniaj.
+            Jeżeli wybierzesz typ, zostanie on ustawiony dla wszystkich tablic znajdujących się w tym pliku. Jeżeli wybierzesz grupę rozliczeniową, zostanie ona ustawiona dla wpisów prania tych tablic. Puste pole oznacza: nie zmieniaj. Przycisk działa również wtedy, gdy nie ma żadnej nowej tablicy.
           </div>
 
           ${listHtml}
           <div class="sheet-actions">
             <button class="btn btn-outline" id="cancelFleetUpdate">Anuluj</button>
-            <button class="btn btn-solid" id="confirmFleetUpdate" ${validNew.length ? '' : 'disabled'}>Dodaj ${validNew.length} nowych</button>
+            <button class="btn btn-solid" id="confirmFleetUpdate" ${rows.length ? '' : 'disabled'}>ZASTOSUJ ZMIANY (${rows.length})</button>
           </div>
         </div>
       </div>`;
@@ -4848,7 +4849,7 @@ window.FLEET_DATA = {
     document.getElementById('confirmFleetUpdate').addEventListener('click', () => {
       const selectedType = document.getElementById('fleetImportType')?.value || '';
       const selectedBilling = document.getElementById('fleetImportBilling')?.value || '';
-      runFleetUpdate(validNew, selectedType, selectedBilling);
+      runFleetUpdate(rows, selectedType, selectedBilling);
     });
   }
 

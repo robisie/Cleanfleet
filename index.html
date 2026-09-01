@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v98 -->
+<!-- CleanFleet v100 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -568,6 +568,35 @@
 
   .record-plate-line{display:flex;align-items:center;gap:8px;}
   .record-plate-line .history-button{flex:0 0 auto;}
+
+/* v99: trzy przyciski dolnego menu zawsze wyśrodkowane */
+.bottom-bar{
+  justify-content:center !important;
+}
+.bottom-bar > button#btnMonth,
+.bottom-bar > button#btnYear,
+.bottom-bar > button#btnAll{
+  flex: 1 1 0;
+  text-align:center;
+}
+
+/* v100: trzy przyciski dolnego paska jako wyśrodkowana grupa */
+@media(min-width:640px){
+  .bottom-bar{
+    grid-template-columns:repeat(3,minmax(0,280px)) !important;
+    justify-content:center !important;
+  }
+}
+@media(min-width:640px) and (max-width:900px){
+  .bottom-bar{
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  }
+}
+/* v100: wylogowanie bez wypychania na sam dół */
+.menu-logout{
+  margin-top:0 !important;
+}
+
 </style>
 
 <style id="mobile-user-header-fix">

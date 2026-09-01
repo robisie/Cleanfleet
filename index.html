@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v90 -->
+<!-- CleanFleet v91 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -3633,10 +3633,34 @@ window.FLEET_DATA = {
       <table class="report"><thead><tr><th>Tablica</th><th>Typ</th><th>Data prania</th><th>Kwota</th><th>Zapł.</th></tr></thead><tbody>${body}</tbody></table>
       <div class="sheet-actions">
         ${paid ? '<button class="btn btn-solid" disabled>✓ Faktura opłacona</button>' : '<button class="btn btn-solid" id="markInvoicePaidBtn">Faktura opłacona</button>'}
+        <button class="btn btn-outline" id="deleteInvoiceBtn" title="Usuń fakturę" aria-label="Usuń fakturę" style="background:#c62828;color:#fff;border-color:#c62828;font-size:20px;line-height:1;min-width:48px;padding:10px 14px;">🗑️</button>
         <button class="btn btn-outline" id="backFinanceBtn">Wróć</button>
       </div>`;
     reportShell('Szczegóły faktury', '', bodyHtml);
     document.getElementById('backFinanceBtn').addEventListener('click', showFinanceQueue);
+
+    document.getElementById('deleteInvoiceBtn').addEventListener('click',()=>{
+      showConfirm(
+        'Usunąć fakturę z kolejki?',
+        `Faktura ${escapeHtml(inv.invoice_number)} oraz jej przypisania do pojazdów zostaną usunięte z rozliczeń. Wpisy prania pozostaną w bazie.`,
+        async()=>{
+          try{
+            const {error:itemError}=await cfSupabase.from('invoice_items').delete().eq('invoice_id', invoiceId);
+            if(itemError) throw itemError;
+            const {error:invoiceError}=await cfSupabase.from('invoices').delete().eq('id', invoiceId);
+            if(invoiceError) throw invoiceError;
+
+            await cfLoadInvoices();
+            showToast('Faktura usunięta z kolejki płatności');
+            showFinanceQueue();
+            renderAttentionPanel();
+          }catch(e){
+            console.error('CleanFleet delete invoice error:',e);
+            showToast(e?.message || 'Nie udało się usunąć faktury');
+          }
+        }
+      );
+    });
     if(!paid){
       document.getElementById('markInvoicePaidBtn').addEventListener('click',()=>{
         showConfirm('Oznaczyć fakturę jako opłaconą?', `Wszystkie ${rows.length} przypisane pojazdy zostaną oznaczone jako zapłacone.`, async()=>{

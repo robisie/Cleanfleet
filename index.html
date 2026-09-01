@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v92 -->
+<!-- CleanFleet v93 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -4643,21 +4643,17 @@ window.FLEET_DATA = {
       else incomingNew.push(r);
     });
 
-    const invalid = incomingNew.filter(r => !r.wash_date || !r.performed_by);
-    const validNew = incomingNew.filter(r => r.wash_date && r.performed_by);
+    // Każda nowa tablica jest dodawana. Brak daty prania oznacza po prostu brak historii prania.
+    const validNew = incomingNew;
 
     const listHtml = validNew.length
       ? `<div style="max-height:260px;overflow:auto;margin-top:12px;">${
           validNew.map(r => `<div style="padding:8px 0;border-bottom:1px solid var(--line);">
             <strong style="font-family:'JetBrains Mono',monospace;">${escapeHtml(r.plate)}</strong>
-            <span style="color:var(--ink-soft);"> · ${escapeHtml(fmtDate(r.wash_date))} · ${escapeHtml(r.performed_by)}</span>
+            <span style="color:var(--ink-soft);"> · ${r.wash_date ? escapeHtml(fmtDate(r.wash_date)) : 'brak daty prania'} · ${r.performed_by ? escapeHtml(r.performed_by) : 'brak informacji'}</span>
           </div>`).join('')
         }</div>`
-      : '<div class="confirm-text">Brak nowych pojazdów gotowych do dodania.</div>';
-
-    const invalidHtml = invalid.length
-      ? `<div class="confirm-text" style="margin-top:12px;"><strong>${invalid.length}</strong> nowych tablic pominięto, ponieważ brakuje daty prania lub osoby, która prała.</div>`
-      : '';
+      : '<div class="confirm-text">Brak nowych pojazdów do dodania.</div>';
 
     const html = `
       <div class="overlay" id="fleetUpdateOverlay">
@@ -4715,32 +4711,37 @@ window.FLEET_DATA = {
         await cfSupabase.from('vehicles').insert(vehicleRows);
       if(insertVehicleError) throw insertVehicleError;
 
-      // Each newly added vehicle gets one historical wash record from the XLS.
-      const washRows = newRows.map(r => ({
-        id: uid(),
-        plate: r.plate,
-        type: '',
-        brand: '',
-        billing_category: null,
-        ordered: false,
-        ordered_by: '',
-        order_date: null,
-        order_due_date: null,
-        notes: 'Import z pliku floty',
-        wash_date: r.wash_date,
-        performed_by: r.performed_by,
-        cost: 0,
-        approved: true,
-        paid: false,
-        created_at: new Date().toISOString()
-      }));
+      // Add a historical wash record only when the XLS actually contains a wash date.
+      // A new vehicle without a wash date is still added to the vehicles table.
+      const washRows = newRows
+        .filter(r => r.wash_date)
+        .map(r => ({
+          id: uid(),
+          plate: r.plate,
+          type: '',
+          brand: '',
+          billing_category: null,
+          ordered: false,
+          ordered_by: '',
+          order_date: null,
+          order_due_date: null,
+          notes: 'Import z pliku floty',
+          wash_date: r.wash_date,
+          performed_by: r.performed_by || '',
+          cost: 0,
+          approved: true,
+          paid: false,
+          created_at: new Date().toISOString()
+        }));
 
-      const { error: insertWashError } =
-        await cfSupabase.from('wash_records').insert(washRows);
-      if(insertWashError){
-        // Best-effort rollback of vehicles added by this operation if wash-record insertion fails.
-        await cfSupabase.from('vehicles').delete().in('plate', newRows.map(r => r.plate));
-        throw insertWashError;
+      if(washRows.length){
+        const { error: insertWashError } =
+          await cfSupabase.from('wash_records').insert(washRows);
+        if(insertWashError){
+          // Best-effort rollback of vehicles added by this operation if wash-record insertion fails.
+          await cfSupabase.from('vehicles').delete().in('plate', newRows.map(r => r.plate));
+          throw insertWashError;
+        }
       }
 
       closeModal();

@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v106 -->
+<!-- CleanFleet v107 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -3468,8 +3468,12 @@ window.FLEET_DATA = {
     const unpaidInvoices=invoices.filter(i=>i.status!=='paid').length;
     const oldVehicles=Object.keys(registry).filter(plate=>{
       const latest=records.filter(r=>r.tablica===plate && r.data_prania).sort((a,b)=>(b.data_prania||'').localeCompare(a.data_prania||''))[0];
-      // „Dawno nie prane” tylko wtedy, gdy znana jest data ostatniego prania
-      // i minęło co najmniej 182,5 dnia (365/2).
+      // „Dawno nie prane” tylko wtedy, gdy znana jest data ostatniego prania,
+      // minęło co najmniej 182,5 dnia (365/2), a pojazd NIE jest typu BUS.
+      // BUS jest celowo wyłączony zarówno z listy, jak i z licznika kafelka.
+      const info=registry[plate] || {};
+      const vehicleType=String((latest && latest.typ) || info.typ || '').trim().toUpperCase();
+      if(vehicleType==='BUS') return false;
       if(!latest) return false;
       return daysSinceLastWashForRecord(latest)>=(365/2);
     }).length;

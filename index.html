@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v100 -->
+<!-- CleanFleet v103 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -596,6 +596,23 @@
 .menu-logout{
   margin-top:0 !important;
 }
+
+
+.report-plate-link{
+  appearance:none;
+  -webkit-appearance:none;
+  border:0;
+  background:transparent;
+  padding:0;
+  margin:0;
+  font:inherit;
+  color:inherit;
+  text-decoration:underline;
+  text-decoration-color:var(--green-ink);
+  text-underline-offset:3px;
+  cursor:pointer;
+}
+.report-plate-link:active{opacity:.65;}
 
 </style>
 
@@ -4367,6 +4384,8 @@ window.FLEET_DATA = {
       const days = daysSinceLastWashForRecord(latest);
       if(days === null || days < (365 / 2)) return null;
       const info = registry[plate] || {};
+      const vehicleType = String(latest.typ || info.typ || '').trim().toUpperCase();
+      if(vehicleType === 'BUS') return null;
       return {
         typ: (latest.typ || info.typ || '—'),
         tablica: plate,
@@ -4383,7 +4402,7 @@ window.FLEET_DATA = {
         <tbody>${rows.map(r => `
           <tr>
             <td>${escapeHtml(r.typ)}</td>
-            <td class="mono">${escapeHtml(r.tablica)}</td>
+            <td class="mono"><button type="button" class="report-plate-link" data-old-plate="${escapeHtml(r.tablica)}">${escapeHtml(r.tablica)}</button></td>
             <td>${escapeHtml(r.marka)}</td>
             <td>${fmtDate(r.data_prania)}</td>
             <td>${escapeHtml(r.kto_wykonal)}</td>
@@ -4393,9 +4412,20 @@ window.FLEET_DATA = {
 
     reportShell(
       'Dawno nie prane',
-      `<div class="confirm-text">Pojazdy, których od ostatniego wykonanego prania minęło co najmniej <strong>182,5 dnia</strong>.</div>`,
+      `<div class="confirm-text">Pojazdy, których od ostatniego wykonanego prania minęło co najmniej <strong>182,5 dnia</strong>. Kliknij tablicę, aby od razu otworzyć nowy wpis prania.</div>`,
       body
     );
+
+    document.querySelectorAll('[data-old-plate]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const plate = el.getAttribute('data-old-plate') || '';
+        closeModal();
+        window.__pendingPlate = plate;
+        openForm(null);
+      });
+    });
   }
 
   function showAllOutstanding(){
@@ -4772,6 +4802,34 @@ window.FLEET_DATA = {
           <div class="confirm-text" style="margin-top:8px;">
             Istniejące tablice nie zostaną zmienione. Nie zostanie podmieniona żadna data prania ani osoba.
           </div>
+
+          <div class="field-row" style="margin-top:12px;">
+            <div class="field">
+              <label for="fleetImportType">Typ pojazdu dla nowych</label>
+              <select id="fleetImportType">
+                <option value="SOLÓWKA">SOLÓWKA</option>
+                <option value="ZESTAW">ZESTAW</option>
+                <option value="BUS">BUS</option>
+                <option value="BUS C">BUS C</option>
+                <option value="OSOBOWE">OSOBOWE</option>
+                <option value="BUS MŁYNCZAK">BUS MŁYNCZAK</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="fleetImportBilling">Grupa rozliczeniowa</label>
+              <select id="fleetImportBilling">
+                <option value="">— brak / nie ustawiaj —</option>
+                <option value="osobowe">Osobowe</option>
+                <option value="ciezarowe">Ciężarowe</option>
+                <option value="busy">Busy</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="confirm-text" style="margin-top:8px;">
+            Wybrany typ zostanie przypisany do nowych pojazdów. Wybrana grupa rozliczeniowa zostanie przypisana do importowanego wpisu prania, jeżeli wiersz zawiera datę prania. Istniejące pojazdy pozostają bez zmian.
+          </div>
+
           ${listHtml}
           <div class="sheet-actions">
             <button class="btn btn-outline" id="cancelFleetUpdate">Anuluj</button>
@@ -4786,16 +4844,20 @@ window.FLEET_DATA = {
     });
     document.querySelector('#fleetUpdateOverlay [data-close]').addEventListener('click', closeModal);
     document.getElementById('cancelFleetUpdate').addEventListener('click', closeModal);
-    document.getElementById('confirmFleetUpdate').addEventListener('click', () => runFleetUpdate(validNew));
+    document.getElementById('confirmFleetUpdate').addEventListener('click', () => {
+      const selectedType = document.getElementById('fleetImportType')?.value || '';
+      const selectedBilling = document.getElementById('fleetImportBilling')?.value || '';
+      runFleetUpdate(validNew, selectedType, selectedBilling);
+    });
   }
 
-  async function runFleetUpdate(rows){
+  async function runFleetUpdate(rows, selectedType, selectedBilling){
     if(!rows.length){ closeModal(); return; }
 
     try{
       // Re-read current vehicle list just before insertion so an existing plate can never be overwritten.
       const { data: currentVehicles, error: vehicleError } =
-        await cfSupabase.from('vehicles').select('plate');
+        await cfSupabase.from('vehicles').select('plate,type');
       if(vehicleError) throw vehicleError;
 
       const existing = new Set((currentVehicles || []).map(v => normalizePlate(v.plate)));
@@ -4808,11 +4870,46 @@ window.FLEET_DATA = {
         return;
       }
 
-      // INSERT, never UPSERT: existing vehicles cannot be modified by this import.
-      const vehicleRows = newRows.map(r => ({plate:r.plate, type:'', brand:''}));
+      // Nowe pojazdy są zawsze dodawane. Istniejące pojazdy nie są nadpisywane.
+      // Wyjątek: jeżeli istniejący pojazd ma pusty typ, uzupełniamy go wybranym typem.
+      const vehicleRows = newRows.map(r => ({plate:r.plate, type:selectedType || '', brand:''}));
       const { error: insertVehicleError } =
         await cfSupabase.from('vehicles').insert(vehicleRows);
       if(insertVehicleError) throw insertVehicleError;
+
+      const existingBlankTypePlates = (currentVehicles || [])
+        .filter(v => {
+          const plate = normalizePlate(v.plate);
+          return plate && !String(v.type || '').trim() && rows.some(r => r.plate === plate);
+        })
+        .map(v => normalizePlate(v.plate));
+
+      if(selectedType && existingBlankTypePlates.length){
+        const { error: updateBlankTypesError } =
+          await cfSupabase.from('vehicles')
+            .update({type:selectedType})
+            .in('plate', existingBlankTypePlates);
+        if(updateBlankTypesError) throw updateBlankTypesError;
+
+        // Uzupełniamy również puste pole typu w istniejących wpisach prania
+        // dotyczących tych pojazdów. Żadnych już wypełnionych typów nie zmieniamy.
+        const { data: blankTypeRecords, error: blankTypeRecordsError } =
+          await cfSupabase.from('wash_records')
+            .select('id,plate,type')
+            .in('plate', existingBlankTypePlates);
+        if(blankTypeRecordsError) throw blankTypeRecordsError;
+
+        const blankRecords = (blankTypeRecords || [])
+          .filter(r => !String(r.type || '').trim());
+
+        for(const record of blankRecords){
+          const { error: updateRecordTypeError } =
+            await cfSupabase.from('wash_records')
+              .update({type:selectedType})
+              .eq('id', record.id);
+          if(updateRecordTypeError) throw updateRecordTypeError;
+        }
+      }
 
       // Add a historical wash record only when the XLS actually contains a wash date.
       // A new vehicle without a wash date is still added to the vehicles table.
@@ -4821,9 +4918,9 @@ window.FLEET_DATA = {
         .map(r => ({
           id: uid(),
           plate: r.plate,
-          type: '',
+          type: selectedType || '',
           brand: '',
-          billing_category: null,
+          billing_category: selectedBilling || null,
           ordered: false,
           ordered_by: '',
           order_date: null,
@@ -4849,7 +4946,8 @@ window.FLEET_DATA = {
 
       closeModal();
       await loadAll();
-      showToast(`Dodano ${newRows.length} nowych pojazdów z datą ostatniego prania`);
+      const filledExisting = existingBlankTypePlates.length;
+      showToast(`Dodano ${newRows.length} nowych${filledExisting ? `, uzupełniono typ w ${filledExisting} istniejących` : ''}`);
     }catch(error){
       console.error('CleanFleet fleet update error:', error);
       showToast(error?.message || 'Nie udało się zaktualizować bazy pojazdów');

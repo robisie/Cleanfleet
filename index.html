@@ -620,6 +620,11 @@
 }
 .report-plate-link:active{opacity:.65;}
 
+
+    .vehicle-filter-card{cursor:pointer;border:1px solid rgba(0,0,0,.10);font:inherit;text-align:left;width:100%;appearance:none;-webkit-appearance:none;}
+    .vehicle-filter-card:hover{transform:translateY(-1px);}
+    .vehicle-filter-card.active{outline:2px solid #2f9e44;outline-offset:-2px;}
+    .vehicle-filter-card .finance-card-label,.vehicle-filter-card .finance-card-value{display:block;}
 </style>
 
 <style id="mobile-user-header-fix">
@@ -4625,16 +4630,16 @@ window.FLEET_DATA = {
     ];
 
     const typeCards = orderedTypes.map(type =>
-      `<div class="finance-card"><div class="finance-card-label">${escapeHtml(type)}</div><div class="finance-card-value">${counts[type]}</div></div>`
+      `<button type="button" class="finance-card vehicle-filter-card" data-vehicle-filter="${escapeHtml(type)}" aria-label="Pokaż pojazdy: ${escapeHtml(type)}"><span class="finance-card-label">${escapeHtml(type)}</span><span class="finance-card-value">${counts[type]}</span></button>`
     ).join('');
 
     const summary = `
       <div class="finance-summary" style="grid-template-columns:1fr;">
         <div class="finance-summary-row finance-summary-types" style="grid-template-columns:repeat(6,minmax(0,1fr));">
-          <div class="finance-card">
-            <div class="finance-card-label">Liczba pojazdów</div>
-            <div class="finance-card-value">${rows.length}</div>
-          </div>
+          <button type="button" class="finance-card vehicle-filter-card active" data-vehicle-filter="ALL" aria-label="Pokaż wszystkie pojazdy">
+            <span class="finance-card-label">Liczba pojazdów</span>
+            <span class="finance-card-value">${rows.length}</span>
+          </button>
           ${typeCards}
         </div>
       </div>`;
@@ -4651,19 +4656,6 @@ window.FLEET_DATA = {
     if(rows.length === 0){
       return '<div class="empty-state" style="margin-top:14px;">Brak pojazdów na liście.</div>';
     }
-
-    const types = [...new Set(rows.map(r => String(r.typ || '').trim().toUpperCase()).filter(Boolean))];
-    const ordered = ['SOLÓWKA','ZESTAW','BUS','BUS C','OSOBOWE'];
-    types.sort((a,b) => {
-      const ai = ordered.indexOf(a), bi = ordered.indexOf(b);
-      if(ai !== -1 || bi !== -1) return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-      return a.localeCompare(b, 'pl');
-    });
-
-    const typeOptions = [
-      '<option value="ALL">Wszystkie typy</option>',
-      ...types.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`)
-    ].join('');
 
     const body = rows.map(r => `
       <tr data-vehicle-type="${escapeHtml(String(r.typ || '').trim().toUpperCase())}">
@@ -4682,11 +4674,7 @@ window.FLEET_DATA = {
 
     const wrapper = `
       <div class="vehicle-list-toolbar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;margin-bottom:10px;">
-        <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
-          <span>Typ pojazdu:</span>
-          <select id="vehicleTypeFilter" style="min-width:170px;">${typeOptions}</select>
-        </label>
-        <span id="vehicleTypeFilterCount" class="confirm-text" style="margin:0;">${rows.length} pojazdów</span>
+        <span id="vehicleTypeFilterLabel" class="confirm-text" style="margin:0;font-weight:600;">Wszystkie pojazdy · ${rows.length}</span>
       </div>`;
 
     const table = `
@@ -4699,23 +4687,32 @@ window.FLEET_DATA = {
   }
 
   function bindAllVehiclesTable(){
-    const filter = document.getElementById('vehicleTypeFilter');
     const table = document.getElementById('allVehiclesTable');
-    const count = document.getElementById('vehicleTypeFilterCount');
-    if(!filter || !table) return;
+    const label = document.getElementById('vehicleTypeFilterLabel');
+    const cards = document.querySelectorAll('.vehicle-filter-card');
+    if(!table) return;
 
-    const update = () => {
-      const value = filter.value;
+    const plural = (n) => n === 1 ? 'pojazd' : (n >= 2 && n <= 4 ? 'pojazdy' : 'pojazdów');
+
+    const update = (value, card) => {
       let visible = 0;
       table.querySelectorAll('tbody tr').forEach(row => {
         const show = value === 'ALL' || row.dataset.vehicleType === value;
         row.style.display = show ? '' : 'none';
         if(show) visible++;
       });
-      if(count) count.textContent = `${visible} ${visible === 1 ? 'pojazd' : (visible >= 2 && visible <= 4 ? 'pojazdy' : 'pojazdów')}`;
+      cards.forEach(c => c.classList.toggle('active', c === card));
+      if(label){
+        const name = value === 'ALL' ? 'Wszystkie pojazdy' : value;
+        label.textContent = `${name} · ${visible} ${plural(visible)}`;
+      }
     };
 
-    filter.addEventListener('change', update);
+    cards.forEach(card => {
+      card.addEventListener('click', () => {
+        update(card.getAttribute('data-vehicle-filter') || 'ALL', card);
+      });
+    });
 
     table.querySelectorAll('.vehicle-history-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -4724,7 +4721,8 @@ window.FLEET_DATA = {
       });
     });
 
-    update();
+    const active = document.querySelector('.vehicle-filter-card.active') || document.querySelector('.vehicle-filter-card');
+    if(active) update(active.getAttribute('data-vehicle-filter') || 'ALL', active);
   }
 
   // --- Supabase: pobieranie całej tabeli stronicami ---

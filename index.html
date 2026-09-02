@@ -423,6 +423,8 @@
   .history-button{margin-top:0;padding:6px 9px;border:1px solid var(--line-strong);background:#fff;border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;cursor:pointer;}
   .history-delete-btn{width:34px;height:34px;padding:0;border:1px solid rgba(194,75,63,.35);background:#fff;color:var(--red);border-radius:7px;font-size:18px;line-height:1;cursor:pointer;}
   .history-delete-btn:hover{background:rgba(194,75,63,.06);border-color:var(--red);}
+  .history-edit-btn{width:34px;height:34px;padding:0;border:1px solid var(--line-strong);background:#fff;color:var(--ink);border-radius:7px;font-size:18px;line-height:1;cursor:pointer;}
+  .history-edit-btn:hover{background:var(--green-bg);border-color:var(--green);}
   .history-actions{display:flex;gap:8px;align-items:center;justify-content:flex-start;margin-top:12px;}
   .history-actions .btn{margin-top:0;}
   .history-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px;}
@@ -3526,7 +3528,7 @@ window.FLEET_DATA = {
     const days = last ? Math.max(0,Math.floor((Date.now()-new Date(last.data_prania+'T00:00:00').getTime())/86400000)) : null;
     const historyRows = rows.length ? rows.map(r=>`<tr>
       <td>${r.data_prania?fmtDate(r.data_prania):'—'}</td><td>${escapeHtml(r.typ||'—')}</td><td>${escapeHtml(r.kto_wykonal||'—')}</td><td>${fmtMoney(r.koszt)}</td><td>${r.zlecone?'ZLECONE':'—'}</td>
-      <td style="text-align:right;"><button type="button" class="history-delete-btn" data-delete-history-id="${escapeHtml(r.id)}" title="Usuń wpis prania" aria-label="Usuń wpis prania">🗑️</button></td>
+      <td style="text-align:right;white-space:nowrap;"><button type="button" class="history-edit-btn" data-edit-history-id="${escapeHtml(r.id)}" title="Edytuj wpis prania" aria-label="Edytuj wpis prania">✎</button><button type="button" class="history-delete-btn" data-delete-history-id="${escapeHtml(r.id)}" title="Usuń wpis prania" aria-label="Usuń wpis prania">🗑️</button></td>
     </tr>`).join('') : '<tr><td colspan="6">Brak historii.</td></tr>';
     const body=`<div class="confirm-text"><strong>${escapeHtml(plate)}</strong> · ${escapeHtml(info.typ||'—')} · ${escapeHtml(info.marka||'—')}</div>
       <div class="history-summary">
@@ -3537,8 +3539,23 @@ window.FLEET_DATA = {
       <div style="overflow-x:auto;">
         <table class="report"><thead><tr><th>Data prania</th><th>Typ</th><th>Wykonał</th><th>Kwota</th><th>Status</th><th></th></tr></thead><tbody>${historyRows}</tbody></table>
       </div>
-      <div class="history-actions"><button type="button" class="btn btn-danger" id="deleteVehicleBtn">Usuń samochód</button></div>`;
+      <div class="history-actions"><button type="button" class="btn btn-solid" id="addWashBtn">Dodaj pranie</button><button type="button" class="btn btn-danger" id="deleteVehicleBtn">Usuń samochód</button></div>`;
     reportShell('Historia samochodu', '', body);
+
+    document.getElementById('addWashBtn')?.addEventListener('click', () => {
+      window.__pendingPlate = plate;
+      closeModal();
+      openForm(null);
+    });
+
+    document.querySelectorAll('[data-edit-history-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-edit-history-id');
+        if(!records.find(r => String(r.id) === String(id))) return;
+        closeModal();
+        openForm(id);
+      });
+    });
 
     document.querySelectorAll('[data-delete-history-id]').forEach(btn => {
       btn.addEventListener('click', () => {

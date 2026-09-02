@@ -421,6 +421,10 @@
   .attention-card.attention-alert{border-color:rgba(194,75,63,.4);}
   .attention-card.attention-alert .attention-value{color:var(--red);}
   .history-button{margin-top:0;padding:6px 9px;border:1px solid var(--line-strong);background:#fff;border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;cursor:pointer;}
+  .history-delete-btn{width:34px;height:34px;padding:0;border:1px solid rgba(194,75,63,.35);background:#fff;color:var(--red);border-radius:7px;font-size:18px;line-height:1;cursor:pointer;}
+  .history-delete-btn:hover{background:rgba(194,75,63,.06);border-color:var(--red);}
+  .history-actions{display:flex;gap:8px;align-items:center;justify-content:flex-start;margin-top:12px;}
+  .history-actions .btn{margin-top:0;}
   .history-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px;}
   .history-stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;}
   .history-stat-label{font-size:10px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;color:var(--ink-soft);}
@@ -2928,43 +2932,37 @@ window.FLEET_DATA = {
 
   async function saveRegistry(changedPlate=null, oldPlate=null){
     try{
-      // Zwykłe dodanie/edycja pojazdu: zapisujemy WYŁĄCZNIE ten pojazd.
-      // Bez retry — pojedyncza operacja ma zakończyć się od razu błędem,
-      // zamiast sztucznie wydłużać czas oczekiwania przy problemie sieciowym.
+      // Zapis pojedynczego pojazdu: jedna operacja UPSERT, nigdy całej listy.
+      // Dzięki onConflict aplikacja nie musi zgadywać, czy rekord już istnieje.
       if(changedPlate){
         const v = registry[changedPlate] || {typ:'', marka:''};
         const payload = { plate:changedPlate, type:v.typ||'', brand:v.marka||'' };
-        const existsRemotely = cfRemoteVehiclePlates.has(changedPlate);
-
-        let result;
-        if(existsRemotely){
-          result = await cfSupabase
-            .from('vehicles')
-            .update({type:payload.type, brand:payload.brand})
-            .eq('plate', changedPlate);
-        } else {
-          result = await cfSupabase
-            .from('vehicles')
-            .insert(payload);
-        }
-        if(result?.error) throw result.error;
+        const { error } = await cfSupabase
+          .from('vehicles')
+          .upsert(payload, {onConflict:'plate'});
+        if(error) throw error;
 
         if(oldPlate && oldPlate !== changedPlate){
-          const deleteResult = await cfSupabase.from('vehicles').delete().eq('plate', oldPlate);
-          if(deleteResult?.error) throw deleteResult.error;
+          const { error: deleteError } = await cfSupabase
+            .from('vehicles')
+            .delete()
+            .eq('plate', oldPlate);
+          if(deleteError) throw deleteError;
           cfRemoteVehiclePlates.delete(oldPlate);
         }
         cfRemoteVehiclePlates.add(changedPlate);
       } else {
-        // Import / pełna synchronizacja nadal zapisuje całą listę.
+        // Import / pełna synchronizacja pozostaje bez zmian.
         const rows = Object.entries(registry).map(([plate,v])=>({plate,type:v.typ||'',brand:v.marka||''}));
         if(rows.length){
-          await cfRetrySupabase(() => cfSupabase.from('vehicles').upsert(rows, {onConflict:'plate'}));
+          const { error } = await cfSupabase.from('vehicles').upsert(rows, {onConflict:'plate'});
+          if(error) throw error;
         }
         const currentPlates = new Set(Object.keys(registry));
         const removed = [...cfRemoteVehiclePlates].filter(plate=>!currentPlates.has(plate));
         if(removed.length){
-          await cfRetrySupabase(() => cfSupabase.from('vehicles').delete().in('plate', removed));
+          const { error } = await cfSupabase.from('vehicles').delete().in('plate', removed);
+          if(error) throw error;
         }
         cfRemoteVehiclePlates = currentPlates;
       }
@@ -3528,15 +3526,66 @@ window.FLEET_DATA = {
     const days = last ? Math.max(0,Math.floor((Date.now()-new Date(last.data_prania+'T00:00:00').getTime())/86400000)) : null;
     const historyRows = rows.length ? rows.map(r=>`<tr>
       <td>${r.data_prania?fmtDate(r.data_prania):'—'}</td><td>${escapeHtml(r.typ||'—')}</td><td>${escapeHtml(r.kto_wykonal||'—')}</td><td>${fmtMoney(r.koszt)}</td><td>${r.zlecone?'ZLECONE':'—'}</td>
-    </tr>`).join('') : '<tr><td colspan="5">Brak historii.</td></tr>';
+      <td style="text-align:right;"><button type="button" class="history-delete-btn" data-delete-history-id="${escapeHtml(r.id)}" title="Usuń wpis prania" aria-label="Usuń wpis prania">🗑️</button></td>
+    </tr>`).join('') : '<tr><td colspan="6">Brak historii.</td></tr>';
     const body=`<div class="confirm-text"><strong>${escapeHtml(plate)}</strong> · ${escapeHtml(info.typ||'—')} · ${escapeHtml(info.marka||'—')}</div>
       <div class="history-summary">
         <div class="history-stat"><div class="history-stat-label">Prań</div><div class="history-stat-value">${washed.length}</div></div>
         <div class="history-stat"><div class="history-stat-label">Przychód</div><div class="history-stat-value">${fmtMoney(total)}</div></div>
         <div class="history-stat"><div class="history-stat-label">Ostatnie pranie</div><div class="history-stat-value">${days===null?'—':days+' dni'}</div></div>
       </div>
-      <table class="report"><thead><tr><th>Data prania</th><th>Typ</th><th>Wykonał</th><th>Kwota</th><th>Status</th></tr></thead><tbody>${historyRows}</tbody></table>`;
+      <div style="overflow-x:auto;">
+        <table class="report"><thead><tr><th>Data prania</th><th>Typ</th><th>Wykonał</th><th>Kwota</th><th>Status</th><th></th></tr></thead><tbody>${historyRows}</tbody></table>
+      </div>
+      <div class="history-actions"><button type="button" class="btn btn-danger" id="deleteVehicleBtn">Usuń samochód</button></div>`;
     reportShell('Historia samochodu', '', body);
+
+    document.querySelectorAll('[data-delete-history-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-delete-history-id');
+        const rec = records.find(r => String(r.id) === String(id));
+        if(!rec) return;
+        showConfirm('Usunąć wpis prania?', `Wpis prania dla ${rec.tablica} z ${rec.data_prania ? fmtDate(rec.data_prania) : 'brakiem daty prania'} zostanie trwale usunięty z bazy.`, async () => {
+          try{
+            const { error } = await cfSupabase.from('wash_records').delete().eq('id', rec.id);
+            if(error) throw error;
+            records = records.filter(x => x.id !== rec.id);
+            cfRemoteRecordIds.delete(rec.id);
+            cfScheduleWashReminders();
+            showToast('Wpis prania usunięty');
+            showVehicleHistory(plate, onBack);
+          }catch(error){
+            showToast('Błąd usuwania wpisu: '+(error?.message||error));
+          }
+        });
+      });
+    });
+
+    document.getElementById('deleteVehicleBtn')?.addEventListener('click', () => {
+      showConfirm('Usunąć samochód?', `Samochód ${plate} oraz cała jego historia prania zostaną trwale usunięte z bazy. Tej operacji nie można cofnąć.`, async () => {
+        try{
+          const { error: recordsError } = await cfSupabase.from('wash_records').delete().eq('plate', plate);
+          if(recordsError) throw recordsError;
+          const { error: vehicleError } = await cfSupabase.from('vehicles').delete().eq('plate', plate);
+          if(vehicleError) throw vehicleError;
+          delete registry[plate];
+          records = records.filter(r => r.tablica !== plate);
+          cfRemoteVehiclePlates.delete(plate);
+          for(const id of [...cfRemoteRecordIds]){
+            if(!records.some(r => r.id === id)) cfRemoteRecordIds.delete(id);
+          }
+          localStorage.setItem('cf-registry', JSON.stringify(registry));
+          renderPlateList();
+          renderAttentionPanel();
+          renderRecords();
+          cfScheduleWashReminders();
+          showToast('Samochód usunięty');
+          if(onBack) onBack(); else closeModal();
+        }catch(error){
+          showToast('Błąd usuwania samochodu: '+(error?.message||error));
+        }
+      });
+    });
 
     // Powrót zależny od miejsca, z którego otwarto historię.
     if(onBack){

@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v107 -->
+<!-- CleanFleet v108 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -2791,34 +2791,41 @@ window.FLEET_DATA = {
         const key = cfReminderKey(r, item.suffix);
         if(localStorage.getItem(key)) return;
 
-        const delay = item.date.getTime() - now.getTime();
-        const timer = setTimeout(() => {
-          try{
-            const current = records.find(x => x.id === r.id);
-            if(!current || !current.zlecone || current.zatwierdzone || current.zaplacone ||
-               current.data_zlecenia_do !== r.data_zlecenia_do) return;
+        const scheduleAtReminder = () => {
+          const remaining = item.date.getTime() - Date.now();
+          if(remaining <= 0){
+            try{
+              const current = records.find(x => x.id === r.id);
+              if(!current || !current.zlecone || current.zatwierdzone || current.zaplacone ||
+                 current.data_zlecenia_do !== r.data_zlecenia_do) return;
 
-            const n = new Notification(item.title, {
-              body: `${current.tablica} — zaplanowane na ${fmtDate(current.data_zlecenia_do)}`,
-              tag: `cleanfleet-wash-${current.id}-${item.suffix}`,
-              renotify: false
-            });
+              const n = new Notification(item.title, {
+                body: `${current.tablica} — zaplanowane na ${fmtDate(current.data_zlecenia_do)}`,
+                tag: `cleanfleet-wash-${current.id}-${item.suffix}`,
+                renotify: false
+              });
 
-            localStorage.setItem(key, '1');
-
-            n.onclick = () => {
-              window.focus();
-              try { n.close(); } catch(e) {}
-              openForm(current.id);
-            };
-          }catch(error){
-            console.warn('CleanFleet wash reminder:', error);
-          }finally{
-            cfWashReminderTimers.delete(key);
+              localStorage.setItem(key, '1');
+              n.onclick = () => {
+                window.focus();
+                try { n.close(); } catch(e) {}
+                openForm(current.id);
+              };
+            }catch(error){
+              console.warn('CleanFleet wash reminder:', error);
+            }finally{
+              cfWashReminderTimers.delete(key);
+            }
+            return;
           }
-        }, Math.min(delay, 2147483647));
 
-        cfWashReminderTimers.set(key, timer);
+          // Safari/iOS ogranicza setTimeout do ok. 24,8 dnia.
+          // Dłuższe terminy dzielimy na kolejne odcinki, żeby przypomnienie
+          // nie uruchomiło się przed właściwą datą.
+          const timer = setTimeout(scheduleAtReminder, Math.min(remaining, 2147483647));
+          cfWashReminderTimers.set(key, timer);
+        };
+        scheduleAtReminder();
       });
     });
   }
@@ -2904,21 +2911,57 @@ window.FLEET_DATA = {
     cfScheduleWashReminders();
   }
 
-  async function saveRegistry(){
-    const rows = Object.entries(registry).map(([plate,v])=>({plate,type:v.typ||'',brand:v.marka||''}));
-    if(rows.length){
-      const { error } = await cfSupabase.from('vehicles').upsert(rows, {onConflict:'plate'});
-      if(error){ showToast('Błąd zapisu pojazdów: '+error.message); throw error; }
+  async function cfRetrySupabase(action, attempts=3){
+    let lastError = null;
+    for(let i=0;i<attempts;i++){
+      try{
+        const result = await action();
+        if(!result?.error) return result;
+        lastError = result.error;
+      }catch(error){
+        lastError = error;
+      }
+      if(i < attempts-1) await new Promise(resolve => setTimeout(resolve, 700 * (i+1)));
     }
-    const currentPlates = new Set(Object.keys(registry));
-    const removed = [...cfRemoteVehiclePlates].filter(plate=>!currentPlates.has(plate));
-    if(removed.length){
-      const { error } = await cfSupabase.from('vehicles').delete().in('plate', removed);
-      if(error){ showToast('Błąd usuwania pojazdów: '+error.message); throw error; }
+    throw lastError || new Error('Nie udało się wykonać operacji w bazie.');
+  }
+
+  async function saveRegistry(changedPlate=null, oldPlate=null){
+    try{
+      // Przy zwykłym dodawaniu/edycji zapisujemy tylko zmieniony pojazd.
+      // Wcześniej każda zmiana wysyłała całą listę pojazdów do Supabase,
+      // co na iPadzie/Safari mogło kończyć się błędem „Load failed”.
+      if(changedPlate){
+        const v = registry[changedPlate] || {typ:'', marka:''};
+        await cfRetrySupabase(() => cfSupabase.from('vehicles').upsert({
+          plate:changedPlate, type:v.typ||'', brand:v.marka||''
+        }, {onConflict:'plate'}));
+
+        if(oldPlate && oldPlate !== changedPlate){
+          await cfRetrySupabase(() => cfSupabase.from('vehicles').delete().eq('plate', oldPlate));
+          cfRemoteVehiclePlates.delete(oldPlate);
+        }
+        cfRemoteVehiclePlates.add(changedPlate);
+      } else {
+        // Import / pełna synchronizacja nadal zapisuje całą listę.
+        const rows = Object.entries(registry).map(([plate,v])=>({plate,type:v.typ||'',brand:v.marka||''}));
+        if(rows.length){
+          await cfRetrySupabase(() => cfSupabase.from('vehicles').upsert(rows, {onConflict:'plate'}));
+        }
+        const currentPlates = new Set(Object.keys(registry));
+        const removed = [...cfRemoteVehiclePlates].filter(plate=>!currentPlates.has(plate));
+        if(removed.length){
+          await cfRetrySupabase(() => cfSupabase.from('vehicles').delete().in('plate', removed));
+        }
+        cfRemoteVehiclePlates = currentPlates;
+      }
+      cfLastSync = new Date();
+      cfSetSync('Zapisano · '+cfFormatSyncTime(cfLastSync),'ok');
+    }catch(error){
+      const message = error?.message || String(error);
+      showToast('Błąd zapisu pojazdu: '+message);
+      throw error;
     }
-    cfRemoteVehiclePlates = currentPlates;
-    cfLastSync = new Date();
-    cfSetSync('Zapisano · '+cfFormatSyncTime(cfLastSync),'ok');
   }
 
   async function cfRefresh(){
@@ -3270,9 +3313,22 @@ window.FLEET_DATA = {
     addOptionIfNew('kto_zlecil', kto_zlecil);
     addOptionIfNew('kto_wykonal', kto_wykonal);
 
+    const oldPlate = editingId ? (records.find(x => x.id === editingId)?.tablica || '') : '';
+    const previousRegistryValue = registry[plate] ? { ...registry[plate] } : null;
     registry[plate] = { typ, marka };
-    await saveRegistry();
-    renderPlateList();
+    try{
+      await saveRegistry(plate, oldPlate);
+    }catch(error){
+      if(oldPlate && oldPlate !== plate){
+        delete registry[plate];
+        registry[oldPlate] = previousRegistryValue || { typ:'', marka:'' };
+      } else if(previousRegistryValue){
+        registry[plate] = previousRegistryValue;
+      } else {
+        delete registry[plate];
+      }
+      return;
+    }
 
     if(editingId){
       const rec = records.find(x => x.id === editingId);
@@ -5260,6 +5316,13 @@ window.FLEET_DATA = {
       showToast('Nie udało się załadować połączenia z Supabase. Odśwież stronę.');
     }
   }
+
+  // Po powrocie do aplikacji ponownie wyliczamy terminy. Ma to znaczenie na
+  // iPadzie/iPhonie, gdzie Safari może wstrzymać timery w tle.
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible') cfScheduleWashReminders();
+  });
+  window.addEventListener('focus', () => cfScheduleWashReminders());
 
   function defaultBillingCategory(type){
     const t = String(type || '').trim().toLowerCase();

@@ -2928,27 +2928,30 @@ window.FLEET_DATA = {
 
   async function saveRegistry(changedPlate=null, oldPlate=null){
     try{
-      // Zwykłe dodanie/edycja pojazdu: rozdzielamy INSERT i UPDATE.
-      // Nie używamy tutaj upsert(), ponieważ na Safari/iPadOS błąd sieciowy
-      // potrafił być zwracany jako mało mówiące „TypeError: Load failed”.
+      // Zwykłe dodanie/edycja pojazdu: zapisujemy WYŁĄCZNIE ten pojazd.
+      // Bez retry — pojedyncza operacja ma zakończyć się od razu błędem,
+      // zamiast sztucznie wydłużać czas oczekiwania przy problemie sieciowym.
       if(changedPlate){
         const v = registry[changedPlate] || {typ:'', marka:''};
         const payload = { plate:changedPlate, type:v.typ||'', brand:v.marka||'' };
         const existsRemotely = cfRemoteVehiclePlates.has(changedPlate);
 
+        let result;
         if(existsRemotely){
-          await cfRetrySupabase(() => cfSupabase
+          result = await cfSupabase
             .from('vehicles')
             .update({type:payload.type, brand:payload.brand})
-            .eq('plate', changedPlate));
+            .eq('plate', changedPlate);
         } else {
-          await cfRetrySupabase(() => cfSupabase
+          result = await cfSupabase
             .from('vehicles')
-            .insert(payload));
+            .insert(payload);
         }
+        if(result?.error) throw result.error;
 
         if(oldPlate && oldPlate !== changedPlate){
-          await cfRetrySupabase(() => cfSupabase.from('vehicles').delete().eq('plate', oldPlate));
+          const deleteResult = await cfSupabase.from('vehicles').delete().eq('plate', oldPlate);
+          if(deleteResult?.error) throw deleteResult.error;
           cfRemoteVehiclePlates.delete(oldPlate);
         }
         cfRemoteVehiclePlates.add(changedPlate);

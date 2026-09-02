@@ -2928,14 +2928,24 @@ window.FLEET_DATA = {
 
   async function saveRegistry(changedPlate=null, oldPlate=null){
     try{
-      // Przy zwykłym dodawaniu/edycji zapisujemy tylko zmieniony pojazd.
-      // Wcześniej każda zmiana wysyłała całą listę pojazdów do Supabase,
-      // co na iPadzie/Safari mogło kończyć się błędem „Load failed”.
+      // Zwykłe dodanie/edycja pojazdu: rozdzielamy INSERT i UPDATE.
+      // Nie używamy tutaj upsert(), ponieważ na Safari/iPadOS błąd sieciowy
+      // potrafił być zwracany jako mało mówiące „TypeError: Load failed”.
       if(changedPlate){
         const v = registry[changedPlate] || {typ:'', marka:''};
-        await cfRetrySupabase(() => cfSupabase.from('vehicles').upsert({
-          plate:changedPlate, type:v.typ||'', brand:v.marka||''
-        }, {onConflict:'plate'}));
+        const payload = { plate:changedPlate, type:v.typ||'', brand:v.marka||'' };
+        const existsRemotely = cfRemoteVehiclePlates.has(changedPlate);
+
+        if(existsRemotely){
+          await cfRetrySupabase(() => cfSupabase
+            .from('vehicles')
+            .update({type:payload.type, brand:payload.brand})
+            .eq('plate', changedPlate));
+        } else {
+          await cfRetrySupabase(() => cfSupabase
+            .from('vehicles')
+            .insert(payload));
+        }
 
         if(oldPlate && oldPlate !== changedPlate){
           await cfRetrySupabase(() => cfSupabase.from('vehicles').delete().eq('plate', oldPlate));
@@ -2959,7 +2969,9 @@ window.FLEET_DATA = {
       cfSetSync('Zapisano · '+cfFormatSyncTime(cfLastSync),'ok');
     }catch(error){
       const message = error?.message || String(error);
-      showToast('Błąd zapisu pojazdu: '+message);
+      const detail = [error?.code, error?.details, error?.hint].filter(Boolean).join(' · ');
+      console.error('CleanFleet saveRegistry error:', error);
+      showToast('Błąd zapisu pojazdu: '+message+(detail ? ' · '+detail : ''));
       throw error;
     }
   }

@@ -796,16 +796,16 @@ async function cfInitSupabase(){
 }
 
 // CleanFleet — role / permissions layer
-let cfCurrentRole = 'admin';
+let cfCurrentRole = null;
 let cfCurrentUserId = null;
 
 async function cfLoadRole(){
   const { data:{user} } = await cfSupabase.auth.getUser();
   cfCurrentUserId = user?.id || null;
-  if(!cfCurrentUserId){ cfCurrentRole='admin'; return; }
-  const { data, error } = await cfSupabase.from('user_roles').select('role').eq('user_id', cfCurrentUserId).maybeSingle();
-  if(error){ console.warn('CleanFleet role:', error.message); cfCurrentRole='admin'; }
-  else cfCurrentRole = data?.role || 'admin';
+  if(!cfCurrentUserId){ cfCurrentRole=null; return; }
+  const { data, error } = await cfSupabase.rpc('cf_get_my_role');
+  if(error){ console.warn('CleanFleet role:', error.message); cfCurrentRole=null; }
+  else cfCurrentRole = data || null;
   document.body?.setAttribute('data-cf-role', cfCurrentRole);
   const badge=document.getElementById('cfRoleBadge');
   if(badge) badge.textContent = cfCurrentRole==='fleet_employee' ? 'Pracownik floty' : 'Administrator';
@@ -2747,7 +2747,7 @@ window.FLEET_DATA = {
 
   function cfMapVehicle(row){ return { plate: row.plate, type: row.type || '', brand: row.brand || '' }; }
   function cfMapRecord(row){ return { id: row.id, created_by: row.created_by || null, tablica: row.plate, typ: row.type || '', marka: row.brand || '', billing_category: row.billing_category || '', zlecone: !!row.ordered, kto_zlecil: row.ordered_by || '', data_zlecenia: row.order_date || '', data_zlecenia_do: row.order_due_date || '', uwagi: row.notes || '', data_prania: row.wash_date || '', kto_wykonal: row.performed_by || '', koszt: Number(row.cost)||0, zatwierdzone: !!row.approved, zaplacone: !!row.paid, created_at: new Date(row.created_at).getTime() || Date.now() }; }
-  function cfRecordToDb(r){ return { id:r.id, plate:r.tablica, type:r.typ||'', brand:r.marka||'', billing_category:r.billing_category||null, ordered:!!r.zlecone, ordered_by:r.kto_zlecil||'', order_date:r.data_zlecenia||null, order_due_date:r.data_zlecenia_do||null, notes:r.uwagi||'', wash_date:r.data_prania||null, performed_by:r.kto_wykonal||'', cost:Number(r.koszt)||0, approved:!!r.zatwierdzone, paid:!!r.zaplacone, created_at:new Date(r.created_at||Date.now()).toISOString(), created_by:r.created_by || (cfIsFleetEmployee()?cfCurrentUserId:null) }; }
+  function cfRecordToDb(r){ return { id:r.id, plate:r.tablica, type:r.typ||'', brand:r.marka||'', billing_category:r.billing_category||null, ordered:!!r.zlecone, ordered_by:r.kto_zlecil||'', order_date:r.data_zlecenia||null, order_due_date:r.data_zlecenia_do||null, notes:r.uwagi||'', wash_date:r.data_prania||null, performed_by:r.kto_wykonal||'', cost:Number(r.koszt)||0, approved:!!r.zatwierdzone, paid:!!r.zaplacone, created_at:new Date(r.created_at||Date.now()).toISOString(), created_by:r.created_by || cfCurrentUserId }; }
 
   async function loadAll(){
     cfSetSync('Pobieranie aktualnych danych…');
@@ -2811,7 +2811,25 @@ window.FLEET_DATA = {
     cfSetSync('Zapisano · '+cfFormatSyncTime(cfLastSync),'ok');
   }
 
-  async function saveRegistry(){
+  async function saveRegistry(changedPlate=null){
+    // Pracownik nie wykonuje globalnego synchronizowania/usuwania listy pojazdów.
+    // Zapisuje tylko pojazd, który faktycznie zmienił lub dodał.
+    if(cfIsFleetEmployee()){
+      const plate = normalizePlate(changedPlate || window.__pendingPlate || '');
+      const v = plate ? registry[plate] : null;
+      if(!plate || !v) throw new Error('Brak pojazdu do zapisu.');
+      const { error } = await cfSupabase.from('vehicles').upsert([{
+        plate,
+        type:v.typ||'',
+        brand:v.marka||''
+      }], {onConflict:'plate'});
+      if(error){ showToast('Błąd zapisu pojazdu: '+error.message); throw error; }
+      cfRemoteVehiclePlates.add(plate);
+      cfLastSync = new Date();
+      cfSetSync('Zapisano · '+cfFormatSyncTime(cfLastSync),'ok');
+      return;
+    }
+
     const rows = Object.entries(registry).map(([plate,v])=>({plate,type:v.typ||'',brand:v.marka||''}));
     if(rows.length){
       const { error } = await cfSupabase.from('vehicles').upsert(rows, {onConflict:'plate'});
@@ -3191,7 +3209,7 @@ window.FLEET_DATA = {
     addOptionIfNew('kto_wykonal', kto_wykonal);
 
     registry[plate] = { typ, marka };
-    await saveRegistry();
+    await saveRegistry(plate);
     renderPlateList();
 
     if(editingId){
@@ -3380,6 +3398,10 @@ window.FLEET_DATA = {
       <td>${r.data_prania?fmtDate(r.data_prania):'—'}</td><td>${escapeHtml(r.typ||'—')}</td><td>${escapeHtml(r.kto_wykonal||'—')}</td><td>${fmtMoney(r.koszt)}</td><td>${r.zlecone?'ZLECONE':'—'}</td>
     </tr>`).join('') : '<tr><td colspan="5">Brak historii.</td></tr>';
     const body=`<div class="confirm-text"><strong>${escapeHtml(plate)}</strong> · ${escapeHtml(info.typ||'—')} · ${escapeHtml(info.marka||'—')}</div>
+      <div class="sheet-actions" style="margin:10px 0 14px;">
+        <button type="button" class="btn btn-outline" id="historyAddWash">Dodaj nowe pranie</button>
+        <button type="button" class="btn btn-danger" id="historyDeleteVehicle">Usuń pojazd</button>
+      </div>
       <div class="history-summary">
         <div class="history-stat"><div class="history-stat-label">Prań</div><div class="history-stat-value">${washed.length}</div></div>
         <div class="history-stat"><div class="history-stat-label">Przychód</div><div class="history-stat-value">${fmtMoney(total)}</div></div>
@@ -3387,6 +3409,37 @@ window.FLEET_DATA = {
       </div>
       <table class="report"><thead><tr><th>Data prania</th><th>Typ</th><th>Wykonał</th><th>Kwota</th><th>Status</th></tr></thead><tbody>${historyRows}</tbody></table>`;
     reportShell('Historia samochodu', '', body);
+
+    document.getElementById('historyAddWash')?.addEventListener('click', () => {
+      closeModal();
+      window.__pendingPlate = plate;
+      openForm(null);
+    });
+
+    document.getElementById('historyDeleteVehicle')?.addEventListener('click', () => {
+      showConfirm(
+        'Usunąć pojazd?',
+        `Pojazd ${escapeHtml(plate)} zostanie usunięty z rejestru. Historia wykonań pozostanie w bazie.`,
+        async () => {
+          try {
+            if(cfIsFleetEmployee()){
+              const {error}=await cfSupabase.from('vehicles').delete().eq('plate',plate);
+              if(error) throw error;
+            } else {
+              delete registry[plate];
+              await saveRegistry();
+            }
+            delete registry[plate];
+            closeModal();
+            renderPlateList();
+            renderRecords();
+            showToast('Pojazd usunięty');
+          } catch(e){
+            showToast('Nie udało się usunąć pojazdu: '+(e?.message||'błąd'));
+          }
+        }
+      );
+    });
   }
 
   function renderAttentionPanel(){
@@ -4677,11 +4730,11 @@ window.FLEET_DATA = {
       await cfInitSupabase();
       const { data:{session} } = await cfSupabase.auth.getSession();
       if(!session){ cfShowLogin(true); cfSetSync('Wymagane logowanie'); }
-      else { cfShowLogin(false); await cfLoadRole(); await loadAll(); await cfPrepareNotifications(); }
+      else { cfShowLogin(false); await cfLoadRole(); if(!cfCurrentRole){ cfShowLogin(true); cfSetSync('Brak prawidłowej roli użytkownika','err'); return; } await loadAll(); await cfPrepareNotifications(); }
       cfSupabase.auth.onAuthStateChange((_event, session)=>{
         if(session){
           cfShowLogin(false);
-          setTimeout(async ()=>{ await cfLoadRole(); await loadAll(); await cfPrepareNotifications(); },0);
+          setTimeout(async ()=>{ await cfLoadRole(); if(!cfCurrentRole){ cfShowLogin(true); cfSetSync('Brak prawidłowej roli użytkownika','err'); return; } await loadAll(); await cfPrepareNotifications(); },0);
         } else {
           cfShowLogin(true);
           cfSetSync('Wymagane logowanie');

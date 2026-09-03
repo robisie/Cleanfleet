@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
+<!-- CleanFleet employee final v2: role-aware menu and history actions -->
 <meta charset="UTF-8">
 <!-- CleanFleet v86 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -101,7 +102,7 @@
     padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:14px;
   }
   .menu-list{display:flex;flex-direction:column;gap:8px;flex:1;min-height:0;overflow-y:auto;padding-bottom:4px;}
-  .menu-logout-wrap{flex-shrink:0;padding-top:8px;}
+  .menu-logout-wrap{flex:0 0 auto;display:block;min-height:62px;padding-top:10px;border-top:1px solid var(--line);background:var(--paper);}
   .menu-item{
     text-align:left;
     background:#fff;
@@ -113,7 +114,7 @@
   }
   .menu-item:disabled{opacity:.72;cursor:default;}
   .menu-item:active{background:var(--paper-alt);}
-  .menu-logout{margin-top:auto;border-color:rgba(194,75,63,0.35);}
+  .menu-logout{width:100%;margin:0;border-color:rgba(194,75,63,0.35);}
   .menu-logout .menu-item-title{color:var(--red);}
   .menu-item-title{font-size:14px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:7px;}
   .cf-bell-icon{font-size:17px;line-height:1;display:inline-flex;align-items:center;justify-content:center;}
@@ -646,6 +647,17 @@
 }
 </style>
 
+
+<style id="cf-employee-menu-fix">
+  .menu-overlay { z-index:2000 !important; }
+  .menu-overlay .menu-panel, .menu-overlay .menu-sheet { overflow:hidden; }
+  .menu-overlay .menu-list { min-height:0; overflow-y:auto; }
+  .menu-overlay .menu-logout-wrap { flex-shrink:0; position:relative; z-index:2; padding-bottom:2px; }
+  .menu-overlay .menu-logout { position:relative; bottom:auto; margin-top:8px; }
+  @media (max-height:720px){
+    .menu-overlay .menu-list { max-height:calc(100vh - 170px); }
+  }
+</style>
 </head>
 <body>
 
@@ -696,11 +708,11 @@
       <button class="close" id="menuClose">&times;</button>
     </div>
     <div class="menu-list">
-      <button class="menu-item" id="cfNotificationsBtn" disabled>
+      <button class="menu-item" id="cfNotificationsBtn" disabled hidden>
         <span class="menu-item-title"><span class="cf-bell-icon" aria-hidden="true">🔔</span><span id="cfNotificationsTitle">Sprawdzanie powiadomień…</span></span>
         <span class="menu-item-sub" id="cfNotificationsSub">Sprawdzanie stanu tego urządzenia…</span>
       </button>
-      <button class="menu-item" id="importBtn">
+      <button class="menu-item" id="importBtn" hidden>
         <span class="menu-item-title">Importuj / przywróć dane</span>
         <span class="menu-item-sub">Pełny backup CleanFleet albo lista pojazdów Excel / CSV</span>
       </button>
@@ -708,7 +720,7 @@
         <span class="menu-item-title">Eksportuj PDF (miesiąc)</span>
         <span class="menu-item-sub">Wygeneruj plik PDF z zatwierdzonymi pojazdami z wybranego miesiąca</span>
       </button>
-      <button class="menu-item" id="exportExcelBtn">
+      <button class="menu-item" id="exportExcelBtn" hidden>
         <span class="menu-item-title">💾 Backup / eksportuj pełną bazę</span>
         <span class="menu-item-sub">Zapisz pełną kopię pojazdów, prań, faktur i rozliczeń</span>
       </button>
@@ -753,7 +765,6 @@
   <button id="btnMonth">Podsumowanie<br>miesiąca</button>
   <button id="btnYear">Podsumowanie<br>roku</button>
   <button id="btnAll">Lista wszystkich<br>samochodów</button>
-  <button id="btnPending">Zlecone<br>do zrobienia</button>
   <button id="btnBottomMenu" aria-label="Otwórz menu dolne" aria-expanded="false">☰&nbsp;&nbsp;MENU</button>
 </div>
 
@@ -765,13 +776,10 @@
       <button type="button" data-bottom-action="month">Podsumowanie<br>miesiąca</button>
       <button type="button" data-bottom-action="year">Podsumowanie<br>roku</button>
       <button type="button" data-bottom-action="all">Lista wszystkich<br>samochodów</button>
-      <button type="button" data-bottom-action="pending">Zlecone<br>do zrobienia</button>
     </div>
   </div>
 </div>
 
-<style>#cfRoleBadge{display:inline-flex;align-items:center;margin-left:8px;padding:4px 9px;border-radius:999px;background:#eef7ee;color:#2f6b3a;font-size:12px;font-weight:700}body[data-cf-role="fleet_employee"] #cfRoleBadge{background:#eef5ff;color:#24558a}</style>
-<span id="cfRoleBadge" aria-live="polite">CleanFleet</span>
 <div id="modalRoot"></div>
 <div class="toast" id="toast"></div>
 
@@ -818,11 +826,37 @@ async function cfLoadRole(){
   document.body?.setAttribute('data-cf-role', cfCurrentRole);
   const badge=document.getElementById('cfRoleBadge');
   if(badge) badge.textContent = cfCurrentRole==='fleet_employee' ? 'Pracownik floty' : 'Administrator';
+  cfApplyRoleMenu();
   return cfCurrentRole;
 }
 function cfIsAdmin(){ return cfCurrentRole==='admin'; }
 function cfIsFleetEmployee(){ return cfCurrentRole==='fleet_employee'; }
 function cfEmployeeOwn(r){ return !!(r && cfIsFleetEmployee() && r.created_by===cfCurrentUserId); }
+
+function cfApplyRoleMenu(){
+  const admin = cfIsAdmin();
+  const setVisible = (id, visible) => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.hidden = !visible;
+    el.style.display = visible ? '' : 'none';
+  };
+
+  // Pracownik floty: tylko funkcje robocze/informacyjne + wylogowanie.
+  setVisible('importBtn', admin);
+  setVisible('exportExcelBtn', admin);
+  setVisible('cfNotificationsBtn', admin);
+  setVisible('exportPdfBtn', true);
+  setVisible('financeBtn', true);
+  setVisible('statsBtn', true);
+
+  const logout = document.getElementById('cfLogoutBtn');
+  if(logout){
+    logout.hidden = false;
+    logout.style.display = '';
+  }
+}
+
 async function cfSubmitChangeRequest(recordId, requestType, proposedData, reason=''){
   const {data,error}=await cfSupabase.rpc('cf_submit_change_request',{p_wash_record_id:recordId,p_request_type:requestType,p_proposed_data:proposedData||null,p_reason:reason||null});
   if(error) throw error;
@@ -4391,27 +4425,125 @@ window.FLEET_DATA = {
         zaplacone: latest ? !!latest.zaplacone : null
       };
     });
-    reportShell('Lista wszystkich samochodów', '<div class="confirm-text">Pełna lista pojazdów na liście — status dotyczy ostatniego wpisu prania.</div>', vehicleTableHtml(rows));
+
+    const typeOrder = ['SOLÓWKA','ZESTAW','BUS','BUS C','OSOBOWE'];
+    const counts = {};
+    rows.forEach(r => {
+      const raw = String(r.typ || '').trim();
+      if(!raw || raw === '—'){
+        counts['BEZ TYPU'] = (counts['BEZ TYPU'] || 0) + 1;
+        return;
+      }
+      const key = raw.toUpperCase();
+      counts[key] = (counts[key] || 0) + 1;
+    });
+
+    const orderedTypes = [
+      ...typeOrder.filter(type => Object.prototype.hasOwnProperty.call(counts, type)),
+      ...Object.keys(counts).filter(type => !typeOrder.includes(type))
+    ];
+
+    const typeCards = orderedTypes.map(type =>
+      `<div class="finance-card"><div class="finance-card-label">${escapeHtml(type)}</div><div class="finance-card-value">${counts[type]}</div></div>`
+    ).join('');
+
+    const summary = `
+      <div class="finance-summary" style="grid-template-columns:1fr;">
+        <div class="finance-summary-row finance-summary-types" style="grid-template-columns:repeat(6,minmax(0,1fr));">
+          <div class="finance-card">
+            <div class="finance-card-label">Liczba pojazdów</div>
+            <div class="finance-card-value">${rows.length}</div>
+          </div>
+          ${typeCards}
+        </div>
+      </div>`;
+
+    reportShell(
+      'Lista wszystkich samochodów',
+      '<div class="confirm-text">Pełna lista pojazdów w bazie. Liczniki pokazują aktualny typ zapisany przy pojeździe.</div>',
+      summary + vehicleTableHtml(rows)
+    );
+    bindAllVehiclesTable();
   }
 
   function vehicleTableHtml(rows){
     if(rows.length === 0){
       return '<div class="empty-state" style="margin-top:14px;">Brak pojazdów na liście.</div>';
     }
+
+    const types = [...new Set(rows.map(r => String(r.typ || '').trim().toUpperCase()).filter(Boolean))];
+    const ordered = ['SOLÓWKA','ZESTAW','BUS','BUS C','OSOBOWE'];
+    types.sort((a,b) => {
+      const ai = ordered.indexOf(a), bi = ordered.indexOf(b);
+      if(ai !== -1 || bi !== -1) return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      return a.localeCompare(b, 'pl');
+    });
+
+    const typeOptions = [
+      '<option value="ALL">Wszystkie typy</option>',
+      ...types.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`)
+    ].join('');
+
     const body = rows.map(r => `
-      <tr>
+      <tr data-vehicle-type="${escapeHtml(String(r.typ || '').trim().toUpperCase())}">
         <td>${escapeHtml(r.typ)}</td>
-        <td class="mono">${escapeHtml(r.tablica)}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span class="mono">${escapeHtml(r.tablica)}</span>
+            <button type="button" class="history-button vehicle-history-btn" data-history-plate="${escapeHtml(r.tablica)}">Historia</button>
+          </div>
+        </td>
         <td>${escapeHtml(r.marka)}</td>
         <td>${r.data_prania ? `<span class="vehicle-last-wash">${fmtDate(r.data_prania)}${(() => { const days=Math.floor((Date.now()-new Date(r.data_prania+'T00:00:00').getTime())/86400000); return days>=(365 / 2) ? ` · ⚠️ ${days} dni` : ''; })()}</span>` : '<span class="record-badge">brak wpisu</span>'}</td>
         <td>${r.zatwierdzone===null ? '—' : `<span class="pill ${r.zatwierdzone?'pill-yes':'pill-no'}">${r.zatwierdzone?'TAK':'NIE'}</span>`}</td>
         <td>${r.zaplacone===null ? '—' : `<span class="pill ${r.zaplacone?'pill-yes':'pill-no'}">${r.zaplacone?'TAK':'NIE'}</span>`}</td>
       </tr>`).join('');
-    return `
-      <table class="report">
+
+    const wrapper = `
+      <div class="vehicle-list-toolbar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;margin-bottom:10px;">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+          <span>Typ pojazdu:</span>
+          <select id="vehicleTypeFilter" style="min-width:170px;">${typeOptions}</select>
+        </label>
+        <span id="vehicleTypeFilterCount" class="confirm-text" style="margin:0;">${rows.length} pojazdów</span>
+      </div>`;
+
+    const table = `
+      <table class="report" id="allVehiclesTable">
         <thead><tr><th>Typ</th><th>Tablica</th><th>Marka</th><th>Ostatnie pranie</th><th>Zatw.</th><th>Zapł.</th></tr></thead>
         <tbody>${body}</tbody>
       </table>`;
+
+    return wrapper + table;
+  }
+
+  function bindAllVehiclesTable(){
+    const filter = document.getElementById('vehicleTypeFilter');
+    const table = document.getElementById('allVehiclesTable');
+    const count = document.getElementById('vehicleTypeFilterCount');
+    if(!filter || !table) return;
+
+    const update = () => {
+      const value = filter.value;
+      let visible = 0;
+      table.querySelectorAll('tbody tr').forEach(row => {
+        const show = value === 'ALL' || row.dataset.vehicleType === value;
+        row.style.display = show ? '' : 'none';
+        if(show) visible++;
+      });
+      if(count) count.textContent = `${visible} ${visible === 1 ? 'pojazd' : (visible >= 2 && visible <= 4 ? 'pojazdy' : 'pojazdów')}`;
+    };
+
+    filter.addEventListener('change', update);
+
+    table.querySelectorAll('.vehicle-history-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const plate = btn.getAttribute('data-history-plate') || '';
+        if(plate) showVehicleHistory(plate, showAllOutstanding);
+      });
+    });
+
+    update();
   }
 
   // --- Supabase: pobieranie całej tabeli stronicami ---
@@ -4773,11 +4905,11 @@ window.FLEET_DATA = {
       await cfInitSupabase();
       const { data:{session} } = await cfSupabase.auth.getSession();
       if(!session){ cfShowLogin(true); cfSetSync('Wymagane logowanie'); }
-      else { cfShowLogin(false); await cfLoadRole(); if(!cfCurrentRole){ cfShowLogin(true); cfSetSync('Brak prawidłowej roli użytkownika','err'); return; } await loadAll(); await cfPrepareNotifications(); }
+      else { cfShowLogin(false); await cfLoadRole(); cfApplyRoleMenu(); if(!cfCurrentRole){ cfShowLogin(true); cfSetSync('Brak prawidłowej roli użytkownika','err'); return; } await loadAll(); await cfPrepareNotifications(); }
       cfSupabase.auth.onAuthStateChange((_event, session)=>{
         if(session){
           cfShowLogin(false);
-          setTimeout(async ()=>{ await cfLoadRole(); if(!cfCurrentRole){ cfShowLogin(true); cfSetSync('Brak prawidłowej roli użytkownika','err'); return; } await loadAll(); await cfPrepareNotifications(); },0);
+          setTimeout(async ()=>{ await cfLoadRole(); cfApplyRoleMenu(); if(!cfCurrentRole){ cfShowLogin(true); cfSetSync('Brak prawidłowej roli użytkownika','err'); return; } await loadAll(); await cfPrepareNotifications(); },0);
         } else {
           cfShowLogin(true);
           cfSetSync('Wymagane logowanie');
@@ -4830,29 +4962,12 @@ window.FLEET_DATA = {
   document.getElementById('btnMonth').addEventListener('click', showMonthReport);
   document.getElementById('btnYear').addEventListener('click', showYearReport);
   document.getElementById('btnAll').addEventListener('click', showAllOutstanding);
-  document.getElementById('btnPending').addEventListener('click', showPendingOrders);
 
   // Na telefonie cztery dolne akcje są dostępne z jednego menu.
   const bottomMobileMenu = document.getElementById('bottomMobileMenu');
   const btnBottomMenu = document.getElementById('btnBottomMenu');
   const closeBottomMenu = document.getElementById('closeBottomMenu');
   const bottomMobileMenuBackdrop = document.getElementById('bottomMobileMenuBackdrop');
-  // iOS Safari/PWA: keep the bottom navigation pinned to the visible viewport
-  // when the visual viewport changes while scrolling.
-  (function keepBottomBarAtVisualViewport(){
-    const bar = document.querySelector('.bottom-bar');
-    if(!bar || !window.visualViewport) return;
-    const sync = () => {
-      const vv = window.visualViewport;
-      const offset = Math.max(0, (window.innerHeight - vv.height - vv.offsetTop));
-      bar.style.bottom = offset + 'px';
-    };
-    sync();
-    window.visualViewport.addEventListener('resize', sync, {passive:true});
-    window.visualViewport.addEventListener('scroll', sync, {passive:true});
-    window.addEventListener('resize', sync, {passive:true});
-  })();
-
   const closeBottomMobileMenu = () => {
     bottomMobileMenu?.classList.remove('open');
     bottomMobileMenu?.setAttribute('aria-hidden','true');

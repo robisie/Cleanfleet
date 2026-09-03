@@ -2872,6 +2872,24 @@ function cfIsAdmin(){ return cfCurrentRole==='admin'; }
 function cfIsFleetEmployee(){ return cfCurrentRole==='fleet_employee'; }
 function cfEmployeeOwn(r){ return !!(r && cfIsFleetEmployee() && r.created_by===cfCurrentUserId); }
 
+// Pracownik składa wniosek o zmianę/anulowanie wpisu zamiast nadpisywać wpis administratora.
+// Wniosek jest obsługiwany przez bezpieczny RPC w Supabase.
+async function cfSubmitChangeRequest(washRecordId, requestType, proposedData=null, reason=null){
+  if(!cfSupabase) throw new Error('Supabase nie jest jeszcze gotowe.');
+  if(!cfIsFleetEmployee()) throw new Error('Tylko pracownik floty może składać wnioski.');
+  if(!washRecordId) throw new Error('Brak identyfikatora wpisu.');
+  if(!['edit','cancel'].includes(requestType)) throw new Error('Nieprawidłowy typ wniosku.');
+
+  const { data, error } = await cfSupabase.rpc('cf_submit_change_request', {
+    p_wash_record_id: washRecordId,
+    p_request_type: requestType,
+    p_proposed_data: proposedData,
+    p_reason: reason
+  });
+  if(error) throw error;
+  return data;
+}
+
 function cfApplyRoleMenu(){
   const admin = cfIsAdmin();
   const employee = cfIsFleetEmployee();

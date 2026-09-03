@@ -748,39 +748,41 @@
       <button class="close" id="menuClose">&times;</button>
     </div>
     <div class="menu-list">
-<button class="menu-item" id="financeBtn">
-        <span class="menu-item-title">💰 Rozliczenia / oczekujące płatności</span>
-        <span class="menu-item-sub">Faktury, pojazdy przypisane do faktur i płatności</span>
+      <button class="menu-item" id="financeBtn">
+        <span class="menu-item-title" id="financeBtnTitle">💰 Rozliczenia / oczekujące płatności</span>
+        <span class="menu-item-sub" id="financeBtnSub">Faktury, pojazdy przypisane do faktur i płatności</span>
       </button>
-<button class="menu-item" id="statsBtn">
+      <button class="menu-item" id="statsBtn">
         <span class="menu-item-title">📊 Statystyki finansowe</span>
         <span class="menu-item-sub">Finanse, faktury i płatności z wyborem miesiąca</span>
       </button>
-<button class="menu-item" id="exportPdfBtn">
-        <span class="menu-item-title">Eksportuj PDF (miesiąc)</span>
-        <span class="menu-item-sub">Wygeneruj plik PDF z zatwierdzonymi pojazdami z wybranego miesiąca</span>
+      <button class="menu-item" id="exportPdfBtn">
+        <span class="menu-item-title" id="exportPdfBtnTitle">Eksportuj PDF (miesiąc)</span>
+        <span class="menu-item-sub" id="exportPdfBtnSub">Wygeneruj plik PDF z zatwierdzonymi pojazdami z wybranego miesiąca</span>
       </button>
-<button class="menu-item" id="fleetUpdateBtn" hidden>
+      <button class="menu-item" id="fleetUpdateBtn">
         <span class="menu-item-title">🚚 Aktualizuj pojazdy</span>
         <span class="menu-item-sub">Dodaj tylko brakujące tablice z datą prania i osobą</span>
       </button>
-<button class="menu-item" id="exportExcelBtn" hidden>
+      <button class="menu-item" id="exportExcelBtn">
         <span class="menu-item-title">💾 Backup / eksportuj pełną bazę</span>
         <span class="menu-item-sub">Zapisz pełną kopię pojazdów, prań, faktur i rozliczeń</span>
       </button>
-<button class="menu-item" id="importBtn" hidden>
+      <button class="menu-item" id="importBtn">
         <span class="menu-item-title">Importuj / przywróć dane</span>
         <span class="menu-item-sub">Pełny backup CleanFleet</span>
       </button>
-<button class="menu-item" id="cfNotificationsBtn" hidden disabled>
+      <button class="menu-item" id="cfNotificationsBtn" disabled>
         <span class="menu-item-title"><span class="cf-bell-icon" aria-hidden="true">🔔</span><span id="cfNotificationsTitle">Sprawdzanie powiadomień…</span></span>
         <span class="menu-item-sub" id="cfNotificationsSub">Sprawdzanie stanu tego urządzenia…</span>
       </button>
-<button class="menu-item menu-logout" id="cfLogoutBtn">
+    </div>
+    <div class="menu-logout-wrap">
+      <button class="menu-item menu-logout" id="cfLogoutBtn">
         <span class="menu-item-title">Wyloguj</span>
         <span class="menu-item-sub">Wyloguj z konta CleanFleet na tym urządzeniu</span>
       </button>
-</div>
+    </div>
     <input type="file" id="importFile" accept=".csv,.txt,.xlsx,.xls" style="display:none;">
     <input type="file" id="fleetUpdateFile" accept=".xlsx,.xls,.csv" style="display:none;">
   </div>
@@ -2866,6 +2868,7 @@ function cfEmployeeOwn(r){ return !!(r && cfIsFleetEmployee() && r.created_by===
 
 function cfApplyRoleMenu(){
   const admin = cfIsAdmin();
+  const employee = cfIsFleetEmployee();
   const setVisible = (id, visible) => {
     const el = document.getElementById(id);
     if(!el) return;
@@ -2873,20 +2876,38 @@ function cfApplyRoleMenu(){
     el.style.display = visible ? '' : 'none';
   };
 
-  // Pracownik floty: tylko funkcje robocze/informacyjne + wylogowanie.
-  setVisible('importBtn', admin);
+  // Wspólne funkcje: faktury/rozliczenia, raport oraz aktualizacja pojazdów.
+  setVisible('financeBtn', admin || employee);
+  setVisible('exportPdfBtn', admin || employee);
+  setVisible('fleetUpdateBtn', admin || employee);
+
+  // Tylko administrator.
+  setVisible('statsBtn', admin);
   setVisible('exportExcelBtn', admin);
+  setVisible('importBtn', admin);
   setVisible('cfNotificationsBtn', admin);
-  setVisible('exportPdfBtn', true);
-  setVisible('financeBtn', true);
-  setVisible('statsBtn', true);
+
+  const financeTitle = document.getElementById('financeBtnTitle');
+  const financeSub = document.getElementById('financeBtnSub');
+  const reportTitle = document.getElementById('exportPdfBtnTitle');
+  const reportSub = document.getElementById('exportPdfBtnSub');
+
+  if(employee){
+    if(financeTitle) financeTitle.textContent = '🧾 Faktury';
+    if(financeSub) financeSub.textContent = 'Lista wszystkich faktur z filtrowaniem po miesiącu';
+    if(reportTitle) reportTitle.textContent = '📄 Generuj raport';
+    if(reportSub) reportSub.textContent = 'Samodzielnie wybierz dane, zakres i format raportu';
+  }else{
+    if(financeTitle) financeTitle.textContent = '💰 Rozliczenia / oczekujące płatności';
+    if(financeSub) financeSub.textContent = 'Faktury, pojazdy przypisane do faktur i płatności';
+    if(reportTitle) reportTitle.textContent = 'Eksportuj PDF (miesiąc)';
+    if(reportSub) reportSub.textContent = 'Wygeneruj plik PDF z zatwierdzonymi pojazdami z wybranego miesiąca';
+  }
 
   const logout = document.getElementById('cfLogoutBtn');
-  if(logout){
-    logout.hidden = false;
-    logout.style.display = '';
-  }
+  if(logout){ logout.hidden = false; logout.style.display = ''; }
 }
+
 
 
 function uid(){
@@ -3876,9 +3897,10 @@ function uid(){
   function showFinanceQueue(){
     menuOverlay.classList.remove('open');
 
+    const isEmployee = cfIsFleetEmployee();
     const renderInvoiceRows = (list) => {
       if(!list.length){
-        return '<div class="empty-state" style="margin-top:14px;">Brak faktur w kolejce oczekujących płatności.</div>';
+        return '<div class="empty-state" style="margin-top:14px;">Brak faktur dla wybranego miesiąca.</div>';
       }
       return list.map(inv=>{
         const count = invoiceItems.filter(x=>x.invoice_id===inv.id).length;
@@ -3886,7 +3908,7 @@ function uid(){
         return `<div class="invoice-row" data-invoice-open="${escapeHtml(inv.id)}">
           <div class="invoice-row-top">
             <div>
-              <div class="invoice-number">${escapeHtml(inv.invoice_number)}</div>
+              <div class="invoice-number">${escapeHtml(inv.invoice_number || '—')}</div>
               <div class="invoice-meta">${inv.invoice_date ? fmtDate(inv.invoice_date) : '—'} · ${count} pojazdów · ${fmtMoney(inv.amount)}</div>
             </div>
             <span class="invoice-status ${paid?'invoice-paid':'invoice-pending'}">${paid?'OPŁACONA':'OCZEKUJE'}</span>
@@ -3895,27 +3917,36 @@ function uid(){
       }).join('');
     };
 
-    const sorted = [...invoices].sort((a,b)=>{
-      if(a.status !== b.status) return a.status === 'paid' ? 1 : -1;
-      return String(b.invoice_date||b.created_at||'').localeCompare(String(a.invoice_date||a.created_at||''));
-    });
+    const months = [...new Set(invoices.map(i=>String(i.invoice_date||'').slice(0,7)).filter(Boolean))].sort().reverse();
+    const monthOptions = ['<option value="ALL">Wszystkie miesiące</option>', ...months.map(m=>{
+      const [y,mo]=m.split('-');
+      const label = new Date(Number(y),Number(mo)-1,1).toLocaleDateString('pl-PL',{month:'long',year:'numeric'});
+      return `<option value="${m}">${escapeHtml(label)}</option>`;
+    })].join('');
 
-    const pending=sorted.filter(i=>i.status!=='paid');
-    const pendingAmount=pending.reduce((s,i)=>s+Number(i.amount||0),0);
-    const paidAmount=sorted.filter(i=>i.status==='paid').reduce((s,i)=>s+Number(i.amount||0),0);
-    const body = `<div class="confirm-text">Tutaj znajdują się faktury zapisane przy generowaniu załącznika. Otwórz fakturę, aby zobaczyć przypisane pojazdy i oznaczyć całą fakturę jako opłaconą.</div>
-      <div class="finance-queue-summary">
-        <div class="finance-queue-card"><div class="q-label">Oczekujące</div><div class="q-value">${pending.length}</div></div>
-        <div class="finance-queue-card"><div class="q-label">Do zapłaty</div><div class="q-value">${fmtMoney(pendingAmount)}</div></div>
-        <div class="finance-queue-card"><div class="q-label">Opłacone</div><div class="q-value">${fmtMoney(paidAmount)}</div></div>
-      </div>
-      <div id="financeQueueList">${renderInvoiceRows(sorted)}</div>`;
+    const controls = `<div class="report-controls" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+      <label style="font-size:12px;color:var(--ink-soft);">Miesiąc:</label>
+      <select id="invoiceMonthFilter" style="min-width:190px;">${monthOptions}</select>
+    </div>`;
 
-    reportShell('Rozliczenia / oczekujące płatności', '', body);
+    const body = `<div class="confirm-text">Lista wszystkich faktur zapisanych w CleanFleet. Wybierz miesiąc, aby pokazać tylko faktury dotyczące tego miesiąca. Kliknij fakturę, aby zobaczyć jej szczegóły.</div>
+      <div id="financeQueueList" style="margin-top:12px;"></div>`;
 
-    document.querySelectorAll('#financeQueueList [data-invoice-open]').forEach(el=>{
-      el.addEventListener('click',()=>showInvoiceDetails(el.getAttribute('data-invoice-open')));
-    });
+    reportShell(isEmployee ? 'Faktury' : 'Rozliczenia / oczekujące płatności', controls, body);
+
+    const render = () => {
+      const value = document.getElementById('invoiceMonthFilter')?.value || 'ALL';
+      const filtered = [...invoices]
+        .filter(i => value==='ALL' || String(i.invoice_date||'').slice(0,7)===value)
+        .sort((a,b)=>String(b.invoice_date||b.created_at||'').localeCompare(String(a.invoice_date||a.created_at||'')));
+      const list = document.getElementById('financeQueueList');
+      if(list) list.innerHTML = renderInvoiceRows(filtered);
+      document.querySelectorAll('#financeQueueList [data-invoice-open]').forEach(el=>{
+        el.addEventListener('click',()=>showInvoiceDetails(el.getAttribute('data-invoice-open')));
+      });
+    };
+    document.getElementById('invoiceMonthFilter')?.addEventListener('change',render);
+    render();
   }
 
   function showInvoiceDetails(invoiceId){
@@ -3930,17 +3961,18 @@ function uid(){
       <td><span class="pill ${r.zaplacone?'pill-yes':'pill-no'}">${r.zaplacone?'TAK':'NIE'}</span></td>
     </tr>`).join('') : '<tr><td colspan="5">Brak przypisanych wpisów.</td></tr>';
     const paid = inv.status==='paid';
+    const employeeReadOnly = cfIsFleetEmployee();
     const bodyHtml = `<div class="confirm-text">Faktura <strong>${escapeHtml(inv.invoice_number)}</strong> · ${fmtMoney(inv.amount)} · ${rows.length} pojazdów</div>
       <table class="report"><thead><tr><th>Tablica</th><th>Typ</th><th>Data prania</th><th>Kwota</th><th>Zapł.</th></tr></thead><tbody>${body}</tbody></table>
       <div class="sheet-actions">
-        ${paid ? '<button class="btn btn-solid" disabled>✓ Faktura opłacona</button>' : '<button class="btn btn-solid" id="markInvoicePaidBtn">Faktura opłacona</button>'}
+        ${employeeReadOnly ? '<button class="btn btn-outline" id="backFinanceBtn">Wróć</button>' : `${paid ? '<button class="btn btn-solid" disabled>✓ Faktura opłacona</button>' : '<button class="btn btn-solid" id="markInvoicePaidBtn">Faktura opłacona</button>'}
         <button class="btn btn-outline" id="deleteInvoiceBtn" title="Usuń fakturę" aria-label="Usuń fakturę" style="background:#c62828;color:#fff;border-color:#c62828;font-size:20px;line-height:1;min-width:48px;padding:10px 14px;">🗑️</button>
-        <button class="btn btn-outline" id="backFinanceBtn">Wróć</button>
+        <button class="btn btn-outline" id="backFinanceBtn">Wróć</button>`}
       </div>`;
     reportShell('Szczegóły faktury', '', bodyHtml);
     document.getElementById('backFinanceBtn').addEventListener('click', showFinanceQueue);
 
-    document.getElementById('deleteInvoiceBtn').addEventListener('click',()=>{
+    document.getElementById('deleteInvoiceBtn')?.addEventListener('click',()=>{
       showConfirm(
         'Usunąć fakturę z kolejki?',
         `Faktura ${escapeHtml(inv.invoice_number)} oraz jej przypisania do pojazdów zostaną usunięte z rozliczeń. Wpisy prania pozostaną w bazie.`,
@@ -3962,8 +3994,8 @@ function uid(){
         }
       );
     });
-    if(!paid){
-      document.getElementById('markInvoicePaidBtn').addEventListener('click',()=>{
+    if(!paid && !employeeReadOnly){
+      document.getElementById('markInvoicePaidBtn')?.addEventListener('click',()=>{
         showConfirm('Oznaczyć fakturę jako opłaconą?', `Wszystkie ${rows.length} przypisane pojazdy zostaną oznaczone jako zapłacone.`, async()=>{
           try{
             await cfMarkInvoicePaid(invoiceId);
@@ -4041,7 +4073,10 @@ function uid(){
     updateStats();
   }
 
-  document.getElementById('exportPdfBtn').addEventListener('click', showPdfExportModal);
+  document.getElementById('exportPdfBtn').addEventListener('click', ()=>{
+    if(cfIsFleetEmployee()) showEmployeeReportModal();
+    else showPdfExportModal();
+  });
   document.getElementById('exportExcelBtn').addEventListener('click', cfExportExcel);
   document.getElementById('financeBtn').addEventListener('click', showFinanceQueue);
   document.getElementById('statsBtn').addEventListener('click', ()=>{
@@ -4129,6 +4164,149 @@ function uid(){
       console.error('CleanFleet invoice PDF read error:', err);
       if(status) status.textContent = 'Nie udało się odczytać tekstu faktury. Numer można wpisać ręcznie.';
     }
+  }
+
+  const CF_REPORT_FIELDS = [
+    {key:'typ', label:'Typ pojazdu', value:r=>r.typ||'—'},
+    {key:'tablica', label:'Tablica rejestracyjna', value:r=>r.tablica||'—'},
+    {key:'marka', label:'Marka', value:r=>r.marka||'—'},
+    {key:'billing_category', label:'Kategoria rozliczeniowa', value:r=>pdfBillingCategory(r)},
+    {key:'ordered', label:'Zlecone', value:r=>r.zlecone?'TAK':'NIE'},
+    {key:'ordered_by', label:'Kto zlecił', value:r=>r.kto_zlecil||'—'},
+    {key:'order_date', label:'Data zlecenia', value:r=>fmtDate(r.data_zlecenia)},
+    {key:'order_due_date', label:'Termin wykonania', value:r=>fmtDate(r.termin_wykonania)},
+    {key:'notes', label:'Uwagi', value:r=>r.uwagi||'—'},
+    {key:'wash_date', label:'Data prania', value:r=>fmtDate(r.data_prania)},
+    {key:'performed_by', label:'Wykonał', value:r=>r.kto_wykonal||'—'},
+    {key:'cost', label:'Koszt', value:r=>fmtMoney(r.koszt)},
+    {key:'approved', label:'Zatwierdzone', value:r=>r.zatwierdzone?'TAK':'NIE'},
+    {key:'paid', label:'Zapłacone', value:r=>r.zaplacone?'TAK':'NIE'},
+    {key:'created_at', label:'Utworzono', value:r=>r.created_at?new Date(r.created_at).toLocaleString('pl-PL'):'—'},
+    {key:'created_by', label:'Autor wpisu', value:r=>r.created_by||'—'},
+    {key:'invoice_number', label:'Numer faktury', value:r=>r.__invoice_number||'—'},
+    {key:'invoice_date', label:'Data faktury', value:r=>fmtDate(r.__invoice_date)}
+  ];
+
+  function cfReportRowsFromRecords(){
+    return records.map(r=>{
+      const item = invoiceItems.find(x=>String(x.wash_record_id)===String(r.id));
+      const inv = item ? invoices.find(i=>String(i.id)===String(item.invoice_id)) : null;
+      return {...r, __invoice_number:inv?.invoice_number||'', __invoice_date:inv?.invoice_date||''};
+    });
+  }
+
+  function showEmployeeReportModal(){
+    menuOverlay.classList.remove('open');
+    const now = new Date();
+    const defaultMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const checks = CF_REPORT_FIELDS.map(f=>`<label class="field-check" style="margin-top:7px;"><input type="checkbox" class="cf-report-field" value="${f.key}" checked><span>${escapeHtml(f.label)}</span></label>`).join('');
+    const html=`<div class="overlay" id="cfReportOverlay">
+      <div class="sheet" style="max-width:620px;width:96%;max-height:90vh;overflow:auto;">
+        <button class="close" data-close>&times;</button>
+        <h2>Generuj raport</h2>
+        <div class="confirm-text">Skonfiguruj raport według własnych potrzeb. Możesz wybrać zakres, statusy, typy pojazdów oraz dokładnie te informacje, które mają znaleźć się w pliku.</div>
+        <div class="field"><label>Zakres dat</label>
+          <select id="cfReportPeriodMode"><option value="month">Wybrany miesiąc</option><option value="all">Wszystkie dane</option><option value="custom">Własny zakres dat</option></select>
+        </div>
+        <div id="cfReportMonthWrap" class="field"><label>Miesiąc</label><input type="month" id="cfReportMonth" value="${defaultMonth}"></div>
+        <div id="cfReportCustomWrap" class="field" style="display:none;"><label>Od</label><input type="date" id="cfReportDateFrom"><label style="margin-top:8px;">Do</label><input type="date" id="cfReportDateTo"></div>
+        <div class="field"><label>Typy pojazdów</label>
+          <label class="field-check" style="margin-top:7px;"><input type="checkbox" class="cf-report-type" value="personal" checked><span>Osobowe</span></label>
+          <label class="field-check" style="margin-top:7px;"><input type="checkbox" class="cf-report-type" value="heavy" checked><span>Ciężarowe</span></label>
+          <label class="field-check" style="margin-top:7px;"><input type="checkbox" class="cf-report-type" value="bus" checked><span>Busy</span></label>
+        </div>
+        <div class="field"><label>Status wpisów</label>
+          <label class="field-check" style="margin-top:7px;"><input type="checkbox" class="cf-report-status" value="ordered" checked><span>Zlecone / oczekujące</span></label>
+          <label class="field-check" style="margin-top:7px;"><input type="checkbox" class="cf-report-status" value="done" checked><span>Wykonane</span></label>
+          <label class="field-check" style="margin-top:7px;"><input type="checkbox" class="cf-report-status" value="unapproved" checked><span>Niezatwierdzone</span></label>
+          <label class="field-check" style="margin-top:7px;"><input type="checkbox" class="cf-report-status" value="approved" checked><span>Zatwierdzone</span></label>
+          <label class="field-check" style="margin-top:7px;"><input type="checkbox" class="cf-report-status" value="paid" checked><span>Zapłacone</span></label>
+        </div>
+        <div class="field"><label>Informacje w raporcie</label>${checks}</div>
+        <div class="field"><label>Nazwa pliku (opcjonalnie)</label><input id="cfReportFilename" type="text" placeholder="np. raport-prania-wrzesien-2026"></div>
+        <div class="sheet-actions" style="gap:8px;">
+          <button class="btn btn-solid" id="cfReportPdfBtn" style="flex:1;">Generuj PDF</button>
+          <button class="btn btn-outline" id="cfReportXlsBtn" style="flex:1;">Generuj XLS</button>
+        </div>
+      </div></div>`;
+    document.getElementById('modalRoot').innerHTML=html;
+    document.querySelector('#cfReportOverlay [data-close]').addEventListener('click',closeModal);
+    const mode=document.getElementById('cfReportPeriodMode');
+    mode.addEventListener('change',()=>{
+      const m=mode.value;
+      document.getElementById('cfReportMonthWrap').style.display=m==='month'?'':'none';
+      document.getElementById('cfReportCustomWrap').style.display=m==='custom'?'':'none';
+    });
+    document.getElementById('cfReportPdfBtn').addEventListener('click',()=>generateConfiguredReport('pdf'));
+    document.getElementById('cfReportXlsBtn').addEventListener('click',()=>generateConfiguredReport('xls'));
+  }
+
+  function cfGetConfiguredReport(){
+    const mode=document.getElementById('cfReportPeriodMode')?.value||'month';
+    const month=document.getElementById('cfReportMonth')?.value||'';
+    const from=document.getElementById('cfReportDateFrom')?.value||'';
+    const to=document.getElementById('cfReportDateTo')?.value||'';
+    const types=Array.from(document.querySelectorAll('.cf-report-type:checked')).map(x=>x.value);
+    const statuses=Array.from(document.querySelectorAll('.cf-report-status:checked')).map(x=>x.value);
+    const fields=Array.from(document.querySelectorAll('.cf-report-field:checked')).map(x=>x.value);
+    if(!types.length) throw new Error('Wybierz co najmniej jeden typ pojazdu.');
+    if(!statuses.length) throw new Error('Wybierz co najmniej jeden status wpisów.');
+    if(!fields.length) throw new Error('Wybierz co najmniej jedną informację do raportu.');
+    if(mode==='month'&&!month) throw new Error('Wybierz miesiąc.');
+    if(mode==='custom'&&(!from||!to)) throw new Error('Wybierz datę początkową i końcową.');
+    const all=cfReportRowsFromRecords();
+    const rows=all.filter(r=>{
+      if(!types.includes(pdfBillingCategoryKey(r))) return false;
+      const d=String(r.data_prania||r.data_zlecenia||'');
+      if(mode==='month' && d.slice(0,7)!==month) return false;
+      if(mode==='custom' && (d<from || d>to)) return false;
+      const done=!!r.data_prania;
+      const approved=!!r.zatwierdzone;
+      const paid=!!r.zaplacone;
+      const matches=(statuses.includes('ordered') && !done) || (statuses.includes('done')&&done) || (statuses.includes('unapproved')&&!approved) || (statuses.includes('approved')&&approved) || (statuses.includes('paid')&&paid);
+      return matches;
+    }).sort((a,b)=>String(a.data_prania||a.data_zlecenia||'').localeCompare(String(b.data_prania||b.data_zlecenia||'')));
+    if(!rows.length) throw new Error('Brak wpisów dla wybranych ustawień.');
+    return {rows,fields,mode,month,from,to};
+  }
+
+  async function generateConfiguredReport(format){
+    try{
+      const cfg=cfGetConfiguredReport();
+      const defs=CF_REPORT_FIELDS.filter(f=>cfg.fields.includes(f.key));
+      const filenameBase=(document.getElementById('cfReportFilename')?.value.trim()||`CleanFleet-raport-${cfg.month||todayISO()}`).replace(/[^a-zA-Z0-9._-]+/g,'_');
+      if(format==='xls'){
+        if(typeof XLSX==='undefined') throw new Error('Moduł Excel nie został załadowany.');
+        const aoa=[defs.map(d=>d.label),...cfg.rows.map(r=>defs.map(d=>d.value(r)))];
+        const wb=XLSX.utils.book_new();
+        const ws=XLSX.utils.aoa_to_sheet(aoa);
+        XLSX.utils.book_append_sheet(wb,ws,'Raport');
+        XLSX.writeFile(wb,`${filenameBase}.xlsx`);
+        showToast('Raport XLS wygenerowany.');
+        closeModal();
+        return;
+      }
+      if(!window.jspdf||!window.html2canvas) throw new Error('Nie udało się wczytać generatora PDF — sprawdź połączenie z internetem.');
+      const header=defs.map(d=>`<th style="text-align:left;padding:7px 8px;background:#16150F;color:#F5F4EE;font-size:11px;">${escapeHtml(d.label)}</th>`).join('');
+      const body=cfg.rows.map((r,i)=>`<tr style="background:${i%2?'#F7F6F1':'#FFFFFF'};">${defs.map(d=>`<td style="padding:6px 8px;font-size:10px;border-bottom:1px solid #E5E3D8;vertical-align:top;">${escapeHtml(String(d.value(r)))}</td>`).join('')}</tr>`).join('');
+      const logo=document.querySelector('.app-logo');
+      const container=document.createElement('div');
+      container.style.cssText='position:fixed;left:-9999px;top:0;width:1100px;background:#fff;color:#16150F;font-family:Arial,Helvetica,sans-serif;padding:28px;';
+      container.innerHTML=`<div style="margin-bottom:18px;">${logo?`<img src="${logo.src}" style="height:48px;display:block;margin-bottom:12px;">`:''}<div style="font-size:19px;font-weight:700;">Raport CleanFleet</div><div style="font-size:11px;color:#666;margin-top:4px;">${cfg.mode==='all'?'Wszystkie dane':cfg.mode==='month'?`Miesiąc: ${cfg.month}`:`Zakres: ${cfg.from} – ${cfg.to}`} · ${cfg.rows.length} wpisów</div></div><table style="width:100%;border-collapse:collapse;"><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
+      document.body.appendChild(container);
+      const canvas=await html2canvas(container,{scale:2,backgroundColor:'#fff',useCORS:true});
+      document.body.removeChild(container);
+      const {jsPDF}=window.jspdf;
+      const doc=new jsPDF({unit:'mm',format:'a4',orientation:'landscape'});
+      const margin=8, width=281, pageHeight=194, pxPerMM=canvas.width/width, slice=pageHeight*pxPerMM;
+      let y=0, first=true;
+      while(y<canvas.height){
+        const h=Math.min(slice,canvas.height-y); const c=document.createElement('canvas'); c.width=canvas.width;c.height=h;c.getContext('2d').drawImage(canvas,0,y,canvas.width,h,0,0,canvas.width,h); if(!first) doc.addPage(); doc.addImage(c.toDataURL('image/png'),'PNG',margin,margin,width,h/pxPerMM); y+=h; first=false;
+      }
+      doc.save(`${filenameBase}.pdf`);
+      showToast('Raport PDF wygenerowany.');
+      closeModal();
+    }catch(e){ showToast(e?.message||'Nie udało się wygenerować raportu.'); }
   }
 
   function showPdfExportModal(){

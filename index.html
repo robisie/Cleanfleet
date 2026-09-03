@@ -3921,12 +3921,38 @@ function uid(){
 
     const safeInvoice=invoiceNumber.replace(/[^a-zA-Z0-9._-]+/g,'_');
     const filename=`zalacznik-do-faktury-${safeInvoice}-${period}.pdf`;
-    const blobUrl=URL.createObjectURL(doc.output('blob'));
-    const a=document.createElement('a');
-    a.href=blobUrl;
-    a.download=filename;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(blobUrl),5000);
+    const pdfBlob = doc.output('blob');
+    const blobUrl = URL.createObjectURL(pdfBlob);
+
+    // Podgląd załącznika w aplikacji — PDF nie zastępuje strony CleanFleet.
+    const previewHtml = `
+      <div class="overlay" id="invoicePdfPreviewOverlay" style="align-items:center;">
+        <div class="sheet" style="max-width:900px;width:96%;height:90vh;display:flex;flex-direction:column;padding-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;">
+            <h2 style="margin:0;font-size:18px;">Podgląd załącznika PDF</h2>
+            <button class="close" id="closeInvoicePdfPreview" type="button">&times;</button>
+          </div>
+          <iframe src="${blobUrl}" title="Podgląd załącznika PDF" style="flex:1;width:100%;min-height:0;border:1px solid var(--line-strong);border-radius:8px;background:#fff;"></iframe>
+          <div class="sheet-actions" style="gap:8px;margin-top:12px;">
+            <button class="btn btn-solid" id="downloadInvoicePdfFromPreview" style="flex:1;">Pobierz PDF</button>
+            <button class="btn btn-outline" id="closeInvoicePdfPreviewBtn" style="flex:1;">Zamknij</button>
+          </div>
+        </div>
+      </div>`;
+
+    document.getElementById('modalRoot').innerHTML = previewHtml;
+    const closePreview = () => {
+      URL.revokeObjectURL(blobUrl);
+      document.getElementById('invoicePdfPreviewOverlay')?.remove();
+    };
+    document.getElementById('closeInvoicePdfPreview')?.addEventListener('click', closePreview);
+    document.getElementById('closeInvoicePdfPreviewBtn')?.addEventListener('click', closePreview);
+    document.getElementById('downloadInvoicePdfFromPreview')?.addEventListener('click', () => {
+      const a=document.createElement('a');
+      a.href=blobUrl;
+      a.download=filename;
+      document.body.appendChild(a); a.click(); a.remove();
+    });
   }
 
   async function cfEnsureInvoiceSavedWithAttachment(invoiceContext, blob, filename){

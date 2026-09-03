@@ -1,9 +1,8 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-<!-- CleanFleet employee final v2: role-aware menu and history actions -->
 <meta charset="UTF-8">
-<!-- CleanFleet v86 -->
+<!-- CleanFleet v108 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -101,8 +100,7 @@
     display:flex;align-items:center;justify-content:space-between;
     padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:14px;
   }
-  .menu-list{display:flex;flex-direction:column;gap:8px;flex:1;min-height:0;overflow-y:auto;padding-bottom:4px;}
-  .menu-logout-wrap{flex:0 0 auto;display:block;min-height:62px;padding-top:10px;border-top:1px solid var(--line);background:var(--paper);}
+  .menu-list{display:flex;flex-direction:column;gap:8px;flex:1;}
   .menu-item{
     text-align:left;
     background:#fff;
@@ -114,7 +112,7 @@
   }
   .menu-item:disabled{opacity:.72;cursor:default;}
   .menu-item:active{background:var(--paper-alt);}
-  .menu-logout{width:100%;margin:0;border-color:rgba(194,75,63,0.35);}
+  .menu-logout{margin-top:auto;border-color:rgba(194,75,63,0.35);}
   .menu-logout .menu-item-title{color:var(--red);}
   .menu-item-title{font-size:14px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:7px;}
   .cf-bell-icon{font-size:17px;line-height:1;display:inline-flex;align-items:center;justify-content:center;}
@@ -241,8 +239,8 @@
   .toggle.on{color:var(--ink);font-weight:600;}
 
   .bottom-bar{
-    position:fixed;
-    left:0;right:0;bottom:0;
+    position:fixed !important;
+    left:0;right:0;bottom:0 !important;top:auto !important;
     width:100%;
     background:var(--panel);
     padding:12px 16px calc(12px + env(safe-area-inset-bottom));
@@ -423,12 +421,6 @@
   .attention-card.attention-alert{border-color:rgba(194,75,63,.4);}
   .attention-card.attention-alert .attention-value{color:var(--red);}
   .history-button{margin-top:0;padding:6px 9px;border:1px solid var(--line-strong);background:#fff;border-radius:7px;font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;cursor:pointer;}
-  .history-delete-btn{width:34px;height:34px;padding:0;border:1px solid rgba(194,75,63,.35);background:#fff;color:var(--red);border-radius:7px;font-size:18px;line-height:1;cursor:pointer;}
-  .history-delete-btn:hover{background:rgba(194,75,63,.06);border-color:var(--red);}
-  .history-edit-btn{width:34px;height:34px;padding:0;border:1px solid var(--line-strong);background:#fff;color:var(--ink);border-radius:7px;font-size:18px;line-height:1;cursor:pointer;}
-  .history-edit-btn:hover{background:var(--green-bg);border-color:var(--green);}
-  .history-actions{display:flex;gap:8px;align-items:center;justify-content:flex-start;margin-top:12px;}
-  .history-actions .btn{margin-top:0;}
   .history-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px;}
   .history-stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px;}
   .history-stat-label{font-size:10px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;color:var(--ink-soft);}
@@ -576,6 +568,52 @@
 
   .record-plate-line{display:flex;align-items:center;gap:8px;}
   .record-plate-line .history-button{flex:0 0 auto;}
+
+/* v99: trzy przyciski dolnego menu zawsze wyśrodkowane */
+.bottom-bar{
+  justify-content:center !important;
+}
+.bottom-bar > button#btnMonth,
+.bottom-bar > button#btnYear,
+.bottom-bar > button#btnAll{
+  flex: 1 1 0;
+  text-align:center;
+}
+
+/* v100: trzy przyciski dolnego paska jako wyśrodkowana grupa */
+@media(min-width:640px){
+  .bottom-bar{
+    grid-template-columns:repeat(3,minmax(0,280px)) !important;
+    justify-content:center !important;
+  }
+}
+@media(min-width:640px) and (max-width:900px){
+  .bottom-bar{
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  }
+}
+/* v100: wylogowanie bez wypychania na sam dół */
+.menu-logout{
+  margin-top:0 !important;
+}
+
+
+.report-plate-link{
+  appearance:none;
+  -webkit-appearance:none;
+  border:0;
+  background:transparent;
+  padding:0;
+  margin:0;
+  font:inherit;
+  color:inherit;
+  text-decoration:underline;
+  text-decoration-color:var(--green-ink);
+  text-underline-offset:3px;
+  cursor:pointer;
+}
+.report-plate-link:active{opacity:.65;}
+
 </style>
 
 <style id="mobile-user-header-fix">
@@ -648,15 +686,17 @@
 </style>
 
 
-<style id="cf-employee-menu-fix">
-  .menu-overlay { z-index:2000 !important; }
-  .menu-overlay .menu-panel, .menu-overlay .menu-sheet { overflow:hidden; }
-  .menu-overlay .menu-list { min-height:0; overflow-y:auto; }
-  .menu-overlay .menu-logout-wrap { flex-shrink:0; position:relative; z-index:2; padding-bottom:2px; }
-  .menu-overlay .menu-logout { position:relative; bottom:auto; margin-top:8px; }
-  @media (max-height:720px){
-    .menu-overlay .menu-list { max-height:calc(100vh - 170px); }
-  }
+<style id="cf-employee-role-ui">
+  .menu-overlay{z-index:2000 !important;}
+  .menu-drawer{z-index:2001 !important; padding-bottom:calc(20px + env(safe-area-inset-bottom));}
+  .menu-list{min-height:0;overflow-y:auto;}
+  .history-delete-btn{width:34px;height:34px;padding:0;border:1px solid rgba(194,75,63,.35);background:#fff;color:var(--red);border-radius:7px;font-size:18px;line-height:1;cursor:pointer;}
+  .history-delete-btn:hover{background:rgba(194,75,63,.06);border-color:var(--red);}
+  .history-edit-btn{width:34px;height:34px;padding:0;border:1px solid var(--line-strong);background:#fff;color:var(--ink);border-radius:7px;font-size:18px;line-height:1;cursor:pointer;}
+  .history-edit-btn:hover{background:var(--green-bg);border-color:var(--green);}
+  .history-actions{display:flex;gap:8px;align-items:center;justify-content:flex-start;margin-top:12px;}
+  .history-actions .btn{margin-top:0;}
+  @media(max-width:639px){.menu-drawer{bottom:0;max-height:none;}.menu-list{overflow-y:auto;}}
 </style>
 </head>
 <body>
@@ -708,38 +748,41 @@
       <button class="close" id="menuClose">&times;</button>
     </div>
     <div class="menu-list">
-      <button class="menu-item" id="cfNotificationsBtn" disabled hidden>
-        <span class="menu-item-title"><span class="cf-bell-icon" aria-hidden="true">🔔</span><span id="cfNotificationsTitle">Sprawdzanie powiadomień…</span></span>
-        <span class="menu-item-sub" id="cfNotificationsSub">Sprawdzanie stanu tego urządzenia…</span>
-      </button>
-      <button class="menu-item" id="importBtn" hidden>
-        <span class="menu-item-title">Importuj / przywróć dane</span>
-        <span class="menu-item-sub">Pełny backup CleanFleet albo lista pojazdów Excel / CSV</span>
-      </button>
-      <button class="menu-item" id="exportPdfBtn">
-        <span class="menu-item-title">Eksportuj PDF (miesiąc)</span>
-        <span class="menu-item-sub">Wygeneruj plik PDF z zatwierdzonymi pojazdami z wybranego miesiąca</span>
-      </button>
-      <button class="menu-item" id="exportExcelBtn" hidden>
-        <span class="menu-item-title">💾 Backup / eksportuj pełną bazę</span>
-        <span class="menu-item-sub">Zapisz pełną kopię pojazdów, prań, faktur i rozliczeń</span>
-      </button>
-      <button class="menu-item" id="financeBtn">
+<button class="menu-item" id="financeBtn">
         <span class="menu-item-title">💰 Rozliczenia / oczekujące płatności</span>
         <span class="menu-item-sub">Faktury, pojazdy przypisane do faktur i płatności</span>
       </button>
-      <button class="menu-item" id="statsBtn">
+<button class="menu-item" id="statsBtn">
         <span class="menu-item-title">📊 Statystyki finansowe</span>
         <span class="menu-item-sub">Finanse, faktury i płatności z wyborem miesiąca</span>
       </button>
-    </div>
-    <div class="menu-logout-wrap">
-      <button class="menu-item menu-logout" id="cfLogoutBtn">
+<button class="menu-item" id="exportPdfBtn">
+        <span class="menu-item-title">Eksportuj PDF (miesiąc)</span>
+        <span class="menu-item-sub">Wygeneruj plik PDF z zatwierdzonymi pojazdami z wybranego miesiąca</span>
+      </button>
+<button class="menu-item" id="fleetUpdateBtn" hidden>
+        <span class="menu-item-title">🚚 Aktualizuj pojazdy</span>
+        <span class="menu-item-sub">Dodaj tylko brakujące tablice z datą prania i osobą</span>
+      </button>
+<button class="menu-item" id="exportExcelBtn" hidden>
+        <span class="menu-item-title">💾 Backup / eksportuj pełną bazę</span>
+        <span class="menu-item-sub">Zapisz pełną kopię pojazdów, prań, faktur i rozliczeń</span>
+      </button>
+<button class="menu-item" id="importBtn" hidden>
+        <span class="menu-item-title">Importuj / przywróć dane</span>
+        <span class="menu-item-sub">Pełny backup CleanFleet</span>
+      </button>
+<button class="menu-item" id="cfNotificationsBtn" hidden disabled>
+        <span class="menu-item-title"><span class="cf-bell-icon" aria-hidden="true">🔔</span><span id="cfNotificationsTitle">Sprawdzanie powiadomień…</span></span>
+        <span class="menu-item-sub" id="cfNotificationsSub">Sprawdzanie stanu tego urządzenia…</span>
+      </button>
+<button class="menu-item menu-logout" id="cfLogoutBtn">
         <span class="menu-item-title">Wyloguj</span>
         <span class="menu-item-sub">Wyloguj z konta CleanFleet na tym urządzeniu</span>
       </button>
-    </div>
+</div>
     <input type="file" id="importFile" accept=".csv,.txt,.xlsx,.xls" style="display:none;">
+    <input type="file" id="fleetUpdateFile" accept=".xlsx,.xls,.csv" style="display:none;">
   </div>
 </div>
 
@@ -754,7 +797,6 @@
         <option value="done">Wykonane</option>
         <option value="unapproved">Niezatwierdzone</option>
         <option value="unpaid">Niezapłacone</option>
-        <option value="old">Dawno nie prane</option>
       </select>
     </div>
   </div>
@@ -810,57 +852,6 @@ async function cfInitSupabase(){
   if (!window.supabase || !window.supabase.createClient) throw new Error('Nie udało się załadować biblioteki Supabase.');
   cfSupabase = window.supabase.createClient(CF_SUPABASE_URL, CF_SUPABASE_KEY);
   return cfSupabase;
-}
-
-// CleanFleet — role / permissions layer
-let cfCurrentRole = null;
-let cfCurrentUserId = null;
-
-async function cfLoadRole(){
-  const { data:{user} } = await cfSupabase.auth.getUser();
-  cfCurrentUserId = user?.id || null;
-  if(!cfCurrentUserId){ cfCurrentRole=null; return; }
-  const { data, error } = await cfSupabase.rpc('cf_get_my_role');
-  if(error){ console.warn('CleanFleet role:', error.message); cfCurrentRole=null; }
-  else cfCurrentRole = data || null;
-  document.body?.setAttribute('data-cf-role', cfCurrentRole);
-  const badge=document.getElementById('cfRoleBadge');
-  if(badge) badge.textContent = cfCurrentRole==='fleet_employee' ? 'Pracownik floty' : 'Administrator';
-  cfApplyRoleMenu();
-  return cfCurrentRole;
-}
-function cfIsAdmin(){ return cfCurrentRole==='admin'; }
-function cfIsFleetEmployee(){ return cfCurrentRole==='fleet_employee'; }
-function cfEmployeeOwn(r){ return !!(r && cfIsFleetEmployee() && r.created_by===cfCurrentUserId); }
-
-function cfApplyRoleMenu(){
-  const admin = cfIsAdmin();
-  const setVisible = (id, visible) => {
-    const el = document.getElementById(id);
-    if(!el) return;
-    el.hidden = !visible;
-    el.style.display = visible ? '' : 'none';
-  };
-
-  // Pracownik floty: tylko funkcje robocze/informacyjne + wylogowanie.
-  setVisible('importBtn', admin);
-  setVisible('exportExcelBtn', admin);
-  setVisible('cfNotificationsBtn', admin);
-  setVisible('exportPdfBtn', true);
-  setVisible('financeBtn', true);
-  setVisible('statsBtn', true);
-
-  const logout = document.getElementById('cfLogoutBtn');
-  if(logout){
-    logout.hidden = false;
-    logout.style.display = '';
-  }
-}
-
-async function cfSubmitChangeRequest(recordId, requestType, proposedData, reason=''){
-  const {data,error}=await cfSupabase.rpc('cf_submit_change_request',{p_wash_record_id:recordId,p_request_type:requestType,p_proposed_data:proposedData||null,p_reason:reason||null});
-  if(error) throw error;
-  return data;
 }
 
 // CleanFleet — Web Push / VAPID
@@ -1007,6 +998,7 @@ async function cfEnableNotifications(){
     }
     await cfSavePushSubscription(subscription);
     cfSetNotificationsStatus('Powiadomienia są aktywne na tym urządzeniu.', true);
+    cfScheduleWashReminders();
     cfShowToast('Powiadomienia zostały włączone');
   }catch(error){
     console.error('CleanFleet notifications error:', error);
@@ -2765,7 +2757,139 @@ window.FLEET_DATA = {
   let invoiceItems = [];
   let mainStatusFilter = 'all';
 
-  function uid(){
+  // CleanFleet — przypomnienia o zbliżającym się praniu.
+  // Dzień wcześniej o 13:00 oraz w dniu prania o 09:00 czasu urządzenia.
+  const CF_WASH_REMINDER_LEAD_DAYS = 1;
+  const CF_WASH_REMINDER_DAY_BEFORE_HOUR = 13;
+  const CF_WASH_REMINDER_SAME_DAY_HOUR = 9;
+  const cfWashReminderTimers = new Map();
+
+  function cfReminderKey(r, suffix){
+    return `cleanfleet-wash-reminder:${r.id}:${r.data_zlecenia_do}:${suffix}`;
+  }
+
+  function cfScheduleWashReminders(){
+    for(const timer of cfWashReminderTimers.values()) clearTimeout(timer);
+    cfWashReminderTimers.clear();
+    if(!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    const now = new Date();
+
+    records.forEach(r => {
+      if(!r || !r.zlecone || r.zatwierdzone || r.zaplacone || !r.data_zlecenia_do) return;
+
+      const dueDate = new Date(`${r.data_zlecenia_do}T00:00:00`);
+      if(!Number.isFinite(dueDate.getTime())) return;
+
+      const reminders = [
+        {
+          suffix: 'day-before',
+          title: 'Jutro termin prania',
+          date: new Date(dueDate)
+        },
+        {
+          suffix: 'same-day',
+          title: 'Dzisiaj termin prania',
+          date: new Date(dueDate)
+        }
+      ];
+
+      reminders[0].date.setDate(reminders[0].date.getDate() - CF_WASH_REMINDER_LEAD_DAYS);
+      reminders[0].date.setHours(CF_WASH_REMINDER_DAY_BEFORE_HOUR, 0, 0, 0);
+      reminders[1].date.setHours(CF_WASH_REMINDER_SAME_DAY_HOUR, 0, 0, 0);
+
+      reminders.forEach(item => {
+        if(item.date <= now) return;
+
+        const key = cfReminderKey(r, item.suffix);
+        if(localStorage.getItem(key)) return;
+
+        const scheduleAtReminder = () => {
+          const remaining = item.date.getTime() - Date.now();
+          if(remaining <= 0){
+            try{
+              const current = records.find(x => x.id === r.id);
+              if(!current || !current.zlecone || current.zatwierdzone || current.zaplacone ||
+                 current.data_zlecenia_do !== r.data_zlecenia_do) return;
+
+              const n = new Notification(item.title, {
+                body: `${current.tablica} — zaplanowane na ${fmtDate(current.data_zlecenia_do)}`,
+                tag: `cleanfleet-wash-${current.id}-${item.suffix}`,
+                renotify: false
+              });
+
+              localStorage.setItem(key, '1');
+              n.onclick = () => {
+                window.focus();
+                try { n.close(); } catch(e) {}
+                openForm(current.id);
+              };
+            }catch(error){
+              console.warn('CleanFleet wash reminder:', error);
+            }finally{
+              cfWashReminderTimers.delete(key);
+            }
+            return;
+          }
+
+          // Safari/iOS ogranicza setTimeout do ok. 24,8 dnia.
+          // Dłuższe terminy dzielimy na kolejne odcinki, żeby przypomnienie
+          // nie uruchomiło się przed właściwą datą.
+          const timer = setTimeout(scheduleAtReminder, Math.min(remaining, 2147483647));
+          cfWashReminderTimers.set(key, timer);
+        };
+        scheduleAtReminder();
+      });
+    });
+  }
+
+  // CleanFleet — role / permissions layer
+let cfCurrentRole = null;
+let cfCurrentUserId = null;
+
+async function cfLoadRole(){
+  const { data:{user} } = await cfSupabase.auth.getUser();
+  cfCurrentUserId = user?.id || null;
+  if(!cfCurrentUserId){ cfCurrentRole=null; return; }
+  const { data, error } = await cfSupabase.rpc('cf_get_my_role');
+  if(error){ console.warn('CleanFleet role:', error.message); cfCurrentRole=null; }
+  else cfCurrentRole = data || null;
+  document.body?.setAttribute('data-cf-role', cfCurrentRole);
+  const badge=document.getElementById('cfRoleBadge');
+  if(badge) badge.textContent = cfCurrentRole==='fleet_employee' ? 'Pracownik floty' : 'Administrator';
+  cfApplyRoleMenu();
+  return cfCurrentRole;
+}
+function cfIsAdmin(){ return cfCurrentRole==='admin'; }
+function cfIsFleetEmployee(){ return cfCurrentRole==='fleet_employee'; }
+function cfEmployeeOwn(r){ return !!(r && cfIsFleetEmployee() && r.created_by===cfCurrentUserId); }
+
+function cfApplyRoleMenu(){
+  const admin = cfIsAdmin();
+  const setVisible = (id, visible) => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.hidden = !visible;
+    el.style.display = visible ? '' : 'none';
+  };
+
+  // Pracownik floty: tylko funkcje robocze/informacyjne + wylogowanie.
+  setVisible('importBtn', admin);
+  setVisible('exportExcelBtn', admin);
+  setVisible('cfNotificationsBtn', admin);
+  setVisible('exportPdfBtn', true);
+  setVisible('financeBtn', true);
+  setVisible('statsBtn', true);
+
+  const logout = document.getElementById('cfLogoutBtn');
+  if(logout){
+    logout.hidden = false;
+    logout.style.display = '';
+  }
+}
+
+
+function uid(){
     if(window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
     const bytes = new Uint8Array(16);
     if(window.crypto && typeof window.crypto.getRandomValues === 'function') {
@@ -2812,7 +2936,6 @@ window.FLEET_DATA = {
     renderRecords();
     const session = (await cfSupabase.auth.getSession()).data.session;
     const userText = document.getElementById('cfUserText');
-    const roleBadge=document.getElementById('cfRoleBadge'); if(roleBadge) roleBadge.textContent = cfIsFleetEmployee() ? 'Pracownik floty' : 'Administrator';
     if(userText) {
       userText.textContent = '';
       if(session?.user?.email) {
@@ -2826,6 +2949,7 @@ window.FLEET_DATA = {
       }
     }
     cfSetSync('Dane aktualne · '+cfFormatSyncTime(cfLastSync),'ok');
+    cfScheduleWashReminders();
   }
 
   async function saveRecords(changedRecordId=null){
@@ -2836,6 +2960,7 @@ window.FLEET_DATA = {
       if(error){ showToast('Błąd zapisu wpisu: '+error.message); throw error; }
       cfRemoteRecordIds.add(rec.id);
       cfLastSync=new Date(); cfSetSync('Zapisano · '+cfFormatSyncTime(cfLastSync),'ok');
+      cfScheduleWashReminders();
       return;
     }
     const rows = records.map(cfRecordToDb);
@@ -2852,41 +2977,96 @@ window.FLEET_DATA = {
     cfRemoteRecordIds = currentIds;
     cfLastSync = new Date();
     cfSetSync('Zapisano · '+cfFormatSyncTime(cfLastSync),'ok');
+    cfScheduleWashReminders();
   }
 
-  async function saveRegistry(changedPlate=null){
-    // Pracownik nie wykonuje globalnego synchronizowania/usuwania listy pojazdów.
-    // Zapisuje tylko pojazd, który faktycznie zmienił lub dodał.
-    if(cfIsFleetEmployee()){
-      const plate = normalizePlate(changedPlate || window.__pendingPlate || '');
-      const v = plate ? registry[plate] : null;
-      if(!plate || !v) throw new Error('Brak pojazdu do zapisu.');
-      const { error } = await cfSupabase.from('vehicles').upsert([{
-        plate,
-        type:v.typ||'',
-        brand:v.marka||''
-      }], {onConflict:'plate'});
-      if(error){ showToast('Błąd zapisu pojazdu: '+error.message); throw error; }
-      cfRemoteVehiclePlates.add(plate);
+  async function cfRetrySupabase(action, attempts=3){
+    let lastError = null;
+    for(let i=0;i<attempts;i++){
+      try{
+        const result = await action();
+        if(!result?.error) return result;
+        lastError = result.error;
+      }catch(error){
+        lastError = error;
+      }
+      if(i < attempts-1) await new Promise(resolve => setTimeout(resolve, 700 * (i+1)));
+    }
+    throw lastError || new Error('Nie udało się wykonać operacji w bazie.');
+  }
+
+  async function saveRegistry(changedPlate=null, oldPlate=null){
+    try{
+      if(cfIsFleetEmployee()){
+        const plate = normalizePlate(changedPlate || window.__pendingPlate || '');
+        const v = plate ? registry[plate] : null;
+        if(!plate || !v) throw new Error('Brak pojazdu do zapisu.');
+        const existsRemotely = cfRemoteVehiclePlates.has(plate);
+        let result;
+        if(existsRemotely){
+          result = await cfSupabase.from('vehicles').update({type:v.typ||'',brand:v.marka||''}).eq('plate',plate);
+        }else{
+          result = await cfSupabase.from('vehicles').insert({plate,type:v.typ||'',brand:v.marka||''});
+        }
+        if(result?.error) throw result.error;
+        if(oldPlate && oldPlate !== plate){
+          const del = await cfSupabase.from('vehicles').delete().eq('plate',oldPlate);
+          if(del?.error) throw del.error;
+          cfRemoteVehiclePlates.delete(oldPlate);
+        }
+        cfRemoteVehiclePlates.add(plate);
+        cfLastSync=new Date(); cfSetSync('Zapisano · '+cfFormatSyncTime(cfLastSync),'ok');
+        return;
+      }
+      // Zwykłe dodanie/edycja pojazdu: zapisujemy WYŁĄCZNIE ten pojazd.
+      // Bez retry — pojedyncza operacja ma zakończyć się od razu błędem,
+      // zamiast sztucznie wydłużać czas oczekiwania przy problemie sieciowym.
+      if(changedPlate){
+        const v = registry[changedPlate] || {typ:'', marka:''};
+        const payload = { plate:changedPlate, type:v.typ||'', brand:v.marka||'' };
+        const existsRemotely = cfRemoteVehiclePlates.has(changedPlate);
+
+        let result;
+        if(existsRemotely){
+          result = await cfSupabase
+            .from('vehicles')
+            .update({type:payload.type, brand:payload.brand})
+            .eq('plate', changedPlate);
+        } else {
+          result = await cfSupabase
+            .from('vehicles')
+            .insert(payload);
+        }
+        if(result?.error) throw result.error;
+
+        if(oldPlate && oldPlate !== changedPlate){
+          const deleteResult = await cfSupabase.from('vehicles').delete().eq('plate', oldPlate);
+          if(deleteResult?.error) throw deleteResult.error;
+          cfRemoteVehiclePlates.delete(oldPlate);
+        }
+        cfRemoteVehiclePlates.add(changedPlate);
+      } else {
+        // Import / pełna synchronizacja nadal zapisuje całą listę.
+        const rows = Object.entries(registry).map(([plate,v])=>({plate,type:v.typ||'',brand:v.marka||''}));
+        if(rows.length){
+          await cfRetrySupabase(() => cfSupabase.from('vehicles').upsert(rows, {onConflict:'plate'}));
+        }
+        const currentPlates = new Set(Object.keys(registry));
+        const removed = [...cfRemoteVehiclePlates].filter(plate=>!currentPlates.has(plate));
+        if(removed.length){
+          await cfRetrySupabase(() => cfSupabase.from('vehicles').delete().in('plate', removed));
+        }
+        cfRemoteVehiclePlates = currentPlates;
+      }
       cfLastSync = new Date();
       cfSetSync('Zapisano · '+cfFormatSyncTime(cfLastSync),'ok');
-      return;
+    }catch(error){
+      const message = error?.message || String(error);
+      const detail = [error?.code, error?.details, error?.hint].filter(Boolean).join(' · ');
+      console.error('CleanFleet saveRegistry error:', error);
+      showToast('Błąd zapisu pojazdu: '+message+(detail ? ' · '+detail : ''));
+      throw error;
     }
-
-    const rows = Object.entries(registry).map(([plate,v])=>({plate,type:v.typ||'',brand:v.marka||''}));
-    if(rows.length){
-      const { error } = await cfSupabase.from('vehicles').upsert(rows, {onConflict:'plate'});
-      if(error){ showToast('Błąd zapisu pojazdów: '+error.message); throw error; }
-    }
-    const currentPlates = new Set(Object.keys(registry));
-    const removed = [...cfRemoteVehiclePlates].filter(plate=>!currentPlates.has(plate));
-    if(removed.length){
-      const { error } = await cfSupabase.from('vehicles').delete().in('plate', removed);
-      if(error){ showToast('Błąd usuwania pojazdów: '+error.message); throw error; }
-    }
-    cfRemoteVehiclePlates = currentPlates;
-    cfLastSync = new Date();
-    cfSetSync('Zapisano · '+cfFormatSyncTime(cfLastSync),'ok');
   }
 
   async function cfRefresh(){
@@ -2969,7 +3149,14 @@ window.FLEET_DATA = {
       el.addEventListener('click', () => openForm(el.getAttribute('data-open')));
     });
     list.querySelectorAll('[data-history-plate]').forEach(el => {
-      el.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); showVehicleHistory(el.getAttribute('data-history-plate')); });
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showVehicleHistory(el.getAttribute('data-history-plate'), () => {
+          closeModal();
+          renderRecords();
+        });
+      });
     });
     list.querySelectorAll('[data-toggle-zatw]').forEach(el => {
       el.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); toggleZatwierdzone(el.getAttribute('data-toggle-zatw')); });
@@ -3217,6 +3404,7 @@ window.FLEET_DATA = {
     }
   }
 
+
   async function submitForm(){
     const plate = document.getElementById('f_tablica').value.trim().toUpperCase();
     const typ = document.getElementById('f_typ').value.trim();
@@ -3276,6 +3464,7 @@ window.FLEET_DATA = {
     renderRecords();
     showToast(wasEditing ? 'Zapisano zmiany' : 'Dodano wpis');
   }
+
 
   function closeModal(){
     document.getElementById('modalRoot').innerHTML = '';
@@ -3519,6 +3708,7 @@ window.FLEET_DATA = {
     });
   }
 
+
   function renderAttentionPanel(){
     const panel=document.getElementById('attentionPanel');
     if(!panel) return;
@@ -3526,17 +3716,21 @@ window.FLEET_DATA = {
     const unpaidInvoices=invoices.filter(i=>i.status!=='paid').length;
     const oldVehicles=Object.keys(registry).filter(plate=>{
       const latest=records.filter(r=>r.tablica===plate && r.data_prania).sort((a,b)=>(b.data_prania||'').localeCompare(a.data_prania||''))[0];
-      // „Dawno nie prane” tylko wtedy, gdy znana jest data ostatniego prania
-      // i minęło co najmniej 182,5 dnia (365/2).
+      // „Dawno nie prane” tylko wtedy, gdy znana jest data ostatniego prania,
+      // minęło co najmniej 182,5 dnia (365/2), a pojazd NIE jest typu BUS.
+      // BUS jest celowo wyłączony zarówno z listy, jak i z licznika kafelka.
+      const info=registry[plate] || {};
+      const vehicleType=String((latest && latest.typ) || info.typ || '').trim().toUpperCase();
+      if(vehicleType==='BUS') return false;
       if(!latest) return false;
       return daysSinceLastWashForRecord(latest)>=(365/2);
     }).length;
     const unapproved=records.filter(r=>r.data_prania && !r.zatwierdzone && !r.zaplacone).length;
     const items=[
       {label:'Do wykonania',value:pendingOrders,filter:'todo',alert:pendingOrders>0},
-      {label:'Dawno nie prane',value:oldVehicles,filter:'old',alert:oldVehicles>0},
+      {label:'Dawno nie prane',value:oldVehicles,action:'old',alert:oldVehicles>0},
       {label:'Niezatwierdzone',value:unapproved,filter:'unapproved',alert:unapproved>0},
-      {label:'Oczekuje płatność',value:unpaidInvoices,action:'finance',alert:unpaidInvoices>0}
+      {label:'Faktury do zapłaty',value:unpaidInvoices,action:'finance',alert:unpaidInvoices>0}
     ];
     if(!items.some(x=>x.value>0)){ panel.classList.remove('show'); panel.innerHTML=''; return; }
     panel.classList.add('show');
@@ -3544,6 +3738,7 @@ window.FLEET_DATA = {
     panel.querySelectorAll('[data-attention-index]').forEach(btn=>btn.addEventListener('click',()=>{
       const item=items[Number(btn.dataset.attentionIndex)];
       if(item.action==='finance') showFinanceQueue();
+      else if(item.action==='old') showOldVehicles();
       else { mainStatusFilter=item.filter; const sel=document.getElementById('mainStatusFilter'); if(sel) sel.value=item.filter; renderRecords(); document.getElementById('recordsList')?.scrollIntoView({behavior:'smooth',block:'start'}); }
     }));
   }
@@ -3621,7 +3816,6 @@ window.FLEET_DATA = {
   }
 
   async function cfCreateInvoiceFromRows(invoiceNumber, period, rows){
-    if(!cfIsAdmin()) throw new Error('Tylko administrator może tworzyć faktury.');
     const {data:{session}} = await cfSupabase.auth.getSession();
     if(!session?.user?.id) throw new Error('Brak zalogowanego użytkownika.');
     const amount = rows.reduce((sum,r)=>sum+(Number(r.koszt)||0),0);
@@ -3663,7 +3857,6 @@ window.FLEET_DATA = {
   }
 
   async function cfMarkInvoicePaid(invoiceId){
-    if(!cfIsAdmin()) throw new Error('Tylko administrator może rozliczać faktury.');
     const invoice = invoices.find(i=>i.id===invoiceId);
     if(!invoice) return;
     const rows = invoiceRowsFor(invoiceId);
@@ -3741,10 +3934,34 @@ window.FLEET_DATA = {
       <table class="report"><thead><tr><th>Tablica</th><th>Typ</th><th>Data prania</th><th>Kwota</th><th>Zapł.</th></tr></thead><tbody>${body}</tbody></table>
       <div class="sheet-actions">
         ${paid ? '<button class="btn btn-solid" disabled>✓ Faktura opłacona</button>' : '<button class="btn btn-solid" id="markInvoicePaidBtn">Faktura opłacona</button>'}
+        <button class="btn btn-outline" id="deleteInvoiceBtn" title="Usuń fakturę" aria-label="Usuń fakturę" style="background:#c62828;color:#fff;border-color:#c62828;font-size:20px;line-height:1;min-width:48px;padding:10px 14px;">🗑️</button>
         <button class="btn btn-outline" id="backFinanceBtn">Wróć</button>
       </div>`;
     reportShell('Szczegóły faktury', '', bodyHtml);
     document.getElementById('backFinanceBtn').addEventListener('click', showFinanceQueue);
+
+    document.getElementById('deleteInvoiceBtn').addEventListener('click',()=>{
+      showConfirm(
+        'Usunąć fakturę z kolejki?',
+        `Faktura ${escapeHtml(inv.invoice_number)} oraz jej przypisania do pojazdów zostaną usunięte z rozliczeń. Wpisy prania pozostaną w bazie.`,
+        async()=>{
+          try{
+            const {error:itemError}=await cfSupabase.from('invoice_items').delete().eq('invoice_id', invoiceId);
+            if(itemError) throw itemError;
+            const {error:invoiceError}=await cfSupabase.from('invoices').delete().eq('id', invoiceId);
+            if(invoiceError) throw invoiceError;
+
+            await cfLoadInvoices();
+            showToast('Faktura usunięta z kolejki płatności');
+            showFinanceQueue();
+            renderAttentionPanel();
+          }catch(e){
+            console.error('CleanFleet delete invoice error:',e);
+            showToast(e?.message || 'Nie udało się usunąć faktury');
+          }
+        }
+      );
+    });
     if(!paid){
       document.getElementById('markInvoicePaidBtn').addEventListener('click',()=>{
         showConfirm('Oznaczyć fakturę jako opłaconą?', `Wszystkie ${rows.length} przypisane pojazdy zostaną oznaczone jako zapłacone.`, async()=>{
@@ -4410,6 +4627,59 @@ window.FLEET_DATA = {
       </table>`;
   }
 
+  function showOldVehicles(){
+    const rows = Object.keys(registry).map(plate => {
+      const latest = records
+        .filter(r => r.tablica === plate && r.data_prania)
+        .sort((a,b) => (b.data_prania||'').localeCompare(a.data_prania||''))[0];
+      if(!latest) return null;
+      const days = daysSinceLastWashForRecord(latest);
+      if(days === null || days < (365 / 2)) return null;
+      const info = registry[plate] || {};
+      const vehicleType = String(latest.typ || info.typ || '').trim().toUpperCase();
+      if(vehicleType === 'BUS') return null;
+      return {
+        typ: (latest.typ || info.typ || '—'),
+        tablica: plate,
+        marka: (latest.marka || info.marka || '—'),
+        data_prania: latest.data_prania,
+        kto_wykonal: latest.kto_wykonal || '—',
+        dni: days
+      };
+    }).filter(Boolean).sort((a,b) => b.dni - a.dni);
+
+    const body = rows.length ? `
+      <table class="report">
+        <thead><tr><th>Typ</th><th>Tablica</th><th>Marka</th><th>Ostatnie pranie</th><th>Wykonał</th><th>Dni</th></tr></thead>
+        <tbody>${rows.map(r => `
+          <tr>
+            <td>${escapeHtml(r.typ)}</td>
+            <td class="mono"><button type="button" class="report-plate-link" data-old-plate="${escapeHtml(r.tablica)}">${escapeHtml(r.tablica)}</button></td>
+            <td>${escapeHtml(r.marka)}</td>
+            <td>${fmtDate(r.data_prania)}</td>
+            <td>${escapeHtml(r.kto_wykonal)}</td>
+            <td><span class="pill pill-no">${r.dni} dni</span></td>
+          </tr>`).join('')}</tbody>
+      </table>` : '<div class="empty-state" style="margin-top:14px;">Brak pojazdów spełniających kryterium 182,5 dnia.</div>';
+
+    reportShell(
+      'Dawno nie prane',
+      `<div class="confirm-text">Pojazdy, których od ostatniego wykonanego prania minęło co najmniej <strong>182,5 dnia</strong>. Kliknij tablicę, aby od razu otworzyć nowy wpis prania.</div>`,
+      body
+    );
+
+    document.querySelectorAll('[data-old-plate]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const plate = el.getAttribute('data-old-plate') || '';
+        closeModal();
+        window.__pendingPlate = plate;
+        openForm(null);
+      });
+    });
+  }
+
   function showAllOutstanding(){
     const plates = Object.keys(registry).sort();
     const rows = plates.map(plate => {
@@ -4761,6 +5031,301 @@ window.FLEET_DATA = {
 
   let pendingImportRows = null;
 
+
+  // Aktualizacja pojazdów z pliku floty:
+  // wymagane kolumny: Tablica | Data prania | Kto prał
+  // Istniejących tablic NIE modyfikujemy. Nowe tablice dostają pojazd + historyczny wpis prania.
+  function cfNormalizeImportedDate(value){
+    if(value === null || value === undefined || value === '') return '';
+    if(value instanceof Date && !isNaN(value.getTime())){
+      return value.toISOString().slice(0,10);
+    }
+    if(typeof value === 'number' && typeof XLSX !== 'undefined' && XLSX.SSF){
+      const parsed = XLSX.SSF.parse_date_code(value);
+      if(parsed && parsed.y && parsed.m && parsed.d){
+        return `${String(parsed.y).padStart(4,'0')}-${String(parsed.m).padStart(2,'0')}-${String(parsed.d).padStart(2,'0')}`;
+      }
+    }
+    const raw = String(value).trim();
+    let m = raw.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})$/);
+    if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+    m = raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+    if(m) return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+    return '';
+  }
+
+  function cfExtractFleetUpdateRows(rawRows){
+    if(!rawRows || !rawRows.length) return [];
+    const header = rawRows[0].map(h => String(h ?? '').trim().toLowerCase());
+    const idxPlate = header.findIndex(h => h === 'tablica' || h.includes('tablic') || h === 'plate' || h.includes('rejestrac'));
+    const idxWash = header.findIndex(h => h === 'data prania' || h.includes('data prania') || h === 'wash_date');
+    const idxWho = header.findIndex(h => h === 'kto prał' || h === 'kto pral' || h.includes('kto pra') || h === 'performed_by');
+
+    if(idxPlate < 0 || idxWash < 0 || idxWho < 0){
+      throw new Error('Plik musi mieć kolumny: Tablica, Data prania, Kto prał.');
+    }
+
+    const result = [];
+    const seen = new Set();
+
+    for(let i=1;i<rawRows.length;i++){
+      const row = rawRows[i] || [];
+      const plate = normalizePlate(String(row[idxPlate] ?? '').trim());
+      if(!plate || seen.has(plate)) continue;
+      seen.add(plate);
+      result.push({
+        plate,
+        wash_date: cfNormalizeImportedDate(row[idxWash]),
+        performed_by: String(row[idxWho] ?? '').trim()
+      });
+    }
+    return result;
+  }
+
+  function showFleetUpdatePreview(rows){
+    const existing = [];
+    const incomingNew = [];
+    rows.forEach(r => {
+      if(registry[r.plate]) existing.push(r);
+      else incomingNew.push(r);
+    });
+
+    // Każda nowa tablica jest dodawana. Brak daty prania oznacza po prostu brak historii prania.
+    const validNew = incomingNew;
+
+    const listHtml = validNew.length
+      ? `<div style="max-height:260px;overflow:auto;margin-top:12px;">${
+          validNew.map(r => `<div style="padding:8px 0;border-bottom:1px solid var(--line);">
+            <strong style="font-family:'JetBrains Mono',monospace;">${escapeHtml(r.plate)}</strong>
+            <span style="color:var(--ink-soft);"> · ${r.wash_date ? escapeHtml(fmtDate(r.wash_date)) : 'brak daty prania'} · ${r.performed_by ? escapeHtml(r.performed_by) : 'brak informacji'}</span>
+          </div>`).join('')
+        }</div>`
+      : '<div class="confirm-text">Brak nowych pojazdów do dodania.</div>';
+
+    const html = `
+      <div class="overlay" id="fleetUpdateOverlay">
+        <div class="sheet" style="max-width:560px;">
+          <button class="close" data-close>&times;</button>
+          <h2>Aktualizacja pojazdów</h2>
+          <div class="confirm-text">
+            W pliku: <strong>${rows.length}</strong><br>
+            Już istnieją w CleanFleet: <strong>${existing.length}</strong><br>
+            <strong>Do dodania: ${validNew.length}</strong><br>
+            <strong>Do aktualizacji typu/grupy: ${existing.length}</strong>
+          </div>
+          <div class="confirm-text" style="margin-top:8px;">
+            Istniejące tablice nie zostaną dodane ponownie. Wybrany typ i grupa rozliczeniowa mogą zostać zastosowane do wszystkich tablic z tego pliku.
+          </div>
+
+          <div class="field-row" style="margin-top:12px;">
+            <div class="field">
+              <label for="fleetImportType">Typ pojazdu dla nowych</label>
+              <select id="fleetImportType">
+                <option value="" selected>— brak / nie ustawiaj —</option>
+                <option value="SOLÓWKA">SOLÓWKA</option>
+                <option value="ZESTAW">ZESTAW</option>
+                <option value="BUS">BUS</option>
+                <option value="BUS C">BUS C</option>
+                <option value="OSOBOWE">OSOBOWE</option>
+                <option value="BUS MŁYNCZAK">BUS MŁYNCZAK</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="fleetImportBilling">Grupa rozliczeniowa</label>
+              <select id="fleetImportBilling">
+                <option value="">— brak / nie ustawiaj —</option>
+                <option value="osobowe">Osobowe</option>
+                <option value="ciezarowe">Ciężarowe</option>
+                <option value="busy">Busy</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="confirm-text" style="margin-top:8px;">
+            Jeżeli wybierzesz typ, zostanie on ustawiony dla wszystkich tablic znajdujących się w tym pliku. Jeżeli wybierzesz grupę rozliczeniową, zostanie ona ustawiona dla wpisów prania tych tablic. Puste pole oznacza: nie zmieniaj. Przycisk działa również wtedy, gdy nie ma żadnej nowej tablicy.
+          </div>
+
+          ${listHtml}
+          <div class="sheet-actions">
+            <button class="btn btn-outline" id="cancelFleetUpdate">Anuluj</button>
+            <button class="btn btn-solid" id="confirmFleetUpdate" ${rows.length ? '' : 'disabled'}>ZASTOSUJ ZMIANY (${rows.length})</button>
+          </div>
+        </div>
+      </div>`;
+
+    document.getElementById('modalRoot').innerHTML = html;
+    document.getElementById('fleetUpdateOverlay').addEventListener('click', e => {
+      if(e.target.id === 'fleetUpdateOverlay') closeModal();
+    });
+    document.querySelector('#fleetUpdateOverlay [data-close]').addEventListener('click', closeModal);
+    document.getElementById('cancelFleetUpdate').addEventListener('click', closeModal);
+    document.getElementById('confirmFleetUpdate').addEventListener('click', () => {
+      const selectedType = document.getElementById('fleetImportType')?.value || '';
+      const selectedBilling = document.getElementById('fleetImportBilling')?.value || '';
+      runFleetUpdate(rows, selectedType, selectedBilling);
+    });
+  }
+
+  async function runFleetUpdate(rows, selectedType, selectedBilling){
+    if(!rows.length){ closeModal(); return; }
+
+    try{
+      // Aktualizacja floty działa na CAŁEJ liście z importu:
+      // - nowa tablica -> dodaj,
+      // - istniejąca tablica -> nie dodawaj ponownie,
+      // - wybrany typ -> ustaw dla wszystkich importowanych tablic,
+      // - wybrana grupa rozliczeniowa -> ustaw dla wpisów prania tych tablic,
+      // - puste wybory -> nie zmieniaj odpowiedniego pola.
+      const { data: currentVehicles, error: vehicleError } =
+        await cfSupabase.from('vehicles').select('plate,type,brand');
+      if(vehicleError) throw vehicleError;
+
+      const existing = new Set((currentVehicles || []).map(v => normalizePlate(v.plate)));
+      const importedPlates = [...new Set(rows.map(r => normalizePlate(r.plate)).filter(Boolean))];
+      const newRows = rows.filter(r => !existing.has(r.plate));
+
+      // 1. Dodaj tylko brakujące pojazdy.
+      if(newRows.length){
+        const vehicleRows = newRows.map(r => ({
+          plate:r.plate,
+          type:selectedType || '',
+          brand:''
+        }));
+        const { error: insertVehicleError } =
+          await cfSupabase.from('vehicles').insert(vehicleRows);
+        if(insertVehicleError) throw insertVehicleError;
+      }
+
+      // 2. Jeżeli wybrano typ, ustaw go dla WSZYSTKICH pojazdów z importowanej listy.
+      // Dotyczy również pojazdów, które już były w bazie — właśnie po to służy
+      // wybór typu podczas aktualizacji floty.
+      if(selectedType && importedPlates.length){
+        const { error: updateVehicleTypeError } =
+          await cfSupabase.from('vehicles')
+            .update({type:selectedType})
+            .in('plate', importedPlates);
+        if(updateVehicleTypeError) throw updateVehicleTypeError;
+
+        // Synchronizujemy również typ w istniejących wpisach prania.
+        // Dzięki temu statystyki i historia dla importowanej grupy są spójne.
+        const { data: recordsToUpdate, error: recordsReadError } =
+          await cfSupabase.from('wash_records')
+            .select('id,plate')
+            .in('plate', importedPlates);
+        if(recordsReadError) throw recordsReadError;
+
+        for(const record of (recordsToUpdate || [])){
+          const { error: updateRecordTypeError } =
+            await cfSupabase.from('wash_records')
+              .update({type:selectedType})
+              .eq('id', record.id);
+          if(updateRecordTypeError) throw updateRecordTypeError;
+        }
+      }
+
+      // 3. Jeżeli wybrano grupę rozliczeniową, ustaw ją dla istniejących
+      // wpisów prania wszystkich importowanych tablic.
+      // Pusta grupa = nie zmieniamy istniejących grup.
+      if(selectedBilling && importedPlates.length){
+        const { error: updateBillingError } =
+          await cfSupabase.from('wash_records')
+            .update({billing_category:selectedBilling})
+            .in('plate', importedPlates);
+        if(updateBillingError) throw updateBillingError;
+      }
+
+      // 4. Dla nowych pojazdów utwórz historię tylko wtedy, gdy XLS ma datę prania.
+      const washRows = newRows
+        .filter(r => r.wash_date)
+        .map(r => ({
+          id: uid(),
+          plate: r.plate,
+          type: selectedType || '',
+          brand: '',
+          billing_category: selectedBilling || null,
+          ordered: false,
+          ordered_by: '',
+          order_date: null,
+          order_due_date: null,
+          notes: 'Import z pliku floty',
+          wash_date: r.wash_date,
+          performed_by: r.performed_by || '',
+          cost: 0,
+          approved: true,
+          paid: true,
+          created_at: new Date().toISOString()
+        }));
+
+      if(washRows.length){
+        const { error: insertWashError } =
+          await cfSupabase.from('wash_records').insert(washRows);
+        if(insertWashError){
+          await cfSupabase.from('vehicles').delete().in('plate', newRows.map(r => r.plate));
+          throw insertWashError;
+        }
+      }
+
+      // Aktualizacja lokalnego rejestru po pomyślnym zapisie.
+      importedPlates.forEach(plate => {
+        const info = registry[plate] || {};
+        registry[plate] = {
+          typ: selectedType || info.typ || '',
+          marka: info.marka || ''
+        };
+      });
+
+      closeModal();
+      await loadAll();
+
+      const updatedExisting = importedPlates.filter(p => existing.has(p)).length;
+      const parts = [];
+      if(newRows.length) parts.push(`dodano ${newRows.length}`);
+      if(updatedExisting && selectedType) parts.push(`typ zaktualizowano w ${updatedExisting}`);
+      if(updatedExisting && selectedBilling) parts.push(`grupę rozliczeniową zaktualizowano w ${updatedExisting}`);
+      showToast(parts.length ? parts.join(', ') : 'Nie wybrano pól do aktualizacji');
+    }catch(error){
+      console.error('CleanFleet fleet update error:', error);
+      showToast(error?.message || 'Nie udało się zaktualizować bazy pojazdów');
+    }
+  }
+
+  document.getElementById('fleetUpdateBtn').addEventListener('click', () => {
+    document.getElementById('fleetUpdateFile').click();
+  });
+
+  document.getElementById('fleetUpdateFile').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if(!file) return;
+
+    try{
+      let rawRows;
+      const ext = file.name.split('.').pop().toLowerCase();
+
+      if(ext === 'xlsx' || ext === 'xls'){
+        const wb = XLSX.read(await file.arrayBuffer(), {type:'array', cellDates:true});
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        rawRows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:'', raw:true});
+      }else{
+        rawRows = csvToRows(await file.text());
+      }
+
+      const rows = cfExtractFleetUpdateRows(rawRows);
+      e.target.value = '';
+
+      if(!rows.length){
+        showToast('Nie znaleziono pojazdów w pliku');
+        return;
+      }
+
+      menuOverlay.classList.remove('open');
+      showFleetUpdatePreview(rows);
+    }catch(error){
+      e.target.value = '';
+      console.error('CleanFleet fleet update read error:', error);
+      showToast(error?.message || 'Nie udało się odczytać pliku aktualizacji');
+    }
+  });
+
   document.getElementById('importFile').addEventListener('change', async (e) => {
     const file=e.target.files[0];
     if(!file) return;
@@ -4905,11 +5470,11 @@ window.FLEET_DATA = {
       await cfInitSupabase();
       const { data:{session} } = await cfSupabase.auth.getSession();
       if(!session){ cfShowLogin(true); cfSetSync('Wymagane logowanie'); }
-      else { cfShowLogin(false); await cfLoadRole(); cfApplyRoleMenu(); if(!cfCurrentRole){ cfShowLogin(true); cfSetSync('Brak prawidłowej roli użytkownika','err'); return; } await loadAll(); await cfPrepareNotifications(); }
+      else { cfShowLogin(false); await cfLoadRole(); if(!cfCurrentRole){ throw new Error('Brak przypisanej roli użytkownika.'); } await loadAll(); await cfPrepareNotifications(); }
       cfSupabase.auth.onAuthStateChange((_event, session)=>{
         if(session){
           cfShowLogin(false);
-          setTimeout(async ()=>{ await cfLoadRole(); cfApplyRoleMenu(); if(!cfCurrentRole){ cfShowLogin(true); cfSetSync('Brak prawidłowej roli użytkownika','err'); return; } await loadAll(); await cfPrepareNotifications(); },0);
+          setTimeout(async ()=>{ await cfLoadRole(); if(!cfCurrentRole) return; await loadAll(); await cfPrepareNotifications(); },0);
         } else {
           cfShowLogin(true);
           cfSetSync('Wymagane logowanie');
@@ -4921,6 +5486,13 @@ window.FLEET_DATA = {
       showToast('Nie udało się załadować połączenia z Supabase. Odśwież stronę.');
     }
   }
+
+  // Po powrocie do aplikacji ponownie wyliczamy terminy. Ma to znaczenie na
+  // iPadzie/iPhonie, gdzie Safari może wstrzymać timery w tle.
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible') cfScheduleWashReminders();
+  });
+  window.addEventListener('focus', () => cfScheduleWashReminders());
 
   function defaultBillingCategory(type){
     const t = String(type || '').trim().toLowerCase();
@@ -4987,7 +5559,6 @@ window.FLEET_DATA = {
       if(action === 'month') showMonthReport();
       else if(action === 'year') showYearReport();
       else if(action === 'all') showAllOutstanding();
-      else if(action === 'pending') showPendingOrders();
     });
   });
   document.addEventListener('keydown', e => { if(e.key === 'Escape') closeBottomMobileMenu(); });

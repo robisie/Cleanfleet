@@ -3742,7 +3742,7 @@ function uid(){
       // BUS jest celowo wyłączony zarówno z listy, jak i z licznika kafelka.
       const info=registry[plate] || {};
       const vehicleType=String((latest && latest.typ) || info.typ || '').trim().toUpperCase();
-      if(vehicleType==='BUS') return false;
+      if(vehicleType==='BUS' && !cfIsFleetEmployee()) return false;
       if(!latest) return false;
       return daysSinceLastWashForRecord(latest)>=(365/2);
     }).length;
@@ -3836,6 +3836,44 @@ function uid(){
     }
   }
 
+  async function cfStoreInvoiceAttachment(invoiceId, blob, filename){
+    if(!invoiceId || !blob) return false;
+    const path = `invoices/${invoiceId}.pdf`;
+    const { error } = await cfSupabase.storage
+      .from('invoice-attachments')
+      .upload(path, blob, { contentType:'application/pdf', upsert:true });
+    if(error){
+      console.warn('CleanFleet invoice attachment upload:', error.message);
+      return false;
+    }
+    return true;
+  }
+
+  async function cfDownloadInvoiceAttachment(invoice){
+    if(!invoice?.id) throw new Error('Brak identyfikatora faktury.');
+    const path = `invoices/${invoice.id}.pdf`;
+    const { data, error } = await cfSupabase.storage
+      .from('invoice-attachments')
+      .createSignedUrl(path, 120);
+    if(error || !data?.signedUrl){
+      throw new Error('Ta faktura nie ma jeszcze zapisanego załącznika PDF.');
+    }
+    const a=document.createElement('a');
+    a.href=data.signedUrl;
+    a.target='_blank';
+    a.rel='noopener';
+    a.download=`zalacznik-do-faktury-${String(invoice.invoice_number||invoice.id).replace(/[^a-zA-Z0-9._-]+/g,'_')}.pdf`;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  async function cfEnsureInvoiceSavedWithAttachment(invoiceContext, blob, filename){
+    const result = await cfCreateInvoiceFromRows(invoiceContext.invoiceNumber, invoiceContext.period, invoiceContext.rows);
+    const saved = result.invoice;
+    const stored = await cfStoreInvoiceAttachment(saved.id, blob, filename);
+    if(!stored) throw new Error('Faktura została zapisana, ale nie udało się zapisać jej załącznika PDF.');
+    return result;
+  }
+
   async function cfCreateInvoiceFromRows(invoiceNumber, period, rows){
     const {data:{session}} = await cfSupabase.auth.getSession();
     if(!session?.user?.id) throw new Error('Brak zalogowanego użytkownika.');
@@ -3911,7 +3949,10 @@ function uid(){
               <div class="invoice-number">${escapeHtml(inv.invoice_number || '—')}</div>
               <div class="invoice-meta">${inv.invoice_date ? fmtDate(inv.invoice_date) : '—'} · ${count} pojazdów · ${fmtMoney(inv.amount)}</div>
             </div>
-            <span class="invoice-status ${paid?'invoice-paid':'invoice-pending'}">${paid?'OPŁACONA':'OCZEKUJE'}</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button type="button" class="btn btn-outline" data-invoice-attachment="${escapeHtml(inv.id)}" title="Pobierz załącznik PDF do tej faktury" aria-label="Pobierz załącznik PDF" style="padding:7px 10px;">📄 PDF</button>
+              <span class="invoice-status ${paid?'invoice-paid':'invoice-pending'}">${paid?'OPŁACONA':'OCZEKUJE'}</span>
+            </div>
           </div>
         </div>`;
       }).join('');
@@ -3942,7 +3983,18 @@ function uid(){
       const list = document.getElementById('financeQueueList');
       if(list) list.innerHTML = renderInvoiceRows(filtered);
       document.querySelectorAll('#financeQueueList [data-invoice-open]').forEach(el=>{
-        el.addEventListener('click',()=>showInvoiceDetails(el.getAttribute('data-invoice-open')));
+        el.addEventListener('click',(e)=>{
+          if(e.target.closest('[data-invoice-attachment]')) return;
+          showInvoiceDetails(el.getAttribute('data-invoice-open'));
+        });
+      });
+      document.querySelectorAll('#financeQueueList [data-invoice-attachment]').forEach(el=>{
+        el.addEventListener('click',async(e)=>{
+          e.preventDefault(); e.stopPropagation();
+          const inv=invoices.find(i=>i.id===el.getAttribute('data-invoice-attachment'));
+          try{ await cfDownloadInvoiceAttachment(inv); }
+          catch(err){ showToast(err?.message || 'Nie udało się pobrać załącznika PDF'); }
+        });
       });
     };
     document.getElementById('invoiceMonthFilter')?.addEventListener('change',render);
@@ -3965,12 +4017,20 @@ function uid(){
     const bodyHtml = `<div class="confirm-text">Faktura <strong>${escapeHtml(inv.invoice_number)}</strong> · ${fmtMoney(inv.amount)} · ${rows.length} pojazdów</div>
       <table class="report"><thead><tr><th>Tablica</th><th>Typ</th><th>Data prania</th><th>Kwota</th><th>Zapł.</th></tr></thead><tbody>${body}</tbody></table>
       <div class="sheet-actions">
+        <button class="btn btn-solid" id="downloadInvoiceAttachmentBtn">📄 Pobierz załącznik PDF</button>
         ${employeeReadOnly ? '<button class="btn btn-outline" id="backFinanceBtn">Wróć</button>' : `${paid ? '<button class="btn btn-solid" disabled>✓ Faktura opłacona</button>' : '<button class="btn btn-solid" id="markInvoicePaidBtn">Faktura opłacona</button>'}
         <button class="btn btn-outline" id="deleteInvoiceBtn" title="Usuń fakturę" aria-label="Usuń fakturę" style="background:#c62828;color:#fff;border-color:#c62828;font-size:20px;line-height:1;min-width:48px;padding:10px 14px;">🗑️</button>
         <button class="btn btn-outline" id="backFinanceBtn">Wróć</button>`}
       </div>`;
     reportShell('Szczegóły faktury', '', bodyHtml);
     document.getElementById('backFinanceBtn').addEventListener('click', showFinanceQueue);
+    document.getElementById('downloadInvoiceAttachmentBtn')?.addEventListener('click', async()=>{
+      try{
+        await cfDownloadInvoiceAttachment(inv);
+      }catch(e){
+        showToast(e?.message || 'Nie udało się pobrać załącznika PDF');
+      }
+    });
 
     document.getElementById('deleteInvoiceBtn')?.addEventListener('click',()=>{
       showConfirm(
@@ -4601,18 +4661,19 @@ function uid(){
     });
 
     document.getElementById('pdfDownloadBtn').addEventListener('click',async()=>{
-      const saveInvoice=async()=>{
-        try{
-          const result=await cfCreateInvoiceFromRows(invoiceContext.invoiceNumber,invoiceContext.period,invoiceContext.rows);
-          showToast(result.existing?'Ta faktura jest już w kolejce':'Faktura dodana do kolejki „Oczekuje na płatność”');
-        }catch(err){ console.error(err); showToast(err?.message||'Nie udało się zapisać faktury'); }
-      };
-      await saveInvoice();
+      try{
+        const result=await cfEnsureInvoiceSavedWithAttachment(invoiceContext, reportBlob, filename);
+        showToast(result.existing?'Faktura już była zapisana — załącznik PDF został zaktualizowany':'Faktura i załącznik PDF zostały zapisane');
+      }catch(err){ console.error(err); showToast(err?.message||'Nie udało się zapisać faktury i załącznika'); return; }
       const a=document.createElement('a'); a.href=blobUrl; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
     });
 
-    document.getElementById('pdfMailBtn').addEventListener('click',()=>{
-      showMailDialog(reportBlob,filename,invoiceContext.invoiceFile,invoiceContext.invoiceFile?.name || `faktura-${invoiceContext.invoiceNumber}.pdf`,invoiceContext.invoiceNumber,invoiceContext.period);
+    document.getElementById('pdfMailBtn').addEventListener('click',async()=>{
+      try{
+        const result=await cfEnsureInvoiceSavedWithAttachment(invoiceContext, reportBlob, filename);
+        showToast(result.existing?'Faktura już była zapisana — załącznik PDF został zaktualizowany':'Faktura i załącznik PDF zostały zapisane');
+        showMailDialog(reportBlob,filename,invoiceContext.invoiceFile,invoiceContext.invoiceFile?.name || `faktura-${invoiceContext.invoiceNumber}.pdf`,invoiceContext.invoiceNumber,invoiceContext.period);
+      }catch(err){ console.error(err); showToast(err?.message||'Nie udało się zapisać faktury i załącznika'); }
     });
   }
 
@@ -4815,7 +4876,7 @@ function uid(){
       if(days === null || days < (365 / 2)) return null;
       const info = registry[plate] || {};
       const vehicleType = String(latest.typ || info.typ || '').trim().toUpperCase();
-      if(vehicleType === 'BUS') return null;
+      if(vehicleType === 'BUS' && !cfIsFleetEmployee()) return null;
       return {
         typ: (latest.typ || info.typ || '—'),
         tablica: plate,

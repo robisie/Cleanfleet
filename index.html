@@ -3851,19 +3851,76 @@ function uid(){
 
   async function cfDownloadInvoiceAttachment(invoice){
     if(!invoice?.id) throw new Error('Brak identyfikatora faktury.');
-    const path = `invoices/${invoice.id}.pdf`;
-    const { data, error } = await cfSupabase.storage
-      .from('invoice-attachments')
-      .createSignedUrl(path, 120);
-    if(error || !data?.signedUrl){
-      throw new Error('Ta faktura nie ma jeszcze zapisanego załącznika PDF.');
+    const rows = invoiceRowsFor(invoice.id);
+    if(!rows.length) throw new Error('Ta faktura nie ma przypisanych wpisów prania.');
+
+    // Pracownik nie pobiera zapisanego pliku — PDF jest generowany ponownie
+    // dokładnie tym samym mechanizmem co załącznik tworzony przez administratora.
+    const invoiceNumber = String(invoice.invoice_number || '');
+    const period = String(invoice.period || invoice.invoice_date || '').slice(0,7);
+    const activeCols = PDF_COLUMNS.slice();
+    const headerCells = activeCols.map(c=>`<th style="text-align:left;padding:8px 10px;background:#16150F;color:#F5F4EE;font-size:13px;">${escapeHtml(colDefs[c.key].header)}</th>`).join('');
+    const bodyRows = rows.map((r,i)=>`
+      <tr style="background:${i%2?'#F7F6F1':'#FFFFFF'};">
+        ${activeCols.map(c=>`<td style="padding:7px 10px;font-size:12.5px;border-bottom:1px solid #E5E3D8;">${escapeHtml(String(colDefs[c.key].cell(r)))}</td>`).join('')}
+      </tr>`).join('');
+
+    const summaryLabels={personal:'Osobowe',heavy:'Ciężarowe',bus:'Busy'};
+    const summaryLines=['personal','heavy','bus'].map(type=>{
+      const total=rows.filter(r=>pdfBillingCategoryKey(r)===type).reduce((sum,r)=>sum+(Number(r.koszt)||0),0);
+      return `<div style="display:flex;justify-content:space-between;gap:20px;margin-top:5px;"><span>${summaryLabels[type]}</span><span>${fmtMoney(total)}</span></div>`;
+    }).join('');
+    const sumHtml=`<div style="margin-top:18px;font-size:14px;font-weight:700;border-top:1px solid #D9D6C9;padding-top:10px;">${summaryLines}</div>`;
+
+    const logoImg=document.querySelector('.app-logo');
+    const logoSrc=logoImg?logoImg.src:'';
+    const container=document.createElement('div');
+    container.style.cssText='position:fixed;left:-9999px;top:0;width:900px;background:#ffffff;color:#16150F;font-family:Arial,Helvetica,sans-serif;padding:32px;';
+    container.innerHTML=`
+      <div style="margin-bottom:22px;">
+        ${logoSrc?`<img src="${logoSrc}" style="height:58px;width:auto;display:block;margin-bottom:18px;">`:''}
+        <div style="font-size:17px;font-weight:700;line-height:1.35;">Załącznik do faktury</div>
+        <div style="font-size:16px;margin-top:3px;">${escapeHtml(invoiceNumber)}</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr>${headerCells}</tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+      ${sumHtml}`;
+    document.body.appendChild(container);
+
+    let canvas;
+    try{
+      canvas=await html2canvas(container,{scale:2,backgroundColor:'#ffffff',useCORS:true});
+    }catch(e){
+      document.body.removeChild(container);
+      throw new Error('Nie udało się wygenerować załącznika PDF.');
     }
+    document.body.removeChild(container);
+
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({unit:'mm',format:'a4'});
+    const marginMM=10, imgWidthMM=190, pageHeightMM=277;
+    const pxPerMM=canvas.width/imgWidthMM, pageHeightPx=pageHeightMM*pxPerMM;
+    let renderedPx=0, firstPage=true;
+    while(renderedPx<canvas.height){
+      const sliceHeightPx=Math.min(pageHeightPx,canvas.height-renderedPx);
+      const sliceCanvas=document.createElement('canvas');
+      sliceCanvas.width=canvas.width; sliceCanvas.height=sliceHeightPx;
+      sliceCanvas.getContext('2d').drawImage(canvas,0,renderedPx,canvas.width,sliceHeightPx,0,0,canvas.width,sliceHeightPx);
+      if(!firstPage) doc.addPage();
+      doc.addImage(sliceCanvas.toDataURL('image/png'),'PNG',marginMM,marginMM,imgWidthMM,sliceHeightPx/pxPerMM);
+      renderedPx+=sliceHeightPx; firstPage=false;
+    }
+
+    const safeInvoice=invoiceNumber.replace(/[^a-zA-Z0-9._-]+/g,'_');
+    const filename=`zalacznik-do-faktury-${safeInvoice}-${period}.pdf`;
+    const blobUrl=URL.createObjectURL(doc.output('blob'));
     const a=document.createElement('a');
-    a.href=data.signedUrl;
-    a.target='_blank';
-    a.rel='noopener';
-    a.download=`zalacznik-do-faktury-${String(invoice.invoice_number||invoice.id).replace(/[^a-zA-Z0-9._-]+/g,'_')}.pdf`;
+    a.href=blobUrl;
+    a.download=filename;
     document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(blobUrl),5000);
   }
 
   async function cfEnsureInvoiceSavedWithAttachment(invoiceContext, blob, filename){

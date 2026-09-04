@@ -4512,14 +4512,23 @@ function uid(){
 
     const all=cfReportRowsFromRecords();
     const getDate=r=>dateBasis==='order'?String(r.data_zlecenia||''):dateBasis==='created'?(r.created_at?new Date(r.created_at).toISOString().slice(0,10):''):dateBasis==='invoice'?String(r.__invoice_date||''):String(r.data_prania||'');
-    const wantedTypes=new Set(types.map(t=>String(t).trim().toLowerCase()));
-    const wantedBilling=new Set(billing);
+    const wantedTypes=new Set(types.map(t=>String(t).trim().toLowerCase()).filter(Boolean));
+    const wantedBilling=new Set(billing.map(t=>String(t).trim().toLowerCase()).filter(Boolean));
     const rows=all.filter(r=>{
-      const vehicleType=String(r.typ||'').trim().toLowerCase();
-      const cat=String(pdfBillingCategoryKey(r)||'').toLowerCase();
-      if(!wantedTypes.has(vehicleType)) return false;
-      const billingMatch=wantedBilling.has(cat) || (billingEmpty&&!cat);
-      if(!billingMatch) return false;
+      const vehicleType=String(r.typ||'').trim().toLowerCase().replace(/\s+/g,' ');
+      // Pusty wybór typu oznacza brak ograniczenia — dzięki temu przyciski
+      // „Wyczyść typy” nie powodują sztucznego „braku danych”.
+      if(wantedTypes.size && !wantedTypes.has(vehicleType)) return false;
+
+      // Kategoria rozliczeniowa jest filtrowana na podstawie wartości zapisanej
+      // w rekordzie. Dla starych wpisów bez kategorii działa osobna opcja „Brak przypisanej”.
+      const rawBilling=String(r.billing_category||'').trim().toLowerCase();
+      const cat=pdfBillingCategoryKey(r).toLowerCase();
+      const billingFilterActive=wantedBilling.size || billingEmpty;
+      if(billingFilterActive){
+        const billingMatch = (rawBilling ? wantedBilling.has(cat) : billingEmpty);
+        if(!billingMatch) return false;
+      }
       const d=getDate(r);
       if(mode==='month' && d.slice(0,7)!==month) return false;
       if(mode==='custom' && (!d || d<from || d>to)) return false;

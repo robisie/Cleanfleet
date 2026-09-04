@@ -729,27 +729,20 @@
   @media(max-width:640px){.cf-report-status-grid,.cf-report-fields-grid{grid-template-columns:1fr}.cf-report-sheet{padding:16px!important}}
 </style>
 
-<style>
-.cf-admin-notifications-panel{position:fixed;inset:0;z-index:10050;display:none}
-.cf-admin-notifications-panel.open{display:block}
-.cf-admin-notifications-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.42)}
-.cf-admin-notifications-sheet{position:absolute;right:18px;top:18px;width:min(620px,calc(100vw - 36px));max-height:calc(100vh - 36px);overflow:auto;background:#fff;border-radius:16px;box-shadow:0 18px 60px rgba(0,0,0,.25)}
-.cf-admin-notifications-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid #e7e7e7}
-.cf-admin-notifications-head h2{margin:0;font-size:20px}
-#cfAdminNotificationsSub{margin-top:4px;color:#6b7280;font-size:13px}
-#cfAdminNotificationsClose{border:0;background:transparent;font-size:30px;line-height:1;cursor:pointer;padding:2px 8px}
-.cf-admin-notifications-list{padding:12px}
-.cf-admin-notification{border:1px solid #e3e6e8;border-radius:12px;padding:13px 14px;margin-bottom:10px;background:#fff}
-.cf-admin-notification.unread{border-left:4px solid #16834b;background:#f8fcfa}
-.cf-admin-notification-title{font-weight:700;margin-bottom:5px}
-.cf-admin-notification-body{font-size:14px;line-height:1.45;color:#30343b}
-.cf-admin-notification-date{font-size:12px;color:#7b818a;margin-top:8px}
-.cf-admin-notification-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.cf-admin-notification-actions button{border:1px solid #d5d9dd;background:#fff;border-radius:8px;padding:7px 10px;cursor:pointer}
-.cf-admin-notification-actions button.primary{background:#16834b;color:#fff;border-color:#16834b}
-.cf-admin-notifications-empty{padding:28px 12px;text-align:center;color:#707780}
+<style id="cf-admin-notifications">
+#cfAdminNotificationsPanel{display:none;position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.35);align-items:center;justify-content:center;padding:20px;}
+#cfAdminNotificationsPanel.open{display:flex;}
+#cfAdminNotificationsSheet{width:min(620px,96vw);max-height:86vh;overflow:auto;background:#F7F6F1;border:1px solid var(--line-strong);border-radius:16px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+#cfAdminNotificationsSheet h2{margin:0 0 3px;font-size:22px;}
+.cf-admin-notifications-sub{font-size:12px;color:var(--ink-soft);margin-bottom:14px;}
+.cf-admin-notification{border:1px solid var(--line);border-radius:12px;background:#fff;padding:13px;margin:8px 0;cursor:pointer;}
+.cf-admin-notification.unread{border-left:4px solid var(--green);padding-left:10px;background:#fbfcf5;}
+.cf-admin-notification-title{font-weight:800;font-size:14px;}
+.cf-admin-notification-body{font-size:12px;margin-top:5px;line-height:1.45;}
+.cf-admin-notification-date{font-size:10px;color:var(--ink-soft);margin-top:7px;}
+.cf-admin-notification-empty{padding:25px 8px;text-align:center;color:var(--ink-soft);font-size:13px;}
+#cfAdminNotificationsClose{float:right;}
 </style>
-
 </head>
 <body>
 
@@ -824,9 +817,9 @@
         <span class="menu-item-title">Importuj / przywróć dane</span>
         <span class="menu-item-sub">Pełny backup CleanFleet</span>
       </button>
-      <button class="menu-item" id="cfNotificationsBtn" disabled>
-        <span class="menu-item-title"><span class="cf-bell-icon" aria-hidden="true">🔔</span><span id="cfNotificationsTitle">Sprawdzanie powiadomień…</span></span>
-        <span class="menu-item-sub" id="cfNotificationsSub">Sprawdzanie stanu tego urządzenia…</span>
+      <button class="menu-item" id="cfNotificationsBtn" type="button">
+        <span class="menu-item-title"><span class="cf-bell-icon" aria-hidden="true">🔔</span><span id="cfNotificationsTitle">Powiadomienia</span></span>
+        <span class="menu-item-sub" id="cfNotificationsSub">Wnioski i zmiany od użytkownika floty</span>
       </button>
     </div>
     <div class="menu-logout-wrap">
@@ -877,17 +870,12 @@
 </div>
 
 
-<div id="cfAdminNotificationsPanel" class="cf-admin-notifications-panel" aria-hidden="true">
-  <div class="cf-admin-notifications-backdrop" id="cfAdminNotificationsBackdrop"></div>
-  <div class="cf-admin-notifications-sheet" role="dialog" aria-modal="true" aria-labelledby="cfAdminNotificationsHeading">
-    <div class="cf-admin-notifications-head">
-      <div>
-        <h2 id="cfAdminNotificationsHeading">🔔 Powiadomienia</h2>
-        <div id="cfAdminNotificationsSub">Wnioski użytkownika floty</div>
-      </div>
-      <button type="button" id="cfAdminNotificationsClose" aria-label="Zamknij">×</button>
-    </div>
-    <div id="cfAdminNotificationsList" class="cf-admin-notifications-list"></div>
+<div id="cfAdminNotificationsPanel" aria-hidden="true">
+  <div id="cfAdminNotificationsSheet">
+    <button class="close" id="cfAdminNotificationsClose" type="button">&times;</button>
+    <h2>🔔 Powiadomienia</h2>
+    <div class="cf-admin-notifications-sub">Wnioski użytkownika floty dotyczące zmian i anulowania wpisów.</div>
+    <div id="cfAdminNotificationsList"></div>
   </div>
 </div>
 
@@ -964,139 +952,6 @@ function cfShowToast(msg){
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2200);
-}
-
-
-let cfAdminNotifications = [];
-
-function cfEscapeNotificationHtml(value){
-  return String(value ?? '').replace(/[&<>"']/g, ch => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  }[ch]));
-}
-
-function cfFormatNotificationDate(value){
-  if(!value) return '';
-  const d = new Date(value);
-  if(Number.isNaN(d.getTime())) return '';
-  return d.toLocaleString('pl-PL',{
-    day:'2-digit',month:'2-digit',year:'numeric',
-    hour:'2-digit',minute:'2-digit'
-  });
-}
-
-function cfOpenAdminNotificationsPanel(){
-  const panel=document.getElementById('cfAdminNotificationsPanel');
-  if(!panel) return;
-  panel.classList.add('open');
-  panel.setAttribute('aria-hidden','false');
-}
-
-function cfCloseAdminNotificationsPanel(){
-  const panel=document.getElementById('cfAdminNotificationsPanel');
-  if(!panel) return;
-  panel.classList.remove('open');
-  panel.setAttribute('aria-hidden','true');
-}
-
-function cfRenderAdminNotifications(){
-  const list=document.getElementById('cfAdminNotificationsList');
-  const sub=document.getElementById('cfAdminNotificationsSub');
-  const btn=document.getElementById('cfNotificationsBtn');
-  if(!list) return;
-
-  const unread=cfAdminNotifications.filter(n=>!n.read_at).length;
-  if(sub){
-    sub.textContent = unread
-      ? `${unread} nieprzeczytanych · wnioski użytkownika floty`
-      : 'Brak nowych wniosków użytkownika floty';
-  }
-
-  if(btn){
-    const title=document.getElementById('cfNotificationsTitle');
-    if(title) title.textContent = unread ? `🔔 Powiadomienia (${unread})` : '🔔 Powiadomienia';
-    btn.setAttribute('aria-label', unread ? `Powiadomienia: ${unread} nieprzeczytanych` : 'Powiadomienia');
-  }
-
-  if(!cfAdminNotifications.length){
-    list.innerHTML='<div class="cf-admin-notifications-empty">Brak powiadomień.</div>';
-    return;
-  }
-
-  list.innerHTML=cfAdminNotifications.map(n=>{
-    const unreadClass=n.read_at?'':' unread';
-    const entity=n.entity_id || '';
-    return `<div class="cf-admin-notification${unreadClass}" data-notification-id="${cfEscapeNotificationHtml(n.id)}">
-      <div class="cf-admin-notification-title">${cfEscapeNotificationHtml(n.title || 'Powiadomienie')}</div>
-      <div class="cf-admin-notification-body">${cfEscapeNotificationHtml(n.body || '')}</div>
-      <div class="cf-admin-notification-date">${cfFormatNotificationDate(n.created_at)}</div>
-      <div class="cf-admin-notification-actions">
-        ${entity ? `<button type="button" class="primary" data-cf-notification-open="${cfEscapeNotificationHtml(n.id)}">Pokaż wniosek</button>` : ''}
-        ${!n.read_at ? `<button type="button" data-cf-notification-read="${cfEscapeNotificationHtml(n.id)}">Oznacz jako przeczytane</button>` : ''}
-      </div>
-    </div>`;
-  }).join('');
-}
-
-async function cfLoadAdminNotifications(){
-  if(!cfSupabase || !cfIsAdmin()) return;
-  try{
-    const {data,error}=await cfSupabase
-      .from('cf_notifications')
-      .select('id,recipient_user_id,type,title,body,entity_id,read_at,created_at')
-      .eq('recipient_user_id',cfCurrentUserId)
-      .order('created_at',{ascending:false})
-      .limit(50);
-    if(error) throw error;
-    cfAdminNotifications=data || [];
-    cfRenderAdminNotifications();
-  }catch(error){
-    console.warn('CleanFleet admin notifications:', error);
-  }
-}
-
-async function cfMarkAdminNotificationRead(id){
-  if(!cfSupabase || !id || !cfIsAdmin()) return;
-  const {error}=await cfSupabase
-    .from('cf_notifications')
-    .update({read_at:new Date().toISOString()})
-    .eq('id',id)
-    .eq('recipient_user_id',cfCurrentUserId);
-  if(error) throw error;
-  await cfLoadAdminNotifications();
-}
-
-function cfGetAdminNotification(id){
-  return cfAdminNotifications.find(n=>n.id===id) || null;
-}
-
-async function cfOpenAdminNotificationRequest(id){
-  const n=cfGetAdminNotification(id);
-  if(!n) return;
-  if(!n.read_at){
-    try{ await cfMarkAdminNotificationRead(id); }catch(e){ console.warn(e); }
-  }
-  cfCloseAdminNotificationsPanel();
-
-  // The notification is tied to the change-request row. Open the vehicle
-  // history, which is an existing, untouched CleanFleet function.
-  if(n.entity_id){
-    try{
-      const {data,error}=await cfSupabase
-        .from('wash_change_requests')
-        .select('id,wash_record_id,request_type,status,reason,proposed_data,created_at')
-        .eq('id',n.entity_id)
-        .maybeSingle();
-      if(error && error.code !== 'PGRST116') throw error;
-      const request=data;
-      if(request?.wash_record_id){
-        const rec=records.find(r=>r.id===request.wash_record_id);
-        if(rec?.tablica) showVehicleHistory(rec.tablica);
-      }
-    }catch(e){
-      console.warn('CleanFleet notification request open:',e);
-    }
-  }
 }
 
 function cfSetNotificationsStatus(text, enabled=false){
@@ -6152,28 +6007,48 @@ function uid(){
     await cfSignIn(email,password);
   });
   document.getElementById('cfRefreshBtn').addEventListener('click', cfRefresh);
-  document.getElementById('cfNotificationsBtn').addEventListener('click', async ()=>{
+  async function cfLoadAdminNotifications(){
+    if(!cfSupabase || !cfIsAdmin() || !cfCurrentUserId) return;
+    const {data,error}=await cfSupabase.from('cf_notifications')
+      .select('id,recipient_user_id,type,title,body,entity_id,read_at,created_at')
+      .eq('recipient_user_id',cfCurrentUserId).order('created_at',{ascending:false}).limit(50);
+    if(error){ console.warn('CleanFleet admin notifications:',error.message); return; }
+    const list=document.getElementById('cfAdminNotificationsList'); if(!list) return;
+    if(!data?.length){ list.innerHTML='<div class="cf-admin-notification-empty">Brak powiadomień.</div>'; return; }
+    list.innerHTML=data.map(n=>`<div class="cf-admin-notification ${n.read_at?'':'unread'}" data-notification-id="${String(n.id).replace(/"/g,'&quot;')}">
+      <div class="cf-admin-notification-title">${cfEscapeNotificationHtml(n.title||'Powiadomienie')}</div>
+      <div class="cf-admin-notification-body">${cfEscapeNotificationHtml(n.body||'')}</div>
+      <div class="cf-admin-notification-date">${cfFormatNotificationDate(n.created_at)}${n.read_at?'':' · nowe'}</div>
+    </div>`).join('');
+    list.querySelectorAll('[data-notification-id]').forEach(el=>el.addEventListener('click',()=>cfOpenAdminNotificationRequest(el.dataset.notificationId)));
+  }
+  function cfEscapeNotificationHtml(v){const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML;}
+  function cfFormatNotificationDate(v){const d=new Date(v);return isNaN(d)?'':d.toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+  async function cfOpenAdminNotificationsPanel(){
     if(!cfIsAdmin()) return;
-    await cfLoadAdminNotifications();
-    cfOpenAdminNotificationsPanel();
-  });
-
-  document.getElementById('cfAdminNotificationsClose').addEventListener('click', cfCloseAdminNotificationsPanel);
-  document.getElementById('cfAdminNotificationsBackdrop').addEventListener('click', cfCloseAdminNotificationsPanel);
-  document.getElementById('cfAdminNotificationsList').addEventListener('click', async (e)=>{
-    const openBtn=e.target.closest('[data-cf-notification-open]');
-    const readBtn=e.target.closest('[data-cf-notification-read]');
-    try{
-      if(openBtn){
-        await cfOpenAdminNotificationRequest(openBtn.getAttribute('data-cf-notification-open'));
-      }else if(readBtn){
-        await cfMarkAdminNotificationRead(readBtn.getAttribute('data-cf-notification-read'));
+    const p=document.getElementById('cfAdminNotificationsPanel'); if(!p) return;
+    p.classList.add('open'); p.setAttribute('aria-hidden','false'); await cfLoadAdminNotifications();
+  }
+  function cfCloseAdminNotificationsPanel(){const p=document.getElementById('cfAdminNotificationsPanel');if(p){p.classList.remove('open');p.setAttribute('aria-hidden','true');}}
+  async function cfOpenAdminNotificationRequest(id){
+    const {data:n}=await cfSupabase.from('cf_notifications').select('*').eq('id',id).maybeSingle();
+    if(!n) return;
+    if(!n.read_at) await cfSupabase.from('cf_notifications').update({read_at:new Date().toISOString()}).eq('id',id);
+    cfCloseAdminNotificationsPanel();
+    if(n.entity_id){
+      const {data:req}=await cfSupabase.from('wash_change_requests').select('wash_record_id,request_type,proposed_data,reason').eq('id',n.entity_id).maybeSingle();
+      if(req?.wash_record_id){
+        const rec=records.find(r=>r.id===req.wash_record_id);
+        if(rec) showVehicleHistory(rec.tablica);
+        else showToast('Nie znaleziono wpisu, którego dotyczy wniosek.');
       }
-    }catch(error){
-      console.error('CleanFleet admin notification action:',error);
-      showToast('Nie udało się obsłużyć powiadomienia.');
     }
-  });
+    await cfLoadAdminNotifications();
+  }
+  document.getElementById('cfNotificationsBtn').addEventListener('click',cfOpenAdminNotificationsPanel);
+  document.getElementById('cfAdminNotificationsClose').addEventListener('click',cfCloseAdminNotificationsPanel);
+  document.getElementById('cfAdminNotificationsPanel').addEventListener('click',e=>{if(e.target.id==='cfAdminNotificationsPanel')cfCloseAdminNotificationsPanel();});
+  setInterval(()=>{if(cfIsAdmin()&&cfSupabase)cfLoadAdminNotifications();},30000);
 
   async function cfBoot(){
     cfSetSync('Ładowanie połączenia z bazą…');
@@ -6197,8 +6072,6 @@ function uid(){
       showToast('Nie udało się załadować połączenia z Supabase. Odśwież stronę.');
     }
   }
-
-  setInterval(()=>{ if(cfIsAdmin() && cfSupabase) cfLoadAdminNotifications(); },30000);
 
   // Po powrocie do aplikacji ponownie wyliczamy terminy. Ma to znaczenie na
   // iPadzie/iPhonie, gdzie Safari może wstrzymać timery w tle.

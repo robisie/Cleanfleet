@@ -487,12 +487,14 @@
   .cf-dot.ok{background:#4f8a10;}
   .cf-dot.err{background:#c0392b;}
   .cf-syncbar button{border:1px solid var(--line-strong);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px 9px;font-size:12px;cursor:pointer;}
-  .cf-login-overlay{position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;}
-  .cf-login-card{width:min(420px,100%);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,.10);}
-  .cf-login-card h1{margin:0 0 6px;font-size:24px;}
+  .cf-login-overlay{position:fixed;inset:0;background:#F7F6F1;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .cf-login-card{width:min(420px,100%);background:#FFFFFF;color:#16150F;border:1px solid rgba(22,21,15,.18);border-radius:18px;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,.16);}
+  .cf-login-card h1{margin:0 0 6px;font-size:24px;color:#16150F;}
   .cf-login-card p{margin:0 0 20px;color:var(--ink-soft);font-size:14px;line-height:1.45;}
-  .cf-login-card label{display:block;font-size:13px;margin:12px 0 6px;}
-  .cf-login-card input{width:100%;box-sizing:border-box;padding:12px;border:1px solid var(--line-strong);border-radius:10px;font-size:16px;background:var(--bg);color:var(--ink);}
+  .cf-login-card label{display:block;font-size:13px;margin:12px 0 6px;color:#16150F;font-weight:700;}
+  .cf-login-card input{width:100%;box-sizing:border-box;padding:12px;border:1px solid rgba(22,21,15,.30);border-radius:10px;font-size:16px;background:#FFFFFF;color:#16150F;outline:none;}
+  .cf-login-card input:focus{border-color:#6E7A17;box-shadow:0 0 0 3px rgba(171,192,42,.18);}
+  .cf-login-card input::placeholder{color:#8A877B;opacity:1;}
   .cf-login-card .cf-login-btn{width:100%;margin-top:18px;padding:12px;border:0;border-radius:10px;background:var(--solid,#6b7d00);color:#fff;font-weight:700;font-size:15px;}
   .cf-login-msg{min-height:20px;margin-top:12px;font-size:13px;color:#b33;}
   .cf-user{font-size:11px;color:var(--ink-soft);margin-top:4px;}
@@ -877,9 +879,9 @@
     <p>Zaloguj się, aby korzystać ze wspólnej bazy danych.</p>
     <form id="cfLoginForm">
       <label for="cfEmail">E-mail</label>
-      <input id="cfEmail" type="email" autocomplete="username" required>
+      <input id="cfEmail" type="email" autocomplete="username" placeholder="Wpisz adres e-mail" required>
       <label for="cfPassword">Hasło</label>
-      <input id="cfPassword" type="password" autocomplete="current-password" required>
+      <input id="cfPassword" type="password" autocomplete="current-password" placeholder="Wpisz hasło" required>
       <button class="cf-login-btn" type="submit">Zaloguj</button>
       <div class="cf-login-msg" id="cfLoginMsg"></div>
     </form>

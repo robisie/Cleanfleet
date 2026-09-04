@@ -703,6 +703,22 @@
 .vehicle-filter-card:hover{transform:translateY(-1px);}
 .vehicle-filter-card.active{outline:2px solid #2f9e44;outline-offset:-2px;}
 .vehicle-filter-card .finance-card-label,.vehicle-filter-card .finance-card-value{display:block;}
+
+
+  .cf-report-sheet .cf-report-section{border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:14px;background:rgba(255,255,255,.55)}
+  .cf-report-section-title{font-weight:800;font-size:14px;letter-spacing:.02em;margin-bottom:10px}
+  .cf-report-subtitle{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);margin-bottom:7px}
+  .cf-report-chips{display:flex;flex-wrap:wrap;gap:7px}
+  .cf-report-chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;padding:8px 11px;background:#fff;cursor:pointer;font-size:13px}
+  .cf-report-chip:has(input:checked){border-color:#6d7621;box-shadow:0 0 0 2px rgba(109,118,33,.12);background:#f5f6e9}
+  .cf-report-status-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:9px}
+  .cf-report-option{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;cursor:pointer;font-size:13px}
+  .cf-report-fields-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .cf-report-quick-actions{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}
+  .cf-report-quick-actions .btn{padding:8px 12px;font-size:12px}
+  .cf-report-hint{font-size:11px;line-height:1.5;color:var(--ink-soft);background:#f6f5ef;border-radius:9px;padding:9px 10px;margin-top:8px}
+  .cf-report-result-hint{font-size:12px;padding:10px 12px;border-radius:10px;background:#eef2d8;margin-top:14px}
+  @media(max-width:640px){.cf-report-status-grid,.cf-report-fields-grid{grid-template-columns:1fr}.cf-report-sheet{padding:16px!important}}
 </style>
 </head>
 <body>
@@ -4341,7 +4357,7 @@ function uid(){
     {key:'ordered', label:'Zlecone', value:r=>r.zlecone?'TAK':'NIE'},
     {key:'ordered_by', label:'Kto zlecił', value:r=>r.kto_zlecil||'—'},
     {key:'order_date', label:'Data zlecenia', value:r=>fmtDate(r.data_zlecenia)},
-    {key:'order_due_date', label:'Termin wykonania', value:r=>fmtDate(r.termin_wykonania)},
+    {key:'order_due_date', label:'Termin wykonania', value:r=>fmtDate(r.data_zlecenia_do)},
     {key:'notes', label:'Uwagi', value:r=>r.uwagi||'—'},
     {key:'wash_date', label:'Data prania', value:r=>fmtDate(r.data_prania)},
     {key:'performed_by', label:'Wykonał', value:r=>r.kto_wykonal||'—'},
@@ -4349,7 +4365,7 @@ function uid(){
     {key:'approved', label:'Zatwierdzone', value:r=>r.zatwierdzone?'TAK':'NIE'},
     {key:'paid', label:'Zapłacone', value:r=>r.zaplacone?'TAK':'NIE'},
     {key:'created_at', label:'Utworzono', value:r=>r.created_at?new Date(r.created_at).toLocaleString('pl-PL'):'—'},
-    {key:'created_by', label:'Autor wpisu', value:r=>r.created_by||'—'},
+    {key:'created_by', label:'Autor wpisu (ID)', value:r=>r.created_by||'—'},
     {key:'invoice_number', label:'Numer faktury', value:r=>r.__invoice_number||'—'},
     {key:'invoice_date', label:'Data faktury', value:r=>fmtDate(r.__invoice_date)}
   ];
@@ -4362,39 +4378,88 @@ function uid(){
     });
   }
 
+  function cfReportTypeLabel(key){
+    return key==='personal'?'Osobowe':key==='heavy'?'Ciężarowe':'Busy';
+  }
+
+  function cfReportStatusLabel(key){
+    return ({ordered:'Zlecone / oczekujące',todo:'Do wykonania',done:'Wykonane',unapproved:'Niezatwierdzone',approved:'Zatwierdzone',unpaid:'Niezapłacone',paid:'Zapłacone'})[key] || key;
+  }
+
+  function cfReportMatchesStatus(r,key){
+    const done=!!r.data_prania;
+    const approved=!!r.zatwierdzone;
+    const paid=!!r.zaplacone;
+    switch(key){
+      case 'ordered': return !!r.zlecone && !done;
+      case 'todo': return !done;
+      case 'done': return done;
+      case 'unapproved': return done && !approved;
+      case 'approved': return approved;
+      case 'unpaid': return !paid;
+      case 'paid': return paid;
+      default: return true;
+    }
+  }
+
   function showEmployeeReportModal(){
     menuOverlay.classList.remove('open');
     const now = new Date();
     const defaultMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-    const checks = CF_REPORT_FIELDS.map(f=>`<label class="field-check" style="margin-top:7px;"><input type="checkbox" class="cf-report-field" value="${f.key}" checked><span>${escapeHtml(f.label)}</span></label>`).join('');
+    const fieldChecks = CF_REPORT_FIELDS.map(f=>`<label class="field-check cf-report-option"><input type="checkbox" class="cf-report-field" value="${f.key}" ${['typ','tablica','marka','billing_category','wash_date','performed_by','cost','approved','paid'].includes(f.key)?'checked':''}><span>${escapeHtml(f.label)}</span></label>`).join('');
+    const availableTypes = [...new Set(records.map(r=>String(r.typ||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pl'));
+    const typeChecks = availableTypes.length
+      ? availableTypes.map(t=>`<label class="cf-report-chip"><input type="checkbox" class="cf-report-type" value="${escapeHtml(t)}" checked><span>${escapeHtml(t)}</span></label>`).join('')
+      : '<span class="cf-report-hint">Brak typów pojazdów w danych.</span>';
+    const statusChecks = ['ordered','todo','done','unapproved','approved','unpaid','paid'].map(k=>`<label class="cf-report-option"><input type="checkbox" class="cf-report-status" value="${k}"><span>${cfReportStatusLabel(k)}</span></label>`).join('');
     const html=`<div class="overlay" id="cfReportOverlay">
-      <div class="sheet" style="max-width:620px;width:96%;max-height:90vh;overflow:auto;">
+      <div class="sheet cf-report-sheet" style="max-width:760px;width:96%;max-height:92vh;overflow:auto;">
         <button class="close" data-close>&times;</button>
         <h2>Generuj raport</h2>
-        <div class="confirm-text">Skonfiguruj raport według własnych potrzeb. Możesz wybrać zakres, statusy, typy pojazdów oraz dokładnie te informacje, które mają znaleźć się w pliku.</div>
-        <div class="field"><label>Zakres dat</label>
-          <select id="cfReportPeriodMode"><option value="month">Wybrany miesiąc</option><option value="all">Wszystkie dane</option><option value="custom">Własny zakres dat</option></select>
+        <div class="confirm-text">Zbuduj raport dokładnie według potrzeb. Najpierw wybierz <strong>zakres danych</strong>, potem filtry, a na końcu informacje i kolejność kolumn.</div>
+
+        <div class="cf-report-section"><div class="cf-report-section-title">1. Zakres danych</div>
+          <div class="field"><label>Według jakiej daty filtrować?</label>
+            <select id="cfReportDateBasis"><option value="wash">Data prania</option><option value="order">Data zlecenia</option><option value="created">Data utworzenia wpisu</option><option value="invoice">Data faktury</option></select>
+          </div>
+          <div class="field"><label>Zakres</label>
+            <select id="cfReportPeriodMode"><option value="month">Wybrany miesiąc</option><option value="all">Wszystkie dane</option><option value="custom">Własny zakres dat</option></select>
+          </div>
+          <div id="cfReportMonthWrap" class="field"><label>Miesiąc</label><input type="month" id="cfReportMonth" value="${defaultMonth}"></div>
+          <div id="cfReportCustomWrap" class="field" style="display:none;"><div class="field-row"><div class="field"><label>Od</label><input type="date" id="cfReportDateFrom"></div><div class="field"><label>Do</label><input type="date" id="cfReportDateTo"></div></div></div>
         </div>
-        <div id="cfReportMonthWrap" class="field"><label>Miesiąc</label><input type="month" id="cfReportMonth" value="${defaultMonth}"></div>
-        <div id="cfReportCustomWrap" class="field" style="display:none;"><label>Od</label><input type="date" id="cfReportDateFrom"><label style="margin-top:8px;">Do</label><input type="date" id="cfReportDateTo"></div>
-        <div class="field"><label>Typy pojazdów</label>
-          <label class="field-check" style="margin-top:7px;"><input type="checkbox" class="cf-report-type" value="personal" checked><span>Osobowe</span></label>
-          <label class="field-check" style="margin-top:7px;"><input type="checkbox" class="cf-report-type" value="heavy" checked><span>Ciężarowe</span></label>
-          <label class="field-check" style="margin-top:7px;"><input type="checkbox" class="cf-report-type" value="bus" checked><span>Busy</span></label>
+
+        <div class="cf-report-section"><div class="cf-report-section-title">2. Co ma wejść do raportu?</div>
+          <div class="cf-report-subtitle">Typ pojazdu</div><div class="cf-report-quick-actions" style="margin-bottom:7px;"><button type="button" class="btn btn-outline" id="cfReportTypesAll">Wszystkie typy</button><button type="button" class="btn btn-outline" id="cfReportTypesNone">Wyczyść typy</button></div><div class="cf-report-chips">${typeChecks}</div>
+          <div class="cf-report-subtitle" style="margin-top:12px;">Grupa rozliczeniowa</div>
+          <div class="cf-report-chips">
+            <label class="cf-report-chip"><input type="checkbox" class="cf-report-billing" value="osobowe" checked><span>Osobowe</span></label>
+            <label class="cf-report-chip"><input type="checkbox" class="cf-report-billing" value="ciezarowe" checked><span>Ciężarowe</span></label>
+            <label class="cf-report-chip"><input type="checkbox" class="cf-report-billing" value="busy" checked><span>Busy</span></label>
+            <label class="cf-report-chip"><input type="checkbox" id="cfReportBillingEmpty" value="empty" checked><span>Brak przypisanej</span></label>
+          </div>
+          <div class="field" style="margin-top:12px;"><label>Status — możesz łączyć kilka warunków</label>
+            <select id="cfReportStatusMode"><option value="or">SPEŁNIA CO NAJMNIEJ JEDEN wybrany status</option><option value="and">SPEŁNIA WSZYSTKIE wybrane statusy</option></select>
+          </div>
+          <div class="cf-report-status-grid">${statusChecks}</div>
+          <div class="cf-report-hint">Jeżeli nie zaznaczysz żadnego statusu, status nie ograniczy wyników.</div>
+          <div class="field-row" style="margin-top:12px;"><div class="field"><label>Tablica zawiera</label><input id="cfReportPlateSearch" placeholder="np. WGM"></div><div class="field"><label>Marka zawiera</label><input id="cfReportBrandSearch" placeholder="np. DAF"></div></div>
+          <div class="field-row"><div class="field"><label>Kto zlecił — zawiera</label><input id="cfReportOrderedBySearch" placeholder="np. DANIEL"></div><div class="field"><label>Wykonał — zawiera</label><input id="cfReportPerformedBySearch" placeholder="np. JAN"></div></div>
+          <div class="field-row"><div class="field"><label>Koszt od (zł)</label><input id="cfReportCostFrom" type="number" min="0" step="0.01"></div><div class="field"><label>Koszt do (zł)</label><input id="cfReportCostTo" type="number" min="0" step="0.01"></div></div>
+          <div class="cf-report-chips" style="margin-top:4px;">
+            <label class="cf-report-chip"><input type="checkbox" id="cfReportOnlyInvoiced"><span>Tylko z fakturą</span></label>
+            <label class="cf-report-chip"><input type="checkbox" id="cfReportOnlyWithoutInvoice"><span>Tylko bez faktury</span></label>
+          </div>
         </div>
-        <div class="field"><label>Status wpisów</label>
-          <label class="field-check" style="margin-top:7px;"><input type="checkbox" class="cf-report-status" value="ordered" checked><span>Zlecone / oczekujące</span></label>
-          <label class="field-check" style="margin-top:7px;"><input type="checkbox" class="cf-report-status" value="done" checked><span>Wykonane</span></label>
-          <label class="field-check" style="margin-top:7px;"><input type="checkbox" class="cf-report-status" value="unapproved" checked><span>Niezatwierdzone</span></label>
-          <label class="field-check" style="margin-top:7px;"><input type="checkbox" class="cf-report-status" value="approved" checked><span>Zatwierdzone</span></label>
-          <label class="field-check" style="margin-top:7px;"><input type="checkbox" class="cf-report-status" value="paid" checked><span>Zapłacone</span></label>
+
+        <div class="cf-report-section"><div class="cf-report-section-title">3. Informacje i układ</div>
+          <div class="cf-report-quick-actions"><button type="button" class="btn btn-outline" id="cfReportSelectAll">Zaznacz wszystko</button><button type="button" class="btn btn-outline" id="cfReportSelectNone">Wyczyść</button><button type="button" class="btn btn-outline" id="cfReportSelectBasic">Podstawowe</button></div>
+          <div class="cf-report-fields-grid">${fieldChecks}</div>
+          <div class="field" style="margin-top:12px;"><label>Sortowanie</label><select id="cfReportSort"><option value="date_asc">Data — najstarsze pierwsze</option><option value="date_desc">Data — najnowsze pierwsze</option><option value="plate_asc">Tablica A–Z</option><option value="plate_desc">Tablica Z–A</option><option value="cost_desc">Koszt — najwyższy pierwszy</option><option value="cost_asc">Koszt — najniższy pierwszy</option><option value="type_plate">Typ, potem tablica</option></select></div>
+          <div class="field"><label>Nazwa pliku (opcjonalnie)</label><input id="cfReportFilename" type="text" placeholder="np. raport-prania-wrzesien-2026"></div>
         </div>
-        <div class="field"><label>Informacje w raporcie</label>${checks}</div>
-        <div class="field"><label>Nazwa pliku (opcjonalnie)</label><input id="cfReportFilename" type="text" placeholder="np. raport-prania-wrzesien-2026"></div>
-        <div class="sheet-actions" style="gap:8px;">
-          <button class="btn btn-solid" id="cfReportPdfBtn" style="flex:1;">Generuj PDF</button>
-          <button class="btn btn-outline" id="cfReportXlsBtn" style="flex:1;">Generuj XLS</button>
-        </div>
+        <div id="cfReportResultHint" class="cf-report-result-hint">Raport zostanie przygotowany po kliknięciu przycisku.</div>
+        <div class="sheet-actions" style="gap:8px;"><button class="btn btn-solid" id="cfReportPdfBtn" style="flex:1;">Generuj PDF</button><button class="btn btn-outline" id="cfReportXlsBtn" style="flex:1;">Generuj XLS</button></div>
       </div></div>`;
     document.getElementById('modalRoot').innerHTML=html;
     document.querySelector('#cfReportOverlay [data-close]').addEventListener('click',closeModal);
@@ -4404,6 +4469,13 @@ function uid(){
       document.getElementById('cfReportMonthWrap').style.display=m==='month'?'':'none';
       document.getElementById('cfReportCustomWrap').style.display=m==='custom'?'':'none';
     });
+    const fields=[...document.querySelectorAll('.cf-report-field')];
+    const typeBoxes=[...document.querySelectorAll('.cf-report-type')];
+    document.getElementById('cfReportTypesAll').addEventListener('click',()=>typeBoxes.forEach(x=>x.checked=true));
+    document.getElementById('cfReportTypesNone').addEventListener('click',()=>typeBoxes.forEach(x=>x.checked=false));
+    document.getElementById('cfReportSelectAll').addEventListener('click',()=>fields.forEach(x=>x.checked=true));
+    document.getElementById('cfReportSelectNone').addEventListener('click',()=>fields.forEach(x=>x.checked=false));
+    document.getElementById('cfReportSelectBasic').addEventListener('click',()=>{const basic=new Set(['typ','tablica','marka','billing_category','wash_date','performed_by','cost','approved','paid']);fields.forEach(x=>x.checked=basic.has(x.value));});
     document.getElementById('cfReportPdfBtn').addEventListener('click',()=>generateConfiguredReport('pdf'));
     document.getElementById('cfReportXlsBtn').addEventListener('click',()=>generateConfiguredReport('xls'));
   }
@@ -4413,28 +4485,72 @@ function uid(){
     const month=document.getElementById('cfReportMonth')?.value||'';
     const from=document.getElementById('cfReportDateFrom')?.value||'';
     const to=document.getElementById('cfReportDateTo')?.value||'';
+    const dateBasis=document.getElementById('cfReportDateBasis')?.value||'wash';
     const types=Array.from(document.querySelectorAll('.cf-report-type:checked')).map(x=>x.value);
+    const billing=Array.from(document.querySelectorAll('.cf-report-billing:checked')).map(x=>x.value);
+    const billingEmpty=!!document.getElementById('cfReportBillingEmpty')?.checked;
     const statuses=Array.from(document.querySelectorAll('.cf-report-status:checked')).map(x=>x.value);
+    const statusMode=document.getElementById('cfReportStatusMode')?.value||'or';
     const fields=Array.from(document.querySelectorAll('.cf-report-field:checked')).map(x=>x.value);
+    const plateSearch=(document.getElementById('cfReportPlateSearch')?.value||'').trim().toLowerCase();
+    const brandSearch=(document.getElementById('cfReportBrandSearch')?.value||'').trim().toLowerCase();
+    const orderedBySearch=(document.getElementById('cfReportOrderedBySearch')?.value||'').trim().toLowerCase();
+    const performedBySearch=(document.getElementById('cfReportPerformedBySearch')?.value||'').trim().toLowerCase();
+    const costFrom=Number(document.getElementById('cfReportCostFrom')?.value);
+    const costTo=Number(document.getElementById('cfReportCostTo')?.value);
+    const onlyInvoiced=!!document.getElementById('cfReportOnlyInvoiced')?.checked;
+    const onlyWithoutInvoice=!!document.getElementById('cfReportOnlyWithoutInvoice')?.checked;
+    const sort=document.getElementById('cfReportSort')?.value||'date_asc';
     if(!types.length) throw new Error('Wybierz co najmniej jeden typ pojazdu.');
-    if(!statuses.length) throw new Error('Wybierz co najmniej jeden status wpisów.');
+    if(!billing.length && !billingEmpty) throw new Error('Wybierz co najmniej jedną grupę rozliczeniową.');
     if(!fields.length) throw new Error('Wybierz co najmniej jedną informację do raportu.');
     if(mode==='month'&&!month) throw new Error('Wybierz miesiąc.');
     if(mode==='custom'&&(!from||!to)) throw new Error('Wybierz datę początkową i końcową.');
+    if(mode==='custom'&&from>to) throw new Error('Data „Od” nie może być późniejsza niż data „Do”.');
+    if(Number.isFinite(costFrom)&&document.getElementById('cfReportCostFrom')?.value && Number.isFinite(costTo)&&document.getElementById('cfReportCostTo')?.value && costFrom>costTo) throw new Error('Koszt „od” nie może być większy niż koszt „do”.');
+    if(onlyInvoiced&&onlyWithoutInvoice) throw new Error('Nie można jednocześnie wybrać „Tylko z fakturą” i „Tylko bez faktury”.');
+
     const all=cfReportRowsFromRecords();
+    const getDate=r=>dateBasis==='order'?String(r.data_zlecenia||''):dateBasis==='created'?(r.created_at?new Date(r.created_at).toISOString().slice(0,10):''):dateBasis==='invoice'?String(r.__invoice_date||''):String(r.data_prania||'');
+    const wantedTypes=new Set(types.map(t=>String(t).trim().toLowerCase()));
+    const wantedBilling=new Set(billing);
     const rows=all.filter(r=>{
-      if(!types.includes(pdfBillingCategoryKey(r))) return false;
-      const d=String(r.data_prania||r.data_zlecenia||'');
+      const vehicleType=String(r.typ||'').trim().toLowerCase();
+      const cat=String(pdfBillingCategoryKey(r)||'').toLowerCase();
+      if(!wantedTypes.has(vehicleType)) return false;
+      const billingMatch=wantedBilling.has(cat) || (billingEmpty&&!cat);
+      if(!billingMatch) return false;
+      const d=getDate(r);
       if(mode==='month' && d.slice(0,7)!==month) return false;
-      if(mode==='custom' && (d<from || d>to)) return false;
-      const done=!!r.data_prania;
-      const approved=!!r.zatwierdzone;
-      const paid=!!r.zaplacone;
-      const matches=(statuses.includes('ordered') && !done) || (statuses.includes('done')&&done) || (statuses.includes('unapproved')&&!approved) || (statuses.includes('approved')&&approved) || (statuses.includes('paid')&&paid);
-      return matches;
-    }).sort((a,b)=>String(a.data_prania||a.data_zlecenia||'').localeCompare(String(b.data_prania||b.data_zlecenia||'')));
+      if(mode==='custom' && (!d || d<from || d>to)) return false;
+      if(statuses.length){
+        const ok=statusMode==='and'?statuses.every(k=>cfReportMatchesStatus(r,k)):statuses.some(k=>cfReportMatchesStatus(r,k));
+        if(!ok) return false;
+      }
+      if(plateSearch&&!String(r.tablica||'').toLowerCase().includes(plateSearch)) return false;
+      if(brandSearch&&!String(r.marka||'').toLowerCase().includes(brandSearch)) return false;
+      if(orderedBySearch&&!String(r.kto_zlecil||'').toLowerCase().includes(orderedBySearch)) return false;
+      if(performedBySearch&&!String(r.kto_wykonal||'').toLowerCase().includes(performedBySearch)) return false;
+      const cost=Number(r.koszt||0);
+      if(document.getElementById('cfReportCostFrom')?.value && cost<costFrom) return false;
+      if(document.getElementById('cfReportCostTo')?.value && cost>costTo) return false;
+      const hasInvoice=!!r.__invoice_number;
+      if(onlyInvoiced&&!hasInvoice) return false;
+      if(onlyWithoutInvoice&&hasInvoice) return false;
+      return true;
+    });
+    rows.sort((a,b)=>{
+      const da=getDate(a), db=getDate(b);
+      if(sort==='date_desc') return db.localeCompare(da);
+      if(sort==='plate_asc') return String(a.tablica||'').localeCompare(String(b.tablica||''),'pl');
+      if(sort==='plate_desc') return String(b.tablica||'').localeCompare(String(a.tablica||''),'pl');
+      if(sort==='cost_desc') return Number(b.koszt||0)-Number(a.koszt||0);
+      if(sort==='cost_asc') return Number(a.koszt||0)-Number(b.koszt||0);
+      if(sort==='type_plate') return String(a.typ||'').localeCompare(String(b.typ||''),'pl') || String(a.tablica||'').localeCompare(String(b.tablica||''),'pl');
+      return da.localeCompare(db);
+    });
     if(!rows.length) throw new Error('Brak wpisów dla wybranych ustawień.');
-    return {rows,fields,mode,month,from,to};
+    return {rows,fields,mode,month,from,to,dateBasis,sort};
   }
 
   async function generateConfiguredReport(format){
@@ -4442,14 +4558,18 @@ function uid(){
       const cfg=cfGetConfiguredReport();
       const defs=CF_REPORT_FIELDS.filter(f=>cfg.fields.includes(f.key));
       const filenameBase=(document.getElementById('cfReportFilename')?.value.trim()||`CleanFleet-raport-${cfg.month||todayISO()}`).replace(/[^a-zA-Z0-9._-]+/g,'_');
+      const hint=document.getElementById('cfReportResultHint');
+      if(hint) hint.innerHTML=`Wybrano <strong>${cfg.rows.length}</strong> wpisów. Generuję ${format==='xls'?'XLS':'PDF'}…`;
       if(format==='xls'){
         if(typeof XLSX==='undefined') throw new Error('Moduł Excel nie został załadowany.');
         const aoa=[defs.map(d=>d.label),...cfg.rows.map(r=>defs.map(d=>d.value(r)))];
         const wb=XLSX.utils.book_new();
         const ws=XLSX.utils.aoa_to_sheet(aoa);
+        ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(0,aoa.length-1),c:Math.max(0,defs.length-1)}})};
+        ws['!cols']=defs.map(d=>({wch:Math.min(34,Math.max(12,d.label.length+4))}));
         XLSX.utils.book_append_sheet(wb,ws,'Raport');
         XLSX.writeFile(wb,`${filenameBase}.xlsx`);
-        showToast('Raport XLS wygenerowany.');
+        showToast(`Raport XLS wygenerowany (${cfg.rows.length} wpisów).`);
         closeModal();
         return;
       }
@@ -4457,9 +4577,11 @@ function uid(){
       const header=defs.map(d=>`<th style="text-align:left;padding:7px 8px;background:#16150F;color:#F5F4EE;font-size:11px;">${escapeHtml(d.label)}</th>`).join('');
       const body=cfg.rows.map((r,i)=>`<tr style="background:${i%2?'#F7F6F1':'#FFFFFF'};">${defs.map(d=>`<td style="padding:6px 8px;font-size:10px;border-bottom:1px solid #E5E3D8;vertical-align:top;">${escapeHtml(String(d.value(r)))}</td>`).join('')}</tr>`).join('');
       const logo=document.querySelector('.app-logo');
+      const basisLabel={wash:'Data prania',order:'Data zlecenia',created:'Data utworzenia',invoice:'Data faktury'}[cfg.dateBasis]||'Data';
+      const rangeLabel=cfg.mode==='all'?'Wszystkie dane':cfg.mode==='month'?`Miesiąc: ${cfg.month}`:`Zakres: ${cfg.from} – ${cfg.to}`;
       const container=document.createElement('div');
       container.style.cssText='position:fixed;left:-9999px;top:0;width:1100px;background:#fff;color:#16150F;font-family:Arial,Helvetica,sans-serif;padding:28px;';
-      container.innerHTML=`<div style="margin-bottom:18px;">${logo?`<img src="${logo.src}" style="height:48px;display:block;margin-bottom:12px;">`:''}<div style="font-size:19px;font-weight:700;">Raport CleanFleet</div><div style="font-size:11px;color:#666;margin-top:4px;">${cfg.mode==='all'?'Wszystkie dane':cfg.mode==='month'?`Miesiąc: ${cfg.month}`:`Zakres: ${cfg.from} – ${cfg.to}`} · ${cfg.rows.length} wpisów</div></div><table style="width:100%;border-collapse:collapse;"><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
+      container.innerHTML=`<div style="margin-bottom:18px;">${logo?`<img src="${logo.src}" style="height:48px;display:block;margin-bottom:12px;">`:''}<div style="font-size:19px;font-weight:700;">Raport CleanFleet</div><div style="font-size:11px;color:#666;margin-top:4px;">${escapeHtml(rangeLabel)} · filtr daty: ${escapeHtml(basisLabel)} · ${cfg.rows.length} wpisów</div></div><table style="width:100%;border-collapse:collapse;"><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
       document.body.appendChild(container);
       const canvas=await html2canvas(container,{scale:2,backgroundColor:'#fff',useCORS:true});
       document.body.removeChild(container);
@@ -4467,11 +4589,9 @@ function uid(){
       const doc=new jsPDF({unit:'mm',format:'a4',orientation:'landscape'});
       const margin=8, width=281, pageHeight=194, pxPerMM=canvas.width/width, slice=pageHeight*pxPerMM;
       let y=0, first=true;
-      while(y<canvas.height){
-        const h=Math.min(slice,canvas.height-y); const c=document.createElement('canvas'); c.width=canvas.width;c.height=h;c.getContext('2d').drawImage(canvas,0,y,canvas.width,h,0,0,canvas.width,h); if(!first) doc.addPage(); doc.addImage(c.toDataURL('image/png'),'PNG',margin,margin,width,h/pxPerMM); y+=h; first=false;
-      }
+      while(y<canvas.height){ const h=Math.min(slice,canvas.height-y); const c=document.createElement('canvas'); c.width=canvas.width;c.height=h;c.getContext('2d').drawImage(canvas,0,y,canvas.width,h,0,0,canvas.width,h); if(!first) doc.addPage(); doc.addImage(c.toDataURL('image/png'),'PNG',margin,margin,width,h/pxPerMM); y+=h; first=false; }
       doc.save(`${filenameBase}.pdf`);
-      showToast('Raport PDF wygenerowany.');
+      showToast(`Raport PDF wygenerowany (${cfg.rows.length} wpisów).`);
       closeModal();
     }catch(e){ showToast(e?.message||'Nie udało się wygenerować raportu.'); }
   }
@@ -5601,8 +5721,31 @@ function uid(){
     }
   }
 
+  function showFleetUpdateInstructions(){
+    menuOverlay.classList.remove('open');
+    const html=`<div class="overlay" id="fleetUpdateHelpOverlay">
+      <div class="sheet cf-fleet-help-sheet" style="max-width:650px;width:96%;max-height:90vh;overflow:auto;">
+        <button class="close" data-close>&times;</button>
+        <h2>Aktualizuj pojazdy</h2>
+        <div class="confirm-text">Przygotuj plik <strong>XLS/XLSX lub CSV</strong>. Pierwszy wiersz musi zawierać dokładnie te trzy informacje:</div>
+        <div style="overflow:auto;margin:16px 0;border:1px solid var(--line);border-radius:12px;">
+          <table style="width:100%;border-collapse:collapse;min-width:520px;background:#fff;">
+            <thead><tr><th style="padding:11px;text-align:left;background:#16150F;color:#F5F4EE;">Tablica</th><th style="padding:11px;text-align:left;background:#16150F;color:#F5F4EE;">Data prania</th><th style="padding:11px;text-align:left;background:#16150F;color:#F5F4EE;">Kto prał</th></tr></thead>
+            <tbody><tr><td style="padding:11px;border-bottom:1px solid var(--line);font-family:'JetBrains Mono',monospace;">WGM6785A</td><td style="padding:11px;border-bottom:1px solid var(--line);">03.09.2026</td><td style="padding:11px;border-bottom:1px solid var(--line);">JAN KOWALSKI</td></tr><tr><td style="padding:11px;font-family:'JetBrains Mono',monospace;">WGM1234B</td><td style="padding:11px;">02.09.2026</td><td style="padding:11px;">PIOTR</td></tr></tbody>
+          </table>
+        </div>
+        <div class="cf-report-hint" style="margin-bottom:14px;">• <strong>Tablica</strong> — numer rejestracyjny pojazdu.<br>• <strong>Data prania</strong> — data ostatniego prania; może być pusta.<br>• <strong>Kto prał</strong> — osoba, która wykonała pranie; może być pusta.<br>Istniejące tablice nie zostaną dodane drugi raz.</div>
+        <div class="sheet-actions"><button class="btn btn-outline" id="fleetHelpCancel">Anuluj</button><button class="btn btn-solid" id="fleetHelpUpload">Wgraj plik</button></div>
+      </div></div>`;
+    document.getElementById('modalRoot').innerHTML=html;
+    document.querySelector('#fleetUpdateHelpOverlay [data-close]').addEventListener('click',closeModal);
+    document.getElementById('fleetHelpCancel').addEventListener('click',closeModal);
+    document.getElementById('fleetHelpUpload').addEventListener('click',()=>document.getElementById('fleetUpdateFile').click());
+  }
+
   document.getElementById('fleetUpdateBtn').addEventListener('click', () => {
-    document.getElementById('fleetUpdateFile').click();
+    if(cfIsFleetEmployee()) showFleetUpdateInstructions();
+    else document.getElementById('fleetUpdateFile').click();
   });
 
   document.getElementById('fleetUpdateFile').addEventListener('change', async e => {

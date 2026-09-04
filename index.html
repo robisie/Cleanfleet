@@ -5980,12 +5980,14 @@ function uid(){
   }
 
 
+  // Raport pracownika korzysta z tej samej klasyfikacji co raport administratora.
+  // Nie odwołujemy się tutaj do nieistniejącej funkcji pdfVehicleType.
   function pdfBillingCategory(rec){
-    const c = String(rec?.billing_category || '').toLowerCase();
-    if(c === 'ciezarowe') return 'Ciężarowe';
-    if(c === 'busy') return 'Busy';
-    if(c === 'osobowe') return 'Osobowe';
-    return pdfVehicleType(rec?.typ);
+    return pdfBillingCategoryKey(rec) === 'personal'
+      ? 'Osobowe'
+      : pdfBillingCategoryKey(rec) === 'heavy'
+        ? 'Ciężarowe'
+        : 'Busy';
   }
 
   function pdfServiceDescription(rec){

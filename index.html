@@ -3034,8 +3034,7 @@ async function cfReviewChangeRequest(requestId, decision){
 }
 
 
-async 
-  function htmlEscape(v){
+function htmlEscape(v){
     return String(v ?? '')
       .replace(/&/g,'&amp;')
       .replace(/</g,'&lt;')
@@ -3044,7 +3043,7 @@ async
       .replace(/'/g,'&#039;');
   }
 
-function cfOpenChangeNotifications(){
+async function cfOpenChangeNotifications(){
   if(!cfSupabase || !cfCurrentUserId) return;
 
   const { data: notes, error } = await cfSupabase

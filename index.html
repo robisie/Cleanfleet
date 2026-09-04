@@ -614,6 +614,14 @@
 }
 .report-plate-link:active{opacity:.65;}
 
+
+.cf-report-preview-sheet .cf-report-preview-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;padding-right:34px;}
+.cf-report-preview-sheet .cf-report-preview-meta{font-size:12px;color:#666;margin-top:4px;}
+.cf-report-preview-sheet .cf-report-preview-format{font-size:12px;font-weight:700;border:1px solid #D8D5C8;border-radius:999px;padding:6px 10px;background:#F7F6F1;}
+.cf-report-preview-sheet .cf-report-preview-table-wrap{overflow:auto;max-height:68vh;border:1px solid #D8D5C8;border-radius:10px;background:#fff;}
+.cf-report-preview-sheet .cf-report-preview-table{width:max-content;min-width:100%;border-collapse:collapse;}
+.cf-report-preview-sheet .cf-report-preview-footer{font-size:12px;color:#666;margin-top:8px;}
+
 </style>
 
 <style id="mobile-user-header-fix">
@@ -4562,47 +4570,121 @@ function uid(){
     return {rows,fields,mode,month,from,to,dateBasis,sort};
   }
 
-  async function generateConfiguredReport(format){
+  function cfReportPreviewHtml(cfg, defs, format, filenameBase){
+    const basisLabel={wash:'Data prania',order:'Data zlecenia',created:'Data utworzenia',invoice:'Data faktury'}[cfg.dateBasis]||'Data';
+    const rangeLabel=cfg.mode==='all'?'Wszystkie dane':cfg.mode==='month'?`Miesiąc: ${cfg.month}`:`Zakres: ${cfg.from} – ${cfg.to}`;
+    const header=defs.map(d=>`<th style="text-align:left;padding:8px;background:#16150F;color:#F5F4EE;font-size:11px;white-space:nowrap;position:sticky;top:0;z-index:1;">${escapeHtml(d.label)}</th>`).join('');
+    const body=cfg.rows.map((r,i)=>`<tr style="background:${i%2?'#F7F6F1':'#FFFFFF'};">${defs.map(d=>`<td style="padding:7px 8px;font-size:11px;border-bottom:1px solid #E5E3D8;vertical-align:top;">${escapeHtml(String(d.value(r) ?? ''))}</td>`).join('')}</tr>`).join('');
+    return `<div class="cf-report-preview-head">
+      <div><strong>Podgląd raportu</strong><div class="cf-report-preview-meta">${escapeHtml(rangeLabel)} · filtr: ${escapeHtml(basisLabel)} · <strong>${cfg.rows.length}</strong> wpisów</div></div>
+      <div class="cf-report-preview-format">${format==='pdf'?'PDF':'XLS'}</div>
+    </div>
+    <div class="cf-report-preview-table-wrap"><table class="cf-report-preview-table"><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table></div>
+    <div class="cf-report-preview-footer">Plik: <strong>${escapeHtml(filenameBase)}.${format==='pdf'?'pdf':'xlsx'}</strong></div>`;
+  }
+
+  function cfCloseReportPreview(){
+    const el=document.getElementById('cfReportPreviewOverlay');
+    if(el) el.remove();
+  }
+
+  function cfBuildXlsFile(cfg, defs, filenameBase){
+    if(typeof XLSX==='undefined') throw new Error('Moduł Excel nie został załadowany.');
+    const aoa=[defs.map(d=>d.label),...cfg.rows.map(r=>defs.map(d=>d.value(r)))];
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(0,aoa.length-1),c:Math.max(0,defs.length-1)}})};
+    ws['!cols']=defs.map(d=>({wch:Math.min(34,Math.max(12,d.label.length+4))}));
+    XLSX.utils.book_append_sheet(wb,ws,'Raport');
+    XLSX.writeFile(wb,`${filenameBase}.xlsx`);
+  }
+
+  async function cfBuildPdfBlob(cfg, defs){
+    if(!window.jspdf||!window.html2canvas) throw new Error('Nie udało się wczytać generatora PDF — sprawdź połączenie z internetem.');
+    const header=defs.map(d=>`<th style="text-align:left;padding:7px 8px;background:#16150F;color:#F5F4EE;font-size:11px;">${escapeHtml(d.label)}</th>`).join('');
+    const body=cfg.rows.map((r,i)=>`<tr style="background:${i%2?'#F7F6F1':'#FFFFFF'};">${defs.map(d=>`<td style="padding:6px 8px;font-size:10px;border-bottom:1px solid #E5E3D8;vertical-align:top;">${escapeHtml(String(d.value(r) ?? ''))}</td>`).join('')}</tr>`).join('');
+    const logo=document.querySelector('.app-logo');
+    const basisLabel={wash:'Data prania',order:'Data zlecenia',created:'Data utworzenia',invoice:'Data faktury'}[cfg.dateBasis]||'Data';
+    const rangeLabel=cfg.mode==='all'?'Wszystkie dane':cfg.mode==='month'?`Miesiąc: ${cfg.month}`:`Zakres: ${cfg.from} – ${cfg.to}`;
+    const container=document.createElement('div');
+    container.style.cssText='position:fixed;left:-9999px;top:0;width:1100px;background:#fff;color:#16150F;font-family:Arial,Helvetica,sans-serif;padding:28px;';
+    container.innerHTML=`<div style="margin-bottom:18px;">${logo?`<img src="${logo.src}" style="height:48px;display:block;margin-bottom:12px;">`:''}<div style="font-size:19px;font-weight:700;">Raport CleanFleet</div><div style="font-size:11px;color:#666;margin-top:4px;">${escapeHtml(rangeLabel)} · filtr daty: ${escapeHtml(basisLabel)} · ${cfg.rows.length} wpisów</div></div><table style="width:100%;border-collapse:collapse;"><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
+    document.body.appendChild(container);
     try{
-      const cfg=cfGetConfiguredReport();
-      const defs=CF_REPORT_FIELDS.filter(f=>cfg.fields.includes(f.key));
-      const filenameBase=(document.getElementById('cfReportFilename')?.value.trim()||`CleanFleet-raport-${cfg.month||todayISO()}`).replace(/[^a-zA-Z0-9._-]+/g,'_');
-      const hint=document.getElementById('cfReportResultHint');
-      if(hint) hint.innerHTML=`Wybrano <strong>${cfg.rows.length}</strong> wpisów. Generuję ${format==='xls'?'XLS':'PDF'}…`;
-      if(format==='xls'){
-        if(typeof XLSX==='undefined') throw new Error('Moduł Excel nie został załadowany.');
-        const aoa=[defs.map(d=>d.label),...cfg.rows.map(r=>defs.map(d=>d.value(r)))];
-        const wb=XLSX.utils.book_new();
-        const ws=XLSX.utils.aoa_to_sheet(aoa);
-        ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(0,aoa.length-1),c:Math.max(0,defs.length-1)}})};
-        ws['!cols']=defs.map(d=>({wch:Math.min(34,Math.max(12,d.label.length+4))}));
-        XLSX.utils.book_append_sheet(wb,ws,'Raport');
-        XLSX.writeFile(wb,`${filenameBase}.xlsx`);
-        showToast(`Raport XLS wygenerowany (${cfg.rows.length} wpisów).`);
-        closeModal();
-        return;
-      }
-      if(!window.jspdf||!window.html2canvas) throw new Error('Nie udało się wczytać generatora PDF — sprawdź połączenie z internetem.');
-      const header=defs.map(d=>`<th style="text-align:left;padding:7px 8px;background:#16150F;color:#F5F4EE;font-size:11px;">${escapeHtml(d.label)}</th>`).join('');
-      const body=cfg.rows.map((r,i)=>`<tr style="background:${i%2?'#F7F6F1':'#FFFFFF'};">${defs.map(d=>`<td style="padding:6px 8px;font-size:10px;border-bottom:1px solid #E5E3D8;vertical-align:top;">${escapeHtml(String(d.value(r)))}</td>`).join('')}</tr>`).join('');
-      const logo=document.querySelector('.app-logo');
-      const basisLabel={wash:'Data prania',order:'Data zlecenia',created:'Data utworzenia',invoice:'Data faktury'}[cfg.dateBasis]||'Data';
-      const rangeLabel=cfg.mode==='all'?'Wszystkie dane':cfg.mode==='month'?`Miesiąc: ${cfg.month}`:`Zakres: ${cfg.from} – ${cfg.to}`;
-      const container=document.createElement('div');
-      container.style.cssText='position:fixed;left:-9999px;top:0;width:1100px;background:#fff;color:#16150F;font-family:Arial,Helvetica,sans-serif;padding:28px;';
-      container.innerHTML=`<div style="margin-bottom:18px;">${logo?`<img src="${logo.src}" style="height:48px;display:block;margin-bottom:12px;">`:''}<div style="font-size:19px;font-weight:700;">Raport CleanFleet</div><div style="font-size:11px;color:#666;margin-top:4px;">${escapeHtml(rangeLabel)} · filtr daty: ${escapeHtml(basisLabel)} · ${cfg.rows.length} wpisów</div></div><table style="width:100%;border-collapse:collapse;"><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
-      document.body.appendChild(container);
       const canvas=await html2canvas(container,{scale:2,backgroundColor:'#fff',useCORS:true});
-      document.body.removeChild(container);
       const {jsPDF}=window.jspdf;
       const doc=new jsPDF({unit:'mm',format:'a4',orientation:'landscape'});
       const margin=8, width=281, pageHeight=194, pxPerMM=canvas.width/width, slice=pageHeight*pxPerMM;
       let y=0, first=true;
-      while(y<canvas.height){ const h=Math.min(slice,canvas.height-y); const c=document.createElement('canvas'); c.width=canvas.width;c.height=h;c.getContext('2d').drawImage(canvas,0,y,canvas.width,h,0,0,canvas.width,h); if(!first) doc.addPage(); doc.addImage(c.toDataURL('image/png'),'PNG',margin,margin,width,h/pxPerMM); y+=h; first=false; }
-      doc.save(`${filenameBase}.pdf`);
-      showToast(`Raport PDF wygenerowany (${cfg.rows.length} wpisów).`);
-      closeModal();
-    }catch(e){ showToast(e?.message||'Nie udało się wygenerować raportu.'); }
+      while(y<canvas.height){
+        const h=Math.min(slice,canvas.height-y);
+        const c=document.createElement('canvas'); c.width=canvas.width; c.height=h;
+        c.getContext('2d').drawImage(canvas,0,y,canvas.width,h,0,0,canvas.width,h);
+        if(!first) doc.addPage();
+        doc.addImage(c.toDataURL('image/png'),'PNG',margin,margin,width,h/pxPerMM);
+        y+=h; first=false;
+      }
+      return doc.output('blob');
+    }finally{
+      container.remove();
+    }
+  }
+
+  function cfShowReportPreview(cfg, defs, format, filenameBase){
+    cfCloseReportPreview();
+    const html=`<div class="overlay" id="cfReportPreviewOverlay">
+      <div class="sheet cf-report-preview-sheet" style="max-width:1100px;width:97%;max-height:94vh;overflow:hidden;display:flex;flex-direction:column;">
+        <button class="close" id="cfReportPreviewClose">&times;</button>
+        <div id="cfReportPreviewContent" style="display:flex;flex-direction:column;min-height:0;">${cfReportPreviewHtml(cfg,defs,format,filenameBase)}</div>
+        <div class="sheet-actions" style="gap:8px;margin-top:10px;flex-shrink:0;">
+          <button class="btn btn-outline" id="cfReportPreviewBack" style="flex:1;">Wróć do ustawień</button>
+          <button class="btn btn-solid" id="cfReportPreviewDownload" style="flex:1;">${format==='pdf'?'Pobierz PDF':'Pobierz XLS'}</button>
+        </div>
+      </div>
+    </div>`;
+    document.getElementById('modalRoot').insertAdjacentHTML('beforeend',html);
+    document.getElementById('cfReportPreviewClose').addEventListener('click',cfCloseReportPreview);
+    document.getElementById('cfReportPreviewBack').addEventListener('click',cfCloseReportPreview);
+    document.getElementById('cfReportPreviewDownload').addEventListener('click',async()=>{
+      const btn=document.getElementById('cfReportPreviewDownload');
+      if(!btn) return;
+      btn.disabled=true;
+      const old=btn.textContent;
+      try{
+        btn.textContent='Przygotowywanie…';
+        if(format==='xls'){
+          cfBuildXlsFile(cfg,defs,filenameBase);
+          showToast(`Raport XLS wygenerowany (${cfg.rows.length} wpisów).`);
+        }else{
+          const blob=await cfBuildPdfBlob(cfg,defs);
+          const url=URL.createObjectURL(blob);
+          const a=document.createElement('a');
+          a.href=url; a.download=`${filenameBase}.pdf`; a.click();
+          setTimeout(()=>URL.revokeObjectURL(url),1000);
+          showToast(`Raport PDF wygenerowany (${cfg.rows.length} wpisów).`);
+        }
+        cfCloseReportPreview();
+        closeModal();
+      }catch(e){
+        showToast(e?.message||'Nie udało się utworzyć pliku.');
+        btn.disabled=false;
+        btn.textContent=old;
+      }
+    });
+  }
+
+  async function generateConfiguredReport(format){
+    try{
+      const cfg=cfGetConfiguredReport();
+      const defs=CF_REPORT_FIELDS.filter(f=>cfg.fields.includes(f.key));
+      if(!defs.length) throw new Error('Wybierz przynajmniej jedną kolumnę raportu.');
+      const filenameBase=(document.getElementById('cfReportFilename')?.value.trim()||`CleanFleet-raport-${cfg.month||todayISO()}`).replace(/[^a-zA-Z0-9._-]+/g,'_');
+      const hint=document.getElementById('cfReportResultHint');
+      if(hint) hint.innerHTML=`Wybrano <strong>${cfg.rows.length}</strong> wpisów. Przygotowuję podgląd ${format==='xls'?'XLS':'PDF'}…`;
+      cfShowReportPreview(cfg,defs,format,filenameBase);
+    }catch(e){
+      showToast(e?.message||'Nie udało się przygotować podglądu raportu.');
+    }
   }
 
   function showPdfExportModal(){

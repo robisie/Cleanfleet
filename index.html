@@ -3199,7 +3199,7 @@ function uid(){
         case 'ordered': return r.zlecone;
         case 'todo': return r.zlecone && !r.data_prania;
         case 'done': return !!r.data_prania;
-        case 'unapproved': return !!r.data_prania && !r.zatwierdzone && !r.zaplacone;
+        case 'unapproved': return !!r.data_prania && !r.zatwierdzone;
         case 'unpaid': return !r.zaplacone;
         case 'old': {
           const days = daysSinceLastWashForRecord(r);
@@ -3794,7 +3794,7 @@ function uid(){
       if(!latest) return false;
       return daysSinceLastWashForRecord(latest)>=(365/2);
     }).length;
-    const unapproved=records.filter(r=>r.data_prania && !r.zatwierdzone && !r.zaplacone).length;
+    const unapproved=records.filter(r=>r.data_prania && !r.zatwierdzone).length;
     const items=[
       {label:'Do wykonania',value:pendingOrders,filter:'todo',alert:pendingOrders>0},
       {label:'Dawno nie prane',value:oldVehicles,action:'old',alert:oldVehicles>0},
@@ -4361,7 +4361,6 @@ function uid(){
     {key:'typ', label:'Typ pojazdu', value:r=>r.typ||'—'},
     {key:'tablica', label:'Tablica rejestracyjna', value:r=>r.tablica||'—'},
     {key:'marka', label:'Marka', value:r=>r.marka||'—'},
-    {key:'billing_category', label:'Kategoria rozliczeniowa', value:r=>pdfBillingCategory(r)},
     {key:'ordered', label:'Zlecone', value:r=>r.zlecone?'TAK':'NIE'},
     {key:'ordered_by', label:'Kto zlecił', value:r=>r.kto_zlecil||'—'},
     {key:'order_date', label:'Data zlecenia', value:r=>fmtDate(r.data_zlecenia)},
@@ -4403,7 +4402,7 @@ function uid(){
       case 'todo': return !done;
       case 'done': return done;
       case 'unapproved': return done && !approved;
-      case 'approved': return approved;
+      case 'approved': return done && approved;
       case 'unpaid': return !paid;
       case 'paid': return paid;
       default: return true;
@@ -4452,7 +4451,7 @@ function uid(){
           <div class="field" style="margin-top:12px;"><label>Sortowanie wierszy</label><select id="cfReportSort"><option value="date_asc">Data — najstarsze pierwsze</option><option value="date_desc">Data — najnowsze pierwsze</option><option value="plate_asc">Tablica A–Z</option><option value="plate_desc">Tablica Z–A</option><option value="cost_desc">Koszt — najwyższy pierwszy</option><option value="cost_asc">Koszt — najniższy pierwszy</option><option value="type_plate">Typ, potem tablica</option></select></div>
           <div class="field"><label>Nazwa pliku (opcjonalnie)</label><input id="cfReportFilename" type="text" placeholder="np. raport-prania-sierpien-2026"></div>
         </div>
-        <div class="cf-report-section"><div class="cf-report-section-title">4. Okres danych</div>
+        <div class="cf-report-section"><div class="cf-report-section-title">3. Okres danych</div>
           <div class="cf-report-hint" style="margin-bottom:10px;">Po ustawieniu filtrów i kolumn możesz na końcu ograniczyć raport do konkretnego miesiąca albo własnego zakresu dat.</div>
           <div class="field"><label>Według jakiej daty filtrować?</label>
             <select id="cfReportDateBasis"><option value="wash">Data prania</option><option value="order">Data zlecenia</option><option value="created">Data utworzenia wpisu</option><option value="invoice">Data faktury</option></select>
@@ -4463,7 +4462,7 @@ function uid(){
           <div id="cfReportMonthWrap" class="field" style="display:none;"><label>Miesiąc</label><input type="month" id="cfReportMonth" value="${new Date().toISOString().slice(0,7)}"></div>
           <div id="cfReportCustomWrap" class="field" style="display:none;"><div class="field-row"><div class="field"><label>Od</label><input type="date" id="cfReportDateFrom"></div><div class="field"><label>Do</label><input type="date" id="cfReportDateTo"></div></div></div>
         </div>
-        <div id="cfReportResultHint" class="cf-report-result-hint">Raport obejmie wszystkie dane spełniające wybrane filtry.</div>
+        <div id="cfReportResultHint" class="cf-report-result-hint">Raport zostanie zbudowany dokładnie z danych widocznych w CleanFleet. Liczba wpisów pojawi się po kliknięciu Generuj PDF lub Generuj XLS.</div>
         <div class="sheet-actions" style="gap:8px;"><button class="btn btn-solid" id="cfReportPdfBtn" style="flex:1;">Generuj PDF</button><button class="btn btn-outline" id="cfReportXlsBtn" style="flex:1;">Generuj XLS</button></div>
       </div></div>`;
     document.getElementById('modalRoot').innerHTML=html;
@@ -4514,7 +4513,7 @@ function uid(){
     if(Number.isFinite(costFrom)&&document.getElementById('cfReportCostFrom')?.value && Number.isFinite(costTo)&&document.getElementById('cfReportCostTo')?.value && costFrom>costTo) throw new Error('Koszt „od” nie może być większy niż koszt „do”.');
 
     const all=cfReportRowsFromRecords();
-    const wantedTypes=new Set(types.map(t=>String(t).trim().toLowerCase()).filter(Boolean));
+    const wantedTypes=new Set(types.map(t=>String(t).trim().toLowerCase().replace(/\s+/g,' ')).filter(Boolean));
     const rows=all.filter(r=>{
       const vehicleType=String(r.typ||'').trim().toLowerCase().replace(/\s+/g,' ');
       if(wantedTypes.size && !wantedTypes.has(vehicleType)) return false;
@@ -4556,7 +4555,7 @@ function uid(){
       return da.localeCompare(db);
     });
     if(!rows.length) throw new Error('Brak wpisów dla wybranych ustawień.');
-    return {rows,fields,mode,month,from,to,dateBasis,sort};
+    return {rows,fields,mode,month,from,to,dateBasis,sort,sourceCount:all.length};
   }
 
   function cfReportPreviewHtml(cfg, defs, format, filenameBase){
@@ -4565,7 +4564,7 @@ function uid(){
     const header=defs.map(d=>`<th style="text-align:left;padding:8px;background:#16150F;color:#F5F4EE;font-size:11px;white-space:nowrap;position:sticky;top:0;z-index:1;">${escapeHtml(d.label)}</th>`).join('');
     const body=cfg.rows.map((r,i)=>`<tr style="background:${i%2?'#F7F6F1':'#FFFFFF'};">${defs.map(d=>`<td style="padding:7px 8px;font-size:11px;border-bottom:1px solid #E5E3D8;vertical-align:top;">${escapeHtml(String(d.value(r) ?? ''))}</td>`).join('')}</tr>`).join('');
     return `<div class="cf-report-preview-head">
-      <div><strong>Podgląd raportu</strong><div class="cf-report-preview-meta">${escapeHtml(rangeLabel)} · filtr: ${escapeHtml(basisLabel)} · <strong>${cfg.rows.length}</strong> wpisów</div></div>
+      <div><strong>Podgląd raportu</strong><div class="cf-report-preview-meta">${escapeHtml(rangeLabel)} · filtr daty: ${escapeHtml(basisLabel)} · <strong>${cfg.rows.length}</strong> wpisów</div></div>
       <div class="cf-report-preview-format">${format==='pdf'?'PDF':'XLS'}</div>
     </div>
     <div class="cf-report-preview-table-wrap"><table class="cf-report-preview-table"><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table></div>

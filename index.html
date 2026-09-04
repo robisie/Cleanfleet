@@ -659,6 +659,14 @@
   opacity:.82;
 }
 .cf-change-notification-row:last-child{margin-bottom:0;}
+.cf-change-notification-row{position:relative;}
+.cf-change-notification-content{display:flex;align-items:center;gap:12px;width:100%;min-width:0;}
+.cf-change-notification-open{flex:1;min-width:0;display:flex;align-items:center;gap:14px;background:transparent;border:0;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer;}
+.cf-change-notification-delete{flex:0 0 auto;width:34px;height:34px;border:1px solid #d8d5c8;border-radius:8px;background:#fff;cursor:pointer;font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;}
+.cf-change-notification-delete:active{background:#f3f1e9;}
+.cf-change-inbox-actions{display:flex;justify-content:flex-end;margin-top:14px;}
+.cf-change-clear-btn{border:1px solid #d8d5c8;background:#fff;border-radius:9px;padding:9px 12px;font:700 11px 'JetBrains Mono',monospace;text-transform:uppercase;cursor:pointer;}
+.cf-change-clear-btn:active{background:#f3f1e9;}
 .cf-change-notification-main{
   flex:1;
   min-width:0;
@@ -3144,15 +3152,40 @@ async function cfOpenChangeNotifications(){
     return items.map(n=>{
       const st = statusInfo(n);
       return `
-        <button type="button" class="cf-change-notification-row ${n.read_at ? 'read' : 'unread'}" data-cf-note-id="${esc(n.id)}">
-          <span class="cf-change-notification-main">
-            <strong>${esc(n.title || 'Powiadomienie')}</strong>
-            <span class="menu-item-sub">${esc(n.body || '')}</span>
-            <span class="cf-change-item-meta">${esc(new Date(n.created_at).toLocaleString('pl-PL'))}</span>
-          </span>
-          <span class="cf-change-status ${st.cls}">${st.text}</span>
-        </button>`;
+        <div class="cf-change-notification-row ${n.read_at ? 'read' : 'unread'}" data-cf-note-id="${esc(n.id)}">
+          <div class="cf-change-notification-content">
+            <button type="button" class="cf-change-notification-open" aria-label="Otwórz powiadomienie">
+              <span class="cf-change-notification-main">
+                <strong>${esc(n.title || 'Powiadomienie')}</strong>
+                <span class="menu-item-sub">${esc(n.body || '')}</span>
+                <span class="cf-change-item-meta">${esc(new Date(n.created_at).toLocaleString('pl-PL'))}</span>
+              </span>
+              <span class="cf-change-status ${st.cls}">${st.text}</span>
+            </button>
+            <button type="button" class="cf-change-notification-delete" data-cf-delete-note="${esc(n.id)}" aria-label="Usuń powiadomienie" title="Usuń powiadomienie">🗑️</button>
+          </div>
+        </div>`;
     }).join('');
+  }
+
+  async function cfDeleteChangeNotification(noteId){
+    if(!noteId) return;
+    const { error } = await cfSupabase
+      .from('cf_notifications')
+      .delete()
+      .eq('id',noteId)
+      .eq('recipient_user_id',cfCurrentUserId)
+      .in('type',['wash_change_request','wash_change_request_result']);
+    if(error) throw error;
+  }
+
+  async function cfClearChangeNotifications(){
+    const { error } = await cfSupabase
+      .from('cf_notifications')
+      .delete()
+      .eq('recipient_user_id',cfCurrentUserId)
+      .in('type',['wash_change_request','wash_change_request_result']);
+    if(error) throw error;
   }
 
   async function openRequest(note){
@@ -3272,6 +3305,7 @@ async function cfOpenChangeNotifications(){
         <h2>Zmiany i wnioski</h2>
         <div class="confirm-text">Informacje dotyczące zmian i wniosków między kontem administratora a kontem pracownika floty.</div>
         <div class="cf-change-preview" id="cfChangeNotificationList">${renderNotificationList()}</div>
+        <div class="cf-change-inbox-actions"><button type="button" class="cf-change-clear-btn" id="cfClearChangeNotifications">Wyczyść listę powiadomień</button></div>
       </div>
     </div>`;
 
@@ -3279,11 +3313,11 @@ async function cfOpenChangeNotifications(){
   document.getElementById('cfCloseChangeNotifications')?.addEventListener('click', closeModal);
   overlay?.addEventListener('click', e => { if(e.target === overlay) closeModal(); });
 
-  overlay?.querySelectorAll('[data-cf-note-id]').forEach(btn=>{
+  overlay?.querySelectorAll('.cf-change-notification-open').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
-      const note = items.find(x=>x.id === btn.dataset.cfNoteId);
+      const row = btn.closest('[data-cf-note-id]');
+      const note = items.find(x=>x.id === row?.dataset.cfNoteId);
       if(!note) return;
-
       if(!note.read_at){
         const {error:readError}=await cfSupabase
           .from('cf_notifications')
@@ -3293,11 +3327,41 @@ async function cfOpenChangeNotifications(){
         if(readError) console.warn('CleanFleet notification read:',readError.message);
         note.read_at = new Date().toISOString();
       }
-
       if(note.entity_id) await openRequest(note);
       else showToast(note.body || note.title || 'Powiadomienie');
     });
   });
+
+  overlay?.querySelectorAll('[data-cf-delete-note]').forEach(btn=>{
+    btn.addEventListener('click', async e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      try{
+        await cfDeleteChangeNotification(btn.dataset.cfDeleteNote);
+        await cfLoadChangeNotifications();
+        showToast('Powiadomienie usunięte.');
+        await cfOpenChangeNotifications();
+      }catch(e){
+        console.error(e);
+        showToast(e.message || 'Nie udało się usunąć powiadomienia.');
+      }
+    });
+  });
+
+  document.getElementById('cfClearChangeNotifications')?.addEventListener('click', async ()=>{
+    if(!items.length) return;
+    if(!confirm('Czy na pewno wyczyścić całą listę powiadomień?')) return;
+    try{
+      await cfClearChangeNotifications();
+      await cfLoadChangeNotifications();
+      showToast('Lista powiadomień została wyczyszczona.');
+      await cfOpenChangeNotifications();
+    }catch(e){
+      console.error(e);
+      showToast(e.message || 'Nie udało się wyczyścić listy powiadomień.');
+    }
+  });
+
 }
 
 function cfApplyRoleMenu(){

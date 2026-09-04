@@ -4412,9 +4412,7 @@ function uid(){
 
   function showEmployeeReportModal(){
     menuOverlay.classList.remove('open');
-    const now = new Date();
-    const defaultMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-    const fieldChecks = CF_REPORT_FIELDS.map(f=>`<label class="field-check cf-report-option"><input type="checkbox" class="cf-report-field" value="${f.key}" ${['typ','tablica','marka','billing_category','wash_date','performed_by','cost','approved','paid'].includes(f.key)?'checked':''}><span>${escapeHtml(f.label)}</span></label>`).join('');
+    const fieldChecks = CF_REPORT_FIELDS.map(f=>`<label class="field-check cf-report-option"><input type="checkbox" class="cf-report-field" value="${f.key}" ${['typ','tablica','marka','wash_date','performed_by','cost','approved','paid'].includes(f.key)?'checked':''}><span>${escapeHtml(f.label)}</span></label>`).join('');
     const availableTypes = [...new Set(records.map(r=>String(r.typ||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pl'));
     const typeChecks = availableTypes.length
       ? availableTypes.map(t=>`<label class="cf-report-chip"><input type="checkbox" class="cf-report-type" value="${escapeHtml(t)}" checked><span>${escapeHtml(t)}</span></label>`).join('')
@@ -4424,34 +4422,22 @@ function uid(){
       <div class="sheet cf-report-sheet" style="max-width:760px;width:96%;max-height:92vh;overflow:auto;">
         <button class="close" data-close>&times;</button>
         <h2>Generuj raport</h2>
-        <div class="confirm-text">Zbuduj raport dokładnie według potrzeb. Najpierw wybierz <strong>zakres danych</strong>, potem filtry, a na końcu informacje i kolejność kolumn.</div>
+        <div class="confirm-text">Wybierz <strong>co ma znaleźć się w raporcie</strong>, następnie ustaw filtry, wybierz kolumny i kolejność. Jeżeli nie ustawisz filtra, raport obejmie wszystkie pasujące dane.</div>
 
-        <div class="cf-report-section"><div class="cf-report-section-title">1. Zakres danych</div>
-          <div class="field"><label>Według jakiej daty filtrować?</label>
-            <select id="cfReportDateBasis"><option value="wash">Data prania</option><option value="order">Data zlecenia</option><option value="created">Data utworzenia wpisu</option><option value="invoice">Data faktury</option></select>
-          </div>
-          <div class="field"><label>Zakres</label>
-            <select id="cfReportPeriodMode"><option value="month">Wybrany miesiąc</option><option value="all">Wszystkie dane</option><option value="custom">Własny zakres dat</option></select>
-          </div>
-          <div id="cfReportMonthWrap" class="field"><label>Miesiąc</label><input type="month" id="cfReportMonth" value="${defaultMonth}"></div>
-          <div id="cfReportCustomWrap" class="field" style="display:none;"><div class="field-row"><div class="field"><label>Od</label><input type="date" id="cfReportDateFrom"></div><div class="field"><label>Do</label><input type="date" id="cfReportDateTo"></div></div></div>
-        </div>
+        <div class="cf-report-section"><div class="cf-report-section-title">1. Co ma wejść do raportu?</div>
+          <div class="cf-report-subtitle">Typ pojazdu</div>
+          <div class="cf-report-quick-actions" style="margin-bottom:7px;"><button type="button" class="btn btn-outline" id="cfReportTypesAll">Wszystkie typy</button><button type="button" class="btn btn-outline" id="cfReportTypesNone">Wyczyść typy</button></div>
+          <div class="cf-report-chips">${typeChecks}</div>
 
-        <div class="cf-report-section"><div class="cf-report-section-title">2. Co ma wejść do raportu?</div>
-          <div class="cf-report-subtitle">Typ pojazdu</div><div class="cf-report-quick-actions" style="margin-bottom:7px;"><button type="button" class="btn btn-outline" id="cfReportTypesAll">Wszystkie typy</button><button type="button" class="btn btn-outline" id="cfReportTypesNone">Wyczyść typy</button></div><div class="cf-report-chips">${typeChecks}</div>
-          <div class="cf-report-subtitle" style="margin-top:12px;">Grupa rozliczeniowa</div>
-          <div class="cf-report-chips">
-            <label class="cf-report-chip"><input type="checkbox" class="cf-report-billing" value="osobowe" checked><span>Osobowe</span></label>
-            <label class="cf-report-chip"><input type="checkbox" class="cf-report-billing" value="ciezarowe" checked><span>Ciężarowe</span></label>
-            <label class="cf-report-chip"><input type="checkbox" class="cf-report-billing" value="busy" checked><span>Busy</span></label>
-            <label class="cf-report-chip"><input type="checkbox" id="cfReportBillingEmpty" value="empty" checked><span>Brak przypisanej</span></label>
-          </div>
-          <div class="field" style="margin-top:12px;"><label>Status — możesz łączyć kilka warunków</label>
+          <div class="cf-report-subtitle" style="margin-top:14px;">Status</div>
+          <div class="field" style="margin-top:6px;"><label>Jeżeli wybierzesz kilka statusów</label>
             <select id="cfReportStatusMode"><option value="or">SPEŁNIA CO NAJMNIEJ JEDEN wybrany status</option><option value="and">SPEŁNIA WSZYSTKIE wybrane statusy</option></select>
           </div>
           <div class="cf-report-status-grid">${statusChecks}</div>
           <div class="cf-report-hint">Jeżeli nie zaznaczysz żadnego statusu, status nie ograniczy wyników.</div>
-          <div class="field-row" style="margin-top:12px;"><div class="field"><label>Tablica zawiera</label><input id="cfReportPlateSearch" placeholder="np. WGM"></div><div class="field"><label>Marka zawiera</label><input id="cfReportBrandSearch" placeholder="np. DAF"></div></div>
+
+          <div class="cf-report-subtitle" style="margin-top:14px;">Dodatkowe filtry</div>
+          <div class="field-row" style="margin-top:6px;"><div class="field"><label>Tablica zawiera</label><input id="cfReportPlateSearch" placeholder="np. WGM"></div><div class="field"><label>Marka zawiera</label><input id="cfReportBrandSearch" placeholder="np. DAF"></div></div>
           <div class="field-row"><div class="field"><label>Kto zlecił — zawiera</label><input id="cfReportOrderedBySearch" placeholder="np. DANIEL"></div><div class="field"><label>Wykonał — zawiera</label><input id="cfReportPerformedBySearch" placeholder="np. JAN"></div></div>
           <div class="field-row"><div class="field"><label>Koszt od (zł)</label><input id="cfReportCostFrom" type="number" min="0" step="0.01"></div><div class="field"><label>Koszt do (zł)</label><input id="cfReportCostTo" type="number" min="0" step="0.01"></div></div>
           <div class="cf-report-chips" style="margin-top:4px;">
@@ -4460,43 +4446,54 @@ function uid(){
           </div>
         </div>
 
-        <div class="cf-report-section"><div class="cf-report-section-title">3. Informacje i układ</div>
+        <div class="cf-report-section"><div class="cf-report-section-title">2. Informacje i układ</div>
           <div class="cf-report-quick-actions"><button type="button" class="btn btn-outline" id="cfReportSelectAll">Zaznacz wszystko</button><button type="button" class="btn btn-outline" id="cfReportSelectNone">Wyczyść</button><button type="button" class="btn btn-outline" id="cfReportSelectBasic">Podstawowe</button></div>
           <div class="cf-report-fields-grid">${fieldChecks}</div>
-          <div class="field" style="margin-top:12px;"><label>Sortowanie</label><select id="cfReportSort"><option value="date_asc">Data — najstarsze pierwsze</option><option value="date_desc">Data — najnowsze pierwsze</option><option value="plate_asc">Tablica A–Z</option><option value="plate_desc">Tablica Z–A</option><option value="cost_desc">Koszt — najwyższy pierwszy</option><option value="cost_asc">Koszt — najniższy pierwszy</option><option value="type_plate">Typ, potem tablica</option></select></div>
-          <div class="field"><label>Nazwa pliku (opcjonalnie)</label><input id="cfReportFilename" type="text" placeholder="np. raport-prania-wrzesien-2026"></div>
+          <div class="field" style="margin-top:12px;"><label>Sortowanie wierszy</label><select id="cfReportSort"><option value="date_asc">Data — najstarsze pierwsze</option><option value="date_desc">Data — najnowsze pierwsze</option><option value="plate_asc">Tablica A–Z</option><option value="plate_desc">Tablica Z–A</option><option value="cost_desc">Koszt — najwyższy pierwszy</option><option value="cost_asc">Koszt — najniższy pierwszy</option><option value="type_plate">Typ, potem tablica</option></select></div>
+          <div class="field"><label>Nazwa pliku (opcjonalnie)</label><input id="cfReportFilename" type="text" placeholder="np. raport-prania-sierpien-2026"></div>
         </div>
-        <div id="cfReportResultHint" class="cf-report-result-hint">Raport zostanie przygotowany po kliknięciu przycisku.</div>
+        <div class="cf-report-section"><div class="cf-report-section-title">4. Okres danych</div>
+          <div class="cf-report-hint" style="margin-bottom:10px;">Po ustawieniu filtrów i kolumn możesz na końcu ograniczyć raport do konkretnego miesiąca albo własnego zakresu dat.</div>
+          <div class="field"><label>Według jakiej daty filtrować?</label>
+            <select id="cfReportDateBasis"><option value="wash">Data prania</option><option value="order">Data zlecenia</option><option value="created">Data utworzenia wpisu</option><option value="invoice">Data faktury</option></select>
+          </div>
+          <div class="field"><label>Okres</label>
+            <select id="cfReportPeriodMode"><option value="all">Wszystkie dane</option><option value="month">Wybrany miesiąc</option><option value="custom">Własny zakres dat</option></select>
+          </div>
+          <div id="cfReportMonthWrap" class="field" style="display:none;"><label>Miesiąc</label><input type="month" id="cfReportMonth" value="${new Date().toISOString().slice(0,7)}"></div>
+          <div id="cfReportCustomWrap" class="field" style="display:none;"><div class="field-row"><div class="field"><label>Od</label><input type="date" id="cfReportDateFrom"></div><div class="field"><label>Do</label><input type="date" id="cfReportDateTo"></div></div></div>
+        </div>
+        <div id="cfReportResultHint" class="cf-report-result-hint">Raport obejmie wszystkie dane spełniające wybrane filtry.</div>
         <div class="sheet-actions" style="gap:8px;"><button class="btn btn-solid" id="cfReportPdfBtn" style="flex:1;">Generuj PDF</button><button class="btn btn-outline" id="cfReportXlsBtn" style="flex:1;">Generuj XLS</button></div>
       </div></div>`;
     document.getElementById('modalRoot').innerHTML=html;
     document.querySelector('#cfReportOverlay [data-close]').addEventListener('click',closeModal);
-    const mode=document.getElementById('cfReportPeriodMode');
-    mode.addEventListener('change',()=>{
-      const m=mode.value;
+    const periodMode=document.getElementById('cfReportPeriodMode');
+    const updatePeriodFields=()=>{
+      const m=periodMode?.value||'all';
       document.getElementById('cfReportMonthWrap').style.display=m==='month'?'':'none';
       document.getElementById('cfReportCustomWrap').style.display=m==='custom'?'':'none';
-    });
+    };
+    periodMode?.addEventListener('change',updatePeriodFields);
+    updatePeriodFields();
     const fields=[...document.querySelectorAll('.cf-report-field')];
     const typeBoxes=[...document.querySelectorAll('.cf-report-type')];
     document.getElementById('cfReportTypesAll').addEventListener('click',()=>typeBoxes.forEach(x=>x.checked=true));
     document.getElementById('cfReportTypesNone').addEventListener('click',()=>typeBoxes.forEach(x=>x.checked=false));
     document.getElementById('cfReportSelectAll').addEventListener('click',()=>fields.forEach(x=>x.checked=true));
     document.getElementById('cfReportSelectNone').addEventListener('click',()=>fields.forEach(x=>x.checked=false));
-    document.getElementById('cfReportSelectBasic').addEventListener('click',()=>{const basic=new Set(['typ','tablica','marka','billing_category','wash_date','performed_by','cost','approved','paid']);fields.forEach(x=>x.checked=basic.has(x.value));});
+    document.getElementById('cfReportSelectBasic').addEventListener('click',()=>{const basic=new Set(['typ','tablica','marka','wash_date','performed_by','cost','approved','paid']);fields.forEach(x=>x.checked=basic.has(x.value));});
     document.getElementById('cfReportPdfBtn').addEventListener('click',()=>generateConfiguredReport('pdf'));
     document.getElementById('cfReportXlsBtn').addEventListener('click',()=>generateConfiguredReport('xls'));
   }
 
   function cfGetConfiguredReport(){
-    const mode=document.getElementById('cfReportPeriodMode')?.value||'month';
+    const mode=document.getElementById('cfReportPeriodMode')?.value||'all';
     const month=document.getElementById('cfReportMonth')?.value||'';
     const from=document.getElementById('cfReportDateFrom')?.value||'';
     const to=document.getElementById('cfReportDateTo')?.value||'';
     const dateBasis=document.getElementById('cfReportDateBasis')?.value||'wash';
     const types=Array.from(document.querySelectorAll('.cf-report-type:checked')).map(x=>x.value);
-    const billing=Array.from(document.querySelectorAll('.cf-report-billing:checked')).map(x=>x.value);
-    const billingEmpty=!!document.getElementById('cfReportBillingEmpty')?.checked;
     const statuses=Array.from(document.querySelectorAll('.cf-report-status:checked')).map(x=>x.value);
     const statusMode=document.getElementById('cfReportStatusMode')?.value||'or';
     const fields=Array.from(document.querySelectorAll('.cf-report-field:checked')).map(x=>x.value);
@@ -4509,37 +4506,18 @@ function uid(){
     const onlyInvoiced=!!document.getElementById('cfReportOnlyInvoiced')?.checked;
     const onlyWithoutInvoice=!!document.getElementById('cfReportOnlyWithoutInvoice')?.checked;
     const sort=document.getElementById('cfReportSort')?.value||'date_asc';
-    if(!types.length) throw new Error('Wybierz co najmniej jeden typ pojazdu.');
-    if(!billing.length && !billingEmpty) throw new Error('Wybierz co najmniej jedną grupę rozliczeniową.');
-    if(!fields.length) throw new Error('Wybierz co najmniej jedną informację do raportu.');
+    if(!fields.length) throw new Error('Wybierz przynajmniej jedną informację do raportu.');
     if(mode==='month'&&!month) throw new Error('Wybierz miesiąc.');
     if(mode==='custom'&&(!from||!to)) throw new Error('Wybierz datę początkową i końcową.');
     if(mode==='custom'&&from>to) throw new Error('Data „Od” nie może być późniejsza niż data „Do”.');
-    if(Number.isFinite(costFrom)&&document.getElementById('cfReportCostFrom')?.value && Number.isFinite(costTo)&&document.getElementById('cfReportCostTo')?.value && costFrom>costTo) throw new Error('Koszt „od” nie może być większy niż koszt „do”.');
     if(onlyInvoiced&&onlyWithoutInvoice) throw new Error('Nie można jednocześnie wybrać „Tylko z fakturą” i „Tylko bez faktury”.');
+    if(Number.isFinite(costFrom)&&document.getElementById('cfReportCostFrom')?.value && Number.isFinite(costTo)&&document.getElementById('cfReportCostTo')?.value && costFrom>costTo) throw new Error('Koszt „od” nie może być większy niż koszt „do”.');
 
     const all=cfReportRowsFromRecords();
-    const getDate=r=>dateBasis==='order'?String(r.data_zlecenia||''):dateBasis==='created'?(r.created_at?new Date(r.created_at).toISOString().slice(0,10):''):dateBasis==='invoice'?String(r.__invoice_date||''):String(r.data_prania||'');
     const wantedTypes=new Set(types.map(t=>String(t).trim().toLowerCase()).filter(Boolean));
-    const wantedBilling=new Set(billing.map(t=>String(t).trim().toLowerCase()).filter(Boolean));
     const rows=all.filter(r=>{
       const vehicleType=String(r.typ||'').trim().toLowerCase().replace(/\s+/g,' ');
-      // Pusty wybór typu oznacza brak ograniczenia — dzięki temu przyciski
-      // „Wyczyść typy” nie powodują sztucznego „braku danych”.
       if(wantedTypes.size && !wantedTypes.has(vehicleType)) return false;
-
-      // Kategoria rozliczeniowa jest filtrowana na podstawie wartości zapisanej
-      // w rekordzie. Dla starych wpisów bez kategorii działa osobna opcja „Brak przypisanej”.
-      const rawBilling=String(r.billing_category||'').trim().toLowerCase();
-      const cat=pdfBillingCategoryKey(r).toLowerCase();
-      const billingFilterActive=wantedBilling.size || billingEmpty;
-      if(billingFilterActive){
-        const billingMatch = (rawBilling ? wantedBilling.has(cat) : billingEmpty);
-        if(!billingMatch) return false;
-      }
-      const d=getDate(r);
-      if(mode==='month' && d.slice(0,7)!==month) return false;
-      if(mode==='custom' && (!d || d<from || d>to)) return false;
       if(statuses.length){
         const ok=statusMode==='and'?statuses.every(k=>cfReportMatchesStatus(r,k)):statuses.some(k=>cfReportMatchesStatus(r,k));
         if(!ok) return false;
@@ -4554,8 +4532,19 @@ function uid(){
       const hasInvoice=!!r.__invoice_number;
       if(onlyInvoiced&&!hasInvoice) return false;
       if(onlyWithoutInvoice&&hasInvoice) return false;
+
+      const reportDate = dateBasis==='order' ? String(r.data_zlecenia||'')
+        : dateBasis==='created' ? (r.created_at ? new Date(r.created_at).toISOString().slice(0,10) : '')
+        : dateBasis==='invoice' ? String(r.__invoice_date||'')
+        : String(r.data_prania||'');
+      if(mode==='month'){
+        if(!reportDate || !reportDate.startsWith(month)) return false;
+      }else if(mode==='custom'){
+        if(!reportDate || reportDate<from || reportDate>to) return false;
+      }
       return true;
     });
+    const getDate=r=>dateBasis==='order'?String(r.data_zlecenia||''):dateBasis==='created'?(r.created_at?new Date(r.created_at).toISOString().slice(0,10):''):dateBasis==='invoice'?String(r.__invoice_date||''):String(r.data_prania||'');
     rows.sort((a,b)=>{
       const da=getDate(a), db=getDate(b);
       if(sort==='date_desc') return db.localeCompare(da);

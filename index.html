@@ -854,8 +854,56 @@
   </div>
 </div>
 
+
+<!-- CleanFleet — powiadomienia administratora o wnioskach pracownika -->
+<div id="cfAdminNotificationsPanel" class="cf-admin-notifications-panel" hidden>
+  <div class="cf-admin-notifications-head">
+    <div>
+      <div class="cf-admin-notifications-title">🔔 Powiadomienia</div>
+      <div class="cf-admin-notifications-sub" id="cfAdminNotificationsSub">Wnioski oczekujące</div>
+    </div>
+    <button type="button" id="cfAdminNotificationsClose" aria-label="Zamknij">×</button>
+  </div>
+  <div id="cfAdminNotificationsList" class="cf-admin-notifications-list"></div>
+</div>
+
 <div id="modalRoot"></div>
 <div class="toast" id="toast"></div>
+
+
+<style>
+.cf-admin-notifications-panel{
+  position:fixed; z-index:10050; top:70px; right:18px; width:min(460px,calc(100vw - 36px));
+  max-height:min(70vh,620px); overflow:hidden; background:#fff; border:1px solid #d8dde5;
+  border-radius:16px; box-shadow:0 14px 40px rgba(0,0,0,.18);
+}
+.cf-admin-notifications-panel[hidden]{display:none!important}
+.cf-admin-notifications-head{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:14px 16px; border-bottom:1px solid #e5e7eb;
+}
+.cf-admin-notifications-title{font-size:18px;font-weight:800}
+.cf-admin-notifications-sub{font-size:13px;color:#68707c;margin-top:2px}
+#cfAdminNotificationsClose{border:0;background:transparent;font-size:28px;line-height:1;cursor:pointer;color:#666}
+.cf-admin-notifications-list{overflow:auto;max-height:calc(min(70vh,620px) - 74px);padding:8px}
+.cf-admin-notification-item{
+  padding:12px;border:1px solid #e1e5ea;border-radius:12px;margin-bottom:8px;background:#fafbfc;
+}
+.cf-admin-notification-item:last-child{margin-bottom:0}
+.cf-admin-notification-title{font-weight:800;font-size:15px}
+.cf-admin-notification-body{font-size:14px;margin-top:4px;color:#454b55}
+.cf-admin-notification-meta{font-size:12px;color:#7a818c;margin-top:6px}
+.cf-admin-notification-actions{display:flex;gap:8px;margin-top:10px}
+.cf-admin-notification-actions button{
+  border:0;border-radius:9px;padding:8px 11px;cursor:pointer;font-weight:700;
+}
+.cf-admin-notification-open{background:#e9f6ee;color:#146c36}
+.cf-admin-notification-read{background:#eef1f5;color:#3e4650}
+.cf-admin-notifications-empty{padding:22px 12px;text-align:center;color:#707782}
+@media(max-width:600px){
+  .cf-admin-notifications-panel{top:58px;right:10px;width:calc(100vw - 20px)}
+}
+</style>
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1086,6 +1134,159 @@ async function cfDisableNotifications(){
   }
 }
 
+
+let cfAdminNotifications = [];
+
+function cfEscapeHtml(value){
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+  }[ch]));
+}
+
+function cfFormatNotificationDate(value){
+  if(!value) return '';
+  const d = new Date(value);
+  if(Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('pl-PL',{
+    day:'2-digit',month:'2-digit',year:'numeric',
+    hour:'2-digit',minute:'2-digit'
+  });
+}
+
+function cfOpenAdminNotificationsPanel(){
+  const panel=document.getElementById('cfAdminNotificationsPanel');
+  if(panel) panel.hidden=false;
+  cfLoadAdminNotifications();
+}
+
+function cfCloseAdminNotificationsPanel(){
+  const panel=document.getElementById('cfAdminNotificationsPanel');
+  if(panel) panel.hidden=true;
+}
+
+function cfRenderAdminNotifications(){
+  const list=document.getElementById('cfAdminNotificationsList');
+  const sub=document.getElementById('cfAdminNotificationsSub');
+  if(!list) return;
+
+  const pending = cfAdminNotifications.filter(n => !n.read_at);
+  if(sub) sub.textContent = pending.length
+    ? `Nierozpatrzone wnioski: ${pending.length}`
+    : 'Brak nowych wniosków';
+
+  if(!cfAdminNotifications.length){
+    list.innerHTML='<div class="cf-admin-notifications-empty">Brak powiadomień.</div>';
+    return;
+  }
+
+  list.innerHTML=cfAdminNotifications.map(n => `
+    <div class="cf-admin-notification-item" data-notification-id="${cfEscapeHtml(n.id)}">
+      <div class="cf-admin-notification-title">${cfEscapeHtml(n.title || 'Powiadomienie')}</div>
+      <div class="cf-admin-notification-body">${cfEscapeHtml(n.body || '')}</div>
+      <div class="cf-admin-notification-meta">${cfFormatNotificationDate(n.created_at)}</div>
+      <div class="cf-admin-notification-actions">
+        ${n.entity_id ? `<button type="button" class="cf-admin-notification-open" data-open-request="${cfEscapeHtml(n.entity_id)}">Otwórz wniosek</button>` : ''}
+        ${!n.read_at ? `<button type="button" class="cf-admin-notification-read" data-read-notification="${cfEscapeHtml(n.id)}">Oznacz jako przeczytane</button>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function cfLoadAdminNotifications(){
+  if(!cfSupabase || !cfIsAdmin()) return;
+  try{
+    const {data,error}=await cfSupabase
+      .from('cf_notifications')
+      .select('id,recipient_user_id,type,title,body,entity_id,read_at,created_at')
+      .eq('recipient_user_id',cfCurrentUserId)
+      .order('created_at',{ascending:false})
+      .limit(50);
+    if(error) throw error;
+    cfAdminNotifications=data||[];
+    cfRenderAdminNotifications();
+    const unread=cfAdminNotifications.filter(n=>!n.read_at).length;
+    const title=document.getElementById('cfNotificationsTitle');
+    const sub=document.getElementById('cfNotificationsSub');
+    if(title) title.textContent=unread ? `Powiadomienia (${unread})` : 'Powiadomienia';
+    if(sub) sub.textContent=unread ? `Masz ${unread} nierozpatrzon${unread===1?'y':'ych'} wniosek${unread===1?'':'ów'}.` : 'Brak nowych wniosków';
+  }catch(e){
+    console.error('CleanFleet admin notifications error:',e);
+  }
+}
+
+async function cfMarkAdminNotificationRead(notificationId){
+  if(!cfSupabase || !notificationId) return;
+  const {error}=await cfSupabase
+    .from('cf_notifications')
+    .update({read_at:new Date().toISOString()})
+    .eq('id',notificationId)
+    .eq('recipient_user_id',cfCurrentUserId);
+  if(error) throw error;
+  await cfLoadAdminNotifications();
+}
+
+async function cfOpenChangeRequest(notificationId){
+  const n=cfAdminNotifications.find(x=>x.id===notificationId);
+  if(!n) return;
+
+  if(n.entity_id){
+    const request = await cfSupabase
+      .from('wash_change_requests')
+      .select('*')
+      .eq('id',n.entity_id)
+      .maybeSingle();
+
+    if(request.error) {
+      console.error(request.error);
+      cfShowToast('Nie udało się otworzyć wniosku.');
+      return;
+    }
+
+    const r=request.data;
+    if(r?.wash_record_id){
+      const rec=records.find(x=>x.id===r.wash_record_id);
+      if(rec){
+        cfCloseAdminNotificationsPanel();
+        // Otwieramy istniejący formularz edycji wpisu, jeśli jest dostępny.
+        if(typeof openEditModal==='function'){
+          openEditModal(rec.id);
+        }else if(typeof showVehicleHistory==='function'){
+          showVehicleHistory(rec.tablica);
+        }else{
+          cfShowToast('Wniosek znaleziony. Otwórz wpis pojazdu, aby go rozpatrzyć.');
+        }
+        return;
+      }
+    }
+  }
+  cfShowToast('Wniosek nie wskazuje dostępnego wpisu.');
+}
+
+document.addEventListener('click', async (event)=>{
+  const readBtn=event.target.closest?.('[data-read-notification]');
+  if(readBtn){
+    try{
+      await cfMarkAdminNotificationRead(readBtn.dataset.readNotification);
+    }catch(e){
+      console.error(e);
+      cfShowToast('Nie udało się oznaczyć powiadomienia.');
+    }
+    return;
+  }
+
+  const openBtn=event.target.closest?.('[data-open-request]');
+  if(openBtn){
+    try{
+      await cfOpenChangeRequest(openBtn.dataset.openRequest);
+      // Samo otwarcie nie oznacza automatycznie przeczytania —
+      // administrator decyduje przyciskiem.
+    }catch(e){
+      console.error(e);
+      cfShowToast('Nie udało się otworzyć wniosku.');
+    }
+  }
+});
+
 async function cfPrepareNotifications(){
   const btn = document.getElementById('cfNotificationsBtn');
   try{
@@ -1135,6 +1336,11 @@ async function cfSignIn(email,password){
 }
 
 async function cfSignOut(){ await cfSupabase.auth.signOut(); }
+
+
+setInterval(()=>{
+  if(cfIsAdmin() && cfSupabase) cfLoadAdminNotifications();
+},30000);
 
 // CleanFleet — Pranie Floty: baza startowa
 // Wygenerowano z pliku: PRANIE_2026_-_Michał-LISTA.xlsx
@@ -5981,9 +6187,20 @@ function uid(){
     const password=document.getElementById('cfPassword').value;
     await cfSignIn(email,password);
   });
-  document.getElementById('cfRefreshBtn').addEventListener('click', cfRefresh);
+  document.getElementById('cfRefreshBtn').addEventListener('click', async ()=>{
+  await cfRefresh();
+  if(cfIsAdmin()) await cfLoadAdminNotifications();
+});
+const cfAdminNotificationsCloseBtn=document.getElementById('cfAdminNotificationsClose');
+if(cfAdminNotificationsCloseBtn) cfAdminNotificationsCloseBtn.addEventListener('click',cfCloseAdminNotificationsPanel);
+
   document.getElementById('cfNotificationsBtn').addEventListener('click', async ()=>{
     try{
+      if(cfIsAdmin()){
+        await cfLoadAdminNotifications();
+        cfOpenAdminNotificationsPanel();
+        return;
+      }
       if(!('serviceWorker' in navigator) || !('PushManager' in window)) {
         await cfEnableNotifications();
         return;
@@ -6004,11 +6221,11 @@ function uid(){
       await cfInitSupabase();
       const { data:{session} } = await cfSupabase.auth.getSession();
       if(!session){ cfShowLogin(true); cfSetSync('Wymagane logowanie'); }
-      else { cfShowLogin(false); await cfLoadRole(); if(!cfCurrentRole){ throw new Error('Brak przypisanej roli użytkownika.'); } await loadAll(); await cfPrepareNotifications(); }
+      else { cfShowLogin(false); await cfLoadRole(); if(!cfCurrentRole){ throw new Error('Brak przypisanej roli użytkownika.'); } await loadAll(); await cfPrepareNotifications(); if(cfIsAdmin()) await cfLoadAdminNotifications(); }
       cfSupabase.auth.onAuthStateChange((_event, session)=>{
         if(session){
           cfShowLogin(false);
-          setTimeout(async ()=>{ await cfLoadRole(); if(!cfCurrentRole) return; await loadAll(); await cfPrepareNotifications(); },0);
+          setTimeout(async ()=>{ await cfLoadRole(); if(!cfCurrentRole) return; await loadAll(); await cfPrepareNotifications(); if(cfIsAdmin()) await cfLoadAdminNotifications(); },0);
         } else {
           cfShowLogin(true);
           cfSetSync('Wymagane logowanie');

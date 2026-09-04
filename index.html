@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v110 -->
+<!-- CleanFleet v111 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -636,13 +636,41 @@
 
 /* CleanFleet v110 — statusy i pełny podgląd wniosków */
 .cf-change-notification-row{
+  width:100%;
   display:flex;
   align-items:center;
-  gap:12px;
+  gap:14px;
+  text-align:left;
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:14px 15px;
+  margin-bottom:10px;
+  background:#fff;
+  cursor:pointer;
+  font:inherit;
+  color:inherit;
+  box-sizing:border-box;
 }
+.cf-change-notification-row.unread{
+  border-left:4px solid #527818;
+  background:#fbfcf7;
+}
+.cf-change-notification-row.read{
+  opacity:.82;
+}
+.cf-change-notification-row:last-child{margin-bottom:0;}
 .cf-change-notification-main{
   flex:1;
   min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+}
+.cf-change-notification-main strong{font-size:14px;line-height:1.3;}
+.cf-change-notification-main .menu-item-sub{
+  font-size:13px;
+  line-height:1.4;
+  white-space:normal;
 }
 .cf-change-status{
   flex:0 0 auto;
@@ -671,7 +699,14 @@
 .cf-change-preview .cf-preview-title{
   font-size:13px;
   font-weight:800;
-  margin:14px 0 7px;
+  margin:14px 0 10px;
+}
+.cf-change-preview .cf-preview-title + .record-card,
+.cf-change-preview .cf-preview-title + .cf-change-card{
+  margin-bottom:22px;
+}
+.cf-change-preview .cf-preview-title + .record-card + .cf-preview-title{
+  margin-top:26px;
 }
 .cf-change-card{
   border:1px solid #dfe5e8;
@@ -2998,6 +3033,8 @@ async function cfSubmitChangeRequest(washRecordId, requestType, proposedData=nul
   return data;
 }
 
+let cfChangeUnreadCount = 0;
+
 async function cfLoadChangeNotifications(){
   const btn = document.getElementById('cfChangeNotificationsBtn');
   const sub = document.getElementById('cfChangeNotificationsSub');
@@ -3011,7 +3048,9 @@ async function cfLoadChangeNotifications(){
       .limit(100);
     if(error) throw error;
     const unread = (data||[]).filter(n=>!n.read_at).length;
+    cfChangeUnreadCount = unread;
     if(sub) sub.innerHTML = unread ? `Nieprzeczytane: <strong>${unread}</strong>` : 'Brak nowych informacji';
+    renderAttentionPanel();
     const title = btn.querySelector('.menu-item-title span:last-child');
     if(title) title.innerHTML = `Zmiany i wnioski${unread ? `<span class="cf-change-badge">${unread}</span>` : ''}`;
     btn.dataset.notifications = JSON.stringify(data||[]);
@@ -3100,6 +3139,7 @@ async function cfOpenChangeNotifications(){
           <span class="cf-change-notification-main">
             <strong>${esc(n.title || 'Powiadomienie')}</strong>
             <span class="menu-item-sub">${esc(n.body || '')}</span>
+            <span class="cf-change-item-meta">${esc(new Date(n.created_at).toLocaleString('pl-PL'))}</span>
           </span>
           <span class="cf-change-status ${st.cls}">${st.text}</span>
         </button>`;
@@ -4133,6 +4173,7 @@ function uid(){
     }).length;
     const unapproved=records.filter(r=>r.data_prania && !r.zatwierdzone).length;
     const items=[
+      {label:'Zmiany i wnioski',value:cfChangeUnreadCount,action:'changes',alert:cfChangeUnreadCount>0},
       {label:'Do wykonania',value:pendingOrders,filter:'todo',alert:pendingOrders>0},
       {label:'Dawno nie prane',value:oldVehicles,action:'old',alert:oldVehicles>0},
       {label:'Niezatwierdzone',value:unapproved,filter:'unapproved',alert:unapproved>0},
@@ -4143,7 +4184,8 @@ function uid(){
     panel.innerHTML=`<div class="attention-head"><div class="attention-title">Wymaga uwagi</div></div><div class="attention-grid">${items.map((x,i)=>`<button type="button" class="attention-card ${x.alert?'attention-alert':''}" data-attention-index="${i}"><div class="attention-label">${x.label}</div><div class="attention-value">${x.value}</div></button>`).join('')}</div>`;
     panel.querySelectorAll('[data-attention-index]').forEach(btn=>btn.addEventListener('click',()=>{
       const item=items[Number(btn.dataset.attentionIndex)];
-      if(item.action==='finance') showFinanceQueue();
+      if(item.action==='changes') cfOpenChangeNotifications();
+      else if(item.action==='finance') showFinanceQueue();
       else if(item.action==='old') showOldVehicles();
       else { mainStatusFilter=item.filter; const sel=document.getElementById('mainStatusFilter'); if(sel) sel.value=item.filter; renderRecords(); document.getElementById('recordsList')?.scrollIntoView({behavior:'smooth',block:'start'}); }
     }));

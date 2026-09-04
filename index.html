@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v108 -->
+<!-- CleanFleet v110 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -633,6 +633,75 @@
   .cf-change-item-meta{font-size:12px;opacity:.68;margin-top:8px;}
   .cf-change-empty{padding:24px 12px;text-align:center;opacity:.68;}
   .cf-change-badge{display:inline-flex;min-width:20px;height:20px;padding:0 6px;align-items:center;justify-content:center;border-radius:10px;background:#527818;color:#fff;font-size:11px;font-weight:700;margin-left:6px;}
+
+/* CleanFleet v110 — statusy i pełny podgląd wniosków */
+.cf-change-notification-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.cf-change-notification-main{
+  flex:1;
+  min-width:0;
+}
+.cf-change-status{
+  flex:0 0 auto;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.3px;
+  padding:6px 9px;
+  border-radius:999px;
+  white-space:nowrap;
+}
+.cf-change-status.pending{
+  background:#fff3cd;
+  color:#856404;
+}
+.cf-change-status.approved{
+  background:#d1e7dd;
+  color:#0f5132;
+}
+.cf-change-status.rejected{
+  background:#f8d7da;
+  color:#842029;
+}
+.cf-change-preview{
+  margin-top:12px;
+}
+.cf-change-preview .cf-preview-title{
+  font-size:13px;
+  font-weight:800;
+  margin:14px 0 7px;
+}
+.cf-change-card{
+  border:1px solid #dfe5e8;
+  border-radius:12px;
+  padding:12px;
+  background:#fff;
+  margin-bottom:12px;
+}
+.cf-change-card.proposed{
+  border-left:4px solid #198754;
+}
+.cf-change-field{
+  display:grid;
+  grid-template-columns:minmax(120px, 42%) 1fr;
+  gap:8px;
+  padding:6px 0;
+  border-bottom:1px solid #eef1f2;
+}
+.cf-change-field:last-child{border-bottom:0}
+.cf-change-field-label{font-weight:700}
+.cf-change-field-value{word-break:break-word}
+.cf-change-actions{
+  display:flex;
+  gap:10px;
+  margin-top:14px;
+}
+.cf-change-actions button{
+  flex:1;
+}
+
 </style>
 
 <style id="mobile-user-header-fix">
@@ -2964,136 +3033,277 @@ async function cfReviewChangeRequest(requestId, decision){
   return data;
 }
 
-async function cfOpenChangeNotifications(){
+
+async 
+  function htmlEscape(v){
+    return String(v ?? '')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#039;');
+  }
+
+function cfOpenChangeNotifications(){
   if(!cfSupabase || !cfCurrentUserId) return;
-  const { data, error } = await cfSupabase
+
+  const { data: notes, error } = await cfSupabase
     .from('cf_notifications')
     .select('id,type,title,body,entity_id,read_at,created_at')
     .eq('recipient_user_id', cfCurrentUserId)
-    .order('created_at',{ascending:false})
-    .limit(100);
+    .order('created_at',{ascending:false});
+
   if(error){
-    showToast('Nie udało się pobrać powiadomień: '+(error.message||''));
+    console.error('CleanFleet notifications:', error);
+    showToast('Nie udało się pobrać powiadomień.');
     return;
   }
-  const rows = data || [];
-  const html = `<div class="overlay" id="cfChangeInboxOverlay">
-    <div class="sheet cf-change-inbox-sheet">
-      <button class="close" data-close>&times;</button>
-      <h2>Zmiany i wnioski</h2>
-      <div class="confirm-text">Informacje dotyczące zmian i wniosków między kontem administratora a kontem pracownika floty.</div>
-      <div class="cf-change-inbox-list">
-        ${rows.length ? rows.map(n=>`<div class="cf-change-item ${n.read_at?'':'unread'}" data-notification-id="${escapeHtml(n.id)}" data-entity-id="${escapeHtml(n.entity_id||'')}" data-type="${escapeHtml(n.type||'')}">
-          <div class="cf-change-item-title">${escapeHtml(n.title||'Powiadomienie')}</div>
-          <div class="cf-change-item-body">${escapeHtml(n.body||'')}</div>
-          <div class="cf-change-item-meta">${n.created_at ? new Date(n.created_at).toLocaleString('pl-PL') : ''}${n.read_at?'':' · nowe'}</div>
-        </div>`).join('') : '<div class="cf-change-empty">Brak powiadomień.</div>'}
-      </div>
-      <div class="sheet-actions"><button class="btn btn-outline" id="cfChangeInboxClose">Zamknij</button></div>
-    </div>
-  </div>`;
-  document.getElementById('modalRoot').innerHTML=html;
-  const close=()=>document.getElementById('cfChangeInboxOverlay')?.remove();
-  document.querySelector('#cfChangeInboxOverlay [data-close]')?.addEventListener('click',close);
-  document.getElementById('cfChangeInboxClose')?.addEventListener('click',close);
-  document.querySelectorAll('#cfChangeInboxOverlay .cf-change-item').forEach(item=>{
-    item.addEventListener('click', async ()=>{
-      const id=item.dataset.notificationId;
-      const entityId=item.dataset.entityId;
-      const type=item.dataset.type;
-      if(id){
-        const {error}=await cfSupabase.from('cf_notifications').update({read_at:new Date().toISOString()}).eq('id',id).eq('recipient_user_id',cfCurrentUserId);
-        if(error) console.warn('CleanFleet notification read:',error);
-      }
-      item.classList.remove('unread');
 
-      // Powiadomienie o nowym wniosku pracownika: administrator dostaje
-      // pełny podgląd proponowanej zmiany oraz przyciski AKCEPTUJ / ODRZUĆ.
-      if(type === 'wash_change_request' && entityId && cfIsAdmin()){
+  const items = notes || [];
+
+  const esc = (v) => htmlEscape(v == null ? '' : String(v));
+
+  function statusInfo(note){
+    if(note.type === 'wash_change_request'){
+      return { text:'DO WERYFIKACJI', cls:'pending' };
+    }
+    if(note.type === 'wash_change_request_result'){
+      const title = String(note.title || '').toLowerCase();
+      if(title.includes('zaakcept')) return { text:'AKCEPTOWANY', cls:'approved' };
+      if(title.includes('odrzu')) return { text:'ODRZUCONY', cls:'rejected' };
+    }
+    return { text: note.read_at ? 'PRZECZYTANE' : 'NOWE', cls: note.read_at ? 'read' : 'pending' };
+  }
+
+  function renderNotificationList(){
+    const rows = items.length ? items.map(n=>{
+      const st = statusInfo(n);
+      return `
+        <button type="button" class="cf-change-notification-row ${n.read_at ? 'read' : 'unread'}" data-cf-note-id="${esc(n.id)}">
+          <span class="cf-change-notification-main">
+            <strong>${esc(n.title || 'Powiadomienie')}</strong>
+            <span class="menu-item-sub">${esc(n.body || '')}</span>
+          </span>
+          <span class="cf-change-status ${st.cls}">${st.text}</span>
+        </button>`;
+    }).join('') : '<div class="cf-change-card">Brak powiadomień.</div>';
+
+    return rows;
+  }
+
+  function field(label, value){
+    return `<div class="cf-change-field">
+      <div class="cf-change-field-label">${esc(label)}</div>
+      <div class="cf-change-field-value">${esc(value === '' || value == null ? '—' : value)}</div>
+    </div>`;
+  }
+
+  function recordCard(record, proposed, title, isProposed){
+    const r = proposed || record || {};
+    return `
+      <div class="cf-preview-title">${esc(title)}</div>
+      <div class="cf-change-card ${isProposed ? 'proposed' : ''}">
+        ${field('Tablica', r.tablica)}
+        ${field('Typ pojazdu', r.typ)}
+        ${field('Marka', r.marka)}
+        ${field('Kategoria rozliczenia', r.billing_category)}
+        ${field('Zlecone', r.zlecone ? 'Tak' : 'Nie')}
+        ${field('Kto zlecił', r.kto_zlecil)}
+        ${field('Data zlecenia', r.data_zlecenia)}
+        ${field('Zlecenie do', r.data_zlecenia_do)}
+        ${field('Uwagi', r.uwagi)}
+        ${field('Data prania', r.data_prania)}
+        ${field('Kto wykonał', r.kto_wykonal)}
+        ${field('Koszt', r.koszt === '' || r.koszt == null ? '—' : r.koszt)}
+        ${field('Zatwierdzone', r.zatwierdzone ? 'Tak' : 'Nie')}
+        ${field('Zapłacone', r.zaplacone ? 'Tak' : 'Nie')}
+      </div>`;
+  }
+
+  async function openRequest(note){
+    const requestId = note.entity_id;
+    if(!requestId) return;
+
+    const { data:req, error:reqError } = await cfSupabase
+      .from('wash_change_requests')
+      .select('id,wash_record_id,request_type,status,proposed_data,reason,requested_by,created_at')
+      .eq('id',requestId)
+      .maybeSingle();
+
+    if(reqError){
+      console.error(reqError);
+      showToast('Nie udało się pobrać wniosku.');
+      return;
+    }
+
+    if(!req){
+      showToast('Wniosek nie istnieje.');
+      return;
+    }
+
+    const { data:row, error:rowError } = await cfSupabase
+      .from('wash_records')
+      .select('id,plate,type,brand,billing_category,ordered,ordered_by,order_date,order_due_date,notes,wash_date,performed_by,cost,approved,paid,created_at,created_by')
+      .eq('id',req.wash_record_id)
+      .maybeSingle();
+
+    if(rowError){
+      console.error(rowError);
+      showToast('Nie udało się pobrać wpisu.');
+      return;
+    }
+
+    const current = row ? cfMapRecord(row) : null;
+    const proposed = req.proposed_data || {};
+    const proposedRecord = current ? {
+      ...current,
+      tablica: proposed.tablica ?? current.tablica,
+      typ: proposed.typ ?? current.typ,
+      marka: proposed.marka ?? current.marka,
+      billing_category: proposed.billing_category ?? current.billing_category,
+      zlecone: proposed.zlecone !== undefined ? !!proposed.zlecone : current.zlecone,
+      kto_zlecil: proposed.kto_zlecil ?? current.kto_zlecil,
+      data_zlecenia: proposed.data_zlecenia ?? current.data_zlecenia,
+      data_zlecenia_do: proposed.data_zlecenia_do ?? current.data_zlecenia_do,
+      uwagi: proposed.uwagi ?? current.uwagi,
+      data_prania: proposed.data_prania ?? current.data_prania,
+      kto_wykonal: proposed.kto_wykonal ?? current.kto_wykonal,
+      koszt: proposed.koszt !== undefined ? proposed.koszt : current.koszt,
+      zatwierdzone: current.zatwierdzone,
+      zaplacone: current.zaplacone
+    } : {
+      tablica: proposed.tablica || '',
+      typ: proposed.typ || '',
+      marka: proposed.marka || '',
+      billing_category: proposed.billing_category || '',
+      zlecone: !!proposed.zlecone,
+      kto_zlecil: proposed.kto_zlecil || '',
+      data_zlecenia: proposed.data_zlecenia || '',
+      data_zlecenia_do: proposed.data_zlecenia_do || '',
+      uwagi: proposed.uwagi || '',
+      data_prania: proposed.data_prania || '',
+      kto_wykonal: proposed.kto_wykonal || '',
+      koszt: proposed.koszt ?? '',
+      zatwierdzone: false,
+      zaplacone: false
+    };
+
+    const st = req.status === 'pending'
+      ? {text:'DO WERYFIKACJI', cls:'pending'}
+      : req.status === 'approved'
+        ? {text:'AKCEPTOWANY', cls:'approved'}
+        : {text:'ODRZUCONY', cls:'rejected'};
+
+    const actions = (cfIsAdmin() && req.status === 'pending')
+      ? `<div class="cf-change-actions">
+           <button type="button" class="primary" id="cfApproveRequest">✓ Akceptuj zmianę</button>
+           <button type="button" class="danger" id="cfRejectRequest">✕ Odrzuć zmianę</button>
+         </div>`
+      : '';
+
+    const modal = document.getElementById('cfChangeNotificationsModal');
+    if(!modal){
+      showToast('Brak okna powiadomień.');
+      return;
+    }
+
+    modal.innerHTML = `
+      <div class="modal-card">
+        <div class="modal-header">
+          <div>
+            <div class="modal-title">${esc(req.request_type === 'cancel' ? 'Prośba o anulowanie wpisu' : 'Prośba o zmianę wpisu')}</div>
+            <div class="cf-change-status ${st.cls}" style="display:inline-block;margin-top:7px">${st.text}</div>
+          </div>
+          <button type="button" class="modal-close" id="cfCloseChangeRequest">×</button>
+        </div>
+        <div class="cf-preview">
+          ${recordCard(current, null, 'WPIS OBECNY', false)}
+          ${recordCard(current, proposedRecord, 'PROPONOWANA WERSJA', true)}
+          ${req.reason ? `<div class="cf-change-card"><strong>Powód:</strong><br>${esc(req.reason)}</div>` : ''}
+          ${actions}
+        </div>
+      </div>`;
+
+    modal.classList.add('show');
+
+    document.getElementById('cfCloseChangeRequest')?.addEventListener('click',()=>{
+      modal.classList.remove('show');
+      cfOpenChangeNotifications();
+    });
+
+    if(actions){
+      document.getElementById('cfApproveRequest')?.addEventListener('click', async ()=>{
         try{
-          const {data:req,error:reqError}=await cfSupabase
-            .from('wash_change_requests')
-            .select('id,wash_record_id,request_type,status,proposed_data,reason,requested_by,created_at')
-            .eq('id',entityId)
-            .maybeSingle();
-          if(reqError) throw reqError;
-          if(!req){ showToast('Nie znaleziono tego wniosku.'); await cfLoadChangeNotifications(); return; }
-
-          const rec=records.find(r=>r.id===req.wash_record_id);
-          const p=req.proposed_data || {};
-          const field=(label,value)=>`<div style="margin:7px 0"><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value ?? '—')}</div>`;
-          const currentPlate=rec?.tablica || '—';
-          const proposedPlate=p.tablica ?? currentPlate;
-          const statusText=req.status==='pending' ? 'Oczekuje na decyzję' : (req.status==='approved' ? 'Zaakceptowany' : 'Odrzucony');
-          const actionHtml=req.status==='pending' ? `<div class="sheet-actions" style="gap:10px;flex-wrap:wrap">
-              <button class="btn" id="cfApproveRequest">✓ Akceptuj zmianę</button>
-              <button class="btn btn-outline" id="cfRejectRequest">✕ Odrzuć zmianę</button>
-            </div>` : `<div class="confirm-text"><strong>Wniosek już rozpatrzony:</strong> ${escapeHtml(statusText)}.</div>`;
-
-          document.getElementById('modalRoot').innerHTML=`<div class="overlay" id="cfRequestReviewOverlay">
-            <div class="sheet cf-change-inbox-sheet">
-              <button class="close" data-close>&times;</button>
-              <h2>Wniosek o zmianę wpisu</h2>
-              <div class="confirm-text"><strong>Samochód:</strong> ${escapeHtml(currentPlate)} → <strong>${escapeHtml(proposedPlate)}</strong></div>
-              ${field('Powód',req.reason || '—')}
-              ${field('Typ pojazdu',p.typ ?? rec?.typ ?? '—')}
-              ${field('Marka',p.marka ?? rec?.marka ?? '—')}
-              ${field('Kategoria rozliczeniowa',p.billing_category ?? rec?.billing_category ?? '—')}
-              ${field('Zlecone',p.zlecone === undefined ? (rec?.zlecone ? 'Tak':'Nie') : (p.zlecone ? 'Tak':'Nie'))}
-              ${field('Kto zlecił',p.kto_zlecil ?? rec?.kto_zlecil ?? '—')}
-              ${field('Data zlecenia',p.data_zlecenia ?? rec?.data_zlecenia ?? '—')}
-              ${field('Termin',p.data_zlecenia_do ?? rec?.data_zlecenia_do ?? '—')}
-              ${field('Uwagi',p.uwagi ?? rec?.uwagi ?? '—')}
-              ${field('Data prania',p.data_prania ?? rec?.data_prania ?? '—')}
-              ${field('Wykonał',p.kto_wykonal ?? rec?.kto_wykonal ?? '—')}
-              ${field('Koszt',p.koszt === undefined ? (rec?.koszt ?? 0) : p.koszt)}
-              ${actionHtml}
-              <div class="sheet-actions"><button class="btn btn-outline" id="cfRequestReviewClose">Zamknij</button></div>
-            </div>
-          </div>`;
-
-          const closeReview=()=>document.getElementById('cfRequestReviewOverlay')?.remove();
-          document.querySelector('#cfRequestReviewOverlay [data-close]')?.addEventListener('click',closeReview);
-          document.getElementById('cfRequestReviewClose')?.addEventListener('click',closeReview);
-          const approve=document.getElementById('cfApproveRequest');
-          const reject=document.getElementById('cfRejectRequest');
-          const review=async decision=>{
-            approve && (approve.disabled=true); reject && (reject.disabled=true);
-            try{
-              await cfReviewChangeRequest(req.id,decision);
-              closeReview();
-              await loadAll();
-              await cfLoadChangeNotifications();
-              showToast(decision==='approved' ? 'Zmiana została zaakceptowana i zapisana.' : 'Wniosek został odrzucony.');
-              // Otwórz skrzynkę ponownie, aby od razu było widać aktualny stan.
-              await cfOpenChangeNotifications();
-            }catch(e){
-              approve && (approve.disabled=false); reject && (reject.disabled=false);
-              showToast('Nie udało się rozpatrzyć wniosku: '+(e?.message||'błąd'));
-            }
-          };
-          approve?.addEventListener('click',()=>review('approved'));
-          reject?.addEventListener('click',()=>review('rejected'));
+          await cfReviewChangeRequest(req.id,'approved');
+          showToast('Zmiana została zaakceptowana.');
+          modal.classList.remove('show');
+          await loadAll();
+          await cfOpenChangeNotifications();
         }catch(e){
-          console.error('CleanFleet request review:',e);
-          showToast('Nie udało się otworzyć wniosku: '+(e?.message||'błąd'));
+          console.error(e);
+          showToast(e.message || 'Nie udało się zaakceptować zmiany.');
         }
-        await cfLoadChangeNotifications();
-        return;
+      });
+
+      document.getElementById('cfRejectRequest')?.addEventListener('click', async ()=>{
+        try{
+          await cfReviewChangeRequest(req.id,'rejected');
+          showToast('Zmiana została odrzucona.');
+          modal.classList.remove('show');
+          await loadAll();
+          await cfOpenChangeNotifications();
+        }catch(e){
+          console.error(e);
+          showToast(e.message || 'Nie udało się odrzucić zmiany.');
+        }
+      });
+    }
+  }
+
+  const modal = document.getElementById('cfChangeNotificationsModal');
+  if(!modal) return;
+
+  modal.innerHTML = `
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">Zmiany i wnioski</div>
+        <button type="button" class="modal-close" id="cfCloseChangeNotifications">×</button>
+      </div>
+      <div class="cf-change-preview" id="cfChangeNotificationList">${renderNotificationList()}</div>
+    </div>`;
+
+  modal.classList.add('show');
+
+  document.getElementById('cfCloseChangeNotifications')?.addEventListener('click',()=>{
+    modal.classList.remove('show');
+  });
+
+  modal.querySelectorAll('[data-cf-note-id]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const note = items.find(x=>x.id===btn.dataset.cfNoteId);
+      if(!note) return;
+
+      if(!note.read_at){
+        const {error:readError}=await cfSupabase
+          .from('cf_notifications')
+          .update({read_at:new Date().toISOString()})
+          .eq('id',note.id)
+          .eq('recipient_user_id',cfCurrentUserId);
+
+        if(readError) console.warn('CleanFleet notification read:',readError.message);
+        note.read_at = new Date().toISOString();
       }
 
-      // Pozostałe powiadomienia mogą otwierać zwykły wpis, jeśli entity_id
-      // wskazuje bezpośrednio na rekord mycia.
-      if(entityId){
-        const rec=records.find(r=>r.id===entityId);
-        if(rec){ close(); openForm(entityId); }
+      if(note.type === 'wash_change_request' && note.entity_id){
+        await openRequest(note);
+      } else {
+        showToast(note.body || note.title || 'Powiadomienie');
       }
-      await cfLoadChangeNotifications();
     });
   });
-  // Otworzenie skrzynki nie oznacza automatycznie przeczytania wszystkich pozycji.
-  await cfLoadChangeNotifications();
 }
+
+
 
 function cfApplyRoleMenu(){
   const admin = cfIsAdmin();

@@ -705,6 +705,10 @@
 .cf-change-preview .cf-preview-title + .cf-change-card{
   margin-bottom:22px;
 }
+.cf-change-preview .cf-preview-separator{
+  height:42px;
+  flex:none;
+}
 /* Wyraźny odstęp między wpisem obecnym a proponowaną zmianą. */
 .cf-change-preview .record-card + .cf-preview-title{
   margin-top:42px !important;
@@ -3215,6 +3219,7 @@ async function cfOpenChangeNotifications(){
         <div style="margin:0 0 14px;"><span class="cf-change-status ${st.cls}">${st.text}</span></div>
         <div class="cf-preview-title">WPIS UTWORZONY</div>
         ${currentCard}
+        <div class="cf-preview-separator" aria-hidden="true"></div>
         <div class="cf-preview-title">PROPONOWANA ZMIANA</div>
         ${proposedCard}
         ${req.reason ? `<div class="cf-change-card"><strong>Powód:</strong><br>${escapeHtml(req.reason)}</div>` : ''}

@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v122 -->
+<!-- CleanFleet v124 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -497,6 +497,22 @@
   .cf-login-card input::placeholder{color:#8A877B;opacity:1;}
   .cf-login-card .cf-login-btn{width:100%;margin-top:18px;padding:12px;border:0;border-radius:10px;background:var(--solid,#6b7d00);color:#fff;font-weight:700;font-size:15px;}
   .cf-login-msg{min-height:20px;margin-top:12px;font-size:13px;color:#b33;}
+  .cf-login-secondary{margin-top:12px;text-align:center;}
+  .cf-login-link{border:0;background:transparent;color:#687500;font-weight:800;font-size:14px;cursor:pointer;padding:8px 4px;}
+  .cf-login-link:hover{text-decoration:underline;}
+  .cf-account-note{font-size:12px;color:var(--ink-soft);line-height:1.45;margin:10px 0 0;}
+  .cf-employee-list{display:flex;flex-direction:column;gap:10px;margin-top:14px;}
+  .cf-employee-row{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:12px;}
+  .cf-employee-main{min-width:0;}
+  .cf-employee-name{font-weight:800;color:var(--ink);font-size:14px;}
+  .cf-employee-email{font-size:12px;color:var(--ink-soft);overflow-wrap:anywhere;margin-top:3px;}
+  .cf-employee-state{font-size:10px;font-weight:900;letter-spacing:.06em;border-radius:999px;padding:5px 8px;display:inline-block;margin-top:6px;}
+  .cf-employee-state.active{background:var(--green-bg);color:var(--green-ink);}
+  .cf-employee-state.blocked{background:#f8d9d5;color:#8e2f25;}
+  .cf-employee-actions{flex:none;}
+  .cf-employee-actions .btn{margin-top:0;white-space:nowrap;}
+  .cf-admin-sheet{max-width:680px;}
+  @media(max-width:639px){.cf-employee-row{align-items:flex-start;}.cf-employee-row .btn{padding:8px 10px;font-size:12px;}}
   .cf-user{font-size:11px;color:var(--ink-soft);margin-top:4px;}
 
 
@@ -905,6 +921,7 @@
       <label for="cfPassword">Hasło</label>
       <input id="cfPassword" type="password" autocomplete="current-password" placeholder="Wpisz hasło" required>
       <button class="cf-login-btn" type="submit">Zaloguj</button>
+      <div class="cf-login-secondary"><button class="cf-login-link" id="cfOpenRegisterBtn" type="button">Nie masz konta? Zarejestruj się</button></div>
       <div class="cf-login-msg" id="cfLoginMsg"></div>
     </form>
   </div>
@@ -975,6 +992,10 @@
       <button class="menu-item" id="cfChangeNotificationsBtn" type="button" hidden>
         <span class="menu-item-title"><span aria-hidden="true">📬</span><span>Zmiany i wnioski</span></span>
         <span class="menu-item-sub" id="cfChangeNotificationsSub">Informacje dotyczące zmian między kontami</span>
+      </button>
+      <button class="menu-item" id="cfEmployeesBtn" type="button" hidden>
+        <span class="menu-item-title"><span aria-hidden="true">👥</span><span>Pracownicy floty</span></span>
+        <span class="menu-item-sub">Lista kont pracowników i blokowanie dostępu</span>
       </button>
     </div>
     <div class="menu-logout-wrap">
@@ -1295,6 +1316,98 @@ function cfSetSync(text, state='') {
 function cfSetLoginMessage(text){ const el=document.getElementById('cfLoginMsg'); if(el) el.textContent=text||''; }
 function cfShowLogin(show){ const el=document.getElementById('cfLoginOverlay'); if(el) el.style.display=show?'flex':'none'; }
 function cfFormatSyncTime(d){ return d ? d.toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'; }
+
+let cfRegistrationInProgress = false;
+
+async function cfOpenRegister(){
+  const modalRoot=document.getElementById('modalRoot');
+  if(!modalRoot) return;
+  modalRoot.innerHTML=`
+    <div class="modal-overlay" id="cfRegisterOverlay" style="display:flex;align-items:center;justify-content:center;">\
+      <div class="sheet cf-admin-sheet" style="width:min(460px,calc(100% - 28px));">\
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">\
+          <h3 style="margin:0;">Rejestracja pracownika</h3>\
+          <button class="close" id="cfRegisterClose" type="button">&times;</button>\
+        </div>\
+        <p style="margin:10px 0 0;color:var(--ink-soft);font-size:13px;line-height:1.45;">Utwórz konto pracownika floty. Konto zostanie automatycznie przypisane do roli „Pracownik floty”.</p>\
+        <form id="cfRegisterForm" style="margin-top:12px;">\
+          <label for="cfRegName">Imię</label>\
+          <input id="cfRegName" type="text" autocomplete="name" placeholder="Wpisz imię" required>\
+          <label for="cfRegEmail">E-mail</label>\
+          <input id="cfRegEmail" type="email" autocomplete="email" placeholder="Wpisz adres e-mail" required>\
+          <label for="cfRegPassword">Hasło</label>\
+          <input id="cfRegPassword" type="password" autocomplete="new-password" placeholder="Minimum 6 znaków" minlength="6" required>\
+          <label for="cfRegPassword2">Powtórz hasło</label>\
+          <input id="cfRegPassword2" type="password" autocomplete="new-password" placeholder="Powtórz hasło" minlength="6" required>\
+          <button class="cf-login-btn" id="cfRegisterSubmit" type="submit">Utwórz konto</button>\
+          <div class="cf-login-msg" id="cfRegisterMsg"></div>\
+        </form>\
+      </div>\
+    </div>`;
+  const close=()=>{ modalRoot.innerHTML=''; };
+  document.getElementById('cfRegisterClose')?.addEventListener('click',close);
+  document.getElementById('cfRegisterOverlay')?.addEventListener('click',e=>{if(e.target?.id==='cfRegisterOverlay') close();});
+  document.getElementById('cfRegisterForm')?.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const name=document.getElementById('cfRegName').value.trim();
+    const email=document.getElementById('cfRegEmail').value.trim();
+    const password=document.getElementById('cfRegPassword').value;
+    const password2=document.getElementById('cfRegPassword2').value;
+    const msg=document.getElementById('cfRegisterMsg');
+    const submit=document.getElementById('cfRegisterSubmit');
+    if(password!==password2){if(msg) msg.textContent='Hasła nie są takie same.';return;}
+    if(password.length<6){if(msg) msg.textContent='Hasło musi mieć co najmniej 6 znaków.';return;}
+    if(submit) submit.disabled=true;
+    if(msg) msg.textContent='Tworzenie konta…';
+    try{
+      cfRegistrationInProgress = true;
+      const {data,error}=await cfSupabase.auth.signUp({email,password,options:{data:{full_name:name}}});
+      if(error) throw error;
+      if(!data?.session){
+        throw new Error('Konto zostało utworzone, ale Supabase wymaga zalogowania po potwierdzeniu adresu e-mail. Wyłącz potwierdzanie e-maili w ustawieniach Auth, jeśli rejestracja ma być bez weryfikacji.');
+      }
+      const {error:roleError}=await cfSupabase.rpc('cf_register_fleet_employee',{p_name:name});
+      if(roleError) throw roleError;
+      await cfSupabase.auth.signOut();
+      close();
+      cfShowLogin(true);
+      cfSetLoginMessage('Konto utworzone. Możesz się teraz zalogować.');
+      document.getElementById('cfEmail').value=email;
+      document.getElementById('cfPassword').value='';
+    }catch(err){
+      console.error('CleanFleet registration error:',err);
+      if(msg) msg.textContent='Nie udało się utworzyć konta: '+(err?.message||'nieznany błąd');
+    }finally{cfRegistrationInProgress = false; if(submit) submit.disabled=false;}
+  });
+}
+
+async function cfOpenEmployees(){
+  if(!cfIsAdmin()) return;
+  const modalRoot=document.getElementById('modalRoot');
+  if(!modalRoot) return;
+  modalRoot.innerHTML=`<div class="modal-overlay" style="display:flex;align-items:center;justify-content:center;"><div class="sheet cf-admin-sheet" style="width:min(680px,calc(100% - 28px));"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><h3 style="margin:0;">Pracownicy floty</h3><button class="close" id="cfEmployeesClose" type="button">&times;</button></div><p style="margin:8px 0 0;color:var(--ink-soft);font-size:13px;">Tutaj możesz sprawdzić zarejestrowane konta i zablokować lub odblokować dostęp.</p><div id="cfEmployeesList" class="cf-employee-list"><div style="padding:12px;color:var(--ink-soft);">Ładowanie…</div></div></div></div>`;
+  document.getElementById('cfEmployeesClose')?.addEventListener('click',()=>{modalRoot.innerHTML='';});
+  const list=document.getElementById('cfEmployeesList');
+  try{
+    const {data,error}=await cfSupabase.from('cf_employee_profiles').select('user_id,full_name,email,active,created_at').order('full_name',{ascending:true});
+    if(error) throw error;
+    if(!data?.length){list.innerHTML='<div style="padding:12px;color:var(--ink-soft);">Brak zarejestrowanych pracowników.</div>';return;}
+    list.innerHTML=data.map(p=>`<div class="cf-employee-row"><div class="cf-employee-main"><div class="cf-employee-name">${cfEsc(p.full_name||'Bez imienia')}</div><div class="cf-employee-email">${cfEsc(p.email||'')}</div><span class="cf-employee-state ${p.active?'active':'blocked'}">${p.active?'AKTYWNY':'ZABLOKOWANY'}</span></div><div class="cf-employee-actions"><button class="btn ${p.active?'btn-danger':'btn-solid'}" type="button" data-employee-toggle="${p.user_id}" data-next-active="${p.active?'false':'true'}">${p.active?'Zablokuj':'Odblokuj'}</button></div></div>`).join('');
+    list.querySelectorAll('[data-employee-toggle]').forEach(btn=>btn.addEventListener('click',async()=>{
+      const userId=btn.getAttribute('data-employee-toggle');
+      const nextActive=btn.getAttribute('data-next-active')==='true';
+      if(!userId) return;
+      if(!nextActive && !confirm('Czy na pewno zablokować to konto? Pracownik nie będzie mógł korzystać z CleanFleet.')) return;
+      btn.disabled=true;
+      try{
+        const {error}=await cfSupabase.from('cf_employee_profiles').update({active:nextActive}).eq('user_id',userId);
+        if(error) throw error;
+        showToast(nextActive?'Konto zostało odblokowane.':'Konto zostało zablokowane.');
+        await cfOpenEmployees();
+      }catch(err){console.error(err);showToast(err?.message||'Nie udało się zmienić stanu konta.');btn.disabled=false;}
+    }));
+  }catch(err){console.error(err);list.innerHTML=`<div style="padding:12px;color:var(--red);">Nie udało się pobrać pracowników: ${cfEsc(err?.message||'nieznany błąd')}</div>`;}
+}
 
 async function cfSignIn(email,password){
   cfSetLoginMessage('Logowanie…');
@@ -3108,7 +3221,7 @@ async function cfLoadChangeNotifications(){
       if(reqError) throw reqError;
       pendingCount = (reqs||[]).filter(r=>r.status === 'pending').length;
     }
-    const unreadCount = (data||[]).filter(n=>!n.read_at && ['wash_change_request','wash_change_request_result','wash_completed'].includes(n.type)).length;
+    const unreadCount = (data||[]).filter(n=>!n.read_at && ['wash_change_request','wash_change_request_result','wash_completed','employee_registered'].includes(n.type)).length;
     cfChangeUnreadCount = pendingCount;
     if(sub) sub.innerHTML = pendingCount ? `Do weryfikacji: <strong>${pendingCount}</strong>${unreadCount>pendingCount ? ` · Nowe: <strong>${unreadCount}</strong>` : ''}` : (unreadCount ? `Nowe powiadomienia: <strong>${unreadCount}</strong>` : 'Brak nowych powiadomień');
     renderAttentionPanel();
@@ -3157,7 +3270,7 @@ async function cfOpenChangeNotifications(){
     .from('cf_notifications')
     .select('id,type,title,body,entity_id,read_at,created_at')
     .eq('recipient_user_id', cfCurrentUserId)
-    .in('type',['wash_change_request','wash_change_request_result','wash_completed'])
+    .in('type',['wash_change_request','wash_change_request_result','wash_completed','employee_registered'])
     .order('created_at',{ascending:false})
     .limit(100);
 
@@ -3168,7 +3281,7 @@ async function cfOpenChangeNotifications(){
   }
 
   const items = notes || [];
-  const requestIds = [...new Set(items.map(n=>n.entity_id).filter(Boolean))];
+  const requestIds = [...new Set(items.filter(n=>['wash_change_request','wash_change_request_result'].includes(n.type)).map(n=>n.entity_id).filter(Boolean))];
   let requestsById = {};
 
   if(requestIds.length){
@@ -3193,6 +3306,7 @@ async function cfOpenChangeNotifications(){
     if(status === 'rejected') return { text:'ODRZUCONY', cls:'rejected' };
     if(status === 'pending') return { text:'DO WERYFIKACJI', cls:'pending' };
     if(note.type === 'wash_completed') return { text: note.read_at ? 'PRZECZYTANE' : 'NOWE', cls: 'completed' };
+    if(note.type === 'employee_registered') return { text: note.read_at ? 'PRZECZYTANE' : 'NOWE', cls: 'completed' };
     return { text: note.read_at ? 'PRZECZYTANE' : 'NOWE', cls: note.read_at ? 'read' : 'pending' };
   }
 
@@ -3205,7 +3319,7 @@ async function cfOpenChangeNotifications(){
           <div class="cf-change-notification-content">
             <button type="button" class="cf-change-notification-open" aria-label="Otwórz powiadomienie">
               <span class="cf-change-notification-main">
-                <strong>${n.type === 'wash_completed' ? '✅ ' : ''}${esc(n.title || 'Powiadomienie')}</strong>
+                <strong>${n.type === 'wash_completed' ? '✅ ' : (n.type === 'employee_registered' ? '👤 ' : '')}${esc(n.title || 'Powiadomienie')}</strong>
                 <span class="menu-item-sub">${esc(n.body || '')}</span>
                 <span class="cf-change-item-meta">${esc(new Date(n.created_at).toLocaleString('pl-PL'))}</span>
               </span>
@@ -3224,7 +3338,7 @@ async function cfOpenChangeNotifications(){
       .delete()
       .eq('id',noteId)
       .eq('recipient_user_id',cfCurrentUserId)
-      .in('type',['wash_change_request','wash_change_request_result','wash_completed']);
+      .in('type',['wash_change_request','wash_change_request_result','wash_completed','employee_registered']);
     if(error) throw error;
   }
 
@@ -3233,7 +3347,7 @@ async function cfOpenChangeNotifications(){
       .from('cf_notifications')
       .delete()
       .eq('recipient_user_id',cfCurrentUserId)
-      .in('type',['wash_change_request','wash_change_request_result','wash_completed']);
+      .in('type',['wash_change_request','wash_change_request_result','wash_completed','employee_registered']);
     if(error) throw error;
   }
 
@@ -3381,7 +3495,18 @@ async function cfOpenChangeNotifications(){
         if(readError) console.warn('CleanFleet notification read:',readError.message);
         note.read_at = new Date().toISOString();
       }
-      if(note.type === 'wash_completed'){
+      if(note.type === 'employee_registered'){
+        const employeeOverlay = document.createElement('div');
+        employeeOverlay.className = 'overlay';
+        employeeOverlay.id = 'cfEmployeeRegisteredOverlay';
+        employeeOverlay.innerHTML = `<div class="sheet" style="max-width:720px;"><button class="close" id="cfCloseEmployeeRegistered">&times;</button><h2>Nowy pracownik floty</h2><div class="cf-preview-title">REJESTRACJA KONTA</div><div class="cf-change-card" style="padding:14px;">${esc(note.body || note.title || 'Zarejestrowano nowe konto pracownika floty.')}</div><div class="sheet-actions" style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="btn btn-solid" id="cfOpenEmployeesFromNotification">👥 Otwórz pracowników floty</button><button type="button" class="btn" id="cfBackEmployeeRegistered">← Wróć do listy powiadomień</button></div></div>`;
+        document.getElementById('modalRoot').innerHTML='';
+        document.getElementById('modalRoot').appendChild(employeeOverlay);
+        document.getElementById('cfCloseEmployeeRegistered')?.addEventListener('click',()=>employeeOverlay.remove());
+        document.getElementById('cfBackEmployeeRegistered')?.addEventListener('click',async ()=>{ employeeOverlay.remove(); await cfOpenChangeNotifications(); });
+        document.getElementById('cfOpenEmployeesFromNotification')?.addEventListener('click',async ()=>{ employeeOverlay.remove(); await cfOpenEmployees(); });
+        employeeOverlay.addEventListener('click',e=>{if(e.target===employeeOverlay) employeeOverlay.remove();});
+      } else if(note.type === 'wash_completed'){
         const { data:doneRow, error:doneError } = await cfSupabase
           .from('wash_records')
           .select('id,plate,type,brand,billing_category,ordered,ordered_by,order_date,order_due_date,notes,wash_date,performed_by,cost,approved,paid,created_at,created_by')
@@ -3460,6 +3585,7 @@ function cfApplyRoleMenu(){
   setVisible('importBtn', admin);
   setVisible('cfNotificationsBtn', admin || employee);
   setVisible('cfChangeNotificationsBtn', admin || employee);
+  setVisible('cfEmployeesBtn', admin);
 
   const financeTitle = document.getElementById('financeBtnTitle');
   const financeSub = document.getElementById('financeBtnSub');
@@ -6525,6 +6651,8 @@ function uid(){
   });
   document.getElementById('cfChangeNotificationsBtn')?.addEventListener('click', cfOpenChangeNotifications);
   document.getElementById('cfHeaderChangeNotificationsBtn')?.addEventListener('click', cfOpenChangeNotifications);
+  document.getElementById('cfOpenRegisterBtn')?.addEventListener('click', cfOpenRegister);
+  document.getElementById('cfEmployeesBtn')?.addEventListener('click', cfOpenEmployees);
 
   async function cfBoot(){
     cfSetSync('Ładowanie połączenia z bazą…');
@@ -6535,8 +6663,21 @@ function uid(){
       else { cfShowLogin(false); await cfLoadRole(); if(!cfCurrentRole){ throw new Error('Brak przypisanej roli użytkownika.'); } await loadAll(); await cfPrepareNotifications(); await cfLoadChangeNotifications(); }
       cfSupabase.auth.onAuthStateChange((_event, session)=>{
         if(session){
+          if(cfRegistrationInProgress) return;
           cfShowLogin(false);
-          setTimeout(async ()=>{ await cfLoadRole(); if(!cfCurrentRole) return; await loadAll(); await cfPrepareNotifications(); await cfLoadChangeNotifications(); },0);
+          setTimeout(async ()=>{
+            await cfLoadRole();
+            if(!cfCurrentRole){
+              await cfSupabase.auth.signOut();
+              cfShowLogin(true);
+              cfSetSync('Wymagane logowanie');
+              cfSetLoginMessage('Konto jest zablokowane albo nie ma przypisanej roli.');
+              return;
+            }
+            await loadAll();
+            await cfPrepareNotifications();
+            await cfLoadChangeNotifications();
+          },0);
         } else {
           cfShowLogin(true);
           cfSetSync('Wymagane logowanie');
@@ -6550,7 +6691,19 @@ function uid(){
   }
 
   // Skrzynka zmian odświeża się niezależnie od powiadomień push.
-  setInterval(() => { if(cfCurrentUserId) cfLoadChangeNotifications(); }, 30000);
+  setInterval(async () => {
+    if(!cfCurrentUserId) return;
+    await cfLoadChangeNotifications();
+    const roleBefore = cfCurrentRole;
+    if(roleBefore === 'fleet_employee'){
+      const roleNow = await cfLoadRole();
+      if(!roleNow){
+        await cfSupabase.auth.signOut();
+        cfShowLogin(true);
+        cfSetLoginMessage('To konto zostało zablokowane przez administratora.');
+      }
+    }
+  }, 30000);
 
   // Po powrocie do aplikacji ponownie wyliczamy terminy. Ma to znaczenie na
   // iPadzie/iPhonie, gdzie Safari może wstrzymać timery w tle.

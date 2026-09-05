@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v134 -->
+<!-- CleanFleet v135 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -511,6 +511,58 @@
   .cf-employee-state.blocked{background:#f8d9d5;color:#8e2f25;}
   .cf-employee-actions{flex:none;}
   .cf-employee-actions .btn{margin-top:0;white-space:nowrap;}
+  /* Rejestracja pracownika — osobny, pełny styl formularza */
+  .cf-admin-sheet h3{font-size:19px;font-weight:800;color:var(--ink);margin:0;}
+  .cf-admin-sheet p{font-size:13px;line-height:1.45;}
+  .cf-admin-sheet form{display:flex;flex-direction:column;gap:0;}
+  .cf-admin-sheet form label{
+    display:block;
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    font-weight:700;
+    color:var(--ink);
+    margin:12px 0 6px;
+  }
+  .cf-admin-sheet form input{
+    display:block;
+    width:100%;
+    box-sizing:border-box;
+    min-height:44px;
+    padding:10px 12px;
+    border:1px solid var(--line-strong);
+    border-radius:10px;
+    background:#fff;
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    font-size:15px;
+    outline:none;
+  }
+  .cf-admin-sheet form input:focus{
+    border-color:#6E7A17;
+    box-shadow:0 0 0 3px rgba(171,192,42,.18);
+  }
+  .cf-admin-sheet form input::placeholder{color:#8A877B;opacity:1;}
+  .cf-admin-sheet #cfRegisterSubmit{
+    display:block;
+    width:100%;
+    min-height:44px;
+    margin-top:18px;
+    padding:11px 14px;
+    border:0;
+    border-radius:10px;
+    background:var(--solid,#6b7d00);
+    color:#fff;
+    font-family:'Inter',sans-serif;
+    font-size:15px;
+    font-weight:800;
+    cursor:pointer;
+  }
+  .cf-admin-sheet #cfRegisterSubmit:disabled{opacity:.65;cursor:wait;}
+  .cf-admin-sheet .cf-login-msg{min-height:20px;margin-top:10px;text-align:center;}
+  @media(max-width:639px){
+    #cfRegisterOverlay{align-items:center!important;justify-content:center!important;padding:14px;box-sizing:border-box;}
+    #cfRegisterOverlay .sheet{width:min(460px,calc(100% - 8px))!important;max-height:calc(100vh - 110px);border-radius:16px;padding:18px;}
+  }
   .cf-admin-sheet{max-width:680px;}
   @media(max-width:639px){.cf-employee-row{align-items:flex-start;}.cf-employee-row .btn{padding:8px 10px;font-size:12px;}}
   .cf-user{font-size:11px;color:var(--ink-soft);margin-top:4px;}

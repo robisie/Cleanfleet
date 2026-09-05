@@ -1385,7 +1385,7 @@ async function cfOpenEmployees(){
   if(!cfIsAdmin()) return;
   const modalRoot=document.getElementById('modalRoot');
   if(!modalRoot) return;
-  modalRoot.innerHTML=`<div class="modal-overlay" style="display:flex;align-items:center;justify-content:center;"><div class="sheet cf-admin-sheet" style="width:min(680px,calc(100% - 28px));"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><h3 style="margin:0;">Pracownicy floty</h3><button class="close" id="cfEmployeesClose" type="button">&times;</button></div><p style="margin:8px 0 0;color:var(--ink-soft);font-size:13px;">Tutaj możesz sprawdzić zarejestrowane konta i zablokować lub odblokować dostęp.</p><div id="cfEmployeesList" class="cf-employee-list"><div style="padding:12px;color:var(--ink-soft);">Ładowanie…</div></div></div></div>`;
+  modalRoot.innerHTML=`<div class="overlay" id="cfEmployeesOverlay"><div class="sheet cf-admin-sheet" style="width:min(680px,calc(100% - 28px));"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><h3 style="margin:0;">Pracownicy floty</h3><button class="close" id="cfEmployeesClose" type="button">&times;</button></div><p style="margin:8px 0 0;color:var(--ink-soft);font-size:13px;">Tutaj możesz sprawdzić zarejestrowane konta i zablokować lub odblokować dostęp.</p><div id="cfEmployeesList" class="cf-employee-list"><div style="padding:12px;color:var(--ink-soft);">Ładowanie…</div></div></div></div>`;
   document.getElementById('cfEmployeesClose')?.addEventListener('click',()=>{modalRoot.innerHTML='';});
   const list=document.getElementById('cfEmployeesList');
   try{

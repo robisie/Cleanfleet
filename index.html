@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v120 -->
+<!-- CleanFleet v121 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -3388,10 +3388,14 @@ async function cfOpenChangeNotifications(){
         const overlayDone = document.createElement('div');
         overlayDone.className = 'overlay';
         overlayDone.id = 'cfCompletedOverlay';
-        overlayDone.innerHTML = `<div class="sheet" style="max-width:720px;"><button class="close" id="cfCloseCompleted">&times;</button><h2>Pranie zakończone</h2><div class="cf-preview-title">WYKONANY WPIS</div>${recordCardHtml(done)}</div>`;
+        overlayDone.innerHTML = `<div class="sheet" style="max-width:720px;"><button class="close" id="cfCloseCompleted">&times;</button><h2>Pranie zakończone</h2><div class="cf-preview-title">WYKONANY WPIS</div>${recordCardHtml(done)}<div class="sheet-actions" style="margin-top:14px;"><button type="button" class="btn btn-solid" id="cfBackCompleted">← Wróć do listy powiadomień</button></div></div>`;
         document.getElementById('modalRoot').innerHTML='';
         document.getElementById('modalRoot').appendChild(overlayDone);
         document.getElementById('cfCloseCompleted')?.addEventListener('click',()=>overlayDone.remove());
+        document.getElementById('cfBackCompleted')?.addEventListener('click',async ()=>{
+          overlayDone.remove();
+          await cfOpenChangeNotifications();
+        });
         overlayDone.addEventListener('click',e=>{if(e.target===overlayDone) overlayDone.remove();});
       } else if(note.entity_id) await openRequest(note);
       else showToast(note.body || note.title || 'Powiadomienie');
@@ -4213,7 +4217,7 @@ function uid(){
     const last = washed[0] || null;
     const days = last ? Math.max(0,Math.floor((Date.now()-new Date(last.data_prania+'T00:00:00').getTime())/86400000)) : null;
     const historyRows = rows.length ? rows.map(r=>`<tr>
-      <td>${r.data_prania?fmtDate(r.data_prania):'—'}</td><td>${escapeHtml(r.typ||'—')}</td><td>${escapeHtml(r.kto_wykonal||'—')}</td><td>${fmtMoney(r.koszt)}</td><td>${r.zlecone?'ZLECONE':'—'}</td>
+      <td>${r.data_prania?fmtDate(r.data_prania):'—'}</td><td>${escapeHtml(r.typ||'—')}</td><td>${escapeHtml(r.kto_wykonal||'—')}</td><td>${fmtMoney(r.koszt)}</td><td>${r.data_prania?'ZREALIZOWANE':(r.zlecone?'ZLECONE':'—')}</td>
       <td style="text-align:right;white-space:nowrap;"><button type="button" class="history-edit-btn" data-edit-history-id="${escapeHtml(r.id)}" title="Edytuj wpis prania" aria-label="Edytuj wpis prania">✎</button><button type="button" class="history-delete-btn" data-delete-history-id="${escapeHtml(r.id)}" title="Usuń wpis prania" aria-label="Usuń wpis prania">🗑️</button></td>
     </tr>`).join('') : '<tr><td colspan="6">Brak historii.</td></tr>';
     const body=`<div class="confirm-text"><strong>${escapeHtml(plate)}</strong> · ${escapeHtml(info.typ||'—')} · ${escapeHtml(info.marka||'—')}</div>

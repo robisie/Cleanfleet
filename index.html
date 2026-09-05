@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v111 -->
+<!-- CleanFleet v120 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -703,6 +703,7 @@
   background:#f8d7da;
   color:#842029;
 }
+.cf-change-status.completed{background:var(--green-bg);color:var(--green-ink);}
 .cf-change-preview{
   margin-top:12px;
 }
@@ -3097,7 +3098,7 @@ async function cfLoadChangeNotifications(){
       .order('created_at',{ascending:false})
       .limit(100);
     if(error) throw error;
-    const requestIds = [...new Set((data||[]).map(n=>n.entity_id).filter(Boolean))];
+    const requestIds = [...new Set((data||[]).filter(n=>['wash_change_request','wash_change_request_result'].includes(n.type)).map(n=>n.entity_id).filter(Boolean))];
     let pendingCount = 0;
     if(requestIds.length){
       const { data:reqs, error:reqError } = await cfSupabase
@@ -3107,15 +3108,16 @@ async function cfLoadChangeNotifications(){
       if(reqError) throw reqError;
       pendingCount = (reqs||[]).filter(r=>r.status === 'pending').length;
     }
+    const unreadCount = (data||[]).filter(n=>!n.read_at && ['wash_change_request','wash_change_request_result','wash_completed'].includes(n.type)).length;
     cfChangeUnreadCount = pendingCount;
-    if(sub) sub.innerHTML = pendingCount ? `Do weryfikacji: <strong>${pendingCount}</strong>` : 'Brak oczekujących wniosków';
+    if(sub) sub.innerHTML = pendingCount ? `Do weryfikacji: <strong>${pendingCount}</strong>${unreadCount>pendingCount ? ` · Nowe: <strong>${unreadCount}</strong>` : ''}` : (unreadCount ? `Nowe powiadomienia: <strong>${unreadCount}</strong>` : 'Brak nowych powiadomień');
     renderAttentionPanel();
     const title = btn.querySelector('.menu-item-title span:last-child');
-    if(title) title.innerHTML = `Zmiany i wnioski${pendingCount ? `<span class="cf-change-badge">${pendingCount}</span>` : ''}`;
+    if(title) title.innerHTML = `Zmiany i wnioski${unreadCount ? `<span class="cf-change-badge">${unreadCount}</span>` : ''}`;
     const headerBell = document.getElementById('cfHeaderChangeNotificationsBtn');
     const headerBadge = document.getElementById('cfHeaderChangeBadge');
-    if(headerBadge){ headerBadge.textContent = pendingCount; headerBadge.hidden = pendingCount === 0; }
-    if(headerBell) headerBell.setAttribute('aria-label', pendingCount ? `Zmiany i wnioski: ${pendingCount} do weryfikacji` : 'Zmiany i wnioski');
+    if(headerBadge){ headerBadge.textContent = unreadCount; headerBadge.hidden = unreadCount === 0; }
+    if(headerBell) headerBell.setAttribute('aria-label', unreadCount ? `Zmiany i wnioski: ${unreadCount} nowych` : 'Zmiany i wnioski');
     btn.dataset.notifications = JSON.stringify(data||[]);
   }catch(error){
     console.warn('CleanFleet change notifications:', error);
@@ -3155,7 +3157,7 @@ async function cfOpenChangeNotifications(){
     .from('cf_notifications')
     .select('id,type,title,body,entity_id,read_at,created_at')
     .eq('recipient_user_id', cfCurrentUserId)
-    .in('type',['wash_change_request','wash_change_request_result'])
+    .in('type',['wash_change_request','wash_change_request_result','wash_completed'])
     .order('created_at',{ascending:false})
     .limit(100);
 
@@ -3190,6 +3192,7 @@ async function cfOpenChangeNotifications(){
     if(status === 'approved') return { text:'AKCEPTOWANY', cls:'approved' };
     if(status === 'rejected') return { text:'ODRZUCONY', cls:'rejected' };
     if(status === 'pending') return { text:'DO WERYFIKACJI', cls:'pending' };
+    if(note.type === 'wash_completed') return { text: note.read_at ? 'PRZECZYTANE' : 'NOWE', cls: 'completed' };
     return { text: note.read_at ? 'PRZECZYTANE' : 'NOWE', cls: note.read_at ? 'read' : 'pending' };
   }
 
@@ -3202,7 +3205,7 @@ async function cfOpenChangeNotifications(){
           <div class="cf-change-notification-content">
             <button type="button" class="cf-change-notification-open" aria-label="Otwórz powiadomienie">
               <span class="cf-change-notification-main">
-                <strong>${esc(n.title || 'Powiadomienie')}</strong>
+                <strong>${n.type === 'wash_completed' ? '✅ ' : ''}${esc(n.title || 'Powiadomienie')}</strong>
                 <span class="menu-item-sub">${esc(n.body || '')}</span>
                 <span class="cf-change-item-meta">${esc(new Date(n.created_at).toLocaleString('pl-PL'))}</span>
               </span>
@@ -3221,7 +3224,7 @@ async function cfOpenChangeNotifications(){
       .delete()
       .eq('id',noteId)
       .eq('recipient_user_id',cfCurrentUserId)
-      .in('type',['wash_change_request','wash_change_request_result']);
+      .in('type',['wash_change_request','wash_change_request_result','wash_completed']);
     if(error) throw error;
   }
 
@@ -3230,7 +3233,7 @@ async function cfOpenChangeNotifications(){
       .from('cf_notifications')
       .delete()
       .eq('recipient_user_id',cfCurrentUserId)
-      .in('type',['wash_change_request','wash_change_request_result']);
+      .in('type',['wash_change_request','wash_change_request_result','wash_completed']);
     if(error) throw error;
   }
 
@@ -3373,7 +3376,24 @@ async function cfOpenChangeNotifications(){
         if(readError) console.warn('CleanFleet notification read:',readError.message);
         note.read_at = new Date().toISOString();
       }
-      if(note.entity_id) await openRequest(note);
+      if(note.type === 'wash_completed'){
+        const { data:doneRow, error:doneError } = await cfSupabase
+          .from('wash_records')
+          .select('id,plate,type,brand,billing_category,ordered,ordered_by,order_date,order_due_date,notes,wash_date,performed_by,cost,approved,paid,created_at,created_by')
+          .eq('id',note.entity_id)
+          .maybeSingle();
+        if(doneError){ console.error(doneError); showToast('Nie udało się pobrać wykonanego wpisu.'); return; }
+        if(!doneRow){ showToast('Wpis nie jest już dostępny.'); return; }
+        const done = cfMapRecord(doneRow);
+        const overlayDone = document.createElement('div');
+        overlayDone.className = 'overlay';
+        overlayDone.id = 'cfCompletedOverlay';
+        overlayDone.innerHTML = `<div class="sheet" style="max-width:720px;"><button class="close" id="cfCloseCompleted">&times;</button><h2>Pranie zakończone</h2><div class="cf-preview-title">WYKONANY WPIS</div>${recordCardHtml(done)}</div>`;
+        document.getElementById('modalRoot').innerHTML='';
+        document.getElementById('modalRoot').appendChild(overlayDone);
+        document.getElementById('cfCloseCompleted')?.addEventListener('click',()=>overlayDone.remove());
+        overlayDone.addEventListener('click',e=>{if(e.target===overlayDone) overlayDone.remove();});
+      } else if(note.entity_id) await openRequest(note);
       else showToast(note.body || note.title || 'Powiadomienie');
     });
   });

@@ -1388,29 +1388,44 @@ async function cfOpenEmployees(){
     return;
   }
 
-  const menuOverlay=document.getElementById('menuOverlay');
-  if(menuOverlay) menuOverlay.classList.remove('open');
+  // Dokładnie ten sam mechanizm okna, którego używają pozostałe pozycje MENU.
+  menuOverlay.classList.remove('open');
 
-  // To okno celowo nie korzysta z modalRoot. Tworzymy je bezpośrednio w body,
-  // żeby żaden kontener aplikacji ani menu nie mógł go zasłonić.
-  document.getElementById('cfEmployeesOverlay')?.remove();
+  const body = `
+    <div class="confirm-text">Lista zarejestrowanych kont pracowników floty. Administrator może aktywować konto albo je zablokować.</div>
+    <div id="cfEmployeesList" class="cf-employee-list">
+      <div style="padding:12px;color:var(--ink-soft);">Ładowanie…</div>
+    </div>`;
 
-  const overlay=document.createElement('div');
-  overlay.id='cfEmployeesOverlay';
-  overlay.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(22,21,15,0.5);padding:20px;box-sizing:border-box;';
-  overlay.innerHTML=`<div class="sheet cf-admin-sheet" style="width:min(680px,100%);max-height:calc(100vh - 40px);overflow:auto;box-sizing:border-box;"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;"><h3 style="margin:0;">Pracownicy floty</h3><button class="close" id="cfEmployeesClose" type="button">&times;</button></div><p style="margin:8px 0 0;color:var(--ink-soft);font-size:13px;">Tutaj możesz sprawdzić zarejestrowane konta i zablokować lub odblokować dostęp.</p><div id="cfEmployeesList" class="cf-employee-list"><div style="padding:12px;color:var(--ink-soft);">Ładowanie…</div></div></div>`;
-  document.body.appendChild(overlay);
+  reportShell('Pracownicy floty', '', body);
 
-  const close=()=>overlay.remove();
-  document.getElementById('cfEmployeesClose')?.addEventListener('click',close);
-  overlay.addEventListener('click',e=>{if(e.target===overlay) close();});
+  const list = document.getElementById('cfEmployeesList');
+  if(!list) return;
 
-  const list=document.getElementById('cfEmployeesList');
   try{
-    const {data,error}=await cfSupabase.from('cf_employee_profiles').select('user_id,full_name,email,active,created_at').order('full_name',{ascending:true});
+    const {data,error}=await cfSupabase
+      .from('cf_employee_profiles')
+      .select('user_id,full_name,email,active,created_at')
+      .order('full_name',{ascending:true});
+
     if(error) throw error;
-    if(!data?.length){list.innerHTML='<div style="padding:12px;color:var(--ink-soft);">Brak zarejestrowanych pracowników.</div>';return;}
-    list.innerHTML=data.map(p=>`<div class="cf-employee-row"><div class="cf-employee-main"><div class="cf-employee-name">${cfEsc(p.full_name||'Bez imienia')}</div><div class="cf-employee-email">${cfEsc(p.email||'')}</div><span class="cf-employee-state ${p.active?'active':'blocked'}">${p.active?'AKTYWNY':'ZABLOKOWANY'}</span></div><div class="cf-employee-actions"><button class="btn ${p.active?'btn-danger':'btn-solid'}" type="button" data-employee-toggle="${p.user_id}" data-next-active="${p.active?'false':'true'}">${p.active?'Zablokuj':'Odblokuj'}</button></div></div>`).join('');
+
+    if(!data?.length){
+      list.innerHTML='<div class="empty-state" style="margin-top:14px;">Brak zarejestrowanych pracowników.</div>';
+      return;
+    }
+
+    list.innerHTML=data.map(p=>`<div class="cf-employee-row">
+      <div class="cf-employee-main">
+        <div class="cf-employee-name">${cfEsc(p.full_name||'Bez imienia')}</div>
+        <div class="cf-employee-email">${cfEsc(p.email||'')}</div>
+        <span class="cf-employee-state ${p.active?'active':'blocked'}">${p.active?'AKTYWNY':'ZABLOKOWANY'}</span>
+      </div>
+      <div class="cf-employee-actions">
+        <button class="btn ${p.active?'btn-danger':'btn-solid'}" type="button" data-employee-toggle="${p.user_id}" data-next-active="${p.active?'false':'true'}">${p.active?'Zablokuj':'Odblokuj'}</button>
+      </div>
+    </div>`).join('');
+
     list.querySelectorAll('[data-employee-toggle]').forEach(btn=>btn.addEventListener('click',async()=>{
       const userId=btn.getAttribute('data-employee-toggle');
       const nextActive=btn.getAttribute('data-next-active')==='true';
@@ -1422,11 +1437,15 @@ async function cfOpenEmployees(){
         if(error) throw error;
         showToast(nextActive?'Konto zostało odblokowane.':'Konto zostało zablokowane.');
         await cfOpenEmployees();
-      }catch(err){console.error(err);showToast(err?.message||'Nie udało się zmienić stanu konta.');btn.disabled=false;}
+      }catch(err){
+        console.error(err);
+        showToast(err?.message||'Nie udało się zmienić stanu konta.');
+        btn.disabled=false;
+      }
     }));
   }catch(err){
-    console.error('CleanFleet employee list error:',err);
-    if(list) list.innerHTML=`<div style="padding:12px;color:var(--red);">Nie udało się pobrać pracowników: ${cfEsc(err?.message||'nieznany błąd')}</div>`;
+    console.error(err);
+    list.innerHTML=`<div style="padding:12px;color:var(--red);">Nie udało się pobrać pracowników: ${cfEsc(err?.message||'nieznany błąd')}</div>`;
   }
 }
 

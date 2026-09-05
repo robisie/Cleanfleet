@@ -3531,7 +3531,7 @@ function uid(){
     }
     const rows = records.map(cfRecordToDb);
     if(rows.length){
-      const { error } = await cfSupabase.from('wash_records').upsert(rows, {onConflict:'id'});
+      const { error } = await cfRetrySupabase(() => cfSupabase.from('wash_records').upsert(rows, {onConflict:'id'}));
       if(error){ showToast('Błąd zapisu wpisów: '+error.message); throw error; }
     }
     const currentIds = new Set(records.map(r=>r.id));
@@ -3585,8 +3585,8 @@ function uid(){
         return;
       }
       // Zwykłe dodanie/edycja pojazdu: zapisujemy WYŁĄCZNIE ten pojazd.
-      // Bez retry — pojedyncza operacja ma zakończyć się od razu błędem,
-      // zamiast sztucznie wydłużać czas oczekiwania przy problemie sieciowym.
+      // Na Safari/iPadOS błędy sieciowe potrafią wracać jako „TypeError: Load failed”,
+      // dlatego pojedynczy zapis również korzysta z retry.
       if(changedPlate){
         const v = registry[changedPlate] || {typ:'', marka:''};
         const payload = { plate:changedPlate, type:v.typ||'', brand:v.marka||'' };
@@ -3594,19 +3594,19 @@ function uid(){
 
         let result;
         if(existsRemotely){
-          result = await cfSupabase
+          result = await cfRetrySupabase(() => cfSupabase
             .from('vehicles')
             .update({type:payload.type, brand:payload.brand})
-            .eq('plate', changedPlate);
+            .eq('plate', changedPlate));
         } else {
-          result = await cfSupabase
+          result = await cfRetrySupabase(() => cfSupabase
             .from('vehicles')
-            .insert(payload);
+            .insert(payload));
         }
         if(result?.error) throw result.error;
 
         if(oldPlate && oldPlate !== changedPlate){
-          const deleteResult = await cfSupabase.from('vehicles').delete().eq('plate', oldPlate);
+          const deleteResult = await cfRetrySupabase(() => cfSupabase.from('vehicles').delete().eq('plate', oldPlate));
           if(deleteResult?.error) throw deleteResult.error;
           cfRemoteVehiclePlates.delete(oldPlate);
         }

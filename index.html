@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v127 -->
+<!-- CleanFleet v130 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1389,7 +1389,7 @@ async function cfOpenEmployees(){
   }
 
   // Dokładnie ten sam mechanizm okna, którego używają pozostałe pozycje MENU.
-  menuOverlay.classList.remove('open');
+  document.getElementById('menuOverlay')?.classList.remove('open');
 
   const body = `
     <div class="confirm-text">Lista zarejestrowanych kont pracowników floty. Administrator może aktywować konto albo je zablokować.</div>
@@ -1397,7 +1397,12 @@ async function cfOpenEmployees(){
       <div style="padding:12px;color:var(--ink-soft);">Ładowanie…</div>
     </div>`;
 
-  reportShell('Pracownicy floty', '', body);
+  if(typeof window.cfReportShell !== 'function'){
+    showToast('Błąd otwierania okna pracowników.');
+    console.error('CleanFleet: cfReportShell nie jest dostępny.');
+    return;
+  }
+  window.cfReportShell('Pracownicy floty', '', body);
 
   const list = document.getElementById('cfEmployeesList');
   if(!list) return;
@@ -4503,6 +4508,8 @@ function uid(){
       else { mainStatusFilter=item.filter; const sel=document.getElementById('mainStatusFilter'); if(sel) sel.value=item.filter; renderRecords(); document.getElementById('recordsList')?.scrollIntoView({behavior:'smooth',block:'start'}); }
     }));
   }
+
+  window.cfReportShell = reportShell;
 
   function reportShell(title, controlsHtml, bodyHtml){
     const html = `

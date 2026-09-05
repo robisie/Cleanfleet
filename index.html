@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v135 -->
+<!-- CleanFleet v136 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -511,7 +511,12 @@
   .cf-employee-state.blocked{background:#f8d9d5;color:#8e2f25;}
   .cf-employee-actions{flex:none;}
   .cf-employee-actions .btn{margin-top:0;white-space:nowrap;}
-  /* Rejestracja pracownika — osobny, pełny styl formularza */
+  /* Lista pracowników — akcje */
+.cf-employee-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+@media(max-width:639px){
+  .cf-employee-actions{width:100%;justify-content:flex-start;margin-top:8px;}
+}
+/* Rejestracja pracownika — osobny, pełny styl formularza */
   .cf-admin-sheet h3{font-size:19px;font-weight:800;color:var(--ink);margin:0;}
   .cf-admin-sheet p{font-size:13px;line-height:1.45;}
   .cf-admin-sheet form{display:flex;flex-direction:column;gap:0;}
@@ -3530,7 +3535,7 @@ async function cfOpenChangeNotifications(){
         document.getElementById('modalRoot').appendChild(employeeOverlay);
         document.getElementById('cfCloseEmployeeRegistered')?.addEventListener('click',()=>employeeOverlay.remove());
         document.getElementById('cfBackEmployeeRegistered')?.addEventListener('click',async ()=>{ employeeOverlay.remove(); await cfOpenChangeNotifications(); });
-        document.getElementById('cfOpenEmployeesFromNotification')?.addEventListener('click',async ()=>{ employeeOverlay.remove(); await cfOpenEmployees(); });
+        document.getElementById('cfOpenEmployeesFromNotification')?.addEventListener('click',async ()=>{ employeeOverlay.remove(); await showEmployeesReport(); });
         employeeOverlay.addEventListener('click',e=>{if(e.target===employeeOverlay) employeeOverlay.remove();});
       } else if(note.type === 'wash_completed'){
         const { data:doneRow, error:doneError } = await cfSupabase
@@ -4522,7 +4527,7 @@ function uid(){
       const {data,error}=await cfSupabase.from('cf_employee_profiles').select('user_id,full_name,email,active,created_at').order('full_name',{ascending:true});
       if(error) throw error;
       if(!data?.length){ list.innerHTML='<div class="empty-state" style="margin-top:14px;">Brak zarejestrowanych pracowników.</div>'; return; }
-      list.innerHTML=data.map(p=>`<div class="cf-employee-row"><div class="cf-employee-main"><div class="cf-employee-name">${escapeHtml(p.full_name||'Bez imienia')}</div><div class="cf-employee-email">${escapeHtml(p.email||'')}</div><span class="cf-employee-state ${p.active?'active':'blocked'}">${p.active?'AKTYWNY':'ZABLOKOWANY'}</span></div><div class="cf-employee-actions"><button class="btn ${p.active?'btn-danger':'btn-solid'}" type="button" data-employee-toggle="${p.user_id}">${p.active?'Zablokuj':'Odblokuj'}</button></div></div>`).join('');
+      list.innerHTML=data.map(p=>`<div class="cf-employee-row"><div class="cf-employee-main"><div class="cf-employee-name">${escapeHtml(p.full_name||'Bez imienia')}</div><div class="cf-employee-email">${escapeHtml(p.email||'')}</div><span class="cf-employee-state ${p.active?'active':'blocked'}">${p.active?'AKTYWNY':'ZABLOKOWANY'}</span></div><div class="cf-employee-actions"><button class="btn ${p.active?'btn-danger':'btn-solid'}" type="button" data-employee-toggle="${p.user_id}">${p.active?'Zablokuj':'Odblokuj'}</button><button class="btn btn-danger" type="button" data-employee-delete="${p.user_id}">🗑 Usuń</button></div></div>`).join('');
       list.querySelectorAll('[data-employee-toggle]').forEach(btn=>btn.addEventListener('click',async()=>{
         const userId=btn.getAttribute('data-employee-toggle');
         const row=data.find(x=>x.user_id===userId); if(!row) return;
@@ -4531,6 +4536,22 @@ function uid(){
         btn.disabled=true;
         try{ const {error}=await cfSupabase.from('cf_employee_profiles').update({active:nextActive}).eq('user_id',userId); if(error) throw error; showToast(nextActive?'Konto zostało odblokowane.':'Konto zostało zablokowane.'); await showEmployeesReport(); }
         catch(err){ console.error(err); showToast(err?.message||'Nie udało się zmienić stanu konta.'); btn.disabled=false; }
+      }));
+      list.querySelectorAll('[data-employee-delete]').forEach(btn=>btn.addEventListener('click',async()=>{
+        const userId=btn.getAttribute('data-employee-delete');
+        const row=data.find(x=>x.user_id===userId); if(!row) return;
+        if(!confirm(`Czy na pewno usunąć konto pracownika "${row.full_name || row.email || 'bez nazwy'}"? Tej operacji nie można cofnąć.`)) return;
+        btn.disabled=true;
+        try{
+          const {error}=await cfSupabase.rpc('cf_admin_delete_fleet_employee',{p_user_id:userId});
+          if(error) throw error;
+          showToast('Konto pracownika zostało usunięte.');
+          await showEmployeesReport();
+        }catch(err){
+          console.error('CleanFleet employee delete error:',err);
+          showToast(err?.message||'Nie udało się usunąć konta pracownika.');
+          btn.disabled=false;
+        }
       }));
     }catch(err){ console.error('CleanFleet employees error:',err); list.innerHTML=`<div style="padding:12px;color:var(--red);">Nie udało się pobrać pracowników: ${escapeHtml(err?.message||'nieznany błąd')}</div>`; }
   }

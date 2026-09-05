@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v121 -->
+<!-- CleanFleet v122 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -3305,11 +3305,12 @@ async function cfOpenChangeNotifications(){
         <div class="cf-preview-title" style="margin-top:0 !important;">PROPONOWANA ZMIANA</div>
         ${proposedCard}
         ${req.reason ? `<div class="cf-change-card"><strong>Powód:</strong><br>${escapeHtml(req.reason)}</div>` : ''}
-        ${cfIsAdmin() && req.status === 'pending' ? `
-          <div class="sheet-actions">
+        <div class="sheet-actions" style="margin-top:14px;">
+          <button type="button" class="btn btn-solid" id="cfBackRequest">← Wróć do listy powiadomień</button>
+          ${cfIsAdmin() && req.status === 'pending' ? `
             <button class="btn btn-solid" id="cfApproveRequest">✓ Akceptuj zmianę</button>
-            <button class="btn btn-danger" id="cfRejectRequest">✕ Odrzuć zmianę</button>
-          </div>` : ''}
+            <button class="btn btn-danger" id="cfRejectRequest">✕ Odrzuć zmianę</button>` : ''}
+        </div>
       </div>`;
 
     document.getElementById('modalRoot').innerHTML = '';
@@ -3317,6 +3318,10 @@ async function cfOpenChangeNotifications(){
 
     const close = () => overlay.remove();
     document.getElementById('cfCloseChangeRequest')?.addEventListener('click', close);
+    document.getElementById('cfBackRequest')?.addEventListener('click', async ()=>{
+      close();
+      await cfOpenChangeNotifications();
+    });
     overlay.addEventListener('click', e => { if(e.target === overlay) close(); });
 
     if(cfIsAdmin() && req.status === 'pending'){

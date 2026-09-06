@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v155 -->
+<!-- CleanFleet v156 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -736,6 +736,7 @@
   .cf-schedule-inline-actions{
     display:flex;
     flex-direction:row;
+    flex-wrap:wrap;
     gap:8px;
     align-items:flex-end;
     justify-content:flex-start;
@@ -746,28 +747,19 @@
   }
   .cf-schedule-inline-actions .btn{
     width:auto;
-    flex:0 1 118px;
-    min-width:0;
+    flex:1 1 120px;
+    min-width:120px;
     min-height:40px;
-    padding:8px 9px;
+    padding:8px 10px;
     font-size:10.5px;
     line-height:1.15;
-    white-space:nowrap;
+    white-space:normal;
     box-sizing:border-box;
   }
   .cf-schedule-inline-actions .cf-schedule-edit-btn{background:#fff;border:1px solid var(--line-strong);color:var(--ink);}
-  .cf-schedule-hint{
-    margin-top:7px;
-    line-height:1.4;
-    min-height:18px;
-    display:block;
-    width:100%;
-    box-sizing:border-box;
-    clear:both;
-    overflow-wrap:anywhere;
-    word-break:normal;
-  }
-  .cf-schedule-hint-active{font-weight:700;color:var(--ink);}
+  /* Przy decyzji termin jest komunikowany przez sam status wpisu i przyciski obok daty. */
+  .cf-schedule-hint{display:none !important;}
+  .cf-schedule-hint-active{display:none !important;}
   .sheet{overflow-x:hidden;}
   @media(max-width:639px){
     .cf-schedule-decision-row{
@@ -4456,8 +4448,6 @@ function uid(){
                   <button type="button" class="btn btn-danger" id="cfInlineEmployeeRejectSchedule">✕ Odrzuć termin</button>
                 </div>` : ''}
               </div>
-              ${rec && rec.schedule_status === 'pending_admin' ? '<div class="record-meta cf-schedule-hint" id="cfScheduleHint">⏳ Termin oczekuje na decyzję administratora.</div>' : ''}
-              ${rec && rec.schedule_status === 'pending_employee' ? '<div class="record-meta cf-schedule-hint" id="cfScheduleHint">📅 Termin zaproponowany przez administratora oczekuje na Twoje potwierdzenie.</div>' : ''}
           </div>
 
           <div class="field">
@@ -4543,11 +4533,6 @@ function uid(){
         scheduleDateInput.focus();
         if(inlineAcceptBtn) inlineAcceptBtn.remove();
         inlineCounterBtn.remove();
-        const hint = document.getElementById('cfScheduleHint');
-        if(hint){
-          hint.textContent = 'Wybierz nowy termin i kliknij „Zatwierdź” na dole.';
-          hint.classList.add('cf-schedule-hint-active');
-        }
       });
     }
     const inlineRejectBtn = document.getElementById('cfInlineRejectSchedule');

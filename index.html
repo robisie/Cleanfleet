@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v154 -->
+<!-- CleanFleet v155 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -4442,7 +4442,7 @@ function uid(){
               <div class="cf-schedule-decision-row">
                 <div class="field cf-schedule-date-field">
                   <label>Termin wykonania</label>
-                  <input type="date" id="f_data_zlecenia_do" value="${rec ? (rec.data_zlecenia_do || rec.schedule_proposed_date || '') : ''}" ${rec && ((rec.schedule_status === 'pending_admin' && cfIsAdmin()) || rec.schedule_status === 'pending_employee' || rec.schedule_status === 'rejected') ? 'disabled' : ''}>
+                  <input type="date" id="f_data_zlecenia_do" value="${rec ? (rec.schedule_proposed_date || rec.data_zlecenia_do || '') : ''}" ${rec && ((rec.schedule_status === 'pending_admin' && cfIsAdmin()) || rec.schedule_status === 'pending_employee' || rec.schedule_status === 'rejected') ? 'disabled' : ''}>
                 </div>
                 ${rec && rec.schedule_status === 'pending_admin' && cfIsAdmin() ? `
                 <div class="cf-schedule-inline-actions" id="cfScheduleInlineActions">
@@ -4450,7 +4450,7 @@ function uid(){
                   <button type="button" class="btn cf-schedule-edit-btn" id="cfInlineCounterSchedule">📅 Inny termin</button>
                   <button type="button" class="btn btn-danger" id="cfInlineRejectSchedule">✕ Odrzuć</button>
                 </div>` : ''}
-                ${rec && rec.schedule_status === 'pending_employee' && cfIsFleetEmployee() && rec.created_by === cfCurrentUserId ? `
+                ${rec && rec.schedule_status === 'pending_employee' && cfIsFleetEmployee() ? `
                 <div class="cf-schedule-inline-actions" id="cfScheduleInlineActions">
                   <button type="button" class="btn btn-solid" id="cfInlineEmployeeConfirmSchedule">✓ Akceptuję termin</button>
                   <button type="button" class="btn btn-danger" id="cfInlineEmployeeRejectSchedule">✕ Odrzuć termin</button>

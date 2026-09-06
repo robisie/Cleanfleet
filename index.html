@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v153 -->
+<!-- CleanFleet v154 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -926,17 +926,6 @@
   flex:1;
 }
 
-
-/* CleanFleet v153 — zmiana już ustalonego terminu */
-.cf-established-schedule-change{margin:10px 0 12px;padding:11px;border:1px solid #dfe5bd;border-radius:11px;background:#fbfcf3;}
-.cf-established-schedule-change[hidden]{display:none!important}
-.cf-established-schedule-title{font-size:12px;font-weight:800;margin-bottom:5px}
-.cf-established-schedule-current{font-size:12px;color:#666;margin-bottom:7px}
-.cf-established-schedule-row{display:grid;grid-template-columns:190px minmax(0,1fr);gap:8px;align-items:center}
-.cf-established-schedule-row input{min-height:42px}
-.cf-established-schedule-row button{min-height:42px}
-.cf-established-schedule-hint{font-size:12px;line-height:1.35;color:#666;margin-top:7px}
-@media(max-width:639px){.cf-established-schedule-row{grid-template-columns:1fr}.cf-established-schedule-row button{width:100%}}
 </style>
 
 <style id="mobile-user-header-fix">
@@ -3542,79 +3531,25 @@ async function cfEmployeeConfirmSchedule(recordId){
   if(error) throw error;
   return data;
 }
-
-
-/* CleanFleet v153 — bezpieczna zmiana ustalonego terminu */
-async function cfAdminProposeEstablishedScheduleChange(recordId, newDate, note=''){
+async function cfEmployeeRejectSchedule(recordId,note=''){
+  if(!cfIsFleetEmployee()) throw new Error('Tylko pracownik floty może odrzucać terminy.');
+  const {data,error}=await cfSupabase.rpc('cf_employee_reject_wash_schedule',{p_wash_record_id:recordId,p_note:note||null});
+  if(error) throw error;
+  return data;
+}
+async function cfAdminProposeEstablishedScheduleChange(recordId,newDate,note=''){
+  if(!cfIsAdmin()) throw new Error('Tylko administrator może proponować zmianę terminu.');
   if(!recordId || !newDate) throw new Error('Wybierz nowy termin.');
-  const {data,error}=await cfSupabase.rpc('cf_admin_propose_wash_schedule_change',{
-    p_wash_record_id:recordId,
-    p_proposed_date:newDate,
-    p_note:note || null
-  });
+  const {data,error}=await cfSupabase.rpc('cf_admin_propose_wash_schedule_change',{p_wash_record_id:recordId,p_proposed_date:newDate,p_note:note||null});
   if(error) throw error;
   return data;
 }
-
-async function cfEmployeeProposeEstablishedScheduleChange(recordId, newDate, note=''){
+async function cfEmployeeProposeEstablishedScheduleChange(recordId,newDate,note=''){
+  if(!cfIsFleetEmployee()) throw new Error('Tylko pracownik floty może proponować zmianę terminu.');
   if(!recordId || !newDate) throw new Error('Wybierz nowy termin.');
-  const {data,error}=await cfSupabase.rpc('cf_employee_propose_wash_schedule_change',{
-    p_wash_record_id:recordId,
-    p_proposed_date:newDate,
-    p_note:note || null
-  });
+  const {data,error}=await cfSupabase.rpc('cf_employee_propose_wash_schedule_change',{p_wash_record_id:recordId,p_proposed_date:newDate,p_note:note||null});
   if(error) throw error;
   return data;
-}
-
-async function cfEmployeeRejectWashSchedule(recordId, note=''){
-  const {data,error}=await cfSupabase.rpc('cf_employee_reject_wash_schedule',{
-    p_wash_record_id:recordId,
-    p_note:note || null
-  });
-  if(error) throw error;
-  return data;
-}
-
-function cfSetupEstablishedScheduleChange(rec){
-  const box=document.getElementById('cfEstablishedScheduleChange');
-  if(!box || !rec) return;
-  const current=rec.data_zlecenia_do || '';
-  if(!current || rec.schedule_status !== 'accepted'){ box.hidden=true; return; }
-  box.hidden=false;
-  const cur=document.getElementById('cfEstablishedScheduleCurrent');
-  const date=document.getElementById('cfEstablishedScheduleNewDate');
-  const send=document.getElementById('cfEstablishedScheduleSend');
-  const hint=document.getElementById('cfEstablishedScheduleHint');
-  if(cur) cur.textContent='Obecnie ustalony termin: '+fmtDate(current);
-  if(date){ date.value=''; date.min=''; }
-  const admin=cfIsAdmin();
-  const employee=cfIsFleetEmployee();
-  if(send) send.textContent=admin ? 'Zaproponuj zmianę pracownikowi' : 'Zaproponuj zmianę administratorowi';
-  if(hint) hint.textContent=admin
-    ? 'Po wysłaniu pracownik floty zaakceptuje albo odrzuci zmianę. Do tego czasu obecny termin pozostaje ustalony.'
-    : 'Po wysłaniu administrator zaakceptuje albo odrzuci zmianę. Do tego czasu obecny termin pozostaje ustalony.';
-  if(send){
-    send.onclick=async()=>{
-      const newDate=date?.value || '';
-      if(!newDate){ showToast('Wybierz nowy termin wykonania prania.'); return; }
-      if(newDate===current){ showToast('Nowy termin musi różnić się od obecnego.'); return; }
-      try{
-        send.disabled=true;
-        if(admin) await cfAdminProposeEstablishedScheduleChange(rec.id,newDate,'');
-        else if(employee) await cfEmployeeProposeEstablishedScheduleChange(rec.id,newDate,'');
-        else throw new Error('Brak uprawnień.');
-        closeModal();
-        await loadAll();
-        await cfLoadChangeNotifications();
-        showToast('Zaproponowano zmianę terminu. Oczekuje na akceptację.');
-      }catch(e){
-        console.error('CleanFleet established schedule change:',e);
-        send.disabled=false;
-        showToast(e?.message || 'Nie udało się zaproponować zmiany terminu.');
-      }
-    };
-  }
 }
 
 
@@ -4506,8 +4441,8 @@ function uid(){
               </div>
               <div class="cf-schedule-decision-row">
                 <div class="field cf-schedule-date-field">
-                  <label>${cfIsFleetEmployee() ? 'Proponowany termin wykonania' : 'Termin wykonania'}</label>
-                  <input type="date" id="f_data_zlecenia_do" value="${rec ? (rec.schedule_status === 'pending_admin' || rec.schedule_status === 'pending_employee' ? (rec.schedule_proposed_date || '') : (rec.data_zlecenia_do || '')) : ''}" ${rec && ((rec.schedule_status === 'pending_admin' && cfIsAdmin()) || rec.schedule_status === 'pending_employee' || rec.schedule_status === 'rejected') ? 'disabled' : ''}>
+                  <label>Termin wykonania</label>
+                  <input type="date" id="f_data_zlecenia_do" value="${rec ? (rec.data_zlecenia_do || rec.schedule_proposed_date || '') : ''}" ${rec && ((rec.schedule_status === 'pending_admin' && cfIsAdmin()) || rec.schedule_status === 'pending_employee' || rec.schedule_status === 'rejected') ? 'disabled' : ''}>
                 </div>
                 ${rec && rec.schedule_status === 'pending_admin' && cfIsAdmin() ? `
                 <div class="cf-schedule-inline-actions" id="cfScheduleInlineActions">
@@ -4521,16 +4456,6 @@ function uid(){
                   <button type="button" class="btn btn-danger" id="cfInlineEmployeeRejectSchedule">✕ Odrzuć termin</button>
                 </div>` : ''}
               </div>
-              ${rec && rec.schedule_status === 'accepted' && rec.data_zlecenia_do ? `
-              <div class="cf-established-schedule-change" id="cfEstablishedScheduleChange">
-                <div class="cf-established-schedule-title">Zmiana ustalonego terminu</div>
-                <div class="cf-established-schedule-current" id="cfEstablishedScheduleCurrent"></div>
-                <div class="cf-established-schedule-row">
-                  <input type="date" id="cfEstablishedScheduleNewDate">
-                  <button type="button" class="btn btn-solid" id="cfEstablishedScheduleSend"></button>
-                </div>
-                <div class="cf-established-schedule-hint" id="cfEstablishedScheduleHint"></div>
-              </div>` : ''}
               ${rec && rec.schedule_status === 'pending_admin' ? '<div class="record-meta cf-schedule-hint" id="cfScheduleHint">⏳ Termin oczekuje na decyzję administratora.</div>' : ''}
               ${rec && rec.schedule_status === 'pending_employee' ? '<div class="record-meta cf-schedule-hint" id="cfScheduleHint">📅 Termin zaproponowany przez administratora oczekuje na Twoje potwierdzenie.</div>' : ''}
           </div>
@@ -4625,6 +4550,27 @@ function uid(){
         }
       });
     }
+    const inlineRejectBtn = document.getElementById('cfInlineRejectSchedule');
+    if(inlineRejectBtn && rec){
+      inlineRejectBtn.addEventListener('click', async () => {
+        try{
+          inlineRejectBtn.disabled = true;
+          if(inlineAcceptBtn) inlineAcceptBtn.disabled = true;
+          if(inlineCounterBtn) inlineCounterBtn.disabled = true;
+          await cfAdminRejectSchedule(rec.id,'');
+          closeModal();
+          await loadAll();
+          await cfLoadChangeNotifications();
+          showToast('Zmiana terminu została odrzucona.');
+        }catch(e){
+          console.error('CleanFleet inline admin reject schedule:',e);
+          inlineRejectBtn.disabled = false;
+          if(inlineAcceptBtn) inlineAcceptBtn.disabled = false;
+          if(inlineCounterBtn) inlineCounterBtn.disabled = false;
+          showToast(e?.message || 'Nie udało się odrzucić zmiany terminu.');
+        }
+      });
+    }
     if(inlineEmployeeConfirmBtn && rec){
       inlineEmployeeConfirmBtn.addEventListener('click', async () => {
         try{
@@ -4641,42 +4587,26 @@ function uid(){
         }
       });
     }
-    const inlineRejectBtn = document.getElementById('cfInlineRejectSchedule');
-    if(inlineRejectBtn && rec){
-      inlineRejectBtn.addEventListener('click', async () => {
-        try{
-          inlineRejectBtn.disabled = true;
-          await cfAdminRejectSchedule(rec.id,'');
-          closeModal();
-          await loadAll();
-          await cfLoadChangeNotifications();
-          showToast('Termin został odrzucony.');
-        }catch(e){
-          console.error('CleanFleet inline reject schedule:',e);
-          inlineRejectBtn.disabled = false;
-          showToast(e?.message || 'Nie udało się odrzucić terminu.');
-        }
-      });
-    }
+
     const inlineEmployeeRejectBtn = document.getElementById('cfInlineEmployeeRejectSchedule');
     if(inlineEmployeeRejectBtn && rec){
       inlineEmployeeRejectBtn.addEventListener('click', async () => {
         try{
           inlineEmployeeRejectBtn.disabled = true;
-          await cfEmployeeRejectWashSchedule(rec.id,'');
+          if(inlineEmployeeConfirmBtn) inlineEmployeeConfirmBtn.disabled = true;
+          await cfEmployeeRejectSchedule(rec.id,'');
           closeModal();
           await loadAll();
           await cfLoadChangeNotifications();
-          showToast('Termin został odrzucony.');
+          showToast('Zmiana terminu została odrzucona.');
         }catch(e){
           console.error('CleanFleet inline employee reject schedule:',e);
           inlineEmployeeRejectBtn.disabled = false;
-          showToast(e?.message || 'Nie udało się odrzucić terminu.');
+          if(inlineEmployeeConfirmBtn) inlineEmployeeConfirmBtn.disabled = false;
+          showToast(e?.message || 'Nie udało się odrzucić zmiany terminu.');
         }
       });
     }
-
-    cfSetupEstablishedScheduleChange(rec);
 
     document.getElementById('formOverlay').addEventListener('click', (e) => {
       if(e.target.id === 'formOverlay') closeModal();
@@ -4720,11 +4650,11 @@ function uid(){
     const koszt = parseFloat(document.getElementById('f_koszt').value) || 0;
     const billing_category = document.getElementById('f_grupa_rozliczeniowa')?.value || null;
 
-    // Zmiana już ustalonego terminu wymaga akceptacji drugiej strony.
-    // Stary order_due_date pozostaje w bazie do czasu akceptacji propozycji.
+    // Zmiana już ustalonego terminu jest traktowana jako propozycja dla drugiej strony.
+    // Stary termin pozostaje ustalony aż do akceptacji.
     if(editingRecForSchedule && editingRecForSchedule.schedule_status === 'accepted' && editingRecForSchedule.data_zlecenia_do && zlecone){
-      const oldScheduleDate = editingRecForSchedule.data_zlecenia_do;
-      if(formScheduleDate && formScheduleDate !== oldScheduleDate){
+      const oldDate = editingRecForSchedule.data_zlecenia_do;
+      if(formScheduleDate && formScheduleDate !== oldDate){
         try{
           if(cfIsAdmin()){
             await cfAdminProposeEstablishedScheduleChange(editingRecForSchedule.id, formScheduleDate, '');
@@ -4739,7 +4669,7 @@ function uid(){
           await cfLoadChangeNotifications();
           showToast('Zaproponowano zmianę terminu. Oczekuje na akceptację.');
         }catch(e){
-          console.error('CleanFleet established schedule submit:',e);
+          console.error('CleanFleet established schedule change:',e);
           showToast(e?.message || 'Nie udało się zaproponować zmiany terminu.');
         }
         return;
@@ -7489,6 +7419,12 @@ function uid(){
   document.addEventListener('keydown', e => { if(e.key === 'Escape') closeBottomMobileMenu(); });
 
   cfBoot();
+
+  // Odświeżamy dzwoneczek również wtedy, gdy druga strona wyśle zmianę
+  // podczas gdy użytkownik ma aplikację już otwartą.
+  setInterval(() => {
+    if(cfCurrentUserId && cfSupabase && cfCurrentRole) cfLoadChangeNotifications();
+  }, 15000);
 })();
 </script>
 

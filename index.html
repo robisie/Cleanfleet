@@ -4,27 +4,29 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f5f7f2">
-  <meta name="description" content="CleanFleet — nowoczesna obsługa prania i odświeżania wnętrz pojazdów flotowych.">
-  <title>CleanFleet — pranie i odświeżanie wnętrz flot</title>
+  <meta name="description" content="CleanFleet — profesjonalne pranie i odświeżanie wnętrz pojazdów flotowych.">
+  <title>CleanFleet — obsługa flot</title>
   <style>
     :root {
-      --bg:#f5f7f2;
-      --bg-2:#eef2e5;
+      --bg:#f4f6f1;
+      --bg-2:#edf1e5;
       --paper:#ffffff;
-      --ink:#0f120d;
-      --ink-2:#22271f;
-      --muted:#6b7465;
-      --line:#dfe5d8;
+      --paper-2:rgba(255,255,255,.72);
+      --ink:#0f130d;
+      --ink-2:#1f261b;
+      --muted:#687063;
+      --line:#dde4d4;
       --green:#b7cc24;
-      --green-2:#d5ea57;
+      --green-2:#d6ea5a;
       --green-dark:#8ea018;
       --dark:#0f120d;
       --dark-2:#171c15;
-      --radius-xl:40px;
-      --radius-lg:28px;
-      --radius-md:20px;
-      --shadow:0 25px 80px rgba(12,15,10,.08);
-      --shadow-soft:0 16px 40px rgba(12,15,10,.06);
+      --radius-xl:42px;
+      --radius-lg:30px;
+      --radius-md:22px;
+      --shadow-xl:0 34px 90px rgba(13,16,11,.10);
+      --shadow-lg:0 22px 60px rgba(13,16,11,.08);
+      --shadow-md:0 12px 30px rgba(13,16,11,.06);
     }
 
     * { box-sizing:border-box; }
@@ -32,19 +34,21 @@
     body {
       margin:0;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: linear-gradient(180deg, #f8faf5 0%, #f3f6ee 100%);
       color:var(--ink);
+      background:
+        radial-gradient(circle at top right, rgba(183,204,36,.10), transparent 22%),
+        linear-gradient(180deg, #f9fbf7 0%, #f3f6ee 100%);
       line-height:1.5;
       overflow-x:hidden;
     }
     a { color:inherit; text-decoration:none; }
-    img, svg { display:block; max-width:100%; }
+    img { display:block; max-width:100%; }
     .container {
-      width:min(1200px, calc(100% - 40px));
+      width:min(1220px, calc(100% - 40px));
       margin:0 auto;
     }
 
-    /* NAV */
+    /* Header */
     .site-header {
       position:fixed;
       inset:0 0 auto 0;
@@ -52,13 +56,13 @@
       transition:.25s ease;
     }
     .site-header.scrolled {
-      background:rgba(248,250,245,.74);
+      background:rgba(248,250,245,.76);
       backdrop-filter:blur(18px) saturate(130%);
       -webkit-backdrop-filter:blur(18px) saturate(130%);
-      border-bottom:1px solid rgba(223,229,216,.88);
+      border-bottom:1px solid rgba(221,228,212,.9);
     }
     .nav {
-      min-height:78px;
+      min-height:80px;
       display:flex;
       align-items:center;
       justify-content:space-between;
@@ -76,7 +80,6 @@
       max-width:260px;
       object-fit:contain;
       object-position:left center;
-      filter: drop-shadow(0 1px 0 rgba(255,255,255,.6));
     }
     .brand-wordmark {
       font-size:28px;
@@ -89,7 +92,7 @@
       gap:28px;
       font-size:14px;
       font-weight:700;
-      color:#2a3027;
+      color:#2b3128;
     }
     .nav-links a {
       position:relative;
@@ -102,59 +105,68 @@
       right:100%;
       bottom:0;
       height:2px;
-      border-radius:2px;
       background:var(--green);
-      transition:.22s ease;
+      border-radius:2px;
+      transition:.2s ease;
     }
     .nav-links a:hover::after { right:0; }
     .nav-cta {
-      padding:11px 16px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:44px;
+      padding:0 16px;
       border-radius:999px;
       background:var(--dark);
       color:#fff;
       font-weight:800;
-      box-shadow:0 10px 25px rgba(15,18,13,.14);
+      box-shadow:0 10px 28px rgba(15,18,13,.14);
     }
     .menu-toggle {
       display:none;
       width:44px;
       height:44px;
       border:1px solid var(--line);
-      background:rgba(255,255,255,.76);
       border-radius:14px;
+      background:rgba(255,255,255,.78);
       font-size:24px;
       color:var(--ink);
     }
 
-    /* HERO */
+    /* Hero */
     .hero {
       position:relative;
-      padding:138px 0 72px;
+      padding:132px 0 84px;
       overflow:hidden;
     }
     .hero::before {
       content:"";
       position:absolute;
-      width:820px;
-      height:820px;
-      right:-260px;
-      top:-150px;
+      width:700px;
+      height:700px;
+      right:-220px;
+      top:-140px;
       border-radius:50%;
-      background:
-        radial-gradient(circle at 30% 35%, rgba(183,204,36,.24), transparent 38%),
-        radial-gradient(circle at 60% 60%, rgba(142,160,24,.13), transparent 48%);
-      filter:blur(10px);
+      background:radial-gradient(circle, rgba(183,204,36,.17), transparent 62%);
       pointer-events:none;
     }
     .hero::after {
       content:"";
       position:absolute;
-      inset:auto auto -130px -140px;
-      width:460px;
-      height:460px;
+      width:500px;
+      height:500px;
+      left:-140px;
+      bottom:-150px;
       border-radius:50%;
-      background:radial-gradient(circle, rgba(183,204,36,.18), transparent 62%);
+      background:radial-gradient(circle, rgba(183,204,36,.10), transparent 65%);
       pointer-events:none;
+    }
+    .hero-head {
+      text-align:center;
+      max-width:1000px;
+      margin:0 auto 44px;
+      position:relative;
+      z-index:1;
     }
     .eyebrow {
       display:inline-flex;
@@ -162,53 +174,46 @@
       gap:8px;
       padding:8px 14px;
       border-radius:999px;
-      background:rgba(255,255,255,.75);
-      border:1px solid rgba(223,229,216,.95);
-      box-shadow:0 8px 22px rgba(12,15,10,.04);
-      color:#32392d;
+      background:rgba(255,255,255,.86);
+      border:1px solid rgba(221,228,212,.96);
+      box-shadow:0 10px 22px rgba(13,16,11,.04);
+      color:#31382d;
       font-size:12px;
-      font-weight:850;
       text-transform:uppercase;
-      letter-spacing:.11em;
-    }
-    .hero-head {
-      text-align:center;
-      max-width:1050px;
-      margin:0 auto 48px;
+      letter-spacing:.12em;
+      font-weight:850;
     }
     .hero-head h1 {
       margin:18px 0 0;
-      font-size:clamp(50px,8vw,102px);
-      line-height:.92;
-      letter-spacing:-.07em;
+      font-size:clamp(52px,8vw,104px);
+      line-height:.90;
+      letter-spacing:-.075em;
       font-weight:900;
     }
-    .hero-head h1 .accent {
-      color:var(--green-dark);
-    }
+    .hero-head .accent { color:var(--green-dark); }
     .hero-head p {
-      max-width:820px;
-      margin:26px auto 0;
-      color:var(--muted);
+      max-width:830px;
+      margin:24px auto 0;
       font-size:clamp(18px,2.2vw,22px);
+      color:var(--muted);
       line-height:1.45;
     }
 
-    .hero-showcase {
+    .hero-shell {
       position:relative;
+      z-index:1;
       display:grid;
-      grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);
+      grid-template-columns:minmax(0,1.02fr) minmax(0,.98fr);
       gap:22px;
       align-items:stretch;
     }
-    .glass-card {
-      position:relative;
-      border:1px solid rgba(223,229,216,.88);
-      background:rgba(255,255,255,.7);
-      backdrop-filter:blur(12px);
-      -webkit-backdrop-filter:blur(12px);
+    .glass {
       border-radius:var(--radius-xl);
-      box-shadow:var(--shadow);
+      border:1px solid rgba(221,228,212,.92);
+      background:rgba(255,255,255,.70);
+      backdrop-filter:blur(14px);
+      -webkit-backdrop-filter:blur(14px);
+      box-shadow:var(--shadow-xl);
       overflow:hidden;
     }
     .hero-copy {
@@ -216,19 +221,19 @@
       display:flex;
       flex-direction:column;
       justify-content:space-between;
-      min-height:580px;
+      min-height:610px;
     }
-    .hero-copy-top h2 {
+    .hero-copy h2 {
       margin:0 0 14px;
-      font-size:clamp(34px,4vw,58px);
-      line-height:.98;
-      letter-spacing:-.05em;
+      font-size:clamp(36px,4vw,62px);
+      line-height:.97;
+      letter-spacing:-.06em;
     }
-    .hero-copy-top p {
+    .hero-copy p {
       margin:0;
-      color:var(--muted);
+      max-width:560px;
       font-size:17px;
-      max-width:540px;
+      color:var(--muted);
     }
     .hero-actions {
       display:flex;
@@ -243,41 +248,41 @@
       min-height:54px;
       padding:0 22px;
       border-radius:16px;
-      border:1px solid transparent;
       font-weight:850;
+      border:1px solid transparent;
       transition:.2s ease;
     }
     .btn-primary {
       background:var(--dark);
       color:#fff;
-      box-shadow:0 12px 28px rgba(15,18,13,.14);
+      box-shadow:0 14px 30px rgba(15,18,13,.15);
     }
-    .btn-primary:hover { transform:translateY(-2px); background:#161b14; }
+    .btn-primary:hover { transform:translateY(-2px); background:#171c15; }
     .btn-secondary {
-      background:rgba(255,255,255,.82);
+      background:rgba(255,255,255,.88);
       border-color:var(--line);
     }
-    .btn-secondary:hover { transform:translateY(-2px); box-shadow:var(--shadow-soft); }
+    .btn-secondary:hover { transform:translateY(-2px); box-shadow:var(--shadow-md); }
 
-    .mini-grid {
+    .stack-grid {
       display:grid;
       grid-template-columns:repeat(2,minmax(0,1fr));
       gap:14px;
       margin-top:30px;
     }
-    .mini-card {
-      padding:18px 18px 16px;
-      border-radius:22px;
-      background:linear-gradient(180deg, rgba(255,255,255,.9) 0%, rgba(247,250,242,.7) 100%);
-      border:1px solid rgba(223,229,216,.9);
-      box-shadow:0 10px 24px rgba(12,15,10,.04);
+    .stack-card {
+      padding:18px;
+      border-radius:24px;
+      border:1px solid rgba(221,228,212,.9);
+      background:linear-gradient(180deg, rgba(255,255,255,.88) 0%, rgba(247,250,242,.82) 100%);
+      box-shadow:var(--shadow-md);
     }
-    .mini-card strong {
+    .stack-card strong {
       display:block;
       font-size:15px;
-      margin-bottom:4px;
+      margin-bottom:5px;
     }
-    .mini-card span {
+    .stack-card span {
       display:block;
       color:var(--muted);
       font-size:13px;
@@ -286,55 +291,58 @@
 
     .hero-visual {
       position:relative;
-      min-height:580px;
-      background:
-        radial-gradient(circle at 20% 18%, rgba(255,255,255,.8), transparent 34%),
-        linear-gradient(180deg, rgba(255,255,255,.62) 0%, rgba(242,246,235,.9) 100%);
-      padding:0;
+      min-height:610px;
+      padding:12px;
+      background:linear-gradient(180deg, rgba(255,255,255,.66), rgba(244,248,238,.82));
     }
-    .hero-visual .visual-surface {
-      position:absolute;
-      inset:0;
-      padding:10px;
-    }
-    .truck-art {
+    .visual-photo {
       width:100%;
       height:100%;
-      border-radius:32px;
-      background:
-        linear-gradient(160deg, rgba(255,255,255,.74), rgba(244,247,239,.82)),
-        radial-gradient(circle at 85% 25%, rgba(183,204,36,.12), transparent 28%);
-      overflow:hidden;
+      min-height:586px;
+      border-radius:34px;
+      object-fit:cover;
+      object-position:center;
+      filter:saturate(1.02) contrast(1.02);
     }
-    .truck-art svg {
-      width:100%;
-      height:100%;
-    }
-    .visual-chip {
+    .floating-card {
       position:absolute;
-      padding:10px 14px;
-      border-radius:999px;
-      background:rgba(255,255,255,.82);
-      border:1px solid rgba(223,229,216,.9);
-      font-size:12px;
-      font-weight:800;
-      color:#2a3027;
-      backdrop-filter:blur(10px);
-      -webkit-backdrop-filter:blur(10px);
-      box-shadow:0 14px 26px rgba(12,15,10,.06);
+      background:rgba(255,255,255,.88);
+      border:1px solid rgba(221,228,212,.95);
+      backdrop-filter:blur(12px);
+      -webkit-backdrop-filter:blur(12px);
+      box-shadow:var(--shadow-lg);
+      border-radius:26px;
+      padding:18px 18px 16px;
+      max-width:260px;
     }
-    .chip-1 { top:30px; left:30px; }
-    .chip-2 { bottom:30px; right:30px; }
-    .chip-3 { bottom:96px; left:30px; }
+    .floating-card strong {
+      display:block;
+      font-size:15px;
+      margin-bottom:5px;
+    }
+    .floating-card span {
+      display:block;
+      font-size:13px;
+      color:var(--muted);
+      line-height:1.45;
+    }
+    .floating-one {
+      left:26px;
+      bottom:26px;
+    }
+    .floating-two {
+      top:28px;
+      right:28px;
+    }
 
-    /* SECTIONS */
+    /* Sections */
     section {
       padding:96px 0;
     }
     .section-head {
       text-align:center;
-      max-width:850px;
-      margin:0 auto 44px;
+      max-width:840px;
+      margin:0 auto 46px;
     }
     .section-head .kicker {
       display:block;
@@ -347,9 +355,9 @@
     }
     .section-head h2 {
       margin:0 0 14px;
-      font-size:clamp(36px,5vw,68px);
-      line-height:.96;
-      letter-spacing:-.06em;
+      font-size:clamp(38px,5vw,70px);
+      line-height:.95;
+      letter-spacing:-.07em;
       font-weight:900;
     }
     .section-head p {
@@ -358,21 +366,26 @@
       font-size:18px;
     }
 
-    .services {
+    .services-grid {
       display:grid;
-      grid-template-columns:repeat(2,minmax(0,1fr));
+      grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+      gap:20px;
+      align-items:stretch;
+    }
+    .services-col {
+      display:grid;
       gap:18px;
     }
-    .service {
-      position:relative;
-      padding:30px;
+    .service-card {
+      padding:28px;
       border-radius:32px;
-      background:rgba(255,255,255,.78);
-      border:1px solid rgba(223,229,216,.95);
-      box-shadow:var(--shadow-soft);
+      background:rgba(255,255,255,.80);
+      border:1px solid rgba(221,228,212,.95);
+      box-shadow:var(--shadow-md);
+      position:relative;
       overflow:hidden;
     }
-    .service::after {
+    .service-card::after {
       content:"";
       position:absolute;
       width:180px;
@@ -380,8 +393,7 @@
       right:-70px;
       bottom:-70px;
       border-radius:50%;
-      background:radial-gradient(circle, rgba(183,204,36,.14), transparent 70%);
-      pointer-events:none;
+      background:radial-gradient(circle, rgba(183,204,36,.12), transparent 66%);
     }
     .service-icon {
       width:56px;
@@ -389,162 +401,157 @@
       border-radius:18px;
       display:grid;
       place-items:center;
-      background:linear-gradient(180deg, rgba(183,204,36,.18) 0%, rgba(183,204,36,.08) 100%);
-      border:1px solid rgba(183,204,36,.25);
+      background:linear-gradient(180deg, rgba(183,204,36,.18), rgba(183,204,36,.08));
+      border:1px solid rgba(183,204,36,.24);
       font-size:24px;
       margin-bottom:18px;
     }
-    .service h3 {
+    .service-card h3 {
       margin:0 0 8px;
       font-size:28px;
-      letter-spacing:-.04em;
-      line-height:1.05;
-    }
-    .service p {
-      margin:0;
-      color:var(--muted);
-      font-size:15px;
-      max-width:500px;
-    }
-
-    .process-wrap {
-      background:linear-gradient(180deg, #11150f 0%, #171c15 100%);
-      border-radius:40px;
-      padding:34px;
-      box-shadow:0 26px 80px rgba(15,18,13,.16);
-    }
-    .process-head {
-      max-width:860px;
-      margin:0 auto 26px;
-      text-align:center;
-    }
-    .process-head .kicker { color:var(--green-2); }
-    .process-head h2 {
-      margin:0 0 12px;
-      color:#fff;
-      font-size:clamp(34px,5vw,60px);
-      line-height:.98;
       letter-spacing:-.05em;
-    }
-    .process-head p {
-      margin:0;
-      color:#aeb7a7;
-      font-size:18px;
-    }
-    .process-grid {
-      display:grid;
-      grid-template-columns:repeat(3,minmax(0,1fr));
-      gap:16px;
-    }
-    .process-card {
-      min-height:270px;
-      padding:28px;
-      border-radius:30px;
-      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
-      border:1px solid rgba(255,255,255,.08);
-      color:#fff;
-      display:flex;
-      flex-direction:column;
-      justify-content:space-between;
-    }
-    .process-num {
-      font-size:64px;
-      line-height:1;
-      font-weight:900;
-      color:rgba(213,234,87,.18);
-      letter-spacing:-.07em;
-    }
-    .process-card h3 {
-      margin:0 0 8px;
-      font-size:24px;
       line-height:1.02;
     }
-    .process-card p {
+    .service-card p {
       margin:0;
-      color:#aeb7a7;
-      font-size:14px;
+      font-size:15px;
+      color:var(--muted);
     }
 
-    .why-grid {
+    .photo-card {
+      position:relative;
+      overflow:hidden;
+      border-radius:36px;
+      background:var(--paper);
+      border:1px solid rgba(221,228,212,.95);
+      box-shadow:var(--shadow-lg);
+      min-height:620px;
+    }
+    .photo-card img {
+      width:100%;
+      height:100%;
+      min-height:620px;
+      object-fit:cover;
+      object-position:center;
+    }
+    .photo-badge {
+      position:absolute;
+      left:24px;
+      right:24px;
+      bottom:24px;
+      padding:20px 22px;
+      border-radius:28px;
+      background:rgba(255,255,255,.86);
+      border:1px solid rgba(221,228,212,.95);
+      backdrop-filter:blur(12px);
+      -webkit-backdrop-filter:blur(12px);
+      box-shadow:var(--shadow-md);
+    }
+    .photo-badge strong {
+      display:block;
+      font-size:16px;
+      margin-bottom:4px;
+    }
+    .photo-badge span {
+      display:block;
+      font-size:13px;
+      color:var(--muted);
+      line-height:1.45;
+    }
+
+    .feature-shell {
       display:grid;
-      grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);
+      grid-template-columns:minmax(0,.96fr) minmax(0,1.04fr);
       gap:22px;
       align-items:stretch;
     }
-    .why-main {
-      padding:36px;
-      border-radius:34px;
-      background:linear-gradient(180deg, rgba(255,255,255,.82) 0%, rgba(246,249,241,.82) 100%);
-      border:1px solid rgba(223,229,216,.94);
-      box-shadow:var(--shadow-soft);
+    .image-tall {
+      position:relative;
+      min-height:620px;
+      border-radius:38px;
+      overflow:hidden;
+      border:1px solid rgba(221,228,212,.95);
+      box-shadow:var(--shadow-lg);
     }
-    .why-main h3 {
+    .image-tall img {
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      object-position:center;
+    }
+    .feature-panel {
+      display:grid;
+      gap:16px;
+    }
+    .main-panel {
+      padding:34px;
+      border-radius:36px;
+      background:linear-gradient(180deg, rgba(255,255,255,.84) 0%, rgba(245,249,239,.86) 100%);
+      border:1px solid rgba(221,228,212,.95);
+      box-shadow:var(--shadow-md);
+    }
+    .main-panel h3 {
       margin:0 0 12px;
-      font-size:clamp(30px,4vw,48px);
+      font-size:clamp(34px,4.2vw,54px);
       line-height:.98;
-      letter-spacing:-.05em;
+      letter-spacing:-.06em;
     }
-    .why-main p {
+    .main-panel p {
       margin:0;
       color:var(--muted);
       font-size:16px;
       max-width:520px;
     }
-    .why-features {
+    .feature-card {
       display:grid;
-      gap:14px;
-    }
-    .feature {
-      padding:22px;
-      border-radius:28px;
-      background:rgba(255,255,255,.8);
-      border:1px solid rgba(223,229,216,.94);
-      box-shadow:var(--shadow-soft);
-      display:grid;
-      grid-template-columns:44px 1fr;
+      grid-template-columns:46px 1fr;
       gap:14px;
       align-items:start;
+      padding:22px;
+      border-radius:28px;
+      background:rgba(255,255,255,.82);
+      border:1px solid rgba(221,228,212,.95);
+      box-shadow:var(--shadow-md);
     }
     .feature-mark {
-      width:44px;
-      height:44px;
-      border-radius:14px;
+      width:46px;
+      height:46px;
+      border-radius:16px;
       display:grid;
       place-items:center;
       background:linear-gradient(180deg, var(--green) 0%, var(--green-2) 100%);
       color:#10140f;
-      font-size:20px;
+      font-size:21px;
       font-weight:900;
     }
-    .feature strong {
+    .feature-card strong {
       display:block;
       margin-bottom:4px;
       font-size:17px;
     }
-    .feature span {
+    .feature-card span {
       display:block;
       color:var(--muted);
       font-size:14px;
       line-height:1.45;
     }
 
-    .contact-card {
+    .contact-shell {
       position:relative;
       overflow:hidden;
       border-radius:40px;
+      background:linear-gradient(180deg, #10140f 0%, #171c15 100%);
+      box-shadow:0 32px 90px rgba(15,18,13,.16);
       padding:42px;
-      background:linear-gradient(180deg, #11150f 0%, #171c15 100%);
-      color:#fff;
-      box-shadow:0 26px 80px rgba(15,18,13,.18);
     }
-    .contact-card::before {
+    .contact-shell::before {
       content:"";
       position:absolute;
-      width:360px;
-      height:360px;
-      border-radius:50%;
+      width:380px;
+      height:380px;
       right:-120px;
       top:-120px;
+      border-radius:50%;
       background:radial-gradient(circle, rgba(183,204,36,.18), transparent 68%);
     }
     .contact-grid {
@@ -552,27 +559,28 @@
       z-index:1;
       display:grid;
       grid-template-columns:minmax(0,1fr) minmax(320px,.78fr);
-      gap:26px;
+      gap:24px;
       align-items:start;
     }
     .contact-copy h2 {
       margin:0 0 12px;
-      font-size:clamp(38px,5vw,66px);
-      line-height:.95;
-      letter-spacing:-.06em;
+      color:#fff;
+      font-size:clamp(40px,5vw,68px);
+      line-height:.94;
+      letter-spacing:-.07em;
     }
     .contact-copy p {
       margin:0;
-      color:#b8c2b2;
-      max-width:620px;
+      color:#b7c0b1;
       font-size:17px;
+      max-width:620px;
     }
     .contact-box {
       background:rgba(255,255,255,.98);
       color:var(--ink);
-      border-radius:28px;
+      border-radius:30px;
       padding:22px;
-      box-shadow:0 20px 50px rgba(0,0,0,.12);
+      box-shadow:0 18px 44px rgba(0,0,0,.12);
     }
     .contact-row {
       padding:14px 0;
@@ -590,11 +598,10 @@
     }
     .contact-row strong {
       font-size:17px;
-      letter-spacing:-.01em;
     }
 
     footer {
-      padding:28px 0 34px;
+      padding:28px 0 36px;
       color:var(--muted);
       font-size:13px;
     }
@@ -606,28 +613,30 @@
       align-items:center;
     }
 
-    /* RESPONSIVE */
-    @media (max-width: 1024px) {
-      .hero-showcase,
-      .why-grid,
+    @media (max-width: 1100px) {
+      .hero-shell,
+      .services-grid,
+      .feature-shell,
       .contact-grid {
         grid-template-columns:1fr;
       }
-      .process-grid {
-        grid-template-columns:1fr;
+      .photo-card,
+      .photo-card img,
+      .image-tall {
+        min-height:500px;
       }
       .hero-copy,
       .hero-visual {
         min-height:auto;
       }
-      .hero-visual {
+      .visual-photo {
         min-height:500px;
       }
     }
 
     @media (max-width: 760px) {
       .container {
-        width:min(100% - 28px, 1200px);
+        width:min(100% - 28px, 1220px);
       }
       .nav {
         min-height:70px;
@@ -636,7 +645,9 @@
         height:38px;
         max-width:210px;
       }
-      .menu-toggle { display:block; }
+      .menu-toggle {
+        display:block;
+      }
       .nav-links {
         display:none;
         position:absolute;
@@ -650,7 +661,7 @@
         background:rgba(255,255,255,.96);
         border:1px solid var(--line);
         border-radius:20px;
-        box-shadow:var(--shadow);
+        box-shadow:var(--shadow-lg);
       }
       .nav-links.open { display:flex; }
       .nav-links a {
@@ -658,35 +669,37 @@
         border-radius:12px;
       }
       .nav-links a::after { display:none; }
-      .nav-cta {
-        display:none !important;
-      }
+      .nav-cta { display:none; }
       .hero {
         padding-top:112px;
       }
       .hero-head {
-        margin-bottom:30px;
+        margin-bottom:28px;
       }
       .hero-copy {
         padding:28px 22px;
       }
-      .mini-grid,
-      .services {
+      .hero-visual {
+        padding:10px;
+      }
+      .stack-grid {
         grid-template-columns:1fr;
       }
+      .floating-card {
+        max-width:none;
+        left:18px;
+        right:18px;
+      }
+      .floating-two {
+        top:auto;
+        bottom:130px;
+      }
       section {
-        padding:72px 0;
+        padding:74px 0;
       }
-      .process-wrap,
-      .contact-card {
-        padding:24px 20px;
-        border-radius:28px;
-      }
-      .visual-chip {
-        font-size:11px;
-      }
-      .contact-box {
-        border-radius:22px;
+      .contact-shell {
+        padding:26px 20px;
+        border-radius:30px;
       }
     }
   </style>
@@ -704,11 +717,11 @@
         <a href="#start">Start</a>
         <a href="#oferta">Oferta</a>
         <a href="#jak-dzialamy">Jak działamy</a>
-        <a href="#dlaczego-my">Dlaczego my</a>
+        <a href="#standard">Standard</a>
         <a href="#kontakt">Kontakt</a>
       </nav>
 
-      <a class="nav-cta" href="#kontakt">Porozmawiajmy</a>
+      <a class="nav-cta" href="#kontakt">Kontakt</a>
     </div>
   </header>
 
@@ -717,23 +730,20 @@
       <div class="container">
         <div class="hero-head">
           <span class="eyebrow">Pranie i odświeżanie wnętrz pojazdów flotowych</span>
-          <h1>
-            Czysta flota.<br>
-            <span class="accent">Nowoczesna obsługa.</span>
-          </h1>
+          <h1>Czysta flota.<br><span class="accent">Nowoczesna obsługa.</span></h1>
           <p>
             CleanFleet łączy profesjonalną usługę z uporządkowanym procesem współpracy.
-            Zlecenie, termin, realizacja i historia wykonania — wszystko w prostym, przejrzystym modelu działania.
+            Zlecenie, termin, realizacja i historia wykonania są przedstawione w prosty i przejrzysty sposób.
           </p>
         </div>
 
-        <div class="hero-showcase">
-          <div class="glass-card hero-copy">
-            <div class="hero-copy-top">
-              <h2>Usługa zaprojektowana pod realną pracę floty.</h2>
+        <div class="hero-shell">
+          <div class="glass hero-copy">
+            <div>
+              <h2>Usługa dopasowana do realnej pracy floty.</h2>
               <p>
-                Skupiamy się na tym, żeby usługa była łatwa do zaplanowania,
-                przewidywalna w realizacji i wygodna do kontrolowania po stronie floty.
+                Skupiamy się na tym, aby pranie i odświeżanie wnętrz pojazdów było łatwe do zorganizowania,
+                przewidywalne w realizacji i czytelne dla osób odpowiedzialnych za flotę.
               </p>
 
               <div class="hero-actions">
@@ -742,146 +752,36 @@
               </div>
             </div>
 
-            <div class="mini-grid">
-              <div class="mini-card">
+            <div class="stack-grid">
+              <div class="stack-card">
                 <strong>Pranie wnętrz</strong>
                 <span>Kompleksowa obsługa pojazdów użytkowanych każdego dnia.</span>
               </div>
-              <div class="mini-card">
-                <strong>Odświeżanie flot</strong>
-                <span>Utrzymanie pojazdów w odpowiednim standardzie wizualnym i użytkowym.</span>
+              <div class="stack-card">
+                <strong>Odświeżanie</strong>
+                <span>Utrzymanie odpowiedniego standardu wizualnego i użytkowego wnętrza.</span>
               </div>
-              <div class="mini-card">
-                <strong>Jasny proces</strong>
-                <span>Prosty przepływ informacji pomiędzy flotą a wykonawcą.</span>
+              <div class="stack-card">
+                <strong>Różne typy pojazdów</strong>
+                <span>Samochody osobowe, busy i pojazdy ciężarowe.</span>
               </div>
-              <div class="mini-card">
-                <strong>Historia realizacji</strong>
-                <span>Łatwe sprawdzenie kiedy, dla którego pojazdu i przez kogo wykonano usługę.</span>
+              <div class="stack-card">
+                <strong>Jasny przebieg usługi</strong>
+                <span>Prosty proces od zgłoszenia do realizacji i historii wykonania.</span>
               </div>
             </div>
           </div>
 
-          <div class="glass-card hero-visual">
-            <div class="visual-surface">
-              <div class="truck-art">
-                
-<svg viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <defs>
-    <linearGradient id="bgGlow" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#eaf2b3" stop-opacity="0.95"/>
-      <stop offset="50%" stop-color="#cfe346" stop-opacity="0.45"/>
-      <stop offset="100%" stop-color="#11150f" stop-opacity="0"/>
-    </linearGradient>
-    <linearGradient id="cab" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#2a3123"/>
-      <stop offset="48%" stop-color="#141811"/>
-      <stop offset="100%" stop-color="#0d100c"/>
-    </linearGradient>
-    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#dff0ff" stop-opacity="0.92"/>
-      <stop offset="45%" stop-color="#9cb8c9" stop-opacity="0.72"/>
-      <stop offset="100%" stop-color="#33424b" stop-opacity="0.3"/>
-    </linearGradient>
-    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#9ab400"/>
-      <stop offset="100%" stop-color="#d7eb58"/>
-    </linearGradient>
-    <filter id="blur40" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="40"/>
-    </filter>
-    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
-      <feDropShadow dx="0" dy="35" stdDeviation="35" flood-color="#0e120d" flood-opacity="0.28"/>
-    </filter>
-  </defs>
-
-  <ellipse cx="790" cy="255" rx="270" ry="190" fill="url(#bgGlow)" filter="url(#blur40)"/>
-  <ellipse cx="830" cy="700" rx="305" ry="48" fill="#0d110d" opacity="0.12" filter="url(#blur40)"/>
-
-  <!-- truck cab -->
-  <g filter="url(#shadow)">
-    <path d="M770 176
-             C700 182 615 219 571 284
-             L493 400
-             C466 440 458 480 458 539
-             L458 620
-             C458 656 485 684 521 684
-             L830 684
-             C881 684 922 643 922 592
-             L922 312
-             C922 235 854 168 770 176Z"
-          fill="url(#cab)"/>
-
-    <!-- front lower -->
-    <path d="M458 534
-             L458 620
-             C458 656 485 684 521 684
-             L643 684
-             C632 606 619 569 458 534Z"
-          fill="#0b0e0a" opacity="0.92"/>
-
-    <!-- main window -->
-    <path d="M781 216
-             C735 219 666 245 623 295
-             L567 360
-             C548 384 540 404 540 436
-             L540 472
-             L838 472
-             L838 275
-             C838 235 819 212 781 216Z"
-          fill="url(#glass)"/>
-
-    <!-- windshield split -->
-    <path d="M719 237 L673 472" stroke="#dfe9ef" stroke-opacity="0.44" stroke-width="7"/>
-    <path d="M803 255 L803 472" stroke="#dfe9ef" stroke-opacity="0.3" stroke-width="5"/>
-
-    <!-- side panel -->
-    <path d="M541 482 L844 482 L844 573 C844 609 815 638 779 638 L541 638 Z" fill="#171c15"/>
-    <rect x="553" y="500" width="198" height="19" rx="9.5" fill="url(#accent)" opacity="0.9"/>
-    <rect x="553" y="532" width="165" height="9" rx="4.5" fill="#70796b" opacity="0.48"/>
-    <rect x="553" y="554" width="138" height="9" rx="4.5" fill="#70796b" opacity="0.32"/>
-
-    <!-- headlight -->
-    <rect x="474" y="513" width="77" height="32" rx="16" fill="#f4f8d6"/>
-    <rect x="487" y="519" width="51" height="20" rx="10" fill="#fff" opacity="0.96"/>
-
-    <!-- grill -->
-    <rect x="475" y="560" width="64" height="11" rx="5.5" fill="#31392f"/>
-    <rect x="475" y="581" width="64" height="11" rx="5.5" fill="#31392f"/>
-    <rect x="475" y="602" width="64" height="11" rx="5.5" fill="#31392f"/>
-
-    <!-- mirror -->
-    <rect x="523" y="293" width="17" height="87" rx="8.5" fill="#10140f"/>
-    <rect x="496" y="307" width="50" height="40" rx="16" fill="#181d18"/>
-
-    <!-- door outline -->
-    <path d="M629 290 L629 639" stroke="#485043" stroke-width="3" opacity="0.42"/>
-    <rect x="648" y="492" width="18" height="8" rx="4" fill="#66705f"/>
-
-    <!-- wheel -->
-    <g transform="translate(625 683)">
-      <circle r="78" fill="#0d100d"/>
-      <circle r="52" fill="#212821"/>
-      <circle r="21" fill="#8ea018"/>
-      <circle r="10" fill="#f0f4d4"/>
-    </g>
-  </g>
-
-  <!-- subtle labels -->
-  <g opacity="0.9">
-    <rect x="132" y="122" width="180" height="38" rx="19" fill="#ffffff" fill-opacity="0.62" stroke="#d9dfd0"/>
-    <text x="222" y="147" text-anchor="middle" fill="#20251e" font-size="20" font-family="Inter, Arial, sans-serif" font-weight="700">ciągnik siodłowy</text>
-    <rect x="132" y="178" width="260" height="68" rx="18" fill="#11150f" fill-opacity="0.78"/>
-    <text x="158" y="209" fill="#d8ec5a" font-size="18" font-family="Inter, Arial, sans-serif" font-weight="700">Wizualizacja usługi</text>
-    <text x="158" y="233" fill="#ffffff" fill-opacity="0.92" font-size="16" font-family="Inter, Arial, sans-serif">pranie i odświeżanie wnętrz</text>
-  </g>
-</svg>
-
-              </div>
+          <div class="glass hero-visual">
+            <img class="visual-photo" src="https://commons.wikimedia.org/wiki/Special:FilePath/Kenworth_W900_front.jpg" alt="Fragment ciągnika siodłowego" loading="eager">
+            <div class="floating-card floating-two">
+              <strong>Obsługa flot</strong>
+              <span>Usługa zaprojektowana tak, aby nie komplikować codziennej pracy pojazdów.</span>
             </div>
-            <div class="visual-chip chip-1">estetyka + organizacja</div>
-            <div class="visual-chip chip-2">obsługa różnych typów pojazdów</div>
-            <div class="visual-chip chip-3">czytelny przebieg usługi</div>
+            <div class="floating-card floating-one">
+              <strong>Przejrzysta współpraca</strong>
+              <span>Zlecenia, terminy i wykonanie prowadzone w uporządkowanym modelu działania.</span>
+            </div>
           </div>
         </div>
       </div>
@@ -893,137 +793,131 @@
           <span class="kicker">Oferta</span>
           <h2>To, czego flota naprawdę potrzebuje.</h2>
           <p>
-            Nie komplikujemy procesu. Budujemy obsługę, którą da się łatwo wdrożyć do codziennej pracy pojazdów.
+            Dobrze zorganizowana usługa to nie tylko samo wykonanie prac, ale także czytelny przebieg całego procesu.
           </p>
         </div>
 
-        <div class="services">
-          <article class="service">
-            <div class="service-icon">🧼</div>
-            <h3>Pranie wnętrz pojazdów</h3>
-            <p>
-              Kompleksowe czyszczenie wnętrz samochodów osobowych, busów i pojazdów ciężarowych.
-            </p>
-          </article>
+        <div class="services-grid">
+          <div class="services-col">
+            <article class="service-card">
+              <div class="service-icon">🧼</div>
+              <h3>Pranie wnętrz pojazdów</h3>
+              <p>Kompleksowe czyszczenie wnętrz samochodów osobowych, busów i pojazdów ciężarowych użytkowanych przez flotę.</p>
+            </article>
 
-          <article class="service">
-            <div class="service-icon">✨</div>
-            <h3>Odświeżanie wnętrz</h3>
-            <p>
-              Przywracanie pojazdom odpowiedniego standardu użytkowego i wizualnego między kolejnymi trasami.
-            </p>
-          </article>
+            <article class="service-card">
+              <div class="service-icon">✨</div>
+              <h3>Odświeżanie wnętrz</h3>
+              <p>Usługa ukierunkowana na utrzymanie pojazdów w odpowiednim standardzie użytkowym i wizualnym.</p>
+            </article>
 
-          <article class="service">
-            <div class="service-icon">🚚</div>
-            <h3>Obsługa flot o różnych potrzebach</h3>
-            <p>
-              Usługa dopasowana do sposobu pracy floty, dostępności pojazdów i realiów operacyjnych.
-            </p>
-          </article>
+            <article class="service-card">
+              <div class="service-icon">📋</div>
+              <h3>Uporządkowany przepływ informacji</h3>
+              <p>Przejrzysta współpraca oparta na jasnym zgłoszeniu pojazdu, ustaleniu terminu i informacji o wykonaniu usługi.</p>
+            </article>
+          </div>
 
-          <article class="service">
-            <div class="service-icon">📋</div>
-            <h3>Uporządkowany przepływ informacji</h3>
-            <p>
-              Jasna historia zleceń, terminów i wykonanych usług, dzięki której łatwo utrzymać kontrolę nad procesem.
-            </p>
-          </article>
+          <div class="photo-card">
+            <img src="https://commons.wikimedia.org/wiki/Special:FilePath/GE%20Johnson%20semi-truck,%20front.jpg" alt="Ciągnik siodłowy na zdjęciu" loading="lazy">
+            <div class="photo-badge">
+              <strong>Obsługa różnych typów pojazdów</strong>
+              <span>Model współpracy dopasowany do potrzeb floty oraz dostępności pojazdów w codziennej pracy.</span>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
     <section id="jak-dzialamy">
       <div class="container">
-        <div class="process-wrap">
-          <div class="process-head">
-            <span class="kicker">Jak działamy</span>
-            <h2>Prosto. Sprawnie. Przewidywalnie.</h2>
-            <p>
-              Dobra obsługa floty to nie tylko sama usługa, ale też czytelna organizacja współpracy na każdym etapie.
-            </p>
+        <div class="section-head">
+          <span class="kicker">Jak działamy</span>
+          <h2>Prosto. Sprawnie. Przewidywalnie.</h2>
+          <p>
+            Naszym celem jest nie tylko wykonanie usługi, ale również ułatwienie komunikacji i planowania po stronie floty.
+          </p>
+        </div>
+
+        <div class="feature-shell">
+          <div class="image-tall">
+            <img src="https://commons.wikimedia.org/wiki/Special:FilePath/Truck%20cab.JPG" alt="Wnętrze kabiny samochodu ciężarowego" loading="lazy">
           </div>
 
-          <div class="process-grid">
-            <article class="process-card">
-              <div class="process-num">01</div>
-              <div>
-                <h3>Zgłoszenie pojazdu</h3>
-                <p>Flota wskazuje pojazd wymagający prania lub odświeżenia oraz przekazuje najważniejsze informacje dotyczące realizacji.</p>
-              </div>
-            </article>
+          <div class="feature-panel">
+            <div class="main-panel">
+              <h3>Usługa zorganizowana wokół codziennej pracy pojazdów.</h3>
+              <p>
+                CleanFleet wspiera prosty przebieg współpracy — od wskazania pojazdu, przez ustalenie terminu,
+                aż po realizację i czytelną historię wykonanych usług.
+              </p>
+            </div>
 
-            <article class="process-card">
-              <div class="process-num">02</div>
+            <div class="feature-card">
+              <div class="feature-mark">1</div>
               <div>
-                <h3>Ustalenie terminu</h3>
-                <p>Termin jest ustalany w sposób dopasowany do pracy pojazdu i możliwości organizacyjnych po stronie floty.</p>
+                <strong>Zgłoszenie pojazdu</strong>
+                <span>Flota wskazuje samochód wymagający prania lub odświeżenia oraz przekazuje najważniejsze informacje.</span>
               </div>
-            </article>
+            </div>
 
-            <article class="process-card">
-              <div class="process-num">03</div>
+            <div class="feature-card">
+              <div class="feature-mark">2</div>
               <div>
-                <h3>Realizacja i historia</h3>
-                <p>Po wykonaniu usługi pozostaje jasna informacja kiedy, dla którego pojazdu i przez kogo została wykonana.</p>
+                <strong>Ustalenie terminu</strong>
+                <span>Termin realizacji dopasowywany jest do dostępności pojazdu i możliwości organizacyjnych.</span>
               </div>
-            </article>
+            </div>
+
+            <div class="feature-card">
+              <div class="feature-mark">3</div>
+              <div>
+                <strong>Realizacja i historia</strong>
+                <span>Po wykonaniu usługi pozostaje czytelna informacja kiedy, dla którego pojazdu i przez kogo została ona wykonana.</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <section id="dlaczego-my">
+    <section id="standard">
       <div class="container">
         <div class="section-head">
-          <span class="kicker">Dlaczego CleanFleet</span>
+          <span class="kicker">Standard współpracy</span>
           <h2>Nowoczesna forma. Konkretna treść.</h2>
           <p>
-            Zależy nam na tym, aby współpraca z flotą była wygodna, czytelna i możliwa do szybkiego sprawdzenia w każdej chwili.
+            Zależy nam na przejrzystości działania, powtarzalności procesu oraz prostym modelu współpracy z flotą.
           </p>
         </div>
 
-        <div class="why-grid">
-          <div class="why-main">
-            <h3>Skupiamy się na usłudze i jej sprawnej organizacji.</h3>
-            <p>
-              CleanFleet powstał po to, aby uporządkować realizację prania i odświeżania wnętrz pojazdów flotowych —
-              bez zbędnych komplikacji i bez chaosu informacyjnego.
-            </p>
+        <div class="services-grid">
+          <div class="services-col">
+            <article class="service-card">
+              <div class="service-icon">✓</div>
+              <h3>Przejrzystość</h3>
+              <p>Jasne informacje o zleceniu, terminie, wykonaniu i historii usługi bez zbędnego chaosu.</p>
+            </article>
+
+            <article class="service-card">
+              <div class="service-icon">↺</div>
+              <h3>Powtarzalność procesu</h3>
+              <p>Stały model współpracy, który łatwo wpasować w codzienny rytm pracy samochodów flotowych.</p>
+            </article>
           </div>
 
-          <div class="why-features">
-            <div class="feature">
-              <div class="feature-mark">✓</div>
-              <div>
-                <strong>Przejrzystość</strong>
-                <span>Jasne informacje o zleceniu, terminie, wykonaniu i historii usługi.</span>
-              </div>
-            </div>
+          <div class="services-col">
+            <article class="service-card">
+              <div class="service-icon">⚡</div>
+              <h3>Elastyczność</h3>
+              <p>Obsługa dopasowana do rodzaju pojazdu, jego dostępności oraz realiów operacyjnych konkretnej floty.</p>
+            </article>
 
-            <div class="feature">
-              <div class="feature-mark">✓</div>
-              <div>
-                <strong>Powtarzalność procesu</strong>
-                <span>Stały model współpracy, który można łatwo wpisać w codzienną eksploatację floty.</span>
-              </div>
-            </div>
-
-            <div class="feature">
-              <div class="feature-mark">✓</div>
-              <div>
-                <strong>Elastyczność</strong>
-                <span>Działanie dopasowane do rodzaju pojazdów oraz ich dostępności w konkretnych terminach.</span>
-              </div>
-            </div>
-
-            <div class="feature">
-              <div class="feature-mark">✓</div>
-              <div>
-                <strong>Profesjonalny standard</strong>
-                <span>Usługa nastawiona na estetykę, porządek i czytelny przebieg realizacji.</span>
-              </div>
-            </div>
+            <article class="service-card">
+              <div class="service-icon">★</div>
+              <h3>Profesjonalny standard</h3>
+              <p>Usługa ukierunkowana na estetykę, porządek i czytelny przebieg realizacji od początku do końca.</p>
+            </article>
           </div>
         </div>
       </div>
@@ -1031,13 +925,13 @@
 
     <section id="kontakt">
       <div class="container">
-        <div class="contact-card">
+        <div class="contact-shell">
           <div class="contact-grid">
             <div class="contact-copy">
               <h2>Porozmawiajmy o obsłudze Twojej floty.</h2>
               <p>
                 Jeżeli szukasz regularnej obsługi prania i odświeżania wnętrz pojazdów flotowych,
-                skontaktuj się z nami. Przygotujemy model współpracy dopasowany do Twoich potrzeb.
+                skontaktuj się z nami. Przygotujemy współpracę dopasowaną do Twoich potrzeb.
               </p>
             </div>
 

@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<!-- CleanFleet v171 -->
+<!-- CleanFleet v172 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light only">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1288,6 +1288,7 @@ async function cfInitSupabase(){
 // Klucz publiczny jest pobierany bezpośrednio z Edge Function,
 // dzięki czemu nie przechowujemy go na stałe w index.html.
 const CF_VAPID_KEY_FUNCTION_URL = CF_SUPABASE_URL + '/functions/v1/cleanfleet-vapid-key';
+const CF_CHAT_PUSH_FUNCTION_URL = CF_SUPABASE_URL + '/functions/v1/cleanfleet-chat-push';
 let cfVapidPublicKey = null;
 let cfPushRegistration = null;
 
@@ -7415,7 +7416,7 @@ function uid(){
 </script>
 
 
-<!-- CleanFleet v171 — pływający wspólny chat -->
+<!-- CleanFleet v172 — pływający wspólny chat -->
 <style>
 .cf-record-chat-btn{border:1px solid #9dbb2a;background:#fff;color:#526800;border-radius:9px;padding:6px 10px;font:700 12px/1.1 Arial,sans-serif;cursor:pointer;white-space:nowrap;touch-action:manipulation}
 .cf-record-chat-btn:active{transform:translateY(1px)}
@@ -7481,7 +7482,17 @@ function uid(){
   async function initChat(){const d=await db();if(!d)return;const r=await d.auth.getUser();user=r.data?.user||null;if(!user){status.textContent='Zaloguj się, aby korzystać z chatu';return;}status.textContent='Wspólny chat';await load();if(!window.__cfChatPoll){window.__cfChatPoll=setInterval(poll,3000);}}
   async function load(){const d=await db();if(!d||!user)return;const r=await d.from('cf_messages').select('id,sender_user_id,sender_name,body,created_at,plate,wash_record_id').order('created_at',{ascending:true}).limit(200);if(r.error){status.textContent='Chat: '+r.error.message;return;}box.innerHTML='';seen.clear();(r.data||[]).forEach(m=>{seen.add(m.id);render(m);});if(r.data?.length)last=new Date(r.data[r.data.length-1].created_at).getTime();box.scrollTop=box.scrollHeight;badge.style.display='none';}
   function render(m){const mine=m.sender_user_id===user?.id,d=document.createElement('div');d.className='cf-chat-msg'+(mine?' mine':'');const a=document.createElement('div');a.className='cf-chat-author';a.textContent=(mine?'Ty':(m.sender_name||'Użytkownik'))+' · '+new Date(m.created_at).toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});const b=document.createElement('div');b.className='cf-chat-bubble';if(m.plate){const v=document.createElement('div');v.className='cf-chat-vehicle';v.textContent='🚗 '+m.plate;if(m.wash_record_id){v.title='Otwórz wpis pojazdu';v.addEventListener('click',()=>{window.cfCloseChat?.();if(typeof openForm==='function')openForm(m.wash_record_id);});}b.appendChild(v);}const t=document.createElement('div');t.textContent=m.body||'';b.appendChild(t);d.appendChild(a);d.appendChild(b);box.appendChild(d);}
-  async function sendMessage(){const text=input.value.trim();if(!text)return;const d=await db();if(!d||!user)return;send.disabled=true;const name=(document.getElementById('cfUserText')?.textContent||'').trim()||user.user_metadata?.full_name||user.email||'Użytkownik';const payload={sender_user_id:user.id,sender_name:name,body:text};if(pendingVehicle?.plate){payload.plate=pendingVehicle.plate;if(pendingVehicle.id)payload.wash_record_id=pendingVehicle.id;}const r=await d.from('cf_messages').insert(payload);send.disabled=false;if(r.error){status.textContent='Nie wysłano: '+r.error.message;return;}input.value='';clearVehicle();await load();}
+  async function cfSendChatPush(message){
+  try{
+    const response=await fetch(CF_CHAT_PUSH_FUNCTION_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':CF_SUPABASE_KEY,'Authorization':'Bearer '+CF_SUPABASE_KEY},
+      body:JSON.stringify({messageId:message.id,senderUserId:message.sender_user_id,senderName:message.sender_name||'Użytkownik',body:message.body||'',plate:message.plate||'',washRecordId:message.wash_record_id||null})
+    });
+    if(!response.ok) console.warn('CleanFleet chat push:',response.status,await response.text().catch(()=>''));
+  }catch(error){ console.warn('CleanFleet chat push:',error); }
+}
+async function sendMessage(){const text=input.value.trim();if(!text)return;const d=await db();if(!d||!user)return;send.disabled=true;const name=(document.getElementById('cfUserText')?.textContent||'').trim()||user.user_metadata?.full_name||user.email||'Użytkownik';const payload={sender_user_id:user.id,sender_name:name,body:text};if(pendingVehicle?.plate){payload.plate=pendingVehicle.plate;if(pendingVehicle.id)payload.wash_record_id=pendingVehicle.id;}const r=await d.from('cf_messages').insert(payload).select('id,sender_user_id,sender_name,body,created_at,plate,wash_record_id').single();send.disabled=false;if(r.error){status.textContent='Nie wysłano: '+r.error.message;return;}input.value='';clearVehicle();await load();cfSendChatPush(r.data);}
   async function poll(){if(!user)return;const d=await db();if(!d)return;const r=await d.from('cf_messages').select('id,sender_user_id,sender_name,body,created_at,plate,wash_record_id').gt('created_at',new Date(last||0).toISOString()).order('created_at',{ascending:true}).limit(50);if(r.error||!r.data?.length)return;r.data.forEach(m=>{if(seen.has(m.id))return;seen.add(m.id);render(m);last=Math.max(last,new Date(m.created_at).getTime());if(m.sender_user_id!==user.id&&!panel.classList.contains('open')){badge.textContent='!';badge.style.display='block';}});if(panel.classList.contains('open'))box.scrollTop=box.scrollHeight;}
   send?.addEventListener('click',sendMessage);input?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}});
 })();

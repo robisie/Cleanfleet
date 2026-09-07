@@ -7495,10 +7495,16 @@ function uid(){
   function render(m){const mine=m.sender_user_id===user?.id,d=document.createElement('div');d.className='cf-chat-msg'+(mine?' mine':'');const a=document.createElement('div');a.className='cf-chat-author';a.textContent=(mine?'Ty':(m.sender_name||'Użytkownik'))+' · '+new Date(m.created_at).toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});const b=document.createElement('div');b.className='cf-chat-bubble';if(m.plate){const v=document.createElement('div');v.className='cf-chat-vehicle';v.textContent='🚗 '+m.plate;if(m.wash_record_id){v.title='Otwórz wpis pojazdu';v.addEventListener('click',()=>{window.cfCloseChat?.();if(typeof openForm==='function')openForm(m.wash_record_id);});}b.appendChild(v);}const t=document.createElement('div');t.textContent=m.body||'';b.appendChild(t);d.appendChild(a);d.appendChild(b);box.appendChild(d);}
   async function cfSendChatPush(message){
   try{
+    const session=(await cfSupabase.auth.getSession()).data.session;
+    const accessToken=session?.access_token;
+    if(!accessToken){
+      console.warn('CleanFleet chat push: brak aktywnej sesji.');
+      return;
+    }
     const response=await fetch(CF_CHAT_PUSH_FUNCTION_URL,{
       method:'POST',
-      headers:{'Content-Type':'application/json','apikey':CF_SUPABASE_KEY,'Authorization':'Bearer '+CF_SUPABASE_KEY},
-      body:JSON.stringify({messageId:message.id,senderUserId:message.sender_user_id,senderName:message.sender_name||'Użytkownik',body:message.body||'',plate:message.plate||'',washRecordId:message.wash_record_id||null})
+      headers:{'Content-Type':'application/json','apikey':CF_SUPABASE_KEY,'Authorization':'Bearer '+accessToken},
+      body:JSON.stringify({messageId:message.id,senderName:message.sender_name||'Użytkownik',body:message.body||'',plate:message.plate||'',washRecordId:message.wash_record_id||null})
     });
     if(!response.ok) console.warn('CleanFleet chat push:',response.status,await response.text().catch(()=>''));
   }catch(error){ console.warn('CleanFleet chat push:',error); }

@@ -1,15 +1,13 @@
 self.addEventListener('push', event => {
   let data = {};
-
   try {
     data = event.data ? event.data.json() : {};
   } catch (_) {
-    data = {
-      body: event.data ? event.data.text() : ''
-    };
+    data = { body: event.data ? event.data.text() : '' };
   }
 
   const title = data.title || '💬 CleanFleet';
+  const appUrl = data.url || '/app/';
 
   const options = {
     body: data.body || 'Nowa wiadomość w chacie CleanFleet',
@@ -17,75 +15,70 @@ self.addEventListener('push', event => {
     badge: data.badge || '/icon-192.png',
     tag: data.tag || ('cleanfleet-chat-' + Date.now()),
     renotify: true,
-
     data: {
-      url: data.url || './index.html',
+      url: appUrl,
       washRecordId: data.washRecordId || null,
       plate: data.plate || ''
     }
   };
 
-  event.waitUntil(
-    self.registration.showNotification(title, options)
-  );
+  event.waitUntil(self.registration.showNotification(title, options));
 });
-
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
 
   const data = event.notification.data || {};
-  const target = data.url || './index.html';
+  const targetUrl = new URL(data.url || '/app/', self.location.origin);
 
-  event.waitUntil(
-    (async () => {
+  if (data.washRecordId) {
+    targetUrl.searchParams.set('cfOpenRecord', data.washRecordId);
+  }
 
-      const clients = await self.clients.matchAll({
-        type: 'window',
-        includeUncontrolled: true
-      });
+  event.waitUntil((async () => {
+    const clientsList = await self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    });
 
-      for (const client of clients) {
-        if ('focus' in client) {
+    const targetPath = targetUrl.pathname;
 
-          try {
-            if (data.washRecordId) {
-              const url = new URL(
-                target,
-                self.location.origin
-              );
-
-              url.searchParams.set(
-                'cfOpenRecord',
-                data.washRecordId
-              );
-
-              await client.navigate(url.href);
-            }
-          } catch (_) {}
-
-          await client.focus();
+    // Najpierw próbujemy znaleźć już otwartą aplikację /app/.
+    for (const client of clientsList) {
+      try {
+        const clientUrl = new URL(client.url);
+        if (clientUrl.origin === targetUrl.origin && clientUrl.pathname.startsWith(targetPath)) {
+          if (client.url !== targetUrl.href && 'navigate' in client) {
+            await client.navigate(targetUrl.href);
+          }
+          if ('focus' in client) {
+            await client.focus();
+          }
           return;
         }
-      }
+      } catch (_) {}
+    }
 
-      if (self.clients.openWindow) {
-
-        const url = new URL(
-          target,
-          self.location.origin
-        );
-
-        if (data.washRecordId) {
-          url.searchParams.set(
-            'cfOpenRecord',
-            data.washRecordId
-          );
+    // Jeśli nie ma otwartej /app/, ale jest inne okno tej samej domeny,
+    // nawigujemy je do właściwej aplikacji.
+    for (const client of clientsList) {
+      try {
+        const clientUrl = new URL(client.url);
+        if (clientUrl.origin === targetUrl.origin) {
+          if ('navigate' in client) {
+            await client.navigate(targetUrl.href);
+          }
+          if ('focus' in client) {
+            await client.focus();
+          }
+          return;
         }
+      } catch (_) {}
+    }
 
-        await self.clients.openWindow(url.href);
-      }
-
-    })()
-  );
+    // W przeciwnym razie otwieramy nowe okno.
+    if (self.clients.openWindow) {
+      await self.clients.openWindow(targetUrl.href);
+    }
+  })());
 });

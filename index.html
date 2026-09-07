@@ -7402,7 +7402,7 @@ function uid(){
 </script>
 
 
-<!-- CleanFleet v167 — pływający wspólny chat -->
+<!-- CleanFleet v168 — pływający wspólny chat -->
 <style>
 .cf-chat-fab{position:fixed;right:18px;bottom:82px;width:56px;height:56px;border:0;border-radius:50%;background:#fff;box-shadow:0 4px 18px rgba(0,0,0,.22);z-index:2147483000;display:flex;align-items:center;justify-content:center;font-size:28px;cursor:pointer;touch-action:none;user-select:none;padding:0}
 .cf-chat-fab .cf-chat-badge{position:absolute;right:-2px;top:-2px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:#d92323;color:#fff;font:700 11px/19px Arial,sans-serif;text-align:center;display:none}
@@ -7418,11 +7418,12 @@ function uid(){
   <div class="cf-chat-compose"><textarea id="cfChatInput" class="cf-chat-input" placeholder="Napisz wiadomość…"></textarea><button type="button" id="cfChatSend" class="cf-chat-send" aria-label="Wyślij">➤</button></div>
 </div>
 <script>
-// CleanFleet v167 — chat
+// CleanFleet v168 — chat
 (function(){
   const fab=document.getElementById('cfChatFab'),panel=document.getElementById('cfChatPanel'),input=document.getElementById('cfChatInput'),send=document.getElementById('cfChatSend'),box=document.getElementById('cfChatMessages'),badge=document.getElementById('cfChatBadge'),status=document.getElementById('cfChatStatus');
   if(!fab||!panel)return;
   let drag=false,moved=false,sx=0,sy=0,ox=0,oy=0,user=null,last=0;
+  const seen=new Set();
   window.cfToggleChat=function(e){
     if(e)e.preventDefault();
     if(moved){moved=false;return;}
@@ -7435,10 +7436,10 @@ function uid(){
   fab.addEventListener('pointerup',()=>{drag=false;});
   async function db(){try{return await cfInitSupabase()}catch(e){status.textContent='Chat: '+(e?.message||'błąd połączenia');return null}}
   async function initChat(){const d=await db();if(!d)return;const r=await d.auth.getUser();user=r.data?.user||null;if(!user){status.textContent='Zaloguj się, aby korzystać z chatu';return;}status.textContent='Wspólny chat';await load();if(!window.__cfChatPoll){window.__cfChatPoll=setInterval(poll,3000);}}
-  async function load(){const d=await db();if(!d||!user)return;const r=await d.from('cf_messages').select('id,sender_user_id,sender_name,body,created_at,plate,wash_record_id').order('created_at',{ascending:true}).limit(200);if(r.error){status.textContent='Chat: '+r.error.message;return;}box.innerHTML='';(r.data||[]).forEach(render);if(r.data?.length)last=new Date(r.data[r.data.length-1].created_at).getTime();box.scrollTop=box.scrollHeight;badge.style.display='none';}
+  async function load(){const d=await db();if(!d||!user)return;const r=await d.from('cf_messages').select('id,sender_user_id,sender_name,body,created_at,plate,wash_record_id').order('created_at',{ascending:true}).limit(200);if(r.error){status.textContent='Chat: '+r.error.message;return;}box.innerHTML='';seen.clear();(r.data||[]).forEach(m=>{seen.add(m.id);render(m);});if(r.data?.length)last=new Date(r.data[r.data.length-1].created_at).getTime();box.scrollTop=box.scrollHeight;badge.style.display='none';}
   function render(m){const mine=m.sender_user_id===user?.id,d=document.createElement('div');d.className='cf-chat-msg'+(mine?' mine':'');const a=document.createElement('div');a.className='cf-chat-author';a.textContent=(mine?'Ty':(m.sender_name||'Użytkownik'))+' · '+new Date(m.created_at).toLocaleString('pl-PL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});const b=document.createElement('div');b.className='cf-chat-bubble';if(m.plate){const v=document.createElement('div');v.className='cf-chat-vehicle';v.textContent='🚗 '+m.plate;if(m.wash_record_id)v.title='Otwórz wpis pojazdu';b.appendChild(v);}const t=document.createElement('div');t.textContent=m.body||'';b.appendChild(t);d.appendChild(a);d.appendChild(b);box.appendChild(d);}
   async function sendMessage(){const text=input.value.trim();if(!text)return;const d=await db();if(!d||!user)return;send.disabled=true;const name=(document.getElementById('cfUserText')?.textContent||'').trim()||user.user_metadata?.full_name||user.email||'Użytkownik';const r=await d.from('cf_messages').insert({sender_user_id:user.id,sender_name:name,body:text});send.disabled=false;if(r.error){status.textContent='Nie wysłano: '+r.error.message;return;}input.value='';await load();}
-  async function poll(){if(!user)return;const d=await db();if(!d)return;const r=await d.from('cf_messages').select('id,sender_user_id,sender_name,body,created_at,plate,wash_record_id').gt('created_at',new Date(last||0).toISOString()).order('created_at',{ascending:true}).limit(50);if(r.error||!r.data?.length)return;r.data.forEach(m=>{render(m);last=Math.max(last,new Date(m.created_at).getTime());if(m.sender_user_id!==user.id&&!panel.classList.contains('open')){badge.textContent='!';badge.style.display='block';}});if(panel.classList.contains('open'))box.scrollTop=box.scrollHeight;}
+  async function poll(){if(!user)return;const d=await db();if(!d)return;const r=await d.from('cf_messages').select('id,sender_user_id,sender_name,body,created_at,plate,wash_record_id').gt('created_at',new Date(last||0).toISOString()).order('created_at',{ascending:true}).limit(50);if(r.error||!r.data?.length)return;r.data.forEach(m=>{if(seen.has(m.id))return;seen.add(m.id);render(m);last=Math.max(last,new Date(m.created_at).getTime());if(m.sender_user_id!==user.id&&!panel.classList.contains('open')){badge.textContent='!';badge.style.display='block';}});if(panel.classList.contains('open'))box.scrollTop=box.scrollHeight;}
   send?.addEventListener('click',sendMessage);input?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}});
 })();
 </script>

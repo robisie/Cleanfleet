@@ -193,12 +193,18 @@
     display:flex;
     justify-content:flex-end;
   }
+  @media(min-width:900px){
+    .hero-photo-wrap{
+      width:calc(100% + clamp(20px,4vw,40px));
+      margin-right:calc(clamp(20px,4vw,40px) * -1);
+    }
+  }
   .hero-photo-card{
     position:relative;
     width:100%;
     aspect-ratio:4/5;
     max-height:520px;
-    border-radius:6px;
+    border-radius:10px 0 0 10px;
     overflow:hidden;
     box-shadow:0 30px 60px rgba(22,21,15,0.14);
     background:#d8ddd4;
@@ -210,13 +216,12 @@
   }
   .hero-photo-media img{
     position:absolute;
-    left:0;
-    right:0;
-    top:-8%;
+    inset:-8% 0 0 0;
     width:100%;
     height:116%;
     object-fit:cover;
-    object-position:center right;
+    object-position:center center;
+    display:block;
     will-change:transform;
   }
 
@@ -391,7 +396,7 @@
       <div class="hero-photo-card" aria-label="Zdjęcie polskiego ciągnika siodłowego">
         <div class="hero-photo-media" data-parallax-wrap>
           <img
-            src="https://commons.wikimedia.org/wiki/Special:FilePath/MAN%20TGS%2018-400%20in%20Krak%C3%B3w.jpg"
+            src="https://images.unsplash.com/photo-1720811559371-7b0ebd219127?auto=format&fit=crop&w=1400&q=80"
             alt="Polski ciągnik siodłowy"
             loading="eager"
             data-parallax

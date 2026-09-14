@@ -1,6 +1,72 @@
 (() => {
   const API = 'https://nxmrobbhfqijmbjjzbof.supabase.co/functions/v1/website-cms';
   let rows = [];
+
+  // Layout safeguards for CMS-controlled font sizes. These rules let text grow
+  // without colliding with the bottom navigation or clipping service rows.
+  const style = document.createElement('style');
+  style.textContent = `
+    .problem .checks,.solution .checks{
+      bottom:max(78px,8vh);
+      width:min(620px,78vw);
+      gap:clamp(8px,1.2vh,14px);
+    }
+    .problem .check,.solution .check{
+      display:flex;
+      align-items:center;
+      line-height:1.22;
+      min-width:0;
+    }
+    .problem .check:before,.solution .check:before{
+      flex:0 0 auto;
+    }
+    .services .service-list{
+      width:min(560px,44vw);
+      bottom:max(72px,6.5vh);
+      padding:10px 16px;
+      overflow:visible;
+    }
+    .services .service-list>div{
+      grid-template-columns:minmax(115px,max-content) minmax(0,1fr);
+      min-height:0;
+      padding:7px 0;
+      line-height:1.18;
+    }
+    .services .service-list b,.services .service-list span{
+      min-width:0;
+      white-space:normal;
+      overflow-wrap:anywhere;
+    }
+    @media(max-width:800px){
+      .problem .checks,.solution .checks{
+        left:22px;
+        right:22px;
+        width:auto;
+        bottom:7vh;
+      }
+      .problem .check,.solution .check{line-height:1.18}
+      .services .service-list{
+        left:22px;
+        right:22px;
+        width:auto;
+        bottom:6.5vh;
+        padding:8px 12px;
+      }
+      .services .service-list>div{
+        grid-template-columns:minmax(88px,max-content) minmax(0,1fr);
+        gap:10px;
+        padding:5px 0;
+      }
+    }
+    @media(min-width:801px) and (max-height:760px){
+      .problem .content,.solution .content,.services .content{top:18%}
+      .problem .checks,.solution .checks{bottom:70px;gap:7px}
+      .services .service-list{bottom:66px}
+      .services .service-list>div{padding:5px 0}
+    }
+  `;
+  document.head.appendChild(style);
+
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
   const br = s => esc(s).replace(/\n/g, '<br>');
   const isMobile = () => innerWidth <= 800;

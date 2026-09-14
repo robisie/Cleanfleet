@@ -1,0 +1,136 @@
+name: CleanFleet public visual refinements
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patch-index2-visual-details.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch index2.html
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index2.html')
+          s = p.read_text(encoding='utf-8')
+
+          # 1) Kolor marki CleanFleet
+          s = s.replace('--g:#82ef5b', '--g:#B6C433')
+          s = s.replace('rgba(130,239,91,.13)', 'rgba(182,196,51,.13)')
+          s = s.replace('rgba(130,239,91,.08)', 'rgba(182,196,51,.08)')
+
+          # 2) Powered by na ekranie startowym
+          s = s.replace('<div class="micro right">CleanFleet<br>est. 2026</div>', '<div class="micro right">Powered by<br>robisie-fer SP. Z o.o.</div>')
+
+          # 3) Widoczne marki obsługiwanych ciągników na hero
+          old_types = '<div class="types"><span>dostawcze</span><span>ciężarowe</span><span>autokary</span></div>'
+          new_types = old_types + '<div class="truck-brands" aria-label="Obsługiwane marki ciągników"><span>MAN</span><span>RENAULT TRUCKS</span><span>SCANIA</span><span>MERCEDES-BENZ</span><span>VOLVO</span></div>'
+          if 'class="truck-brands"' not in s:
+              s = s.replace(old_types, new_types, 1)
+
+          # 4) Stała lista usług na ekranie USŁUGI
+          anchor = '<div class="service-info"><b id="serviceTitle">Fotele</b><span class="small" id="serviceText">Pranie i dokładne odświeżenie tapicerki.</span></div>'
+          repl = '''<div class="service-list" aria-label="Zakres usług CleanFleet">
+            <div><b>FOTELE</b><span>pranie i odświeżanie</span></div>
+            <div><b>PLASTIKI</b><span>czyszczenie i pielęgnacja</span></div>
+            <div><b>SZYBY</b><span>idealna przejrzystość</span></div>
+            <div><b>MATERAC</b><span>higiena i komfort snu</span></div>
+            <div><b>OZONOWANIE</b><span>likwidacja zapachów</span></div>
+          </div>
+          <div class="service-info"><b id="serviceTitle">Fotele</b><span class="small" id="serviceText">Pranie i dokładne odświeżenie tapicerki.</span></div>'''
+          if 'class="service-list"' not in s:
+              s = s.replace(anchor, repl, 1)
+
+          # 5) Odręczny element na ekranie kontaktowym
+          contact_anchor = '<div class="benefits"><div><b>♢</b>Większy komfort kierowców</div><div><b>▥</b>Lepszy wizerunek firmy</div><div><b>♲</b>Czystsza przyszłość</div></div></div></section>'
+          contact_repl = '<div class="benefits"><div><b>♢</b>Większy komfort kierowców</div><div><b>▥</b>Lepszy wizerunek firmy</div><div><b>♲</b>Czystsza przyszłość</div></div></div><div class="contact-signature">Czyste kabiny.<br><span>Dalsze możliwości.</span></div></section>'
+          if 'contact-signature' not in s:
+              s = s.replace(contact_anchor, contact_repl, 1)
+
+          css = r'''
+
+    /* CleanFleet — dopracowanie zgodnie z zaakceptowaną wizualizacją */
+    .truck-brands{
+      display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:18px;
+      font:700 9px Manrope;letter-spacing:.11em;color:#eef0ec;text-transform:uppercase;
+      opacity:.82
+    }
+    .truck-brands span{display:flex;align-items:center;gap:7px}
+    .truck-brands span:not(:last-child)::after{content:'•';color:var(--g);margin-left:7px}
+
+    .services .service-list{
+      position:absolute;left:clamp(24px,7vw,120px);bottom:8.5vh;
+      width:min(430px,34vw);border:1px solid var(--g);border-radius:14px;
+      background:rgba(4,10,7,.82);backdrop-filter:blur(10px);padding:11px 15px;
+      display:grid;gap:0;z-index:3
+    }
+    .services .service-list>div{
+      min-height:31px;display:grid;grid-template-columns:118px 1fr;align-items:center;
+      gap:12px;border-bottom:1px solid rgba(255,255,255,.10);font-size:10px
+    }
+    .services .service-list>div:last-child{border-bottom:0}
+    .services .service-list b{font:800 10px Manrope;color:#fff;letter-spacing:.03em}
+    .services .service-list b::before{content:'◉';color:var(--g);margin-right:8px;font-size:9px}
+    .services .service-list span{color:#c2cac5}
+    @media(min-width:801px){.services .service-info{display:none}}
+
+    .fleet .vehicle-cards{gap:12px;right:6vw;bottom:8vh}
+    .fleet .vcard{
+      border:1px solid rgba(255,255,255,.24);border-radius:12px;padding:16px 15px 14px;
+      background:rgba(5,12,9,.38);backdrop-filter:blur(7px);min-height:122px
+    }
+    .fleet .vicon{width:58px;height:36px;margin-bottom:11px}
+    .fleet .vcard b{font-size:18px}
+    .fleet .vcard small{font-size:8px;line-height:1.4}
+
+    .contact-signature{
+      position:absolute;right:7vw;bottom:14vh;z-index:3;transform:rotate(-6deg);
+      font-family:'Segoe Script','Brush Script MT',cursive;font-size:clamp(20px,2vw,34px);
+      line-height:1.05;color:#fff;text-align:center;text-shadow:0 4px 18px rgba(0,0,0,.7)
+    }
+    .contact-signature span{display:block;margin-top:3px}
+
+    @media(max-width:800px){
+      .truck-brands{display:none}
+      .services .service-list{display:none}
+      .contact-signature{right:20px;bottom:16vh;font-size:19px}
+      .fleet .vcard{padding:11px 9px;min-height:96px}
+      .fleet .vicon{width:42px;height:28px}
+    }
+'''
+          marker = '</style>\n</head>'
+          tag = '/* CleanFleet — dopracowanie zgodnie z zaakceptowaną wizualizacją */'
+          if tag not in s:
+              if marker not in s:
+                  raise SystemExit('Nie znaleziono końca sekcji style')
+              s = s.replace(marker, css + '\n  </style>\n</head>', 1)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Verify
+        shell: bash
+        run: |
+          grep -q -- '--g:#B6C433' index2.html
+          grep -q 'Powered by' index2.html
+          grep -q 'RENAULT TRUCKS' index2.html
+          grep -q 'class="service-list"' index2.html
+          grep -q 'contact-signature' index2.html
+
+      - name: Commit and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name 'CleanFleet Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git rm .github/workflows/patch-index2-visual-details.yml
+          git add index2.html
+          git commit -m 'Public site: align visuals with approved CleanFleet concept'
+          git push

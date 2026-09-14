@@ -70,7 +70,18 @@
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
   const br = s => esc(s).replace(/\n/g, '<br>');
   const isMobile = () => innerWidth <= 800;
-  const font = f => `${Number(isMobile() ? f.mobile : f.desktop) || 14}px`;
+
+  // Values entered in the CMS are now treated as design/reference sizes rather
+  // than rigid pixels. Desktop values are calibrated for a 1440x900 viewport
+  // and scale down proportionally on smaller landscape windows. Mobile values
+  // keep their own reference and only scale slightly on narrower phones.
+  const desktopScale = () => Math.min(1, Math.max(0.46, Math.min(innerWidth / 1440, innerHeight / 900)));
+  const mobileScale = () => Math.min(1, Math.max(0.86, Math.min(innerWidth / 390, innerHeight / 844)));
+  const font = f => {
+    const base = Number(isMobile() ? f.mobile : f.desktop) || 14;
+    const scale = isMobile() ? mobileScale() : desktopScale();
+    return `${Math.round(base * scale * 10) / 10}px`;
+  };
   const set = (el, f, html = false) => { if (!el || !f) return; if (html) el.innerHTML = br(f.text); else el.textContent = f.text ?? ''; el.style.fontSize = font(f); };
 
   function apply() {

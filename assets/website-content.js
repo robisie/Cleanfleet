@@ -35,86 +35,71 @@
       overflow-wrap:anywhere;
     }
 
-    @media(min-width:801px) and (orientation:landscape){
-      /* Screen 06: anchor the text composition to the lower edge, like screens 02–04 */
-      .system-head{
-        top:auto !important;
-        bottom:50vh;
-        max-width:38vw;
-      }
-      .system-head h2{margin:9px 0 8px;line-height:.95}
-      .system-head .small{margin:0;line-height:1.28;max-width:30vw}
-      .steps{
-        top:auto !important;
-        bottom:max(74px,8vh);
-        gap:clamp(10px,2vh,18px);
-      }
-      .step{min-height:0}
-      .step b,.step p{line-height:1.18}
-
-      /* Screen 07: entire content block grows upward from the bottom */
-      .contact .content{
-        top:auto !important;
-        bottom:max(74px,8vh);
-        left:clamp(24px,7vw,120px);
-        width:min(520px,44vw);
-        transform:none;
-      }
-      .contact .content h2{
-        margin:7px 0 10px;
-        line-height:.88;
-        max-width:100%;
-        overflow-wrap:normal;
-        word-break:normal;
-      }
-      .contact .intro{line-height:1.16;margin:0 0 10px}
-      .contact .actions{margin-top:10px;width:min(340px,34vw);gap:7px}
-      .contact .btn{padding:10px 14px}
-      .contact .benefits{
-        margin-top:12px;
-        gap:12px;
-        display:grid;
-        grid-template-columns:repeat(3,minmax(0,1fr));
-        width:min(430px,39vw);
-      }
-      .contact .benefits div{max-width:none;min-width:0;line-height:1.08}
-      .contact-signature{bottom:8vh}
+    /* 06: heading + steps are one block anchored to the bottom */
+    .system-copy{
+      position:absolute;
+      left:7vw;
+      bottom:max(68px,7vh);
+      width:min(460px,36vw);
+      z-index:3;
     }
+    .system-copy .system-head,
+    .system-copy .steps{
+      position:static !important;
+      inset:auto !important;
+      width:100% !important;
+      max-width:none !important;
+    }
+    .system-copy .system-head h2{margin:8px 0 7px;line-height:.94}
+    .system-copy .system-head .small{margin:0 0 18px;line-height:1.2;max-width:100%}
+    .system-copy .steps{display:grid !important;grid-template-columns:1fr !important;gap:8px !important}
+    .system-copy .step{display:grid;grid-template-columns:72px 1fr;gap:14px;align-items:center;min-height:0;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.09)}
+    .system-copy .step:last-child{border-bottom:0}
+    .system-copy .step i{width:72px;margin:0;font-size:38px}
+    .system-copy .step b,.system-copy .step p{line-height:1.15}
+    .system-copy .step p{display:block;margin:3px 0 0}
+
+    /* 07: the complete contact block is anchored to the same lower baseline */
+    .contact .content{
+      top:auto !important;
+      bottom:max(68px,7vh) !important;
+      left:clamp(24px,7vw,120px);
+      width:min(520px,44vw);
+      transform:none !important;
+    }
+    .contact .content h2{margin:6px 0 9px;line-height:.88;max-width:100%;overflow-wrap:normal;word-break:normal}
+    .contact .intro{line-height:1.13;margin:0 0 9px}
+    .contact .actions{margin-top:9px;width:min(340px,34vw);gap:6px}
+    .contact .btn{padding:9px 13px}
+    .contact .benefits{margin-top:10px;gap:10px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:min(430px,39vw)}
+    .contact .benefits div{max-width:none;min-width:0;line-height:1.05}
 
     @media(min-width:801px) and (orientation:landscape) and (max-height:760px){
-      .system-head{bottom:49vh;max-width:39vw}
-      .system-head h2{margin:7px 0 6px;line-height:.92}
-      .system-head .small{max-width:31vw;line-height:1.18}
-      .steps{bottom:max(68px,7vh);gap:9px}
-      .step{padding-bottom:9px}
-      .step i{font-size:36px}
-
-      .contact .content{bottom:max(68px,7vh);width:min(480px,42vw)}
-      .contact .content h2{margin:5px 0 8px;line-height:.86}
-      .contact .intro{line-height:1.12;margin-bottom:8px}
-      .contact .actions{margin-top:8px;gap:6px;width:min(315px,32vw)}
-      .contact .btn{padding:9px 12px}
-      .contact .benefits{margin-top:9px;gap:9px;width:min(400px,37vw)}
-      .contact-signature{bottom:7vh}
+      .system-copy{bottom:64px;width:min(430px,35vw)}
+      .system-copy .system-head .small{margin-bottom:12px}
+      .system-copy .step{padding:5px 0}
+      .system-copy .step i{font-size:34px}
+      .contact .content{bottom:64px !important;width:min(470px,41vw)}
+      .contact .content h2{margin:4px 0 7px;line-height:.85}
+      .contact .intro{line-height:1.08;margin-bottom:7px}
+      .contact .actions{margin-top:7px;width:min(315px,31vw);gap:5px}
+      .contact .btn{padding:8px 11px}
+      .contact .benefits{margin-top:7px;gap:7px;width:min(400px,36vw)}
     }
 
     @media(min-width:801px) and (orientation:landscape) and (max-height:650px){
-      .system-head{bottom:47vh}
-      .system-head .tag{margin-bottom:2px}
-      .system-head h2{line-height:.9;margin:5px 0 4px}
-      .system-head .small{line-height:1.12}
-      .steps{bottom:max(64px,6.5vh);gap:7px}
-      .step{padding-bottom:7px}
-      .step p{margin-top:3px}
-
-      .contact .content{bottom:max(64px,6.5vh);width:min(450px,40vw)}
-      .contact .content h2{margin:3px 0 6px;line-height:.84}
-      .contact .intro{line-height:1.08;margin-bottom:6px}
-      .contact .actions{margin-top:6px;width:min(295px,30vw);gap:5px}
-      .contact .btn{padding:8px 11px}
-      .contact .benefits{margin-top:7px;gap:7px;width:min(380px,35vw)}
-      .contact .benefits div{line-height:1.02}
-      .contact-signature{bottom:6vh}
+      .system-copy{bottom:60px;width:min(405px,34vw)}
+      .system-copy .system-head h2{margin:4px 0 4px;line-height:.9}
+      .system-copy .system-head .small{margin-bottom:8px;line-height:1.08}
+      .system-copy .steps{gap:4px !important}
+      .system-copy .step{padding:3px 0}
+      .system-copy .step p{margin-top:2px}
+      .contact .content{bottom:60px !important;width:min(440px,39vw)}
+      .contact .content h2{margin:2px 0 5px;line-height:.82}
+      .contact .intro{line-height:1.04;margin-bottom:5px}
+      .contact .actions{margin-top:5px;width:min(292px,29vw);gap:4px}
+      .contact .btn{padding:7px 10px}
+      .contact .benefits{margin-top:5px;gap:6px;width:min(375px,34vw)}
     }
 
     @media(max-width:800px){
@@ -122,6 +107,9 @@
       .problem .check,.solution .check{line-height:1.18}
       .services .service-list{left:22px;right:22px;width:auto;bottom:6.5vh;padding:8px 12px}
       .services .service-list>div{grid-template-columns:minmax(88px,max-content) minmax(0,1fr);gap:10px;padding:5px 0}
+      .system-copy{left:22px;right:22px;width:auto;bottom:7vh}
+      .system-copy .system-head .small{margin-bottom:10px}
+      .contact .content{left:22px;right:22px;width:auto;bottom:7vh !important}
     }
 
     @media(min-width:801px) and (max-height:760px){
@@ -147,7 +135,20 @@
     el.style.fontSize = font(f);
   };
 
+  function ensureSystemGroup(){
+    const s=document.querySelector('.system');
+    if(!s || s.querySelector('.system-copy')) return;
+    const head=s.querySelector('.system-head');
+    const steps=s.querySelector('.steps');
+    if(!head || !steps) return;
+    const wrap=document.createElement('div');
+    wrap.className='system-copy';
+    head.before(wrap);
+    wrap.append(head,steps);
+  }
+
   function apply() {
+    ensureSystemGroup();
     const by = Object.fromEntries(rows.map(r => [r.slide, r.data?.fields || {}]));
     let f = by[1];
     if (f) { const s=document.querySelector('.start'); set(s?.querySelector('.tag'),f.tag); set(s?.querySelector('h1'),f.heading,true); [...(s?.querySelectorAll('.types span')||[])].forEach((el,i)=>set(el,f[`type${i+1}`])); const cta=s?.querySelector('.round-next'); if(cta&&f.cta){const arrow=cta.querySelector('i');[...cta.childNodes].filter(n=>n.nodeType===3).forEach(n=>n.remove());cta.append(document.createTextNode(' '+(f.cta.text??'')));cta.style.fontSize=font(f.cta);if(arrow)cta.prepend(arrow);} const m=s?.querySelectorAll('.micro')||[];set(m[0],f.microLeft,true);set(m[1],f.microRight,true); }

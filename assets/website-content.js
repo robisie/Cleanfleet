@@ -43,23 +43,10 @@
       .step{min-height:0}
       .step b,.step p{line-height:1.18}
 
-      .contact .content{
-        top:9vh;
-        width:min(560px,54vw);
-      }
-      .contact .content h2{
-        margin:12px 0 14px;
-        line-height:.92;
-      }
-      .contact .intro{
-        line-height:1.25;
-        margin:0 0 14px;
-      }
-      .contact .actions{
-        margin-top:14px;
-        width:min(340px,42vw);
-        gap:9px;
-      }
+      .contact .content{top:9vh;width:min(560px,54vw)}
+      .contact .content h2{margin:12px 0 14px;line-height:.92}
+      .contact .intro{line-height:1.25;margin:0 0 14px}
+      .contact .actions{margin-top:14px;width:min(340px,42vw);gap:9px}
       .contact .btn{padding:12px 16px}
       .contact .benefits{margin-top:18px;gap:16px}
       .contact-signature{bottom:10vh}
@@ -98,25 +85,10 @@
     }
 
     @media(max-width:800px){
-      .problem .checks,.solution .checks{
-        left:22px;
-        right:22px;
-        width:auto;
-        bottom:7vh;
-      }
+      .problem .checks,.solution .checks{left:22px;right:22px;width:auto;bottom:7vh}
       .problem .check,.solution .check{line-height:1.18}
-      .services .service-list{
-        left:22px;
-        right:22px;
-        width:auto;
-        bottom:6.5vh;
-        padding:8px 12px;
-      }
-      .services .service-list>div{
-        grid-template-columns:minmax(88px,max-content) minmax(0,1fr);
-        gap:10px;
-        padding:5px 0;
-      }
+      .services .service-list{left:22px;right:22px;width:auto;bottom:6.5vh;padding:8px 12px}
+      .services .service-list>div{grid-template-columns:minmax(88px,max-content) minmax(0,1fr);gap:10px;padding:5px 0}
     }
 
     @media(min-width:801px) and (max-height:760px){
@@ -128,29 +100,21 @@
   `;
   document.head.appendChild(style);
 
-  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[c]));
   const br = s => esc(s).replace(/\n/g, '<br>');
   const isMobile = () => innerWidth <= 800;
 
-  const desktopScale = () => Math.min(1, Math.max(0.46, Math.min(innerWidth / 1440, innerHeight / 900)));
-  const mobileScale = () => Math.min(1, Math.max(0.86, Math.min(innerWidth / 390, innerHeight / 844)));
-  const contactScale = () => {
-    if (isMobile()) return 1;
-    const w = Math.min(1, Math.max(.72, innerWidth / 1180));
-    const h = Math.min(1, Math.max(.72, innerHeight / 780));
-    return Math.min(w,h);
+  // CMS values are real viewport percentages now: 1 = 1% of the shorter screen edge.
+  // vmin keeps typography proportional in portrait, landscape and on smaller screens.
+  const font = f => {
+    const base = Number(isMobile() ? f.mobile : f.desktop) || 1.4;
+    return `${base}vmin`;
   };
-  const contactHeadingScale = () => {
-    if (isMobile()) return 1;
-    const s = desktopScale();
-    return Math.min(1, Math.max(.56, s));
+  const set = (el, f, html = false) => {
+    if (!el || !f) return;
+    if (html) el.innerHTML = br(f.text); else el.textContent = f.text ?? '';
+    el.style.fontSize = font(f);
   };
-  const font = (f, extra = 1) => {
-    const base = Number(isMobile() ? f.mobile : f.desktop) || 14;
-    const scale = isMobile() ? mobileScale() : desktopScale();
-    return `${Math.round(base * scale * extra * 10) / 10}px`;
-  };
-  const set = (el, f, html = false, extra = 1) => { if (!el || !f) return; if (html) el.innerHTML = br(f.text); else el.textContent = f.text ?? ''; el.style.fontSize = font(f, extra); };
 
   function apply() {
     const by = Object.fromEntries(rows.map(r => [r.slide, r.data?.fields || {}]));
@@ -167,7 +131,7 @@
     f=by[6];
     if(f){const s=document.querySelector('.system'),tag=s?.querySelector('.system-head .tag');if(tag){const span=tag.querySelector('span');[...tag.childNodes].filter(n=>n.nodeType===3).forEach(n=>n.remove());tag.prepend(document.createTextNode(f.tagLeft?.text??''));tag.style.fontSize=font(f.tagLeft||{});if(span&&f.tagRight){span.textContent=f.tagRight.text??'';span.style.fontSize=font(f.tagRight);}}set(s?.querySelector('.system-head h2'),f.heading);set(s?.querySelector('.system-head .small'),f.intro);[...(s?.querySelectorAll('.step')||[])].forEach((st,i)=>{set(st.querySelector('b'),f[`step${i+1}Title`]);set(st.querySelector('p'),f[`step${i+1}Text`]);});}
     f=by[7];
-    if(f){const s=document.querySelector('.contact');set(s?.querySelector('.tag'),f.tag);set(s?.querySelector('h2'),f.heading,true,contactHeadingScale());set(s?.querySelector('.intro'),f.intro,true,contactScale());const b=s?.querySelectorAll('.actions .btn')||[];if(b[0]&&f.phone){const sp=b[0].querySelector('span');[...b[0].childNodes].filter(n=>n.nodeType===3).forEach(n=>n.remove());b[0].prepend(document.createTextNode((f.phone.text??'')+' '));b[0].style.fontSize=font(f.phone,contactScale());if(sp)b[0].append(sp);}if(b[1]&&f.email){const sp=b[1].querySelector('span');[...b[1].childNodes].filter(n=>n.nodeType===3).forEach(n=>n.remove());b[1].prepend(document.createTextNode((f.email.text??'')+' '));b[1].style.fontSize=font(f.email,contactScale());b[1].href='mailto:'+(f.email.text??'');if(sp)b[1].append(sp);}[...(s?.querySelectorAll('.benefits div')||[])].forEach((el,i)=>{const icon=el.querySelector('b'),t=f[`benefit${i+1}`];if(t){[...el.childNodes].filter(n=>n.nodeType===3).forEach(n=>n.remove());el.append(document.createTextNode(t.text??''));el.style.fontSize=font(t,contactScale());if(icon)el.prepend(icon);}});set(s?.querySelector('.contact-signature'),f.signature,true,contactScale());}
+    if(f){const s=document.querySelector('.contact');set(s?.querySelector('.tag'),f.tag);set(s?.querySelector('h2'),f.heading,true);set(s?.querySelector('.intro'),f.intro,true);const b=s?.querySelectorAll('.actions .btn')||[];if(b[0]&&f.phone){const sp=b[0].querySelector('span');[...b[0].childNodes].filter(n=>n.nodeType===3).forEach(n=>n.remove());b[0].prepend(document.createTextNode((f.phone.text??'')+' '));b[0].style.fontSize=font(f.phone);if(sp)b[0].append(sp);}if(b[1]&&f.email){const sp=b[1].querySelector('span');[...b[1].childNodes].filter(n=>n.nodeType===3).forEach(n=>n.remove());b[1].prepend(document.createTextNode((f.email.text??'')+' '));b[1].style.fontSize=font(f.email);b[1].href='mailto:'+(f.email.text??'');if(sp)b[1].append(sp);}[...(s?.querySelectorAll('.benefits div')||[])].forEach((el,i)=>{const icon=el.querySelector('b'),t=f[`benefit${i+1}`];if(t){[...el.childNodes].filter(n=>n.nodeType===3).forEach(n=>n.remove());el.append(document.createTextNode(t.text??''));el.style.fontSize=font(t);if(icon)el.prepend(icon);}});set(s?.querySelector('.contact-signature'),f.signature,true);}
   }
 
   async function load(){try{const r=await fetch(API,{cache:'no-store'});if(!r.ok)throw new Error(`HTTP ${r.status}`);rows=await r.json();apply();}catch(e){console.warn('CleanFleet CMS: błąd pobierania treści',e);}}

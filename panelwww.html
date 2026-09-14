@@ -1,1 +1,50 @@
-<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>CleanFleet CMS</title></head><body><h1>CleanFleet CMS</h1></body></html>
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>CleanFleet — panel WWW</title>
+<style>
+:root{--g:#B6C433;--bg:#0b100d;--card:#141b16;--line:#2a352e;--text:#f5f7f5;--muted:#9ca7a0;--red:#ff6b6b}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}button,input,textarea{font:inherit}.wrap{width:min(1100px,calc(100% - 28px));margin:0 auto;padding:28px 0 80px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:26px}.top h1{font-size:25px;margin:0}.top small{color:var(--muted)}.login{min-height:100svh;display:grid;place-items:center;padding:20px}.login-card{width:min(430px,100%);background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px}.login-card h1{margin:0 0 8px}.login-card p{color:var(--muted);margin:0 0 20px}.login-card input{width:100%;padding:14px;border-radius:10px;border:1px solid var(--line);background:#0d130f;color:#fff;margin-bottom:12px}.btn{border:0;border-radius:10px;padding:12px 16px;font-weight:800;cursor:pointer}.btn-primary{background:var(--g);color:#0a100b}.btn-dark{background:#1b241d;color:#fff;border:1px solid var(--line)}.error{color:var(--red);font-size:13px;margin-top:10px}.hidden{display:none!important}.slide{background:var(--card);border:1px solid var(--line);border-radius:18px;margin:16px 0;overflow:hidden}.slide-head{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:18px 20px;border-bottom:1px solid var(--line)}.slide-head h2{margin:0;font-size:20px}.slide-head span{color:var(--g);font-weight:800}.fields{padding:18px 20px;display:grid;gap:14px}.field{border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:14px}.field:last-child{border-bottom:0}.label{font-weight:700;margin-bottom:7px}.field textarea,.field input[type=text],.field input[type=number]{width:100%;background:#0d130f;color:#fff;border:1px solid var(--line);border-radius:9px;padding:11px}.field textarea{min-height:78px;resize:vertical}.sizes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:9px}.sizes label{font-size:12px;color:var(--muted)}.sizes input{margin-top:5px}.save-row{display:flex;align-items:center;gap:12px;padding:0 20px 20px}.status{font-size:13px;color:var(--muted)}.status.ok{color:var(--g)}.status.bad{color:var(--red)}.toolbar{position:sticky;top:0;z-index:5;background:rgba(11,16,13,.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:12px 0;margin-bottom:12px}.toolbar-in{width:min(1100px,calc(100% - 28px));margin:auto;display:flex;justify-content:space-between;align-items:center;gap:12px}.toolbar a{color:#fff;text-decoration:none}.hint{color:var(--muted);font-size:12px;line-height:1.5;margin-top:10px}@media(max-width:650px){.sizes{grid-template-columns:1fr}.slide-head{align-items:flex-start}.wrap{padding-top:16px}.toolbar-in{align-items:flex-start}.top{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<section id="loginView" class="login">
+  <form id="loginForm" class="login-card">
+    <h1>CleanFleet CMS</h1>
+    <p>Panel edycji treści strony internetowej.</p>
+    <input id="password" type="password" placeholder="Hasło" autocomplete="current-password" required>
+    <button class="btn btn-primary" type="submit">Zaloguj</button>
+    <div id="loginError" class="error"></div>
+  </form>
+</section>
+
+<section id="panelView" class="hidden">
+  <div class="toolbar"><div class="toolbar-in"><b>CleanFleet CMS</b><div><a href="/" target="_blank">Otwórz stronę ↗</a> &nbsp; <button id="logout" class="btn btn-dark">Wyloguj</button></div></div></div>
+  <div class="wrap">
+    <div class="top"><div><h1>Edycja strony WWW</h1><small>Każdy blok odpowiada jednemu slajdowi.</small></div></div>
+    <div id="slides"></div>
+  </div>
+</section>
+<script>
+const API='https://nxmrobbhfqijmbjjzbof.supabase.co/functions/v1/website-cms';
+let password='';
+let rows=[];
+const LABELS={tag:'Etykieta',heading:'Nagłówek',intro:'Opis',cta:'Tekst przycisku',microLeft:'Mały tekst lewy',microRight:'Mały tekst prawy',type1:'Typ pojazdu 1',type2:'Typ pojazdu 2',type3:'Typ pojazdu 3',check1:'Punkt 1',check2:'Punkt 2',check3:'Punkt 3',check4:'Punkt 4',service1Name:'Usługa 1 — nazwa',service1Text:'Usługa 1 — opis',service2Name:'Usługa 2 — nazwa',service2Text:'Usługa 2 — opis',service3Name:'Usługa 3 — nazwa',service3Text:'Usługa 3 — opis',service4Name:'Usługa 4 — nazwa',service4Text:'Usługa 4 — opis',service5Name:'Usługa 5 — nazwa',service5Text:'Usługa 5 — opis',vehicle1:'Pojazd 1 — nazwa',vehicle1Text:'Pojazd 1 — opis',vehicle2:'Pojazd 2 — nazwa',vehicle2Text:'Pojazd 2 — opis',vehicle3:'Pojazd 3 — nazwa',vehicle3Text:'Pojazd 3 — opis',tagLeft:'Etykieta lewa',tagRight:'Etykieta prawa',step1Title:'Krok 01 — tytuł',step1Text:'Krok 01 — opis',step2Title:'Krok 02 — tytuł',step2Text:'Krok 02 — opis',step3Title:'Krok 03 — tytuł',step3Text:'Krok 03 — opis',phone:'Telefon / tekst przycisku',email:'Adres e-mail',benefit1:'Korzyść 1',benefit2:'Korzyść 2',benefit3:'Korzyść 3',signature:'Podpis na dole'};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+
+async function api(body){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error(await r.text());return r.json();}
+async function load(){const r=await fetch(API,{cache:'no-store'});if(!r.ok)throw new Error('Nie udało się pobrać danych');rows=await r.json();render();}
+
+function fieldHtml(key,f){const multiline=String(f.text??'').includes('\n')||['heading','intro','signature','microLeft','microRight'].includes(key);return `<div class="field" data-key="${esc(key)}"><div class="label">${esc(LABELS[key]||key)}</div>${multiline?`<textarea class="txt">${esc(f.text)}</textarea>`:`<input class="txt" type="text" value="${esc(f.text)}">`}<div class="sizes"><label>Rozmiar desktop (px)<input class="desk" type="number" min="6" max="220" step="1" value="${Number(f.desktop)||14}"></label><label>Rozmiar mobile (px)<input class="mob" type="number" min="6" max="160" step="1" value="${Number(f.mobile)||14}"></label></div></div>`}
+
+function render(){const root=document.getElementById('slides');root.innerHTML=rows.map(r=>{const d=r.data||{},fields=d.fields||{};return `<section class="slide" data-slide="${r.slide}"><div class="slide-head"><h2><span>${String(r.slide).padStart(2,'0')}</span> ${esc(d.title||'Slajd')}</h2></div><div class="fields">${Object.entries(fields).map(([k,f])=>fieldHtml(k,f)).join('')}</div><div class="save-row"><button class="btn btn-primary save" type="button">Zapisz slajd</button><span class="status"></span></div></section>`}).join('');document.querySelectorAll('.save').forEach(b=>b.addEventListener('click',saveSlide));}
+
+async function saveSlide(e){const slideEl=e.target.closest('.slide'),slide=Number(slideEl.dataset.slide),row=rows.find(x=>x.slide===slide),status=slideEl.querySelector('.status');const data=structuredClone(row.data);slideEl.querySelectorAll('.field').forEach(el=>{const k=el.dataset.key;data.fields[k]={text:el.querySelector('.txt').value,desktop:Number(el.querySelector('.desk').value),mobile:Number(el.querySelector('.mob').value)}});status.className='status';status.textContent='Zapisywanie…';try{await api({action:'save',password,slide,data});row.data=data;status.className='status ok';status.textContent='Zapisano ✓';setTimeout(()=>status.textContent='',2500)}catch(err){status.className='status bad';status.textContent='Błąd zapisu';}}
+
+document.getElementById('loginForm').addEventListener('submit',async e=>{e.preventDefault();const p=document.getElementById('password').value,err=document.getElementById('loginError');err.textContent='';try{const ok=await api({action:'login',password:p});if(ok!==true)throw new Error('bad');password=p;sessionStorage.setItem('cf_cms_auth',p);document.getElementById('loginView').classList.add('hidden');document.getElementById('panelView').classList.remove('hidden');await load();}catch(x){err.textContent='Nieprawidłowe hasło.'}});
+document.getElementById('logout').addEventListener('click',()=>{sessionStorage.removeItem('cf_cms_auth');location.reload()});
+(async()=>{const p=sessionStorage.getItem('cf_cms_auth');if(!p)return;try{const ok=await api({action:'login',password:p});if(ok===true){password=p;document.getElementById('loginView').classList.add('hidden');document.getElementById('panelView').classList.remove('hidden');await load();}}catch(e){sessionStorage.removeItem('cf_cms_auth')}})();
+</script>
+</body></html>

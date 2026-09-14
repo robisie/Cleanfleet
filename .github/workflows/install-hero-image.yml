@@ -33,16 +33,20 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
           p=Path('index2.html')
           s=p.read_text(encoding='utf-8')
-          old='src="assets/v2-start.webp" alt="Czerwony ciągnik na parkingu floty"'
-          new='src="assets/cleanfleet-hero-trucks-square.webp" alt="Flota ciężarówek MAN, Renault Trucks, Scania, Mercedes-Benz i Volvo"'
-          if old not in s:
-              raise SystemExit('Nie znaleziono aktualnego hero w index2.html')
-          s=s.replace(old,new,1)
+          pattern=r'(<section\s+class="scene start"\s+id="start">\s*<img\s+class="photo"\s+src=")[^"]+("\s+alt=")[^"]*(")'
+          repl=r'\1assets/cleanfleet-hero-trucks-square.webp\2Flota ciężarówek MAN, Renault Trucks, Scania, Mercedes-Benz i Volvo\3'
+          s2,n=re.subn(pattern,repl,s,count=1)
+          if n != 1:
+              raise SystemExit(f'Nie znaleziono hero start; replacements={n}')
+          s=s2
           marker='/* CleanFleet hero image positioning */'
           css='''\n    /* CleanFleet hero image positioning */\n    .start .photo{object-position:50% 56%}\n    @media (orientation:portrait){.start .photo{object-position:50% 54%}}\n    @media (orientation:landscape){.start .photo{object-position:50% 56%}}\n'''
           if marker not in s:
+              if '</style>' not in s:
+                  raise SystemExit('Brak </style>')
               s=s.replace('</style>',css+'  </style>',1)
           p.write_text(s,encoding='utf-8')
           PY

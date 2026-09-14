@@ -2,8 +2,6 @@
   const API = 'https://nxmrobbhfqijmbjjzbof.supabase.co/functions/v1/website-cms';
   let rows = [];
 
-  // Layout safeguards for CMS-controlled font sizes. These rules let text grow
-  // without colliding with the bottom navigation or clipping service rows.
   const style = document.createElement('style');
   style.textContent = `
     .problem .checks,.solution .checks{
@@ -17,9 +15,8 @@
       line-height:1.22;
       min-width:0;
     }
-    .problem .check:before,.solution .check:before{
-      flex:0 0 auto;
-    }
+    .problem .check:before,.solution .check:before{flex:0 0 auto}
+
     .services .service-list{
       width:min(560px,44vw);
       bottom:max(72px,6.5vh);
@@ -37,6 +34,34 @@
       white-space:normal;
       overflow-wrap:anywhere;
     }
+
+    /* Screen 06: keep heading/intro separated from steps on smaller landscape screens */
+    @media(min-width:801px) and (orientation:landscape){
+      .system-head{top:8.5vh;max-width:38vw}
+      .system-head h2{margin:9px 0 8px;line-height:.95}
+      .system-head .small{margin:0;line-height:1.28;max-width:30vw}
+      .steps{top:44vh;gap:clamp(10px,2vh,18px)}
+      .step{min-height:0}
+      .step b,.step p{line-height:1.18}
+    }
+    @media(min-width:801px) and (orientation:landscape) and (max-height:760px){
+      .system-head{top:6.8vh;max-width:39vw}
+      .system-head h2{margin:7px 0 6px;line-height:.92}
+      .system-head .small{max-width:31vw;line-height:1.18}
+      .steps{top:46vh;gap:9px}
+      .step{padding-bottom:9px}
+      .step i{font-size:36px}
+    }
+    @media(min-width:801px) and (orientation:landscape) and (max-height:650px){
+      .system-head{top:5.5vh}
+      .system-head .tag{margin-bottom:2px}
+      .system-head h2{line-height:.9;margin:5px 0 4px}
+      .system-head .small{line-height:1.12}
+      .steps{top:48vh;gap:7px}
+      .step{padding-bottom:7px}
+      .step p{margin-top:3px}
+    }
+
     @media(max-width:800px){
       .problem .checks,.solution .checks{
         left:22px;
@@ -58,6 +83,7 @@
         padding:5px 0;
       }
     }
+
     @media(min-width:801px) and (max-height:760px){
       .problem .content,.solution .content,.services .content{top:18%}
       .problem .checks,.solution .checks{bottom:70px;gap:7px}
@@ -71,10 +97,6 @@
   const br = s => esc(s).replace(/\n/g, '<br>');
   const isMobile = () => innerWidth <= 800;
 
-  // Values entered in the CMS are now treated as design/reference sizes rather
-  // than rigid pixels. Desktop values are calibrated for a 1440x900 viewport
-  // and scale down proportionally on smaller landscape windows. Mobile values
-  // keep their own reference and only scale slightly on narrower phones.
   const desktopScale = () => Math.min(1, Math.max(0.46, Math.min(innerWidth / 1440, innerHeight / 900)));
   const mobileScale = () => Math.min(1, Math.max(0.86, Math.min(innerWidth / 390, innerHeight / 844)));
   const font = f => {

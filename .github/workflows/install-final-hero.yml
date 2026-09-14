@@ -1,0 +1,36 @@
+name: Install final CleanFleet hero image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/install-final-hero.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build hero asset
+        shell: bash
+        run: |
+          cat .github/tmp/hero.part1 .github/tmp/hero.part2 .github/tmp/hero.part3 .github/tmp/hero.part4 | base64 -d > assets/cleanfleet-hero-trucks-square.webp
+          test "$(wc -c < assets/cleanfleet-hero-trucks-square.webp)" -gt 15000
+          file assets/cleanfleet-hero-trucks-square.webp | grep -qi webp
+      - name: Patch public site
+        shell: bash
+        run: |
+          echo 'ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCnAgPSBQYXRoKCJpbmRleDIuaHRtbCIpCnMgPSBwLnJlYWRfdGV4dChlbmNvZGluZz0idXRmLTgiKQpvbGQgPSAnc3JjPSJhc3NldHMvdjItc3RhcnQud2VicCIgYWx0PSJDemVyd29ueSBjacSFZ25payBuYSBwYXJraW5ndSBmbG90eSInCm5ldyA9ICdzcmM9ImFzc2V0cy9jbGVhbmZsZWV0LWhlcm8tdHJ1Y2tzLXNxdWFyZS53ZWJwIiBhbHQ9IkZsb3RhIGNpxJnFvGFyw7N3ZWsgTUFOLCBSZW5hdWx0IFRydWNrcywgU2NhbmlhLCBNZXJjZWRlcy1CZW56IGkgVm9sdm8iJwppZiBvbGQgaW4gczoKICAgIHMgPSBzLnJlcGxhY2Uob2xkLCBuZXcsIDEpCmVsaWYgJ2NsZWFuZmxlZXQtaGVyby10cnVja3Mtc3F1YXJlLndlYnAnIG5vdCBpbiBzOgogICAgcmFpc2UgU3lzdGVtRXhpdCgiSGVybyBzb3VyY2Ugbm90IGZvdW5kIikKY3NzID0gIlxuICAgIC8qIEZpbmFsIGhlcm8gZnJhbWluZyAqL1xuICAgIC5zdGFydCAucGhvdG97b2JqZWN0LXBvc2l0aW9uOjUwJSA1MCU7fVxuICAgIEBtZWRpYShvcmllbnRhdGlvbjpwb3J0cmFpdCl7LnN0YXJ0IC5waG90b3tvYmplY3QtcG9zaXRpb246NTAlIDUwJTt9fVxuICAgIEBtZWRpYShvcmllbnRhdGlvbjpsYW5kc2NhcGUpey5zdGFydCAucGhvdG97b2JqZWN0LXBvc2l0aW9uOjUwJSA1MCU7fX1cbiIKaWYgJy8qIEZpbmFsIGhlcm8gZnJhbWluZyAqLycgbm90IGluIHM6CiAgICBzID0gcy5yZXBsYWNlKCc8L3N0eWxlPicsIGNzcyArICdcbiAgPC9zdHlsZT4nLCAxKQpwLndyaXRlX3RleHQocywgZW5jb2Rpbmc9InV0Zi04IikK' | base64 -d | python3
+          grep -q 'cleanfleet-hero-trucks-square.webp' index2.html
+      - name: Commit final hero
+        shell: bash
+        run: |
+          git config user.name 'CleanFleet Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git rm .github/tmp/hero.part1 .github/tmp/hero.part2 .github/tmp/hero.part3 .github/tmp/hero.part4 .github/workflows/install-final-hero.yml
+          git add assets/cleanfleet-hero-trucks-square.webp index2.html
+          git commit -m 'Public site: install final square hero image'
+          git push

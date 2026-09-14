@@ -1,0 +1,66 @@
+name: Install CleanFleet square hero image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/install-hero-image.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rebuild hero image
+        shell: bash
+        run: |
+          cat .github/tmp/hero.part1 .github/tmp/hero.part2 .github/tmp/hero.part3 .github/tmp/hero.part4 | base64 -d > assets/cleanfleet-hero-trucks-square.webp
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('assets/cleanfleet-hero-trucks-square.webp')
+          b=p.read_bytes()
+          assert len(b) > 15000, len(b)
+          assert b[:4] == b'RIFF' and b[8:12] == b'WEBP', b[:12]
+          print('hero bytes:', len(b))
+          PY
+
+      - name: Patch public site hero
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index2.html')
+          s=p.read_text(encoding='utf-8')
+          old='src="assets/v2-start.webp" alt="Czerwony ciągnik na parkingu floty"'
+          new='src="assets/cleanfleet-hero-trucks-square.webp" alt="Flota ciężarówek MAN, Renault Trucks, Scania, Mercedes-Benz i Volvo"'
+          if old not in s:
+              raise SystemExit('Nie znaleziono aktualnego hero w index2.html')
+          s=s.replace(old,new,1)
+          marker='/* CleanFleet hero image positioning */'
+          css='''\n    /* CleanFleet hero image positioning */\n    .start .photo{object-position:50% 56%}\n    @media (orientation:portrait){.start .photo{object-position:50% 54%}}\n    @media (orientation:landscape){.start .photo{object-position:50% 56%}}\n'''
+          if marker not in s:
+              s=s.replace('</style>',css+'  </style>',1)
+          p.write_text(s,encoding='utf-8')
+          PY
+
+      - name: Verify references
+        shell: bash
+        run: |
+          grep -q 'assets/cleanfleet-hero-trucks-square.webp' index2.html
+          grep -q 'CleanFleet hero image positioning' index2.html
+          test -s assets/cleanfleet-hero-trucks-square.webp
+
+      - name: Commit final files and clean temporary data
+        shell: bash
+        run: |
+          git config user.name 'CleanFleet Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git rm .github/workflows/install-hero-image.yml
+          git rm .github/tmp/hero.part1 .github/tmp/hero.part2 .github/tmp/hero.part3 .github/tmp/hero.part4
+          git add index2.html assets/cleanfleet-hero-trucks-square.webp
+          git commit -m 'Public site: install square multi-brand hero image'
+          git push

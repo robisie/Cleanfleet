@@ -1,0 +1,62 @@
+name: CleanFleet public hero image patch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patch-index2-hero-image.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch index2 hero image
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index2.html')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('src="assets/v2-start.webp" alt="Czerwony ciągnik na parkingu floty"','src="assets/cleanfleet-hero-trucks-square.jpg" alt="Flota ciężarówek MAN, Renault Trucks, Scania, Mercedes-Benz i Volvo"',1)
+          css=r'''
+
+    /* Hero — kwadratowe zdjęcie 1:1, pełny ekran */
+    .start .photo{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      object-position:50% 58%;
+    }
+    @media (orientation:portrait){
+      .start .photo{object-position:50% 56%;}
+    }
+    @media (orientation:landscape){
+      .start .photo{object-position:50% 60%;}
+    }
+'''
+          tag='/* Hero — kwadratowe zdjęcie 1:1, pełny ekran */'
+          marker='</style>\n</head>'
+          if tag not in s:
+              if marker not in s:
+                  raise SystemExit('Nie znaleziono końca sekcji style')
+              s=s.replace(marker,css+'\n  </style>\n</head>',1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Verify
+        shell: bash
+        run: |
+          grep -q 'cleanfleet-hero-trucks-square.jpg' index2.html
+          grep -q 'Hero — kwadratowe zdjęcie 1:1' index2.html
+      - name: Commit and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name 'CleanFleet Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git rm .github/workflows/patch-index2-hero-image.yml
+          git add index2.html
+          git commit -m 'Public site: replace hero with square multi-brand truck image'
+          git push

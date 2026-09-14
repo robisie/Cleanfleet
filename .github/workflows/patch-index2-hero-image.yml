@@ -17,35 +17,7 @@ jobs:
       - name: Patch index2 hero image
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('index2.html')
-          s=p.read_text(encoding='utf-8')
-          s=s.replace('src="assets/v2-start.webp" alt="Czerwony ciągnik na parkingu floty"','src="assets/cleanfleet-hero-trucks-square.jpg" alt="Flota ciężarówek MAN, Renault Trucks, Scania, Mercedes-Benz i Volvo"',1)
-          css=r'''
-
-    /* Hero — kwadratowe zdjęcie 1:1, pełny ekran */
-    .start .photo{
-      width:100%;
-      height:100%;
-      object-fit:cover;
-      object-position:50% 58%;
-    }
-    @media (orientation:portrait){
-      .start .photo{object-position:50% 56%;}
-    }
-    @media (orientation:landscape){
-      .start .photo{object-position:50% 60%;}
-    }
-'''
-          tag='/* Hero — kwadratowe zdjęcie 1:1, pełny ekran */'
-          marker='</style>\n</head>'
-          if tag not in s:
-              if marker not in s:
-                  raise SystemExit('Nie znaleziono końca sekcji style')
-              s=s.replace(marker,css+'\n  </style>\n</head>',1)
-          p.write_text(s,encoding='utf-8')
-          PY
+          echo 'ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCnA9UGF0aCgiaW5kZXgyLmh0bWwiKQpzPXAucmVhZF90ZXh0KGVuY29kaW5nPSJ1dGYtOCIpCnM9cy5yZXBsYWNlKCdzcmM9ImFzc2V0cy92Mi1zdGFydC53ZWJwIiBhbHQ9IkN6ZXJ3b255IGNpxIVnbmlrIG5hIHBhcmtpbmd1IGZsb3R5IicsJ3NyYz0iYXNzZXRzL2NsZWFuZmxlZXQtaGVyby10cnVja3Mtc3F1YXJlLmpwZyIgYWx0PSJGbG90YSBjacSZxbxhcsOzd2VrIE1BTiwgUmVuYXVsdCBUcnVja3MsIFNjYW5pYSwgTWVyY2VkZXMtQmVueiBpIFZvbHZvIicsMSkKY3NzPXInJycKICAgIC8qIEhlcm8g4oCUIGt3YWRyYXRvd2UgemRqxJljaWUgMToxLCBwZcWCbnkgZWtyYW4gKi8KICAgIC5zdGFydCAucGhvdG97CiAgICAgIHdpZHRoOjEwMCU7CiAgICAgIGhlaWdodDoxMDAlOwogICAgICBvYmplY3QtZml0OmNvdmVyOwogICAgICBvYmplY3QtcG9zaXRpb246NTAlIDU4JTsKICAgIH0KICAgIEBtZWRpYSAob3JpZW50YXRpb246cG9ydHJhaXQpewogICAgICAuc3RhcnQgLnBob3Rve29iamVjdC1wb3NpdGlvbjo1MCUgNTYlO30KICAgIH0KICAgIEBtZWRpYSAob3JpZW50YXRpb246bGFuZHNjYXBlKXsKICAgICAgLnN0YXJ0IC5waG90b3tvYmplY3QtcG9zaXRpb246NTAlIDYwJTt9CiAgICB9CicnJwp0YWc9Jy8qIEhlcm8g4oCUIGt3YWRyYXRvd2UgemRqxJljaWUgMToxLCBwZcWCbnkgZWtyYW4gKi8nCm1hcmtlcj0nPC9zdHlsZT5cbjwvaGVhZD4nCmlmIHRhZyBub3QgaW4gczoKICAgIGlmIG1hcmtlciBub3QgaW4gczoKICAgICAgICByYWlzZSBTeXN0ZW1FeGl0KCJOaWUgem5hbGV6aW9ubyBrb8WEY2Egc2VrY2ppIHN0eWxlIikKICAgIHM9cy5yZXBsYWNlKG1hcmtlcixjc3MrJ1xuICA8L3N0eWxlPlxuPC9oZWFkPicsMSkKcC53cml0ZV90ZXh0KHMsZW5jb2Rpbmc9InV0Zi04IikK' | base64 -d | python3
       - name: Verify
         shell: bash
         run: |

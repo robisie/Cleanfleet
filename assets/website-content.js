@@ -36,15 +36,26 @@
     }
 
     @media(min-width:801px) and (orientation:landscape){
-      .system-head{top:8.5vh;max-width:38vw}
+      /* Screen 06: anchor the text composition to the lower edge, like screens 02–04 */
+      .system-head{
+        top:auto !important;
+        bottom:50vh;
+        max-width:38vw;
+      }
       .system-head h2{margin:9px 0 8px;line-height:.95}
       .system-head .small{margin:0;line-height:1.28;max-width:30vw}
-      .steps{top:44vh;gap:clamp(10px,2vh,18px)}
+      .steps{
+        top:auto !important;
+        bottom:max(74px,8vh);
+        gap:clamp(10px,2vh,18px);
+      }
       .step{min-height:0}
       .step b,.step p{line-height:1.18}
 
+      /* Screen 07: entire content block grows upward from the bottom */
       .contact .content{
-        top:14vh;
+        top:auto !important;
+        bottom:max(74px,8vh);
         left:clamp(24px,7vw,120px);
         width:min(520px,44vw);
         transform:none;
@@ -71,14 +82,14 @@
     }
 
     @media(min-width:801px) and (orientation:landscape) and (max-height:760px){
-      .system-head{top:6.8vh;max-width:39vw}
+      .system-head{bottom:49vh;max-width:39vw}
       .system-head h2{margin:7px 0 6px;line-height:.92}
       .system-head .small{max-width:31vw;line-height:1.18}
-      .steps{top:46vh;gap:9px}
+      .steps{bottom:max(68px,7vh);gap:9px}
       .step{padding-bottom:9px}
       .step i{font-size:36px}
 
-      .contact .content{top:11vh;width:min(480px,42vw)}
+      .contact .content{bottom:max(68px,7vh);width:min(480px,42vw)}
       .contact .content h2{margin:5px 0 8px;line-height:.86}
       .contact .intro{line-height:1.12;margin-bottom:8px}
       .contact .actions{margin-top:8px;gap:6px;width:min(315px,32vw)}
@@ -88,15 +99,15 @@
     }
 
     @media(min-width:801px) and (orientation:landscape) and (max-height:650px){
-      .system-head{top:5.5vh}
+      .system-head{bottom:47vh}
       .system-head .tag{margin-bottom:2px}
       .system-head h2{line-height:.9;margin:5px 0 4px}
       .system-head .small{line-height:1.12}
-      .steps{top:48vh;gap:7px}
+      .steps{bottom:max(64px,6.5vh);gap:7px}
       .step{padding-bottom:7px}
       .step p{margin-top:3px}
 
-      .contact .content{top:9vh;width:min(450px,40vw)}
+      .contact .content{bottom:max(64px,6.5vh);width:min(450px,40vw)}
       .contact .content h2{margin:3px 0 6px;line-height:.84}
       .contact .intro{line-height:1.08;margin-bottom:6px}
       .contact .actions{margin-top:6px;width:min(295px,30vw);gap:5px}

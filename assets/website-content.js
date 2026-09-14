@@ -43,6 +43,28 @@
       .steps{top:44vh;gap:clamp(10px,2vh,18px)}
       .step{min-height:0}
       .step b,.step p{line-height:1.18}
+
+      /* Screen 07: compact contact layout while preserving CMS proportions */
+      .contact .content{
+        top:9vh;
+        width:min(560px,54vw);
+      }
+      .contact .content h2{
+        margin:12px 0 14px;
+        line-height:.92;
+      }
+      .contact .intro{
+        line-height:1.25;
+        margin:0 0 14px;
+      }
+      .contact .actions{
+        margin-top:14px;
+        width:min(340px,42vw);
+        gap:9px;
+      }
+      .contact .btn{padding:12px 16px}
+      .contact .benefits{margin-top:18px;gap:16px}
+      .contact-signature{bottom:10vh}
     }
     @media(min-width:801px) and (orientation:landscape) and (max-height:760px){
       .system-head{top:6.8vh;max-width:39vw}
@@ -51,6 +73,14 @@
       .steps{top:46vh;gap:9px}
       .step{padding-bottom:9px}
       .step i{font-size:36px}
+
+      .contact .content{top:6.5vh;width:min(520px,51vw)}
+      .contact .content h2{margin:8px 0 10px;line-height:.9}
+      .contact .intro{line-height:1.18;margin-bottom:10px}
+      .contact .actions{margin-top:10px;gap:7px;width:min(320px,40vw)}
+      .contact .btn{padding:10px 14px}
+      .contact .benefits{margin-top:12px;gap:12px}
+      .contact-signature{bottom:8vh}
     }
     @media(min-width:801px) and (orientation:landscape) and (max-height:650px){
       .system-head{top:5.5vh}
@@ -60,6 +90,13 @@
       .steps{top:48vh;gap:7px}
       .step{padding-bottom:7px}
       .step p{margin-top:3px}
+
+      .contact .content{top:5vh;width:min(500px,49vw)}
+      .contact .content h2{margin:6px 0 8px;line-height:.88}
+      .contact .intro{line-height:1.12}
+      .contact .actions{margin-top:8px}
+      .contact .benefits{margin-top:9px}
+      .contact-signature{bottom:7vh}
     }
 
     @media(max-width:800px){
@@ -99,12 +136,18 @@
 
   const desktopScale = () => Math.min(1, Math.max(0.46, Math.min(innerWidth / 1440, innerHeight / 900)));
   const mobileScale = () => Math.min(1, Math.max(0.86, Math.min(innerWidth / 390, innerHeight / 844)));
-  const font = f => {
+  const contactScale = () => {
+    if (isMobile()) return 1;
+    const w = Math.min(1, Math.max(.72, innerWidth / 1180));
+    const h = Math.min(1, Math.max(.72, innerHeight / 780));
+    return Math.min(w,h);
+  };
+  const font = (f, extra = 1) => {
     const base = Number(isMobile() ? f.mobile : f.desktop) || 14;
     const scale = isMobile() ? mobileScale() : desktopScale();
-    return `${Math.round(base * scale * 10) / 10}px`;
+    return `${Math.round(base * scale * extra * 10) / 10}px`;
   };
-  const set = (el, f, html = false) => { if (!el || !f) return; if (html) el.innerHTML = br(f.text); else el.textContent = f.text ?? ''; el.style.fontSize = font(f); };
+  const set = (el, f, html = false, extra = 1) => { if (!el || !f) return; if (html) el.innerHTML = br(f.text); else el.textContent = f.text ?? ''; el.style.fontSize = font(f, extra); };
 
   function apply() {
     const by = Object.fromEntries(rows.map(r => [r.slide, r.data?.fields || {}]));
@@ -121,7 +164,7 @@
     f=by[6];
     if(f){const s=document.querySelector('.system'),tag=s?.querySelector('.system-head .tag');if(tag){const span=tag.querySelector('span');[...tag.childNodes].filter(n=>n.nodeType===3).forEach(n=>n.remove());tag.prepend(document.createTextNode(f.tagLeft?.text??''));tag.style.fontSize=font(f.tagLeft||{});if(span&&f.tagRight){span.textContent=f.tagRight.text??'';span.style.fontSize=font(f.tagRight);}}set(s?.querySelector('.system-head h2'),f.heading);set(s?.querySelector('.system-head .small'),f.intro);[...(s?.querySelectorAll('.step')||[])].forEach((st,i)=>{set(st.querySelector('b'),f[`step${i+1}Title`]);set(st.querySelector('p'),f[`step${i+1}Text`]);});}
     f=by[7];
-    if(f){const s=document.querySelector('.contact');set(s?.querySelector('.tag'),f.tag);set(s?.querySelector('h2'),f.heading,true);set(s?.querySelector('.intro'),f.intro,true);const b=s?.querySelectorAll('.actions .btn')||[];if(b[0]&&f.phone){const sp=b[0].querySelector('span');[...b[0].childNodes].filter(n=>n.nodeType===3).forEach(n=>n.remove());b[0].prepend(document.createTextNode((f.phone.text??'')+' '));b[0].style.fontSize=font(f.phone);if(sp)b[0].append(sp);}if(b[1]&&f.email){const sp=b[1].querySelector('span');[...b[1].childNodes].filter(n=>n.nodeType===3).forEach(n=>n.remove());b[1].prepend(document.createTextNode((f.email.text??'')+' '));b[1].style.fontSize=font(f.email);b[1].href='mailto:'+(f.email.text??'');if(sp)b[1].append(sp);}[...(s?.querySelectorAll('.benefits div')||[])].forEach((el,i)=>{const icon=el.querySelector('b'),t=f[`benefit${i+1}`];if(t){[...el.childNodes].filter(n=>n.nodeType===3).forEach(n=>n.remove());el.append(document.createTextNode(t.text??''));el.style.fontSize=font(t);if(icon)el.prepend(icon);}});set(s?.querySelector('.contact-signature'),f.signature,true);}
+    if(f){const s=document.querySelector('.contact');set(s?.querySelector('.tag'),f.tag);set(s?.querySelector('h2'),f.heading,true,contactScale());set(s?.querySelector('.intro'),f.intro,true,contactScale());const b=s?.querySelectorAll('.actions .btn')||[];if(b[0]&&f.phone){const sp=b[0].querySelector('span');[...b[0].childNodes].filter(n=>n.nodeType===3).forEach(n=>n.remove());b[0].prepend(document.createTextNode((f.phone.text??'')+' '));b[0].style.fontSize=font(f.phone,contactScale());if(sp)b[0].append(sp);}if(b[1]&&f.email){const sp=b[1].querySelector('span');[...b[1].childNodes].filter(n=>n.nodeType===3).forEach(n=>n.remove());b[1].prepend(document.createTextNode((f.email.text??'')+' '));b[1].style.fontSize=font(f.email,contactScale());b[1].href='mailto:'+(f.email.text??'');if(sp)b[1].append(sp);}[...(s?.querySelectorAll('.benefits div')||[])].forEach((el,i)=>{const icon=el.querySelector('b'),t=f[`benefit${i+1}`];if(t){[...el.childNodes].filter(n=>n.nodeType===3).forEach(n=>n.remove());el.append(document.createTextNode(t.text??''));el.style.fontSize=font(t,contactScale());if(icon)el.prepend(icon);}});set(s?.querySelector('.contact-signature'),f.signature,true,contactScale());}
   }
 
   async function load(){try{const r=await fetch(API,{cache:'no-store'});if(!r.ok)throw new Error(`HTTP ${r.status}`);rows=await r.json();apply();}catch(e){console.warn('CleanFleet CMS: błąd pobierania treści',e);}}

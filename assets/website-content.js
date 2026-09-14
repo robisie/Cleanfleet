@@ -40,20 +40,22 @@
 
     .start>.content{top:50%!important;transform:translateY(-50%)!important}
 
-    .cf-mail-overlay{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.48);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity .25s ease}
-    .cf-mail-overlay.open{opacity:1;pointer-events:auto}
-    .cf-mail-panel{position:absolute;top:0;right:0;width:min(480px,92vw);height:100%;background:#0b100d;border-left:1px solid rgba(255,255,255,.14);box-shadow:-24px 0 60px rgba(0,0,0,.45);transform:translateX(100%);transition:transform .3s ease;display:flex;flex-direction:column;padding:28px}
-    .cf-mail-overlay.open .cf-mail-panel{transform:translateX(0)}
-    .cf-mail-top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px}
+    /* Contact form: desktop/tablet landscape — opens inside the free right side of slide 07. */
+    .cf-mail-overlay{position:fixed;inset:0;z-index:1000;background:transparent;opacity:0;pointer-events:none;transition:opacity .22s ease}
+    .cf-mail-overlay.open{opacity:1;pointer-events:none}
+    .cf-mail-panel{position:absolute;right:clamp(28px,6vw,96px);top:50%;width:min(560px,42vw);max-height:74svh;background:rgba(6,12,9,.9);border:1px solid rgba(255,255,255,.18);border-radius:22px;box-shadow:0 24px 70px rgba(0,0,0,.5);backdrop-filter:blur(16px);transform:translate(34px,-50%) scale(.985);opacity:0;transition:transform .28s ease,opacity .22s ease;display:flex;flex-direction:column;padding:26px 28px;pointer-events:auto}
+    .cf-mail-overlay.open .cf-mail-panel{transform:translate(0,-50%) scale(1);opacity:1}
+    .cf-mail-top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
     .cf-mail-top h3{margin:0;font:700 28px/1 Space Grotesk,sans-serif}
-    .cf-mail-close{width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:transparent;color:#fff;font-size:24px;cursor:pointer}
-    .cf-mail-form{display:grid;gap:13px;overflow:auto;padding-right:2px}
+    .cf-mail-close{width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.03);color:#fff;font-size:24px;cursor:pointer;flex:0 0 auto}
+    .cf-mail-form{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px;overflow:auto;padding-right:2px}
     .cf-mail-form label{display:grid;gap:6px;font-size:12px;color:#aeb8b2}
-    .cf-mail-form input,.cf-mail-form textarea{width:100%;border:1px solid rgba(255,255,255,.16);background:#111813;color:#fff;border-radius:10px;padding:12px 13px;outline:none}
+    .cf-mail-form label:nth-of-type(5){grid-column:1/-1}
+    .cf-mail-form input,.cf-mail-form textarea{width:100%;border:1px solid rgba(255,255,255,.16);background:#111813;color:#fff;border-radius:10px;padding:11px 12px;outline:none}
     .cf-mail-form input:focus,.cf-mail-form textarea:focus{border-color:var(--g)}
-    .cf-mail-form textarea{min-height:150px;resize:vertical}
-    .cf-mail-submit{border:0;border-radius:10px;background:var(--g);color:#071007;font-weight:800;padding:13px 16px;cursor:pointer;margin-top:4px}
-    .cf-mail-status{min-height:20px;font-size:12px;color:#aeb8b2}
+    .cf-mail-form textarea{min-height:132px;resize:vertical}
+    .cf-mail-submit{grid-column:1/-1;border:0;border-radius:10px;background:var(--g);color:#071007;font-weight:800;padding:13px 16px;cursor:pointer;margin-top:2px}
+    .cf-mail-status{grid-column:1/-1;min-height:20px;font-size:12px;color:#aeb8b2}
     .cf-mail-status.ok{color:var(--g)}
     .cf-mail-status.bad{color:#ff6b6b}
     .cf-honey{position:absolute!important;left:-9999px!important;opacity:0!important}
@@ -75,6 +77,9 @@
       .contact .btn{padding:9px 12px}
       .contact .benefits{margin-top:12px;gap:10px;width:min(410px,38vw)}
       .contact .cf-vcenter>.contact-signature{margin-top:4px}
+      .cf-mail-panel{max-height:78svh;padding:20px 22px}
+      .cf-mail-top{margin-bottom:13px}.cf-mail-top h3{font-size:24px}
+      .cf-mail-form{gap:9px 12px}.cf-mail-form textarea{min-height:105px}
     }
 
     @media(max-width:800px){
@@ -86,7 +91,10 @@
       .fleet .cf-vcenter{gap:14px}.fleet .cf-vcenter>.content{width:88vw!important}.fleet .cf-vcenter>.vehicle-cards{gap:8px}
       .system .cf-vcenter{gap:14px}.system .cf-vcenter>.steps{width:100%!important;display:flex!important;gap:10px}.system .step{grid-template-columns:1fr;text-align:center;flex:1}.system .step i{margin:auto;width:auto;font-size:32px}.system .step p{display:none}
       .contact .cf-vcenter{gap:14px}.contact .actions{width:min(340px,80vw)}.contact .benefits{width:100%;gap:12px;margin-top:16px}.contact .cf-vcenter>.contact-signature{font-size:18px!important;margin-top:8px}
-      .cf-mail-panel{width:100%;padding:22px 18px}
+      .cf-mail-overlay.open{background:rgba(0,0,0,.48);backdrop-filter:blur(3px);pointer-events:auto}
+      .cf-mail-panel{right:12px;left:12px;top:50%;width:auto;max-height:86svh;padding:20px 18px;border-radius:18px;transform:translateY(-46%) scale(.985)}
+      .cf-mail-overlay.open .cf-mail-panel{transform:translateY(-50%) scale(1)}
+      .cf-mail-form{grid-template-columns:1fr}.cf-mail-form label:nth-of-type(5),.cf-mail-submit,.cf-mail-status{grid-column:1}
     }
   `;
   document.head.appendChild(style);

@@ -28,7 +28,26 @@
 
   async function getCompanies(){
     if(typeof cfSupabase==='undefined')throw new Error('Brak połączenia z bazą');
-    const {data,error}=await cfSupabase.from('companies').select('id,name,short_name').eq('active',true).order('name');
+
+    // Kalendarz globalny ma korzystać z tej samej pełnej listy firm co panel administratora.
+    // Bez filtra active=true — firma zapisana w bazie ma być dostępna w wyborze.
+    try{
+      const admin=await cfSupabase.rpc('cf_admin_companies_list');
+      if(!admin.error && Array.isArray(admin.data)){
+        return [...admin.data].sort((a,b)=>String(a.short_name||a.name||'').localeCompare(String(b.short_name||b.name||''),'pl'));
+      }
+    }catch(_){}
+
+    // Dla pracownika CleanFleet korzystamy z analogicznego RPC z jego zakresem dostępu.
+    try{
+      const staff=await cfSupabase.rpc('cf_staff_companies_list');
+      if(!staff.error && Array.isArray(staff.data)){
+        return [...staff.data].sort((a,b)=>String(a.short_name||a.name||'').localeCompare(String(b.short_name||b.name||''),'pl'));
+      }
+    }catch(_){}
+
+    // Fallback: wszystkie firmy widoczne przez RLS, również nieaktywne.
+    const {data,error}=await cfSupabase.from('companies').select('id,name,short_name,active').order('name');
     if(error)throw error;
     return data||[];
   }
@@ -52,7 +71,6 @@
     const selector=`#cfCompanyGrid [data-company-id="${CSS.escape(String(companyId))}"]`;
     let card=document.querySelector(selector);
     if(!card){
-      // Siatka mogła zostać chwilowo przerysowana — dajemy jej moment.
       for(let i=0;i<30&&!card;i++){
         await sleep(50);
         card=document.querySelector(selector);
@@ -61,7 +79,6 @@
     if(!card)throw new Error('Nie znaleziono kafelka firmy');
     card.click();
 
-    // Czekamy aż istniejący mechanizm aplikacji faktycznie ustawi aktywną firmę.
     for(let i=0;i<80;i++){
       const active=typeof window.cfGetActiveCompanyId==='function' ? window.cfGetActiveCompanyId() : window.cfActiveCompanyId;
       if(String(active||'')===String(companyId))return;
@@ -86,7 +103,7 @@
       setFormDate(date);
       document.querySelector('#cfCalMini .cf-cal1215-pick')?.remove();
     }catch(err){
-      console.error('CleanFleet calendar add v1.20.15:',err);
+      console.error('CleanFleet calendar add v1.20.16:',err);
       if(statusEl)statusEl.textContent='Nie udało się otworzyć wpisu.';
       toast('Nie udało się otworzyć nowego wpisu.');
     }finally{busy=false;}
@@ -113,12 +130,10 @@
   async function handlePlus(date){
     try{
       const companies=await getCompanies();
-      if(!companies.length){toast('Brak aktywnej firmy.');return;}
-      // Nawet jeśli aplikacja pamięta poprzednią firmę, w kalendarzu globalnym
-      // zawsze pytamy, do której firmy ma trafić nowy wpis.
+      if(!companies.length){toast('Brak firm w bazie.');return;}
       showPicker(date,companies);
     }catch(err){
-      console.error('CleanFleet calendar plus v1.20.15:',err);
+      console.error('CleanFleet calendar plus v1.20.16:',err);
       toast('Nie udało się pobrać listy firm.');
     }
   }
@@ -136,7 +151,6 @@
 
   function start(){
     ensureStyles();
-    // capture=true celowo: zatrzymuje stary inline/delegowany handler zanim do niego dotrze zdarzenie.
     document.addEventListener('click',onClick,true);
   }
 

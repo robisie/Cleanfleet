@@ -54,7 +54,7 @@ self.addEventListener('fetch', event => {
     }
 
     html = html.replace(/<script src="\/app\/reminder-fix\.js\?v=\d+"><\/script>/g, '');
-    html = html.replace(/<script src="\/app\/weather(?:-position|-rescue|-v2)?\.js\?v=[^"]+"><\/script>/g, '');
+    html = html.replace(/<script src="\/app\/weather(?:-position|-rescue|-v2|-v3)?\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<!-- CF_WEATHER_SLOT_START -->[\s\S]*?<!-- CF_WEATHER_SLOT_END -->/g, '');
 
     const weatherSlot = `<!-- CF_WEATHER_SLOT_START -->
@@ -73,7 +73,7 @@ self.addEventListener('fetch', event => {
       html = html.replace(bodyOpen, `$&\n${weatherSlot}`);
     }
 
-    const weatherScript = '<script src="/app/weather-v2.js?v=20260915-2"></script>';
+    const weatherScript = '<script src="/app/weather-v3.js?v=20260915-1"></script>';
     if (html.includes('</body>')) {
       html = html.replace('</body>', `${weatherScript}\n</body>`);
     } else {

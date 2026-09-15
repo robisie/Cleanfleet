@@ -73,7 +73,7 @@ self.addEventListener('fetch', event => {
       html = html.replace(bodyOpen, `$&\n${weatherSlot}`);
     }
 
-    const weatherScript = '<script src="/app/weather-v2.js?v=20260915-1"></script>';
+    const weatherScript = '<script src="/app/weather-v2.js?v=20260915-2"></script>';
     if (html.includes('</body>')) {
       html = html.replace('</body>', `${weatherScript}\n</body>`);
     } else {

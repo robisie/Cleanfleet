@@ -60,6 +60,16 @@ self.addEventListener('fetch', event => {
     // Remove the old late-running hotfix if it was previously injected.
     html = html.replace(/<script src="\/app\/reminder-fix\.js\?v=\d+"><\/script>/g, '');
 
+    // Inject the lightweight weather module. Keep it separate from index.html so
+    // weather logic can evolve without touching the main 1 MB application file.
+    html = html.replace(/<script src="\/app\/weather\.js\?v=[^"]+"><\/script>/g, '');
+    const weatherScript = '<script src="/app/weather.js?v=20260915-1"></script>';
+    if (html.includes('</body>')) {
+      html = html.replace('</body>', `${weatherScript}\n</body>`);
+    } else {
+      html += weatherScript;
+    }
+
     const headers = new Headers(response.headers);
     headers.delete('content-length');
     headers.set('cache-control', 'no-store, no-cache, must-revalidate');

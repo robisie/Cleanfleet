@@ -20,9 +20,9 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text();
     if (!html.includes('/app/reminder-fix.js')) {
-      html = html.replace('</body>', '<script src="/app/reminder-fix.js?v=2"></script></body>');
+      html = html.replace('</body>', '<script src="/app/reminder-fix.js?v=3"></script></body>');
     } else {
-      html = html.replace('/app/reminder-fix.js?v=1', '/app/reminder-fix.js?v=2');
+      html = html.replace(/\/app\/reminder-fix\.js\?v=\d+/g, '/app/reminder-fix.js?v=3');
     }
 
     const headers = new Headers(response.headers);

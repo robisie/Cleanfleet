@@ -20,9 +20,6 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text();
 
-    // Patch the reminder bucket function BEFORE the application code executes.
-    // This avoids the previous timing issue where a late hotfix ran only after
-    // the reminders view had already been rendered using remind_at.
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';
   const at=new Date(cfReminderEffectiveAt(r));
@@ -50,20 +47,16 @@ self.addEventListener('fetch', event => {
     if (html.includes(originalBucket)) {
       html = html.replace(originalBucket, fixedBucket);
     } else {
-      // Fallback for formatting differences in index.html.
       html = html.replace(
         /function cfReminderBucket\(r, now=new Date\(\)\)\{[\s\S]*?\n\}/,
         fixedBucket
       );
     }
 
-    // Remove the old late-running hotfix if it was previously injected.
     html = html.replace(/<script src="\/app\/reminder-fix\.js\?v=\d+"><\/script>/g, '');
 
-    // Inject the lightweight weather module. Keep it separate from index.html so
-    // weather logic can evolve without touching the main 1 MB application file.
     html = html.replace(/<script src="\/app\/weather\.js\?v=[^"]+"><\/script>/g, '');
-    const weatherScript = '<script src="/app/weather.js?v=20260915-1"></script>';
+    const weatherScript = '<script src="/app/weather.js?v=20260915-2"></script>';
     if (html.includes('</body>')) {
       html = html.replace('</body>', `${weatherScript}\n</body>`);
     } else {

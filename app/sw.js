@@ -20,6 +20,9 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text();
 
+    // CleanFleet versioning rule: new feature => minor version bump.
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.19.0');
+
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';
   const at=new Date(cfReminderEffectiveAt(r));

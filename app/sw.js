@@ -1,3 +1,38 @@
+self.addEventListener('install', event => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('fetch', event => {
+  const req = event.request;
+  if (req.mode !== 'navigate') return;
+
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin || !url.pathname.startsWith('/app/')) return;
+
+  event.respondWith((async () => {
+    const response = await fetch(req);
+    const type = response.headers.get('content-type') || '';
+    if (!response.ok || !type.includes('text/html')) return response;
+
+    let html = await response.text();
+    if (!html.includes('/app/reminder-fix.js')) {
+      html = html.replace('</body>', '<script src="/app/reminder-fix.js?v=1"></script></body>');
+    }
+
+    const headers = new Headers(response.headers);
+    headers.delete('content-length');
+    return new Response(html, {
+      status: response.status,
+      statusText: response.statusText,
+      headers
+    });
+  })());
+});
+
 self.addEventListener('push', event => {
   let data = {};
   try {

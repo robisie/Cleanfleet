@@ -20,7 +20,9 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text();
     if (!html.includes('/app/reminder-fix.js')) {
-      html = html.replace('</body>', '<script src="/app/reminder-fix.js?v=1"></script></body>');
+      html = html.replace('</body>', '<script src="/app/reminder-fix.js?v=2"></script></body>');
+    } else {
+      html = html.replace('/app/reminder-fix.js?v=1', '/app/reminder-fix.js?v=2');
     }
 
     const headers = new Headers(response.headers);
@@ -78,7 +80,6 @@ self.addEventListener('notificationclick', event => {
 
     const targetPath = targetUrl.pathname;
 
-    // Najpierw próbujemy znaleźć już otwartą aplikację /app/.
     for (const client of clientsList) {
       try {
         const clientUrl = new URL(client.url);
@@ -94,8 +95,6 @@ self.addEventListener('notificationclick', event => {
       } catch (_) {}
     }
 
-    // Jeśli nie ma otwartej /app/, ale jest inne okno tej samej domeny,
-    // nawigujemy je do właściwej aplikacji.
     for (const client of clientsList) {
       try {
         const clientUrl = new URL(client.url);
@@ -111,7 +110,6 @@ self.addEventListener('notificationclick', event => {
       } catch (_) {}
     }
 
-    // W przeciwnym razie otwieramy nowe okno.
     if (self.clients.openWindow) {
       await self.clients.openWindow(targetUrl.href);
     }

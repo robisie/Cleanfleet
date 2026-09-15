@@ -56,8 +56,9 @@ self.addEventListener('fetch', event => {
     html = html.replace(/<script src="\/app\/reminder-fix\.js\?v=\d+"><\/script>/g, '');
     html = html.replace(/<script src="\/app\/weather\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<script src="\/app\/weather-position\.js\?v=[^"]+"><\/script>/g, '');
+    html = html.replace(/<script src="\/app\/weather-rescue\.js\?v=[^"]+"><\/script>/g, '');
 
-    const weatherScript = '<script src="/app/weather.js?v=20260915-2"></script>\n<script src="/app/weather-position.js?v=20260915-2"></script>';
+    const weatherScript = '<script src="/app/weather.js?v=20260915-4"></script>\n<script src="/app/weather-position.js?v=20260915-3"></script>\n<script src="/app/weather-rescue.js?v=20260915-1"></script>';
     if (html.includes('</body>')) {
       html = html.replace('</body>', `${weatherScript}\n</body>`);
     } else {

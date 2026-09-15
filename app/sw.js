@@ -20,7 +20,7 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text();
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.19.10');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.19.11');
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';
@@ -60,6 +60,7 @@ self.addEventListener('fetch', event => {
     html = html.replace(/<script src="\/app\/weather-signals-v1198\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<script src="\/app\/weather-signals-v1199\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<script src="\/app\/weather-signals-v11910\.js\?v=[^"]+"><\/script>/g, '');
+    html = html.replace(/<script src="\/app\/weather-signals-v11911\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<!-- CF_WEATHER_SLOT_START -->[\s\S]*?<!-- CF_WEATHER_SLOT_END -->/g, '');
 
     html = html.replace(
@@ -83,7 +84,7 @@ self.addEventListener('fetch', event => {
       html = html.replace(bodyOpen, `$&\n${weatherSlot}`);
     }
 
-    const weatherScript = '<script src="/app/weather-v5.js?v=20260915-2"></script>\n<script src="/app/weather-signals-v11910.js?v=20260915-1"></script>';
+    const weatherScript = '<script src="/app/weather-v5.js?v=20260915-2"></script>\n<script src="/app/weather-signals-v11911.js?v=20260915-1"></script>';
     if (html.includes('</body>')) html = html.replace('</body>', `${weatherScript}\n</body>`);
     else html += weatherScript;
 

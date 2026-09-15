@@ -54,11 +54,26 @@ self.addEventListener('fetch', event => {
     }
 
     html = html.replace(/<script src="\/app\/reminder-fix\.js\?v=\d+"><\/script>/g, '');
-    html = html.replace(/<script src="\/app\/weather\.js\?v=[^"]+"><\/script>/g, '');
-    html = html.replace(/<script src="\/app\/weather-position\.js\?v=[^"]+"><\/script>/g, '');
-    html = html.replace(/<script src="\/app\/weather-rescue\.js\?v=[^"]+"><\/script>/g, '');
+    html = html.replace(/<script src="\/app\/weather(?:-position|-rescue|-v2)?\.js\?v=[^"]+"><\/script>/g, '');
+    html = html.replace(/<!-- CF_WEATHER_SLOT_START -->[\s\S]*?<!-- CF_WEATHER_SLOT_END -->/g, '');
 
-    const weatherScript = '<script src="/app/weather.js?v=20260915-4"></script>\n<script src="/app/weather-position.js?v=20260915-3"></script>\n<script src="/app/weather-rescue.js?v=20260915-1"></script>';
+    const weatherSlot = `<!-- CF_WEATHER_SLOT_START -->
+<style id="cfWeatherSlotBase">
+#cfWeatherSlot{margin:8px 0 10px;background:#fff;border:1px solid #e6e9e7;border-radius:12px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.035)}
+#cfWeatherSlot .cf-weather-static{min-height:44px;display:flex;align-items:center;justify-content:center;padding:8px 12px;font:500 11px/1.3 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#7a837d}
+</style>
+<section id="cfWeatherSlot" aria-label="Prognoza pogody"><div class="cf-weather-static">Nie udało się załadować prognozy pogody.</div></section>
+<!-- CF_WEATHER_SLOT_END -->`;
+
+    const searchRowTag = /<([a-zA-Z][\w:-]*)([^>]*\bclass=["'][^"']*\bcf-main-search-row\b[^"']*["'][^>]*)>/;
+    if (searchRowTag.test(html)) {
+      html = html.replace(searchRowTag, `${weatherSlot}\n$&`);
+    } else {
+      const bodyOpen = /<body([^>]*)>/i;
+      html = html.replace(bodyOpen, `$&\n${weatherSlot}`);
+    }
+
+    const weatherScript = '<script src="/app/weather-v2.js?v=20260915-1"></script>';
     if (html.includes('</body>')) {
       html = html.replace('</body>', `${weatherScript}\n</body>`);
     } else {

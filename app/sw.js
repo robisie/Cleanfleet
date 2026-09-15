@@ -21,7 +21,7 @@ self.addEventListener('fetch', event => {
     let html = await response.text();
 
     // CleanFleet versioning rule: weather UI polish => patch version bump.
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.19.6');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.19.7');
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';
@@ -57,6 +57,7 @@ self.addEventListener('fetch', event => {
     html = html.replace(/<script src="\/app\/weather(?:-position|-rescue|-v2|-v3|-v4|-v5)?\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<script src="\/app\/weather-view-fix-v1192\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<script src="\/app\/weather-colors-v1196\.js\?v=[^"]+"><\/script>/g, '');
+    html = html.replace(/<script src="\/app\/weather-signals-v1197\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<!-- CF_WEATHER_SLOT_START -->[\s\S]*?<!-- CF_WEATHER_SLOT_END -->/g, '');
 
     // Stabilny punkt montowania: wyszukiwarka stoi bezpośrednio po pasku "Dane aktualne".
@@ -81,7 +82,7 @@ self.addEventListener('fetch', event => {
       html = html.replace(bodyOpen, `$&\n${weatherSlot}`);
     }
 
-    const weatherScript = '<script src="/app/weather-v5.js?v=20260915-2"></script>\n<script src="/app/weather-colors-v1196.js?v=20260915-1"></script>';
+    const weatherScript = '<script src="/app/weather-v5.js?v=20260915-2"></script>\n<script src="/app/weather-signals-v1197.js?v=20260915-1"></script>';
     if (html.includes('</body>')) html = html.replace('</body>', `${weatherScript}\n</body>`);
     else html += weatherScript;
 

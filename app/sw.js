@@ -14,19 +14,55 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin || !url.pathname.startsWith('/app/')) return;
 
   event.respondWith((async () => {
-    const response = await fetch(req);
+    const response = await fetch(req, { cache: 'no-store' });
     const type = response.headers.get('content-type') || '';
     if (!response.ok || !type.includes('text/html')) return response;
 
     let html = await response.text();
-    if (!html.includes('/app/reminder-fix.js')) {
-      html = html.replace('</body>', '<script src="/app/reminder-fix.js?v=3"></script></body>');
+
+    // Patch the reminder bucket function BEFORE the application code executes.
+    // This avoids the previous timing issue where a late hotfix ran only after
+    // the reminders view had already been rendered using remind_at.
+    const originalBucket = `function cfReminderBucket(r, now=new Date()){
+  if(r.status==='done' || r.status==='cancelled') return 'done';
+  const at=new Date(cfReminderEffectiveAt(r));
+  if(Number.isNaN(at.getTime())) return 'upcoming';
+  const dayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const nextDay=new Date(dayStart); nextDay.setDate(nextDay.getDate()+1);
+  if(at < now) return 'overdue';
+  if(at < nextDay) return 'today';
+  return 'upcoming';
+}`;
+
+    const fixedBucket = `function cfReminderBucket(r, now=new Date()){
+  if(r.status==='done' || r.status==='cancelled') return 'done';
+  const raw=r.due_at || ((r.status==='snoozed' && r.snoozed_until) ? r.snoozed_until : r.remind_at);
+  const at=new Date(raw);
+  if(Number.isNaN(at.getTime())) return 'upcoming';
+  const dayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const nextDay=new Date(dayStart); nextDay.setDate(nextDay.getDate()+1);
+  const dueDay=new Date(at.getFullYear(),at.getMonth(),at.getDate());
+  if(dueDay < dayStart) return 'overdue';
+  if(dueDay < nextDay) return 'today';
+  return 'upcoming';
+}`;
+
+    if (html.includes(originalBucket)) {
+      html = html.replace(originalBucket, fixedBucket);
     } else {
-      html = html.replace(/\/app\/reminder-fix\.js\?v=\d+/g, '/app/reminder-fix.js?v=3');
+      // Fallback for formatting differences in index.html.
+      html = html.replace(
+        /function cfReminderBucket\(r, now=new Date\(\)\)\{[\s\S]*?\n\}/,
+        fixedBucket
+      );
     }
+
+    // Remove the old late-running hotfix if it was previously injected.
+    html = html.replace(/<script src="\/app\/reminder-fix\.js\?v=\d+"><\/script>/g, '');
 
     const headers = new Headers(response.headers);
     headers.delete('content-length');
+    headers.set('cache-control', 'no-store, no-cache, must-revalidate');
     return new Response(html, {
       status: response.status,
       statusText: response.statusText,

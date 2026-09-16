@@ -154,7 +154,7 @@
     finally{$('loading').classList.add('hidden');loading=false;}
   }
 
-  $('backBtn').addEventListener('click',()=>{location.href='/app/';});
+  $('backBtn').addEventListener('click',()=>{history.back();});
   $('refreshBtn').addEventListener('click',()=>load(true));
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&Date.now()-lastLoad>=REFRESH_MS)load(true);});
   timer=setInterval(()=>load(true),REFRESH_MS);

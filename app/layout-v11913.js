@@ -66,6 +66,17 @@
     tile.querySelectorAll('[data-layout-weather-day]').forEach(b=>b.addEventListener('click',()=>bridge.openDay?.(b.dataset.layoutWeatherDay)));
   }
 
+  function ensureCalendarFullLink(){
+    const tile=document.getElementById('cfCompanyCalendarCard');
+    if(!tile||tile.dataset.cfFullCalendar==='1')return;
+    tile.dataset.cfFullCalendar='1';
+    tile.onclick=e=>{
+      e?.preventDefault?.();
+      e?.stopPropagation?.();
+      location.href='/app/calendar.html';
+    };
+  }
+
   function applyAdminMonthPerformerDefault(){
     const select=document.getElementById('monthPerformerFilter');
     if(!select||select.dataset.cfAdminDefaultApplied==='1')return;
@@ -85,6 +96,7 @@
   function refresh(){
     moveSyncBar();
     ensureWeatherTile();
+    ensureCalendarFullLink();
     applyAdminMonthPerformerDefault();
   }
 

@@ -21,7 +21,61 @@
     document.head.appendChild(style);
   }
 
-  function start(){ensureStyles();moveSyncBar();}
+  function isVisible(el){
+    if(!el)return false;
+    const cs=getComputedStyle(el);
+    if(cs.display==='none'||cs.visibility==='hidden')return false;
+    return !!(el.offsetWidth||el.offsetHeight||el.getClientRects().length);
+  }
+
+  function dayInfo(s){
+    const d=new Date(`${s}T12:00:00`);
+    const names=['ND','PN','WT','ŚR','CZ','PT','SO'];
+    return{short:names[d.getDay()],date:d.toLocaleDateString('pl-PL',{day:'2-digit',month:'2-digit'})};
+  }
+
+  function ensureWeatherTile(){
+    const grid=document.getElementById('cfCompanyGrid');
+    if(!isVisible(grid))return;
+    const bridge=window.cfWeatherBridge;
+    if(!bridge?.getState)return;
+    const state=bridge.getState();
+    let tile=document.getElementById('cfCompanyWeatherCard');
+    if(!tile){
+      tile=document.createElement('section');
+      tile.id='cfCompanyWeatherCard';
+      tile.className='cf-company-card cf-company-weather-card';
+      grid.prepend(tile);
+    }
+    const days=state?.days||[];
+    if(!days.length){
+      if(tile.dataset.cfWeatherSig!=='loading'){
+        tile.dataset.cfWeatherSig='loading';
+        tile.innerHTML='<div class="cf-weather-tile-error">Ładowanie prognozy pogody…</div>';
+      }
+      return;
+    }
+    const sig=days.slice(0,5).map(d=>`${d.date}:${d.tmax}:${d.tmin}:${d.rain}:${d.pop}`).join('|');
+    if(tile.dataset.cfWeatherSig===sig)return;
+    tile.dataset.cfWeatherSig=sig;
+    const t=days[0];
+    tile.innerHTML=`<div class="cf-weather-tile-head"><div><div class="cf-weather-tile-title">Pogoda</div><div class="cf-weather-tile-now"><div class="cf-weather-tile-temp">${Math.round(t.tmax)}°</div><div class="cf-weather-tile-desc">${t.signal?.label||''}</div></div></div><button type="button" class="cf-weather-tile-day" data-layout-weather-day="${t.date}" style="font-size:22px;padding:6px 9px">${bridge.icon(t.date)||'🌤️'}</button></div><div class="cf-weather-tile-days">${days.slice(0,5).map(d=>{const di=dayInfo(d.date);return`<button type="button" class="cf-weather-tile-day" data-layout-weather-day="${d.date}"><strong>${di.short}${bridge.signalHtml(d.date)||''}</strong><div class="cf-weather-tile-icon">${bridge.icon(d.date)||'🌤️'}</div><div class="cf-weather-tile-range">${Math.round(d.tmax)}° <span>${Math.round(d.tmin)}°</span></div></button>`;}).join('')}</div>`;
+    tile.querySelectorAll('[data-layout-weather-day]').forEach(b=>b.addEventListener('click',()=>bridge.openDay?.(b.dataset.layoutWeatherDay)));
+  }
+
+  function refresh(){
+    moveSyncBar();
+    ensureWeatherTile();
+  }
+
+  function start(){
+    ensureStyles();
+    refresh();
+    window.addEventListener('cf-weather-updated',refresh);
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(refresh,100);});
+    document.addEventListener('click',()=>setTimeout(refresh,120),{passive:true});
+    setInterval(refresh,3000);
+  }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
   else start();
 })();

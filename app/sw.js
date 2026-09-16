@@ -20,7 +20,7 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text();
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.23.9');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.23.10');
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';
@@ -56,6 +56,14 @@ self.addEventListener('fetch', event => {
     html = html.replace("case 'todo': return !r.data_prania;", "case 'todo': return !r.zatwierdzone;");
     html = html.replace("const pendingOrders=records.filter(r=>r.zlecone && !r.data_prania).length;", "const pendingOrders=activeRecords().filter(r=>!r.zatwierdzone).length;");
     html = html.replace("const pendingOrders=records.filter(r=>!r.data_prania).length;", "const pendingOrders=activeRecords().filter(r=>!r.zatwierdzone).length;");
+
+    // Bezpieczny domyślny widok aktywnych wpisów: zawsze „Do wykonania”.
+    html = html.replace("let mainStatusFilter = 'all';", "let mainStatusFilter = 'todo';");
+    html = html.replace('<option value="todo">Do wykonania</option>', '<option value="todo" selected>Do wykonania</option>');
+    html = html.replace(
+      `async function cfEnterCompany(companyId){\n  if(!companyId) return;`,
+      `async function cfEnterCompany(companyId){\n  if(!companyId) return;\n  mainStatusFilter = 'todo';\n  const cfMainStatusSelect = document.getElementById('mainStatusFilter');\n  if(cfMainStatusSelect) cfMainStatusSelect.value = 'todo';`
+    );
 
     html = html.replace(/<script src="\/app\/reminder-fix\.js\?v=\d+"><\/script>/g, '');
     html = html.replace(/<script src="\/app\/weather(?:-position|-rescue|-v2|-v3|-v4|-v5|-v6)?\.js\?v=[^"]+"><\/script>/g, '');

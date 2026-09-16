@@ -63,9 +63,27 @@
     tile.querySelectorAll('[data-layout-weather-day]').forEach(b=>b.addEventListener('click',()=>bridge.openDay?.(b.dataset.layoutWeatherDay)));
   }
 
+  function applyAdminMonthPerformerDefault(){
+    const select=document.getElementById('monthPerformerFilter');
+    if(!select||select.dataset.cfAdminDefaultApplied==='1')return;
+    let admin=false;
+    try{ admin=typeof cfIsAdmin==='function' && !!cfIsAdmin(); }catch(_){ admin=false; }
+    if(!admin)return;
+    const target=[...select.options].find(opt=>{
+      const value=String(opt.value||'').trim().toLocaleLowerCase('pl-PL');
+      const text=String(opt.textContent||'').replace(/^Wykonał:\s*/i,'').trim().toLocaleLowerCase('pl-PL');
+      return value==='michał'||text==='michał';
+    });
+    if(!target)return;
+    select.value=target.value;
+    select.dataset.cfAdminDefaultApplied='1';
+    select.dispatchEvent(new Event('change',{bubbles:true}));
+  }
+
   function refresh(){
     moveSyncBar();
     ensureWeatherTile();
+    applyAdminMonthPerformerDefault();
   }
 
   function start(){

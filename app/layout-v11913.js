@@ -16,7 +16,9 @@
     style.id='cfLayout11913Styles';
     style.textContent=`
       .cf-syncbar.cf-syncbar-after-attention{margin:12px 0 12px;padding:0;border:0;background:transparent}
-      @media(max-width:520px){.cf-syncbar.cf-syncbar-after-attention{margin:10px 0 10px}}
+      .cf-weather-full-btn{border:1px solid #dfe7e2;background:#f5f8f6;color:#31483a;border-radius:999px;padding:7px 10px;font-size:10px;font-weight:850;cursor:pointer;white-space:nowrap}
+      .cf-weather-full-btn:active{transform:scale(.98)}
+      @media(max-width:520px){.cf-syncbar.cf-syncbar-after-attention{margin:10px 0 10px}.cf-weather-full-btn{padding:6px 8px;font-size:9px}}
     `;
     document.head.appendChild(style);
   }
@@ -56,10 +58,11 @@
       return;
     }
     const sig=days.slice(0,5).map(d=>`${d.date}:${d.tmax}:${d.tmin}:${d.rain}:${d.pop}`).join('|');
-    if(tile.dataset.cfWeatherSig===sig)return;
+    if(tile.dataset.cfWeatherSig===sig&&tile.querySelector('[data-weather-full]'))return;
     tile.dataset.cfWeatherSig=sig;
     const t=days[0];
-    tile.innerHTML=`<div class="cf-weather-tile-head"><div><div class="cf-weather-tile-title">Pogoda</div><div class="cf-weather-tile-now"><div class="cf-weather-tile-temp">${Math.round(t.tmax)}°</div><div class="cf-weather-tile-desc">${t.signal?.label||''}</div></div></div><button type="button" class="cf-weather-tile-day" data-layout-weather-day="${t.date}" style="font-size:22px;padding:6px 9px">${bridge.icon(t.date)||'🌤️'}</button></div><div class="cf-weather-tile-days">${days.slice(0,5).map(d=>{const di=dayInfo(d.date);return`<button type="button" class="cf-weather-tile-day" data-layout-weather-day="${d.date}"><strong>${di.short}${bridge.signalHtml(d.date)||''}</strong><div class="cf-weather-tile-icon">${bridge.icon(d.date)||'🌤️'}</div><div class="cf-weather-tile-range">${Math.round(d.tmax)}° <span>${Math.round(d.tmin)}°</span></div></button>`;}).join('')}</div>`;
+    tile.innerHTML=`<div class="cf-weather-tile-head"><div><div class="cf-weather-tile-title">Pogoda</div><div class="cf-weather-tile-now"><div class="cf-weather-tile-temp">${Math.round(t.tmax)}°</div><div class="cf-weather-tile-desc">${t.signal?.label||''}</div></div></div><div style="display:flex;align-items:center;gap:7px"><button type="button" class="cf-weather-full-btn" data-weather-full>Pełna prognoza</button><button type="button" class="cf-weather-tile-day" data-layout-weather-day="${t.date}" style="font-size:22px;padding:6px 9px">${bridge.icon(t.date)||'🌤️'}</button></div></div><div class="cf-weather-tile-days">${days.slice(0,5).map(d=>{const di=dayInfo(d.date);return`<button type="button" class="cf-weather-tile-day" data-layout-weather-day="${d.date}"><strong>${di.short}${bridge.signalHtml(d.date)||''}</strong><div class="cf-weather-tile-icon">${bridge.icon(d.date)||'🌤️'}</div><div class="cf-weather-tile-range">${Math.round(d.tmax)}° <span>${Math.round(d.tmin)}°</span></div></button>`;}).join('')}</div>`;
+    tile.querySelector('[data-weather-full]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();location.href='/app/weather.html';});
     tile.querySelectorAll('[data-layout-weather-day]').forEach(b=>b.addEventListener('click',()=>bridge.openDay?.(b.dataset.layoutWeatherDay)));
   }
 

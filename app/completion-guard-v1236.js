@@ -96,8 +96,9 @@
       return;
     }
 
-    const input=btn.querySelector('input[type="checkbox"]');
-    const isCurrentlyDone=btn.classList.contains('on')||!!input?.checked;
+    // Stan bierzemy wyłącznie z klasy renderowanej przed kliknięciem.
+    // Na iOS input.checked może być już przełączony w chwili obsługi click.
+    const isCurrentlyDone=btn.classList.contains('on');
     if(isCurrentlyDone)return;
 
     e.preventDefault();

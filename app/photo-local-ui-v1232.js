@@ -6,6 +6,7 @@
   const STORE='photos';
   let dbPromise=null;
   let refreshTimer=null;
+  let refreshing=false;
 
   function openDb(){
     if(dbPromise)return dbPromise;
@@ -54,29 +55,27 @@
   }
 
   async function refreshIcons(){
-    const rows=await allPhotos();
-    const ids=new Set(rows.map(x=>String(x.recordId)));
-    document.querySelectorAll('[data-cf-photos]').forEach(btn=>{
-      const has=ids.has(String(btn.dataset.cfPhotos||''));
-      btn.textContent=has?'📁':'📷';
-      btn.title=has?'Zdjęcia zapisane lokalnie — otwórz':'Dodaj zdjęcia PRZED / PO';
-      btn.setAttribute('aria-label',btn.title);
-      btn.dataset.localPhotoState=has?'ready':'empty';
-    });
+    if(refreshing)return;
+    refreshing=true;
+    try{
+      const rows=await allPhotos();
+      const ids=new Set(rows.map(x=>String(x.recordId)));
+      document.querySelectorAll('[data-cf-photos]').forEach(btn=>{
+        const has=ids.has(String(btn.dataset.cfPhotos||''));
+        const state=has?'ready':'empty';
+        const text=has?'📁':'📷';
+        const title=has?'Zdjęcia zapisane lokalnie — otwórz':'Dodaj zdjęcia PRZED / PO';
+        if(btn.dataset.localPhotoState!==state)btn.dataset.localPhotoState=state;
+        if(btn.textContent!==text)btn.textContent=text;
+        if(btn.title!==title)btn.title=title;
+        if(btn.getAttribute('aria-label')!==title)btn.setAttribute('aria-label',title);
+      });
+    }finally{refreshing=false;}
   }
 
   function scheduleRefresh(delay=80){
     clearTimeout(refreshTimer);
     refreshTimer=setTimeout(()=>refreshIcons().catch(()=>{}),delay);
-  }
-
-  function currentRecordId(){
-    const overlay=document.getElementById('cfPhotoOverlay');
-    if(!overlay?.classList.contains('open'))return null;
-    const title=overlay.querySelector('[data-photo-record-id]');
-    if(title?.dataset.photoRecordId)return title.dataset.photoRecordId;
-    const visible=document.querySelector('[data-cf-photos][data-local-photo-open="1"]');
-    return visible?.dataset.cfPhotos||null;
   }
 
   function markOpenedButton(id){
@@ -129,9 +128,17 @@
       if(e.target.closest?.('.cf-photo-local-thumb button'))scheduleRefresh(250);
     },true);
 
-    const obs=new MutationObserver(()=>{
-      ensureClearButton();
-      scheduleRefresh(50);
+    const obs=new MutationObserver(mutations=>{
+      let relevant=false;
+      for(const m of mutations){
+        for(const node of m.addedNodes){
+          if(node.nodeType!==1)continue;
+          const el=node;
+          if(el.matches?.('.record-card,[data-cf-photos],#cfPhotoOverlay,.cf-photo-local')||el.querySelector?.('.record-card,[data-cf-photos],#cfPhotoOverlay,.cf-photo-local')){relevant=true;break;}
+        }
+        if(relevant)break;
+      }
+      if(relevant){ensureClearButton();scheduleRefresh(50);}
     });
     obs.observe(document.body,{childList:true,subtree:true});
   }

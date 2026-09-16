@@ -66,9 +66,8 @@
   function applyAdminMonthPerformerDefault(){
     const select=document.getElementById('monthPerformerFilter');
     if(!select||select.dataset.cfAdminDefaultApplied==='1')return;
-    let admin=false;
-    try{ admin=typeof cfIsAdmin==='function' && !!cfIsAdmin(); }catch(_){ admin=false; }
-    if(!admin)return;
+    const isAdmin=document.body?.getAttribute('data-cf-role')==='admin';
+    if(!isAdmin)return;
     const target=[...select.options].find(opt=>{
       const value=String(opt.value||'').trim().toLocaleLowerCase('pl-PL');
       const text=String(opt.textContent||'').replace(/^Wykonał:\s*/i,'').trim().toLocaleLowerCase('pl-PL');
@@ -91,8 +90,8 @@
     refresh();
     window.addEventListener('cf-weather-updated',refresh);
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(refresh,100);});
-    document.addEventListener('click',()=>setTimeout(refresh,120),{passive:true});
-    setInterval(refresh,3000);
+    document.addEventListener('click',()=>setTimeout(refresh,80),{passive:true});
+    setInterval(refresh,1000);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
   else start();

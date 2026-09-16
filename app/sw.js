@@ -14,23 +14,9 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin || !url.pathname.startsWith('/app/')) return;
 
   // Pełnoekranowy moduł pogody jest samodzielnym dokumentem.
-  // Podmieniamy wyłącznie zachowanie przycisku powrotu, żeby zawsze wracał
-  // do panelu administratora z listą firm, a nie do zapamiętanej firmy.
+  // Nie zmieniamy jego nawigacji — przycisk wstecz korzysta z historii Safari/PWA.
   if (url.pathname === '/app/weather.html') {
-    event.respondWith((async () => {
-      const response = await fetch(req, { cache: 'no-store' });
-      const type = response.headers.get('content-type') || '';
-      if (!response.ok || !type.includes('text/html')) return response;
-      let html = await response.text();
-      html = html.replace(
-        "$('backBtn').addEventListener('click',()=>{if(history.length>1)history.back();else location.href='/app/';});",
-        "$('backBtn').addEventListener('click',()=>{location.href='/app/?cfCompanyChooser=1';});"
-      );
-      const headers = new Headers(response.headers);
-      headers.delete('content-length');
-      headers.set('cache-control', 'no-store, no-cache, must-revalidate');
-      return new Response(html, {status:response.status,statusText:response.statusText,headers});
-    })());
+    event.respondWith(fetch(req, { cache: 'no-store' }));
     return;
   }
 
@@ -41,7 +27,7 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text();
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.24.2');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.24.3');
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';
@@ -86,8 +72,7 @@ self.addEventListener('fetch', event => {
       `async function cfEnterCompany(companyId){\n  if(!companyId) return;\n  mainStatusFilter = 'todo';\n  const cfMainStatusSelect = document.getElementById('mainStatusFilter');\n  if(cfMainStatusSelect) cfMainStatusSelect.value = 'todo';`
     );
 
-    // Powrót z pełnoekranowej pogody ma otworzyć panel administratora,
-    // bez kasowania zapamiętanej firmy na przyszłość.
+    // Pozostawiona zgodność z wcześniejszym linkiem do panelu firm.
     html = html.replace(
       `async function cfStartForCurrentUser(){\n  if(cfIsAdmin()){`,
       `async function cfStartForCurrentUser(){\n  if(cfIsAdmin()){\n    const cfForceCompanyChooser=new URLSearchParams(location.search).get('cfCompanyChooser')==='1';\n    if(cfForceCompanyChooser){\n      cfSetCompanyContext(null);\n      try{\n        const cfUrl=new URL(location.href);\n        cfUrl.searchParams.delete('cfCompanyChooser');\n        history.replaceState(null,'',cfUrl.pathname+cfUrl.search+cfUrl.hash);\n      }catch(_){ }\n      await cfShowCompanyChooser();\n      return;\n    }`

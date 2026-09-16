@@ -20,7 +20,7 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text();
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.21.7');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.22.0');
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';
@@ -74,6 +74,7 @@ self.addEventListener('fetch', event => {
     html = html.replace(/<script src="\/app\/photo-queue-v1211\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<script src="\/app\/photo-queue-v1212\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<script src="\/app\/photo-queue-v1217\.js\?v=[^"]+"><\/script>/g, '');
+    html = html.replace(/<script src="\/app\/photo-queue-v1220\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<script src="\/app\/photo-camera-v1213\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<script src="\/app\/calendar-click-v1214\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<script src="\/app\/calendar-add-v1215\.js\?v=[^"]+"><\/script>/g, '');
@@ -102,7 +103,7 @@ self.addEventListener('fetch', event => {
       html = html.replace(bodyOpen, `$&\n${weatherSlot}`);
     }
 
-    const injectedScripts = '<script src="/app/weather-v6.js?v=20260916-1"></script>\n<script src="/app/layout-v11913.js?v=20260916-2"></script>\n<script src="/app/operations-v1200.js?v=20260915-1"></script>\n<script src="/app/photo-queue-v1217.js?v=20260916-1"></script>\n<script src="/app/photo-camera-v1213.js?v=20260916-3"></script>\n<script src="/app/calendar-v1203.js?v=20260915-12"></script>\n<script src="/app/ui-v1209.js?v=20260915-3"></script>\n<script src="/app/calendar-add-v1215.js?v=20260915-2"></script>\n<script src="/app/calendar-weather-v1218.js?v=20260916-3"></script>';
+    const injectedScripts = '<script src="/app/weather-v6.js?v=20260916-1"></script>\n<script src="/app/layout-v11913.js?v=20260916-2"></script>\n<script src="/app/operations-v1200.js?v=20260915-1"></script>\n<script src="/app/photo-queue-v1220.js?v=20260916-1"></script>\n<script src="/app/photo-camera-v1213.js?v=20260916-3"></script>\n<script src="/app/calendar-v1203.js?v=20260915-12"></script>\n<script src="/app/ui-v1209.js?v=20260915-3"></script>\n<script src="/app/calendar-add-v1215.js?v=20260915-2"></script>\n<script src="/app/calendar-weather-v1218.js?v=20260916-3"></script>';
     if (html.includes('</body>')) html = html.replace('</body>', `${injectedScripts}\n</body>`);
     else html += injectedScripts;
 

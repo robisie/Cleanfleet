@@ -6,10 +6,11 @@
     const s=document.createElement('style');
     s.id='cfCalendarWeather1218Styles';
     s.textContent=`
-      #cfCalMini [data-date]>.cf-cal-weather-row{display:flex;align-items:center;justify-content:flex-start;min-height:30px;margin:0 0 3px;padding:3px 0 6px;border-top:0;border-bottom:1px solid #eceee8}
-      .cf-cal-weather-btn{width:100%;border:0;background:transparent;padding:3px 2px;display:flex;align-items:center;justify-content:flex-start;gap:5px;color:#454945;cursor:pointer;text-align:left;font:800 10px/1 system-ui,-apple-system,sans-serif}
+      #cfWeatherModal.cf-w-bg{z-index:140001!important}
+      #cfCalMini [data-date]>.cf-cal-weather-row{display:flex;align-items:center;justify-content:flex-start;min-height:30px;margin:0 -2px 4px;padding:0 2px 5px;border-bottom:1px solid #eceee8}
+      .cf-cal-weather-btn{width:100%;border:0;background:transparent;padding:5px 2px 2px;display:flex;align-items:center;justify-content:flex-start;gap:5px;color:#454945;cursor:pointer;text-align:left;font:800 10px/1 system-ui,-apple-system,sans-serif}
       .cf-cal-weather-btn:active{opacity:.65}.cf-cal-weather-ico{font-size:15px;line-height:1}.cf-cal-weather-temp{font-size:10px;font-weight:900}.cf-cal-weather-btn .cf-signal{gap:3px}.cf-cal-weather-btn .cf-signal-dot{width:6px;height:6px}.cf-cal-weather-btn .cf-rain-period{font-size:9px}
-      .cf-cal-weather-loading{font:700 9px/1 system-ui,-apple-system,sans-serif;color:#9a9e99;padding:5px 2px}
+      .cf-cal-weather-loading{font:700 9px/1 system-ui,-apple-system,sans-serif;color:#9a9e99;padding:5px 2px 7px}
       @media(max-width:620px){.cf-cal-weather-btn{gap:4px}.cf-cal-weather-ico{font-size:14px}.cf-cal-weather-temp{font-size:9px}.cf-cal-weather-btn .cf-rain-period{font-size:8px}}
     `;
     document.head.appendChild(s);
@@ -36,8 +37,6 @@
       if(!row){
         row=document.createElement('div');
         row.className='cf-cal-weather-row';
-        head.insertAdjacentElement('afterend',row);
-      }else if(row.previousElementSibling!==head){
         head.insertAdjacentElement('afterend',row);
       }
       const d=bridge?.getDay?.(date)||null;

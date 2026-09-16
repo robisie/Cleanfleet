@@ -107,7 +107,9 @@
     const items=await byRecord(recordId);
     const before=items.filter(x=>x.kind==='przed'),after=items.filter(x=>x.kind==='po');
     if(!before.length||!after.length)throw new Error('Do ZIP-a potrzebne są zdjęcia PRZED i PO.');
-    const ordered=[...before.map((x,i)=>({x,path:`przed/${String(i+1).padStart(3,'0')}.${extFor(x.name,x.mime)}`})),...after.map((x,i)=>({x,path:`po/${String(i+1).padStart(3,'0')}.${extFor(x.name,x.mime)}`}))];
+    const meta=await metadata(recordId);
+    const root=`${meta.type.toLowerCase()}/${meta.date}/${meta.plate}`;
+    const ordered=[...before.map((x,i)=>({x,path:`${root}/przed/${String(i+1).padStart(3,'0')}.${extFor(x.name,x.mime)}`})),...after.map((x,i)=>({x,path:`${root}/po/${String(i+1).padStart(3,'0')}.${extFor(x.name,x.mime)}`}))];
     const locals=[],centrals=[];let offset=0;const dt=dosDateTime();
     for(let i=0;i<ordered.length;i++){
       const {x,path}=ordered[i];showBuildProgress(i,ordered.length,`Przygotowanie ${path}`);
@@ -118,7 +120,6 @@
       centrals.push(central);offset+=local.size;showBuildProgress(i+1,ordered.length,`Gotowe ${i+1} z ${ordered.length}`);await new Promise(r=>setTimeout(r,0));
     }
     const centralOffset=offset,centralSize=centrals.reduce((s,b)=>s+b.size,0),end=new Blob([u32(0x06054b50),u16(0),u16(0),u16(ordered.length),u16(ordered.length),u32(centralSize),u32(centralOffset),u16(0)]);
-    const meta=await metadata(recordId);
     const blob=new Blob([...locals,...centrals,end],{type:'application/zip'});
     return new File([blob],`${meta.type}_${meta.plate}_${meta.date}.zip`,{type:'application/zip',lastModified:Date.now()});
   }

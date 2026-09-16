@@ -29,7 +29,7 @@
   }
 
   async function deleteRecordPhotos(recordId){
-    const rows=(await allPhotos()).filter(x=>x.recordId===recordId);
+    const rows=(await allPhotos()).filter(x=>String(x.recordId)===String(recordId));
     if(!rows.length)return 0;
     const db=await openDb();
     await new Promise((resolve,reject)=>{
@@ -100,7 +100,7 @@
     const btn=document.querySelector('[data-cf-photos][data-local-photo-open="1"]');
     const recordId=btn?.dataset.cfPhotos||null;
     if(!recordId)return;
-    const rows=(await allPhotos()).filter(x=>x.recordId===recordId);
+    const rows=(await allPhotos()).filter(x=>String(x.recordId)===String(recordId));
     if(!rows.length){
       if(typeof showToast==='function')showToast('Brak lokalnych zdjęć do usunięcia.');
       scheduleRefresh();
@@ -124,7 +124,6 @@
       const opener=e.target.closest?.('[data-cf-photos]');
       if(opener){markOpenedButton(opener.dataset.cfPhotos);setTimeout(()=>{ensureClearButton();scheduleRefresh(0)},220);return;}
       if(e.target.closest?.('[data-local-clear]')){e.preventDefault();e.stopPropagation();clearCurrent().catch(err=>{console.error(err);if(typeof showToast==='function')showToast('Nie udało się wyczyścić zdjęć lokalnych.');});return;}
-      if(e.target.closest?.('[data-photo-save]'))scheduleRefresh(700);
       if(e.target.closest?.('.cf-photo-local-thumb button'))scheduleRefresh(250);
     },true);
 
@@ -134,11 +133,18 @@
         for(const node of m.addedNodes){
           if(node.nodeType!==1)continue;
           const el=node;
-          if(el.matches?.('.record-card,[data-cf-photos],#cfPhotoOverlay,.cf-photo-local')||el.querySelector?.('.record-card,[data-cf-photos],#cfPhotoOverlay,.cf-photo-local')){relevant=true;break;}
+          if(el.matches?.('.record-card,[data-cf-photos],#cfPhotoOverlay,.cf-photo-local,.cf-photo-local-thumb')||el.querySelector?.('.record-card,[data-cf-photos],#cfPhotoOverlay,.cf-photo-local,.cf-photo-local-thumb')){relevant=true;break;}
+        }
+        if(!relevant){
+          for(const node of m.removedNodes){
+            if(node.nodeType!==1)continue;
+            const el=node;
+            if(el.matches?.('.cf-photo-local-thumb')||el.querySelector?.('.cf-photo-local-thumb')){relevant=true;break;}
+          }
         }
         if(relevant)break;
       }
-      if(relevant){ensureClearButton();scheduleRefresh(50);}
+      if(relevant){ensureClearButton();scheduleRefresh(40);}
     });
     obs.observe(document.body,{childList:true,subtree:true});
   }
@@ -147,6 +153,7 @@
     ensureStyles();
     events();
     scheduleRefresh(0);
+    setTimeout(()=>scheduleRefresh(0),500);
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();

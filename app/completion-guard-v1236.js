@@ -16,7 +16,6 @@
     const fill=()=>{
       const date=document.getElementById('f_data_prania');
       if(date && !date.value) date.value=todayLocal();
-
       const performer=document.getElementById('f_kto_wykonal');
       const cost=document.getElementById('f_koszt');
       if(!String(row?.performed_by||'').trim() && performer) performer.focus();
@@ -53,17 +52,11 @@
       if(typeof cfSupabase==='undefined') throw new Error('Brak połączenia z bazą.');
       const {data:row,error}=await cfSupabase
         .from('wash_records')
-        .select('id,wash_date,performed_by,cost,approved')
+        .select('id,wash_date,performed_by,cost')
         .eq('id',id)
         .maybeSingle();
       if(error)throw error;
       if(!row)throw new Error('Nie znaleziono wpisu.');
-
-      if(row.approved){
-        bypassId=String(id);
-        btn.click();
-        return;
-      }
 
       const missingDate=!String(row.wash_date||'').trim();
       const missingPerformer=!String(row.performed_by||'').trim();

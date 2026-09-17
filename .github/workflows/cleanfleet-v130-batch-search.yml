@@ -1,0 +1,256 @@
+name: CleanFleet v1.30.0 batch plate search
+
+on:
+  push:
+    paths:
+      - '.github/workflows/cleanfleet-v130-batch-search.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch app/index.html safely
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          path = Path('app/index.html')
+          expected_sha = '0fa3296f7940c3f269955395063bf2d0cc3c5173'
+          actual_sha = subprocess.check_output(['git','hash-object',str(path)], text=True).strip()
+          if actual_sha != expected_sha:
+              raise SystemExit(f'ABORT: app/index.html SHA changed: expected {expected_sha}, got {actual_sha}')
+
+          text = path.read_text(encoding='utf-8')
+          marker = '/* CleanFleet v1.30.0 — batch plate search */'
+          if marker in text:
+              raise SystemExit('ABORT: v1.30.0 patch already present')
+
+          helper = r'''
+/* CleanFleet v1.30.0 — batch plate search */
+function parseBatchPlateInput(raw){
+  const source=String(raw||'');
+  if(!/[\n,;]/.test(source)) return null;
+  const parts=source.split(/[\n,;]+/).map(s=>s.trim()).filter(Boolean);
+  if(parts.length<2) return null;
+
+  // W tryb zbiorczy wchodzimy tylko dla pozycji wyglądających jak tablice.
+  // Dzięki temu zwykłe wyszukiwanie po marce, typie, uwagach czy numerze FV
+  // nadal trafia do dotychczasowej wyszukiwarki.
+  const plateLike=parts.every(part=>{
+    const n=normalizePlate(part);
+    return n.length>=4 && n.length<=12 && /[A-Z]/.test(n) && /\d/.test(n);
+  });
+  if(!plateLike) return null;
+
+  const seen=new Set();
+  return parts.map(part=>({raw:part.toUpperCase(), norm:normalizePlate(part)}))
+    .filter(item=>item.norm && !seen.has(item.norm) && seen.add(item.norm));
+}
+
+function cfBatchRegistryLookup(){
+  const map=new Map();
+  Object.entries((typeof registry!=='undefined' && registry) ? registry : {}).forEach(([plate,data])=>{
+    const norm=normalizePlate(plate);
+    if(norm) map.set(norm,{plate:String(plate||'').toUpperCase(),data:data||{}});
+  });
+  return map;
+}
+
+function cfBatchActivePlateSet(){
+  const set=new Set();
+  ((typeof records!=='undefined' && records) ? records : []).forEach(r=>{
+    if(r && r.zlecone && !r.data_prania){
+      const norm=normalizePlate(r.tablica||'');
+      if(norm) set.add(norm);
+    }
+  });
+  return set;
+}
+
+async function showBatchPlateSearch(query, plateItems){
+  const box=document.getElementById('searchResults');
+  if(!box) return;
+  try{
+    if(typeof loadAll==='function' && (!registry || !Object.keys(registry).length)) await loadAll();
+
+    const vehicleMap=cfBatchRegistryLookup();
+    const activeSet=cfBatchActivePlateSet();
+    const found=[];
+    const unknown=[];
+
+    plateItems.forEach(item=>{
+      const hit=vehicleMap.get(item.norm);
+      if(hit) found.push({...item,...hit,active:activeSet.has(item.norm)});
+      else unknown.push(item.raw);
+    });
+
+    let html=`<div style="padding:10px 12px;border-bottom:1px solid #dbe6f3;background:#f7fbff;font-weight:650">Wyszukiwanie zbiorcze: <b>${found.length}</b> znalezionych</div>`;
+
+    if(found.length){
+      html += found.map(item=>{
+        const v=item.data||{};
+        const meta=[v.marka,v.typ].filter(Boolean).join(' • ');
+        const status=item.active
+          ? '<span style="font-weight:700;color:#9a6700">Już oczekuje na pranie</span>'
+          : '<span style="font-weight:700;color:#18794e">Gotowy do dodania</span>';
+        return `<label style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-bottom:1px solid #eef3f9;cursor:${item.active?'default':'pointer'}">
+          <input type="checkbox" class="cfBatchPlateCheck" data-plate="${escHtml(item.plate)}" ${item.active?'disabled':'checked'} style="margin-top:4px;transform:scale(1.15)">
+          <span style="min-width:0;flex:1">
+            <span style="display:block;font-weight:750">${escHtml(item.plate)}</span>
+            ${meta?`<span style="display:block;font-size:.9em;opacity:.75;margin-top:2px">${escHtml(meta)}</span>`:''}
+            <span style="display:block;font-size:.86em;margin-top:3px">${status}</span>
+          </span>
+        </label>`;
+      }).join('');
+    }else{
+      html += '<div style="padding:12px">Nie znaleziono żadnego pojazdu z podanych tablic.</div>';
+    }
+
+    if(unknown.length){
+      html += `<div style="padding:10px 12px;background:#fff7f7;border-top:1px solid #f1d7d7"><div style="font-weight:750;margin-bottom:5px">Nierozpoznane tablice (${unknown.length})</div><div style="font-size:.92em">${unknown.map(escHtml).join(', ')}</div></div>`;
+    }
+
+    const selectable=found.filter(x=>!x.active).length;
+    html += `<div style="padding:12px;background:#fff;border-top:1px solid #dbe6f3"><button type="button" id="cfBatchAddToWashBtn" class="secondary-btn" ${selectable?'':'disabled'}>Dodaj zaznaczone do prania</button></div>`;
+
+    box.innerHTML=html;
+    box.style.display='block';
+    const btn=document.getElementById('cfBatchAddToWashBtn');
+    if(btn) btn.addEventListener('click',()=>cfBatchAddSelectedToWash(query,plateItems));
+  }catch(e){
+    console.error('batch plate search',e);
+    box.innerHTML='<div style="padding:12px">Błąd wyszukiwania zbiorczego: '+escHtml(e?.message||e)+'</div>';
+    box.style.display='block';
+  }
+}
+
+async function cfBatchAddSelectedToWash(query,plateItems){
+  const box=document.getElementById('searchResults');
+  const btn=document.getElementById('cfBatchAddToWashBtn');
+  const selected=[...document.querySelectorAll('.cfBatchPlateCheck:checked')].map(el=>String(el.dataset.plate||'').toUpperCase()).filter(Boolean);
+  if(!selected.length){ if(typeof showToast==='function') showToast('Zaznacz co najmniej jeden pojazd.'); return; }
+  if(!cfSupabase || !cfActiveCompanyId){ if(typeof showToast==='function') showToast('Brak aktywnej firmy.'); return; }
+
+  if(btn) btn.disabled=true;
+  try{
+    // Ponowna kontrola bezpośrednio przed zapisem — zabezpiecza przed utworzeniem
+    // drugiego aktywnego wpisu, gdy ktoś dodał auto po wyświetleniu wyników.
+    const {data:pendingRows,error:pendingError}=await cfSupabase
+      .from('wash_records')
+      .select('id,plate,ordered,wash_date')
+      .eq('company_id',cfActiveCompanyId)
+      .eq('ordered',true)
+      .is('wash_date',null);
+    if(pendingError) throw pendingError;
+
+    const pendingNorm=new Set((pendingRows||[]).map(r=>normalizePlate(r.plate||'')).filter(Boolean));
+    const vehicleMap=cfBatchRegistryLookup();
+    const rows=[];
+    let skipped=0;
+    const orderDate=(typeof nowISO==='function') ? nowISO() : new Date().toISOString().slice(0,10);
+
+    selected.forEach(plate=>{
+      const norm=normalizePlate(plate);
+      if(!norm || pendingNorm.has(norm)){ skipped++; return; }
+      const hit=vehicleMap.get(norm);
+      if(!hit){ skipped++; return; }
+      const v=hit.data||{};
+      rows.push({
+        id:typeof uid==='function' ? uid() : crypto.randomUUID(),
+        company_id:cfActiveCompanyId,
+        plate:hit.plate,
+        type:typeof cfCanonicalWashType==='function' ? cfCanonicalWashType(v.typ||'') : (v.typ||''),
+        brand:v.marka||'',
+        billing_category:null,
+        ordered:true,
+        ordered_by:'',
+        order_date:orderDate,
+        order_due_date:null,
+        priority:null,
+        schedule_status:null,
+        schedule_proposed_date:null,
+        schedule_proposed_by:null,
+        schedule_proposed_at:null,
+        schedule_confirmed_by:null,
+        schedule_confirmed_at:null,
+        schedule_note:null,
+        notes:'',
+        wash_date:null,
+        wash_start_time:null,
+        wash_end_time:null,
+        performed_by:'',
+        cost:0,
+        approved:false,
+        paid:false,
+        created_at:new Date().toISOString(),
+        created_by:cfCurrentUserId||null
+      });
+      pendingNorm.add(norm);
+    });
+
+    if(rows.length){
+      const {error:insertError}=await cfSupabase.from('wash_records').insert(rows);
+      if(insertError) throw insertError;
+    }
+
+    if(typeof loadAll==='function') await loadAll();
+    const fresh=parseBatchPlateInput(query) || plateItems;
+    await showBatchPlateSearch(query,fresh);
+    const msg=rows.length
+      ? `Dodano do prania: ${rows.length}${skipped?` • pominięto: ${skipped}`:''}`
+      : 'Nie dodano nowych wpisów — zaznaczone pojazdy już oczekują na pranie.';
+    if(typeof showToast==='function') showToast(msg);
+  }catch(e){
+    console.error('batch add to wash',e);
+    if(typeof showToast==='function') showToast('Błąd dodawania do prania: '+(e?.message||e));
+    else alert('Błąd dodawania do prania: '+(e?.message||e));
+    if(btn) btn.disabled=false;
+  }
+}
+'''
+
+          needle = 'async function doSearch(){'
+          if text.count(needle) != 1:
+              raise SystemExit(f'ABORT: expected exactly one doSearch(), found {text.count(needle)}')
+          text = text.replace(needle, helper + '\n' + needle, 1)
+
+          old = """  const q=(inp.value||'').trim();
+  if(q.length<2){box.style.display='none'; return;}
+  const qu=q.toUpperCase(), qn=normalizePlate(q);
+"""
+          new = """  const q=(inp.value||'').trim();
+  if(q.length<2){box.style.display='none'; return;}
+
+  const batchPlates=parseBatchPlateInput(q);
+  if(batchPlates){
+    await showBatchPlateSearch(q,batchPlates);
+    return;
+  }
+
+  const qu=q.toUpperCase(), qn=normalizePlate(q);
+"""
+          if text.count(old) != 1:
+              raise SystemExit(f'ABORT: doSearch hook not found exactly once ({text.count(old)})')
+          text = text.replace(old,new,1)
+
+          # Header version shown by the current file.
+          text = text.replace('Wersja aplikacji: v1.18.8 beta','Wersja aplikacji: v1.30.0',1)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          git diff --check
+          git diff --stat
+          git config user.name 'CleanFleet Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/index.html
+          git commit -m 'feat: CleanFleet v1.30.0 batch plate search'
+          git push origin HEAD:main

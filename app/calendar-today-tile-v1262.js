@@ -11,11 +11,11 @@
     s.id='cfCalendarTodayTile1262Style';
     s.textContent=`
       #cfCompanyCalendarCard{position:relative;overflow:hidden}
-      #cfCompanyCalendarCard .cf-cal-today{width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;text-align:left;gap:0}
-      #cfCompanyCalendarCard .cf-cal-weekday{font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#6d756f;margin:0 0 1px}
-      #cfCompanyCalendarCard .cf-cal-number{font-size:42px;line-height:.92;font-weight:900;letter-spacing:-.055em;color:#111611;margin:0}
-      #cfCompanyCalendarCard .cf-cal-month{font-size:11px;font-weight:800;color:#111611;margin:4px 0 0}
-      #cfCompanyCalendarCard .cf-cal-count{font-size:9px;font-weight:700;color:#777f79;margin:9px 0 0}
+      #cfCompanyCalendarCard .cf-cal-today{width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:.12em;padding:6% 5%}
+      #cfCompanyCalendarCard .cf-cal-weekday{font-size:clamp(.58rem,.72vw,.9rem);font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#6d756f;margin:0}
+      #cfCompanyCalendarCard .cf-cal-number{font-size:clamp(3rem,5.2vw,5.8rem);line-height:.88;font-weight:950;letter-spacing:-.06em;color:#111611;margin:.02em 0}
+      #cfCompanyCalendarCard .cf-cal-month{font-size:clamp(.72rem,.95vw,1.15rem);font-weight:850;color:#111611;margin:.1em 0 0}
+      #cfCompanyCalendarCard .cf-cal-count{font-size:clamp(.58rem,.68vw,.86rem);font-weight:750;color:#777f79;margin:.7em 0 0;line-height:1.15}
       #cfCompanyCalendarCard .cf-cal-count strong{display:inline;font-size:inherit;color:#6f7f16}
     `;
     document.head.appendChild(s);

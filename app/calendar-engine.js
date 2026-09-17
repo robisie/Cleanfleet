@@ -100,6 +100,25 @@
     if(error)throw error;
   }
 
+  async function moveReminder(id,date){
+    const s=await loadSupabase();
+    const {data,error}=await s.from('cf_reminders')
+      .select('id,start_at,end_at,due_at,remind_at,custom_remind_at,reminder_mode')
+      .eq('id',id).single();
+    if(error)throw error;
+    const oldStart=new Date(data.start_at||data.due_at||data.remind_at);
+    if(Number.isNaN(oldStart.getTime()))throw new Error('Brak terminu przypomnienia.');
+    const [yy,mm,dd]=String(date).split('-').map(Number);
+    const newStart=new Date(yy,mm-1,dd,oldStart.getHours(),oldStart.getMinutes(),oldStart.getSeconds(),0);
+    const delta=newStart.getTime()-oldStart.getTime();
+    const patch={start_at:newStart.toISOString(),due_at:newStart.toISOString(),push_sent_at:null};
+    if(data.end_at){const d=new Date(data.end_at);if(!Number.isNaN(d.getTime()))patch.end_at=new Date(d.getTime()+delta).toISOString();}
+    if(data.remind_at){const d=new Date(data.remind_at);if(!Number.isNaN(d.getTime()))patch.remind_at=new Date(d.getTime()+delta).toISOString();}
+    if(data.custom_remind_at){const d=new Date(data.custom_remind_at);if(!Number.isNaN(d.getTime()))patch.custom_remind_at=new Date(d.getTime()+delta).toISOString();}
+    const {error:updateError}=await s.from('cf_reminders').update(patch).eq('id',id);
+    if(updateError)throw updateError;
+  }
+
   async function saveReminder(payload,id=null){
     const s=await loadSupabase();
     const {data:{user}}=await s.auth.getUser();
@@ -131,5 +150,5 @@
     if(error)throw error;
   }
 
-  window.CFCalendarEngine={loadSupabase,loadAll,moveWash,saveReminder,setReminderStatus,snoozeReminder,deleteReminder,isoDay};
+  window.CFCalendarEngine={loadSupabase,loadAll,moveWash,moveReminder,saveReminder,setReminderStatus,snoozeReminder,deleteReminder,isoDay};
 })();

@@ -1,0 +1,36 @@
+name: Refresh CleanFleet v1.30 cache key
+
+on:
+  push:
+    paths:
+      - '.github/workflows/refresh-v130-cache.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Bump multi-search cache key
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('app/sw.js')
+          s = p.read_text()
+          old = '/app/multi-search-v1300.js?v=20260917-1'
+          new = '/app/multi-search-v1300.js?v=20260917-3'
+          if old not in s:
+              raise SystemExit('expected cache key not found')
+          p.write_text(s.replace(old, new))
+          PY
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/sw.js
+          git commit -m 'fix: refresh v1.30 bulk search cache key'
+          git push origin main

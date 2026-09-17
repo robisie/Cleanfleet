@@ -65,7 +65,7 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text();
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.29.1');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.0');
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';
@@ -158,6 +158,7 @@ self.addEventListener('fetch', event => {
     html = html.replace(/<script src="\/app\/calendar-weather-v1218\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<script src="\/app\/calendar-today-tile-v1262\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<script src="\/app\/admin-dashboard-v1270\.js\?v=[^"]+"><\/script>/g, '');
+    html = html.replace(/<script src="\/app\/multi-search-v1300\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<!-- CF_WEATHER_SLOT_START -->[\s\S]*?<!-- CF_WEATHER_SLOT_END -->/g, '');
 
     html = html.replace('<div class="search-box cf-main-search-box">','<div class="search-box cf-main-search-box cf-main-search-row">');
@@ -188,7 +189,8 @@ self.addEventListener('fetch', event => {
       '<script src="/app/calendar-weather-v1218.js?v=20260916-3"></script>\n' +
       '<script src="/app/reminder-form-v1251.js?v=20260917-3"></script>\n' +
       '<script src="/app/calendar-today-tile-v1262.js?v=20260917-5"></script>\n' +
-      '<script src="/app/admin-dashboard-v1270.js?v=20260917-11"></script>';
+      '<script src="/app/admin-dashboard-v1270.js?v=20260917-11"></script>\n' +
+      '<script src="/app/multi-search-v1300.js?v=20260917-1"></script>';
     if (html.includes('</body>')) html = html.replace('</body>', `${injectedScripts}\n</body>`);
     else html += injectedScripts;
 

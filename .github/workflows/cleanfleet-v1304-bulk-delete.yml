@@ -1,0 +1,95 @@
+name: CleanFleet v1.30.4 bulk delete
+
+on:
+  push:
+    paths:
+      - '.github/workflows/cleanfleet-v1304-bulk-delete.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Apply bulk delete and version sync
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          idx=Path('app/index.html')
+          s=idx.read_text()
+
+          old_menu='''      <button type="button" class="btn btn-solid" id="cfActiveSelectionCopy">Kopiuj</button>\n      <button type="button" class="btn btn-outline" id="cfActiveSelectionChat">Do czatu</button>\n      <button type="button" class="btn btn-outline" id="cfActiveSelectionClear">Odznacz</button>'''
+          new_menu='''      <button type="button" class="btn btn-solid" id="cfActiveSelectionCopy">Kopiuj</button>\n      <button type="button" class="btn btn-outline" id="cfActiveSelectionChat">Do czatu</button>\n      <button type="button" class="btn btn-danger" id="cfActiveSelectionDelete">Usuń zaznaczone</button>\n      <button type="button" class="btn btn-outline" id="cfActiveSelectionClear">Odznacz</button>'''
+          assert s.count(old_menu)==1, f'menu block count: {s.count(old_menu)}'
+          s=s.replace(old_menu,new_menu,1)
+
+          marker="""    menu.querySelector('#cfActiveSelectionClear')?.addEventListener('click',()=>{\n      cfSelectedActiveRecordIds.clear();\n      cfUpdateActiveSelectionUI();\n      renderRecords();\n    });"""
+          bulk="""    menu.querySelector('#cfActiveSelectionDelete')?.addEventListener('click',()=>{\n      const selected=records.filter(r=>cfSelectedActiveRecordIds.has(r.id) && !r.zaplacone);\n      if(!selected.length){\n        cfSelectedActiveRecordIds.clear();\n        cfUpdateActiveSelectionUI();\n        return;\n      }\n      const count=selected.length;\n      const plates=selected.map(r=>String(r.tablica||'').trim()).filter(Boolean);\n      const preview=plates.slice(0,8).join(', ')+(plates.length>8?` +${plates.length-8}`:'');\n      const employee=cfIsFleetEmployee();\n      showConfirm(\n        employee?'Poprosić o anulowanie zaznaczonych wpisów?':'Usunąć zaznaczone wpisy?',\n        employee\n          ? `Dla ${count} ${count===1?'wpisu':'wpisów'} zostanie wysłana prośba do administratora.${preview?`\\n${preview}`:''}`\n          : `${count} ${count===1?'wpis zostanie':'wpisy zostaną'} trwale usunięte.${preview?`\\n${preview}`:''}`,\n        async()=>{\n          if(employee){\n            try{\n              for(const rec of selected){\n                await cfSubmitChangeRequest(rec.id,'cancel',null,'Prośba pracownika floty o anulowanie wpisu.');\n              }\n              cfSelectedActiveRecordIds.clear();\n              cfUpdateActiveSelectionUI();\n              renderRecords();\n              showToast(count===1?'Wysłano prośbę do administratora.':`Wysłano ${count} próśb do administratora.`);\n            }catch(e){\n              showToast('Nie udało się wysłać wszystkich próśb: '+(e?.message||'błąd'));\n            }\n            return;\n          }\n\n          const previous=records;\n          const selectedIds=new Set(selected.map(r=>r.id));\n          records=records.filter(r=>!selectedIds.has(r.id));\n          try{\n            await saveRecords();\n            cfSelectedActiveRecordIds.clear();\n            cfUpdateActiveSelectionUI();\n            renderRecords();\n            showToast(count===1?'Wpis usunięty.':`Usunięto ${count} wpisów.`);\n          }catch(e){\n            records=previous;\n            renderRecords();\n            cfUpdateActiveSelectionUI();\n            console.error('CleanFleet bulk delete:',e);\n            showToast('Nie udało się usunąć zaznaczonych wpisów.');\n          }\n        }\n      );\n    });\n\n"""
+          assert s.count(marker)==1, f'clear handler count: {s.count(marker)}'
+          s=s.replace(marker,bulk+marker,1)
+
+          assert s.count('Wersja aplikacji: v1.30.3')>=1
+          s=s.replace('Wersja aplikacji: v1.30.3','Wersja aplikacji: v1.30.4')
+          s=s.replace("./sw.js?v=20260917-1303","./sw.js?v=20260917-1304")
+          s=s.replace('/app/admin-dashboard-v1270.js?v=20260917-12','/app/admin-dashboard-v1270.js?v=20260917-13')
+          idx.write_text(s)
+
+          dash=Path('app/admin-dashboard-v1270.js')
+          d=dash.read_text()
+          assert 'Wersja aplikacji: v1.30.3' in d
+          d=d.replace('Wersja aplikacji: v1.30.3','Wersja aplikacji: v1.30.4')
+          dash.write_text(d)
+
+          sw=Path('app/sw.js')
+          w=sw.read_text()
+          assert 'Wersja aplikacji: v1.30.3' in w
+          w=w.replace('Wersja aplikacji: v1.30.3','Wersja aplikacji: v1.30.4')
+          w=w.replace('/app/admin-dashboard-v1270.js?v=20260917-12','/app/admin-dashboard-v1270.js?v=20260917-13')
+          sw.write_text(w)
+
+          # hard checks
+          out=idx.read_text()
+          assert 'id="cfActiveSelectionDelete"' in out
+          assert "menu.querySelector('#cfActiveSelectionDelete')" in out
+          assert 'Wersja aplikacji: v1.30.4' in out
+          assert './sw.js?v=20260917-1304' in out
+          assert '/app/admin-dashboard-v1270.js?v=20260917-13' in out
+          assert 'Wersja aplikacji: v1.30.4' in dash.read_text()
+          assert 'Wersja aplikacji: v1.30.4' in sw.read_text()
+          assert '/app/admin-dashboard-v1270.js?v=20260917-13' in sw.read_text()
+          PY
+
+      - name: Validate JavaScript
+        run: |
+          git diff --check
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          html=Path('app/index.html').read_text()
+          blocks=re.findall(r'<script(?![^>]*\\bsrc=)[^>]*>([\\s\\S]*?)</script>',html,re.I)
+          for i,b in enumerate(blocks):
+              if not b.strip():
+                  continue
+              p=Path(f'/tmp/cf-{i}.js')
+              p.write_text(b)
+              subprocess.run(['node','--check',str(p)],check=True)
+          subprocess.run(['node','--check','app/admin-dashboard-v1270.js'],check=True)
+          subprocess.run(['node','--check','app/sw.js'],check=True)
+          PY
+
+      - name: Commit production patch and remove temporary workflow
+        run: |
+          rm -f .github/workflows/cleanfleet-v1304-bulk-delete.yml
+          git config user.name robisie
+          git config user.email robisie-fer@o2.pl
+          git add app/index.html app/sw.js app/admin-dashboard-v1270.js .github/workflows/cleanfleet-v1304-bulk-delete.yml
+          git commit -m "v1.30.4 add bulk delete for selected wash entries"
+          git push origin main

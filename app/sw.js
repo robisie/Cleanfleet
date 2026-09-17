@@ -24,11 +24,28 @@ self.addEventListener('fetch', event => {
       const type = response.headers.get('content-type') || '';
       if (!response.ok || !type.includes('text/html')) return response;
       let html = await response.text();
-      html = html.replace(/\/app\/calendar-engine\.js\?v=[^"']+/g, '/app/calendar-engine.js?v=20260917-3');
+
+      html = html.replace(/\/app\/calendar-engine\.js\?v=[^"']+/g, '/app/calendar-engine.js?v=20260917-4');
+
+      // Filtr „Prywatne” = przypomnienia bez przypisanej firmy.
+      html = html.replace(
+        "if(c&&String(e.company_id||'')!==c)return false;",
+        "if(c==='__PRIVATE__'){if(e.kind!=='reminder'||e.company_id)return false;}else if(c&&String(e.company_id||'')!==c)return false;"
+      );
+      html = html.replace(
+        "$('companyFilter').innerHTML='<option value=\"\">Wszystkie firmy</option>'+data.companies.map",
+        "$('companyFilter').innerHTML='<option value=\"\">Wszystkie firmy</option><option value=\"__PRIVATE__\">Prywatne</option>'+data.companies.map"
+      );
+      html = html.replace(
+        "$('companyFilter').value=current&&data.companies.some(c=>String(c.id)===current)?current:'';",
+        "$('companyFilter').value=(current==='__PRIVATE__'||(current&&data.companies.some(c=>String(c.id)===current)))?current:'';"
+      );
+
       html = html.replace(/<script src="\/app\/reminder-form-v1251\.js\?v=[^"]+"><\/script>/g, '');
       html = html.replace(/<script src="\/app\/calendar-touch-v1251\.js\?v=[^"]+"><\/script>/g, '');
       html = html.replace(/<script src="\/app\/calendar-reminder-edit-v1261\.js\?v=[^"]+"><\/script>/g, '');
-      const calendarScripts = '<script src="/app/reminder-form-v1251.js?v=20260917-3"></script>\n<script src="/app/calendar-touch-v1251.js?v=20260917-3"></script>\n<script src="/app/calendar-reminder-edit-v1261.js?v=20260917-1"></script>';
+      html = html.replace(/<script src="\/app\/calendar-ageing-dnd-v1270\.js\?v=[^"]+"><\/script>/g, '');
+      const calendarScripts = '<script src="/app/reminder-form-v1251.js?v=20260917-3"></script>\n<script src="/app/calendar-touch-v1251.js?v=20260917-3"></script>\n<script src="/app/calendar-reminder-edit-v1261.js?v=20260917-1"></script>\n<script src="/app/calendar-ageing-dnd-v1270.js?v=20260917-1"></script>';
       if (html.includes('</body>')) html = html.replace('</body>', `${calendarScripts}\n</body>`);
       else html += calendarScripts;
       const headers = new Headers(response.headers);
@@ -46,7 +63,7 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text();
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.26.4');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.27.0');
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';
@@ -79,6 +96,12 @@ self.addEventListener('fetch', event => {
     html = html.replace("case 'todo': return !r.data_prania;", "case 'todo': return !r.zatwierdzone;");
     html = html.replace("const pendingOrders=records.filter(r=>r.zlecone && !r.data_prania).length;", "const pendingOrders=activeRecords().filter(r=>!r.zatwierdzone).length;");
     html = html.replace("const pendingOrders=records.filter(r=>!r.data_prania).length;", "const pendingOrders=activeRecords().filter(r=>!r.zatwierdzone).length;");
+
+    // Pasek „Wymaga uwagi” ma być widoczny także wtedy, gdy wszystkie wartości są zerowe.
+    html = html.replace(
+      "if (!items.length || !items.some(x => x.value > 0)) {",
+      "if (!items.length) {"
+    );
 
     html = html.replace("let mainStatusFilter = 'all';", "let mainStatusFilter = 'todo';");
     html = html.replace('<option value="todo">Do wykonania</option>', '<option value="todo" selected>Do wykonania</option>');
@@ -127,6 +150,7 @@ self.addEventListener('fetch', event => {
     html = html.replace(/<script src="\/app\/calendar-weather-v1217\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<script src="\/app\/calendar-weather-v1218\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<script src="\/app\/calendar-today-tile-v1262\.js\?v=[^"]+"><\/script>/g, '');
+    html = html.replace(/<script src="\/app\/admin-dashboard-v1270\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<!-- CF_WEATHER_SLOT_START -->[\s\S]*?<!-- CF_WEATHER_SLOT_END -->/g, '');
 
     html = html.replace('<div class="search-box cf-main-search-box">','<div class="search-box cf-main-search-box cf-main-search-row">');
@@ -143,7 +167,7 @@ self.addEventListener('fetch', event => {
     if (searchRowTag.test(html)) html = html.replace(searchRowTag, `${weatherSlot}\n$&`);
     else html = html.replace(/<body([^>]*)>/i, `$&\n${weatherSlot}`);
 
-    const injectedScripts = '<script src="/app/weather-v6.js?v=20260916-1"></script>\n<script src="/app/weather-refresh-v12311.js?v=20260916-1"></script>\n<script src="/app/layout-v11913.js?v=20260917-2"></script>\n<script src="/app/operations-v1200.js?v=20260915-1"></script>\n<script src="/app/photo-local-v1240.js?v=20260916-2"></script>\n<script src="/app/photo-local-ui-v1232.js?v=20260916-5"></script>\n<script src="/app/photo-camera-v1213.js?v=20260916-3"></script>\n<script src="/app/completion-guard-v1236.js?v=20260916-4"></script>\n<script src="/app/calendar-v1203.js?v=20260917-2"></script>\n<script src="/app/ui-v1209.js?v=20260915-3"></script>\n<script src="/app/calendar-add-v1215.js?v=20260915-2"></script>\n<script src="/app/calendar-weather-v1218.js?v=20260916-3"></script>\n<script src="/app/reminder-form-v1251.js?v=20260917-3"></script>\n<script src="/app/calendar-today-tile-v1262.js?v=20260917-3"></script>';
+    const injectedScripts = '<script src="/app/weather-v6.js?v=20260916-1"></script>\n<script src="/app/weather-refresh-v12311.js?v=20260916-1"></script>\n<script src="/app/layout-v11913.js?v=20260917-2"></script>\n<script src="/app/operations-v1200.js?v=20260915-1"></script>\n<script src="/app/photo-local-v1240.js?v=20260916-2"></script>\n<script src="/app/photo-local-ui-v1232.js?v=20260916-5"></script>\n<script src="/app/photo-camera-v1213.js?v=20260916-3"></script>\n<script src="/app/completion-guard-v1236.js?v=20260916-4"></script>\n<script src="/app/calendar-v1203.js?v=20260917-2"></script>\n<script src="/app/ui-v1209.js?v=20260915-3"></script>\n<script src="/app/calendar-add-v1215.js?v=20260915-2"></script>\n<script src="/app/calendar-weather-v1218.js?v=20260916-3"></script>\n<script src="/app/reminder-form-v1251.js?v=20260917-3"></script>\n<script src="/app/calendar-today-tile-v1262.js?v=20260917-4"></script>\n<script src="/app/admin-dashboard-v1270.js?v=20260917-1"></script>';
     if (html.includes('</body>')) html = html.replace('</body>', `${injectedScripts}\n</body>`);
     else html += injectedScripts;
 

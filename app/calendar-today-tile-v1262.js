@@ -4,6 +4,7 @@
   const pad=n=>String(n).padStart(2,'0');
   const localDay=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   const cap=s=>String(s||'').charAt(0).toUpperCase()+String(s||'').slice(1);
+  let lastCount=null,gridObserver=null,bodyObserver=null,refreshTimer=null;
 
   function ensureStyle(){
     if(document.getElementById('cfCalendarTodayTile1262Style'))return;
@@ -21,7 +22,7 @@
     document.head.appendChild(s);
   }
 
-  function paint(count=null){
+  function paint(count=lastCount){
     const tile=document.getElementById('cfCompanyCalendarCard');
     if(!tile)return false;
     const now=new Date();
@@ -29,7 +30,11 @@
     const month=cap(now.toLocaleDateString('pl-PL',{month:'long'}));
     let summary='Plan dnia';
     if(Number.isFinite(count)) summary=count===0?'Brak pozycji na dziś':`${count} ${count===1?'pozycja':(count>=2&&count<=4?'pozycje':'pozycji')} na dziś`;
-    tile.innerHTML=`<div class="cf-cal-today"><span class="cf-cal-weekday">${weekday}</span><strong class="cf-cal-number">${now.getDate()}</strong><span class="cf-cal-month">${month}</span><span class="cf-cal-count">${summary}</span></div>`;
+    if(!tile.querySelector('.cf-cal-today')||tile.querySelector('.cf-cal-number')?.textContent!==String(now.getDate())){
+      tile.innerHTML=`<div class="cf-cal-today"><span class="cf-cal-weekday">${weekday}</span><strong class="cf-cal-number">${now.getDate()}</strong><span class="cf-cal-month">${month}</span><span class="cf-cal-count">${summary}</span></div>`;
+    }else{
+      const countEl=tile.querySelector('.cf-cal-count');if(countEl)countEl.textContent=summary;
+    }
     tile.setAttribute('aria-label',`Kalendarz. ${weekday}, ${now.getDate()} ${month}. ${summary}`);
     return true;
   }
@@ -45,7 +50,7 @@
       if(w.error||r.error)return;
       const washCount=(w.data||[]).filter(x=>localDayValue(x.order_due_date||x.schedule_proposed_date)===today).length;
       const reminderCount=(r.data||[]).filter(x=>!['done','cancelled'].includes(String(x.status||''))&&localDayValue(x.start_at||x.due_at||x.remind_at)===today).length;
-      paint(washCount+reminderCount);
+      lastCount=washCount+reminderCount;paint(lastCount);
     }catch(e){console.warn('CleanFleet today tile:',e)}
   }
 
@@ -58,12 +63,18 @@
   }
 
   function refresh(){if(paint())countToday()}
+  function schedulePaint(){clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>{if(paint())countToday()},40)}
+  function bindGrid(){
+    const g=document.getElementById('cfCompanyGrid');if(!g)return false;
+    if(gridObserver?.__cfGrid===g)return true;
+    gridObserver?.disconnect();gridObserver=new MutationObserver(schedulePaint);gridObserver.__cfGrid=g;gridObserver.observe(g,{childList:true});schedulePaint();return true;
+  }
   function boot(){
-    ensureStyle();
-    let tries=0;
-    const t=setInterval(()=>{tries++;if(paint()){clearInterval(t);countToday()}else if(tries>150)clearInterval(t)},100);
+    ensureStyle();bindGrid();
+    bodyObserver=new MutationObserver(()=>bindGrid());bodyObserver.observe(document.body,{childList:true,subtree:true});
+    let tries=0;const t=setInterval(()=>{tries++;if(paint()){clearInterval(t);countToday()}else if(tries>150)clearInterval(t)},100);
     setInterval(()=>refresh(),60000);
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()},{passive:true});
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden){bindGrid();refresh()}},{passive:true});
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();

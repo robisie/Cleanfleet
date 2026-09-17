@@ -1,0 +1,48 @@
+name: CleanFleet v1.30.2 stable bulk search
+on:
+  push:
+    paths:
+      - '.github/workflows/cleanfleet-v1302-stable-bulk.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Apply isolated patch
+        run: python3 .github/scripts/patch_v1302_stable_bulk.py
+      - name: Validate patch scope
+        run: |
+          git diff --check
+          git diff --stat -- app/index.html app/sw.js
+          git diff -- app/sw.js
+          grep -n "cfShowBulkPlateSearch\|Wersja aplikacji: v1.30.2" app/index.html | head -20
+      - name: Validate inline JavaScript syntax
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess, tempfile, os
+          html=Path('app/index.html').read_text()
+          blocks=re.findall(r'<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)</script>',html,re.I)
+          checked=0
+          for i,block in enumerate(blocks):
+              if not block.strip(): continue
+              name=f'/tmp/cf-inline-{i}.js'
+              Path(name).write_text(block)
+              subprocess.run(['node','--check',name],check=True)
+              checked+=1
+          print('checked inline scripts:',checked)
+          PY
+      - name: Commit production patch and remove temporary patch files
+        run: |
+          rm .github/scripts/patch_v1302_stable_bulk.py
+          rm .github/workflows/cleanfleet-v1302-stable-bulk.yml
+          git config user.name robisie
+          git config user.email robisie-fer@o2.pl
+          git add app/index.html app/sw.js .github/scripts/patch_v1302_stable_bulk.py .github/workflows/cleanfleet-v1302-stable-bulk.yml
+          git commit -m "v1.30.2 restore stable base and add isolated bulk search"
+          git push origin main

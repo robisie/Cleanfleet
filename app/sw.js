@@ -190,7 +190,7 @@ self.addEventListener('fetch', event => {
       '<script src="/app/reminder-form-v1251.js?v=20260917-3"></script>\n' +
       '<script src="/app/calendar-today-tile-v1262.js?v=20260917-5"></script>\n' +
       '<script src="/app/admin-dashboard-v1270.js?v=20260917-11"></script>\n' +
-      '<script src="/app/multi-search-v1300.js?v=20260917-3"></script>';
+      '<script>try{const v=document.getElementById("cfAppVersion");if(v)v.textContent="Wersja aplikacji: v1.30.0";}catch(_){}</script>';
     if (html.includes('</body>')) html = html.replace('</body>', `${injectedScripts}\n</body>`);
     else html += injectedScripts;
 

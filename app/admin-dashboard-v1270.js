@@ -34,6 +34,31 @@
         transition:box-shadow .14s ease,opacity .14s ease,transform .14s ease;
         user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;
       }
+      #cfCompanyGrid>.cf-company-card.cf-grid-company-tile{
+        padding:10px 13px!important;
+        overflow:hidden!important;
+        box-sizing:border-box!important;
+      }
+      #cfCompanyGrid>.cf-company-card.cf-grid-company-tile>:not(button){
+        zoom:.88;
+      }
+      #cfCompanyGrid>.cf-company-card.cf-grid-company-tile h1,
+      #cfCompanyGrid>.cf-company-card.cf-grid-company-tile h2,
+      #cfCompanyGrid>.cf-company-card.cf-grid-company-tile h3,
+      #cfCompanyGrid>.cf-company-card.cf-grid-company-tile p{
+        margin-top:0!important;
+        margin-bottom:3px!important;
+        line-height:1.08!important;
+      }
+      #cfCompanyGrid>.cf-company-card.cf-grid-company-tile hr{
+        margin:6px 0!important;
+      }
+      #cfCompanyGrid>.cf-company-card.cf-grid-company-tile [class*="stat"],
+      #cfCompanyGrid>.cf-company-card.cf-grid-company-tile [class*="metric"]{
+        row-gap:4px!important;
+        column-gap:8px!important;
+        line-height:1.05!important;
+      }
       #cfCompanyGrid>.cf-company-card.cf-grid-source{opacity:.28}
       #cfCompanyGrid.cf-grid-dragging{
         background-image:linear-gradient(rgba(166,198,27,.065) 1px,transparent 1px),linear-gradient(90deg,rgba(166,198,27,.065) 1px,transparent 1px);
@@ -61,10 +86,13 @@
       @media(max-width:899px){
         #cfCompanyGrid{grid-template-columns:repeat(4,minmax(0,1fr))!important;--cf-row-h:158px}
         #cfCompanyGrid.cf-grid-dragging{background-size:calc((100% - 36px)/4 + 12px) 170px}
+        #cfCompanyGrid>.cf-company-card.cf-grid-company-tile>:not(button){zoom:.84}
       }
       @media(max-width:599px){
         #cfCompanyGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important;--cf-row-h:148px}
         #cfCompanyGrid.cf-grid-dragging{background-size:calc((100% - 12px)/2 + 12px) 160px}
+        #cfCompanyGrid>.cf-company-card.cf-grid-company-tile{padding:8px 10px!important}
+        #cfCompanyGrid>.cf-company-card.cf-grid-company-tile>:not(button){zoom:.8}
       }
     `;
     document.head.appendChild(s);
@@ -125,6 +153,7 @@
     const layout=normalizedLayout();
     cards().forEach(el=>{
       const p=layout[key(el)];if(!p)return;
+      el.classList.toggle('cf-grid-company-tile',!!el.dataset.companyId);
       el.style.order='';
       el.style.gridColumn=`${p.c} / span ${p.w}`;
       el.style.gridRow=`${p.r} / span ${p.h}`;

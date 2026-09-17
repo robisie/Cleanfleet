@@ -35,12 +35,12 @@
     arr.splice(from,1);const ti=arr.indexOf(target);if(ti<0)return;
     arr.splice(ti+(after?1:0),0,source);saveOrder(arr);
   }
-  function swap(source,target){
-    if(!source||!target||source===target)return;
+  function plannedSwap(source,target){
+    if(!source||!target||source===target)return null;
     const arr=visualCards(),a=arr.indexOf(source),b=arr.indexOf(target);
-    if(a<0||b<0)return;
+    if(a<0||b<0)return null;
     [arr[a],arr[b]]=[arr[b],arr[a]];
-    saveOrder(arr);
+    return arr;
   }
   function afterTarget(el,x,y){
     const r=el.getBoundingClientRect(),sr=src?.getBoundingClientRect();
@@ -54,14 +54,18 @@
     ghost=document.createElement('div');ghost.className='cf-admin-sort-ghost';ghost.textContent=(src.textContent||'').trim().replace(/\s+/g,' ').slice(0,90);document.body.appendChild(ghost);moveGhost(x,y);
     if(navigator.vibrate)try{navigator.vibrate(20)}catch(_){}
   }
+  function cardAt(x,y){
+    const el=document.elementFromPoint(x,y);
+    const card=el?.closest?.('#cfCompanyGrid>.cf-company-card')||null;
+    return card&&card!==src?card:null;
+  }
   function moveGhost(x,y){
     if(ghost){ghost.style.left=x+'px';ghost.style.top=y+'px'}
     clearOver();
-    const el=document.elementFromPoint(x,y);
-    const card=el?.closest?.('#cfCompanyGrid>.cf-company-card');
-    if(card&&card!==src){over=card;card.classList.add('cf-sort-over')}
+    const card=cardAt(x,y);
+    if(card){over=card;card.classList.add('cf-sort-over')}
   }
-  function interactiveTarget(target){return target?.closest?.('a,input,select,textarea,button,[data-company-edit],.cf-company-edit')}
+  function interactiveTarget(target){return target?.closest?.('a,input,select,textarea,[data-company-edit],.cf-company-edit')}
 
   function onPointerDown(e){
     if(e.pointerType==='mouse'||!grid)return;
@@ -77,9 +81,17 @@
     if(!src){cleanup();return}
     clearTimeout(pressTimer);if(!active){cleanup();return}
     e.preventDefault();e.stopPropagation();suppressClickUntil=Date.now()+650;
-    const source=src,target=over;
+
+    const source=src;
+    const target=(over&&over!==source)?over:cardAt(e.clientX,e.clientY);
+    const nextOrder=plannedSwap(source,target);
+
     cleanup();
-    if(target)swap(source,target);
+
+    if(nextOrder){
+      saveOrder(nextOrder);
+      requestAnimationFrame(()=>applyOrder());
+    }
   }
   function onPointerCancel(){cleanup()}
 

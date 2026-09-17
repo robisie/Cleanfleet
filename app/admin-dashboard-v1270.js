@@ -1,13 +1,13 @@
 (()=>{
   'use strict';
   const STORAGE='cf-admin-dashboard-order-v1';
-  let grid=null,dragEl=null,ghost=null,pressTimer=null,startX=0,startY=0,active=false,suppressClickUntil=0,dropTarget=null;
+  let grid=null,dragEl=null,ghost=null,pressTimer=null,startX=0,startY=0,active=false,suppressClickUntil=0,dropTarget=null,touchId=null;
 
   function style(){
     if(document.getElementById('cfAdminDashboard1270Style'))return;
     const s=document.createElement('style');s.id='cfAdminDashboard1270Style';s.textContent=`
       @media (min-width:900px){.wrap{max-width:1120px!important}}
-      #cfCompanyGrid>.cf-company-card{transition:transform .14s ease,box-shadow .14s ease,opacity .14s ease}
+      #cfCompanyGrid>.cf-company-card{transition:transform .14s ease,box-shadow .14s ease,opacity .14s ease;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
       #cfCompanyGrid>.cf-company-card.cf-sort-source{opacity:.35}
       #cfCompanyGrid>.cf-company-card.cf-sort-over{box-shadow:inset 0 0 0 2px #a6c61b!important}
       .cf-admin-sort-ghost{position:fixed;z-index:500000;pointer-events:none;min-width:150px;max-width:260px;padding:12px 14px;border-radius:14px;background:#fff;color:#171a18;border:1px solid #a6c61b;box-shadow:0 18px 45px rgba(0,0,0,.25);font:800 12px/1.25 system-ui,-apple-system,sans-serif;transform:translate(-50%,-115%)}
@@ -40,11 +40,12 @@
   }
   function afterTarget(el,x,y){
     const r=el.getBoundingClientRect();
-    const sameRow=Math.abs((dragEl?.getBoundingClientRect().top||0)-r.top)<Math.max(20,r.height*.45);
+    const sr=dragEl?.getBoundingClientRect();
+    const sameRow=sr?Math.abs(sr.top-r.top)<Math.max(20,r.height*.45):true;
     return sameRow?x>r.left+r.width/2:y>r.top+r.height/2;
   }
   function clearOver(){grid?.querySelectorAll('.cf-sort-over').forEach(x=>x.classList.remove('cf-sort-over'));dropTarget=null}
-  function clean(){clearTimeout(pressTimer);pressTimer=null;clearOver();dragEl?.classList.remove('cf-sort-source');dragEl=null;active=false;ghost?.remove();ghost=null}
+  function clean(){clearTimeout(pressTimer);pressTimer=null;clearOver();dragEl?.classList.remove('cf-sort-source');dragEl=null;active=false;touchId=null;ghost?.remove();ghost=null}
   function targetAt(x,y){return document.elementFromPoint(x,y)?.closest?.('#cfCompanyGrid>.cf-company-card')||null}
   function moveGhost(x,y){
     if(ghost){ghost.style.left=x+'px';ghost.style.top=y+'px'}
@@ -53,7 +54,13 @@
     dropTarget=(t&&t!==dragEl)?t:null;
     if(dropTarget)dropTarget.classList.add('cf-sort-over');
   }
-  function beginTouch(x,y){if(!dragEl)return;active=true;dragEl.classList.add('cf-sort-source');ghost=document.createElement('div');ghost.className='cf-admin-sort-ghost';ghost.textContent=(dragEl.textContent||'').trim().replace(/\s+/g,' ').slice(0,90);document.body.appendChild(ghost);moveGhost(x,y);if(navigator.vibrate)try{navigator.vibrate(18)}catch(_){}}
+  function beginTouch(x,y){
+    if(!dragEl)return;
+    active=true;dragEl.classList.add('cf-sort-source');
+    ghost=document.createElement('div');ghost.className='cf-admin-sort-ghost';ghost.textContent=(dragEl.textContent||'').trim().replace(/\s+/g,' ').slice(0,90);document.body.appendChild(ghost);moveGhost(x,y);
+    if(navigator.vibrate)try{navigator.vibrate(18)}catch(_){}
+  }
+  function interactiveTarget(target){return target?.closest?.('a,input,select,textarea,button,[data-company-edit],.cf-company-edit')}
 
   function bindGrid(g){
     if(g.dataset.cfSort1270==='1'){grid=g;applyOrder();return}g.dataset.cfSort1270='1';grid=g;applyOrder();
@@ -63,14 +70,16 @@
     g.addEventListener('drop',e=>{if(!dragEl)return;const t=e.target.closest?.('#cfCompanyGrid>.cf-company-card')||dropTarget;e.preventDefault();const src=dragEl;if(t&&t!==src)reorder(src,t,afterTarget(t,e.clientX,e.clientY));clean()});
     g.addEventListener('dragend',clean);
   }
+
+  // Pointer events zostają dla rysika/urządzeń innych niż klasyczny dotyk Safari.
   function onDown(e){
-    if(e.pointerType==='mouse'||!grid)return;
-    const el=e.target.closest?.('#cfCompanyGrid>.cf-company-card');if(!el)return;
-    const interactive=e.target.closest?.('a,input,select,textarea,[data-company-edit],.cf-company-edit');if(interactive&&interactive!==el)return;
+    if(e.pointerType==='mouse'||e.pointerType==='touch'||!grid)return;
+    const el=e.target.closest?.('#cfCompanyGrid>.cf-company-card');if(!el||interactiveTarget(e.target))return;
     dragEl=el;startX=e.clientX;startY=e.clientY;pressTimer=setTimeout(()=>beginTouch(e.clientX,e.clientY),260);
   }
-  function onMove(e){if(!dragEl)return;if(!active){if(Math.hypot(e.clientX-startX,e.clientY-startY)>9)clean();return}e.preventDefault();moveGhost(e.clientX,e.clientY)}
+  function onMove(e){if(!dragEl||e.pointerType==='touch')return;if(!active){if(Math.hypot(e.clientX-startX,e.clientY-startY)>9)clean();return}e.preventDefault();moveGhost(e.clientX,e.clientY)}
   function onUp(e){
+    if(e.pointerType==='touch')return;
     if(!dragEl){clean();return}
     clearTimeout(pressTimer);if(!active){clean();return}
     e.preventDefault();e.stopPropagation();
@@ -79,26 +88,44 @@
     suppressClickUntil=Date.now()+650;clean();
   }
 
-  function isAdmin(){
-    try{return typeof cfIsAdmin==='function' && !!cfIsAdmin();}
-    catch(_){return false;}
+  // Dedykowane touch events dla Safari / iPadOS.
+  function touchById(list,id){for(const t of list||[]){if(t.identifier===id)return t}return null}
+  function onTouchStart(e){
+    if(!grid||touchId!==null||e.touches.length!==1)return;
+    const el=e.target.closest?.('#cfCompanyGrid>.cf-company-card');if(!el||interactiveTarget(e.target))return;
+    const t=e.touches[0];touchId=t.identifier;dragEl=el;startX=t.clientX;startY=t.clientY;
+    clearTimeout(pressTimer);pressTimer=setTimeout(()=>beginTouch(t.clientX,t.clientY),280);
   }
-  function applyPhotoAccess(){
-    const allowed=isAdmin();
-    document.body?.classList.toggle('cf-photo-admin-only',!allowed);
-    if(!allowed){
-      const overlay=document.getElementById('cfPhotoOverlay');
-      if(overlay?.classList.contains('open'))overlay.classList.remove('open');
+  function onTouchMove(e){
+    if(touchId===null||!dragEl)return;
+    const t=touchById(e.touches,touchId);if(!t)return;
+    if(!active){
+      if(Math.hypot(t.clientX-startX,t.clientY-startY)>10)clean();
+      return;
     }
+    e.preventDefault();e.stopPropagation();moveGhost(t.clientX,t.clientY);
   }
+  function onTouchEnd(e){
+    if(touchId===null||!dragEl){clean();return}
+    const t=touchById(e.changedTouches,touchId);
+    clearTimeout(pressTimer);
+    if(!active){clean();return}
+    if(t){e.preventDefault();e.stopPropagation()}
+    const src=dragEl,x=t?.clientX??startX,y=t?.clientY??startY,target=dropTarget||targetAt(x,y);
+    if(target&&target!==src)reorder(src,target,afterTarget(target,x,y));
+    suppressClickUntil=Date.now()+700;clean();
+  }
+  function onTouchCancel(){clean()}
 
+  function isAdmin(){try{return typeof cfIsAdmin==='function' && !!cfIsAdmin()}catch(_){return false}}
+  function applyPhotoAccess(){
+    const allowed=isAdmin();document.body?.classList.toggle('cf-photo-admin-only',!allowed);
+    if(!allowed){const overlay=document.getElementById('cfPhotoOverlay');if(overlay?.classList.contains('open'))overlay.classList.remove('open')}
+  }
   function ensureAttentionVisible(){
-    const panel=document.getElementById('attentionPanel');
-    if(!panel)return;
-    let activeCompany=null;
-    try{activeCompany=typeof window.cfGetActiveCompanyId==='function'?window.cfGetActiveCompanyId():null}catch(_){activeCompany=null}
-    if(!activeCompany)return;
-    if(panel.classList.contains('show')&&panel.innerHTML.trim())return;
+    const panel=document.getElementById('attentionPanel');if(!panel)return;
+    let activeCompany=null;try{activeCompany=typeof window.cfGetActiveCompanyId==='function'?window.cfGetActiveCompanyId():null}catch(_){activeCompany=null}
+    if(!activeCompany)return;if(panel.classList.contains('show')&&panel.innerHTML.trim())return;
     panel.classList.add('show');
     panel.innerHTML='<div class="attention-head"><div class="attention-title">Wymaga uwagi</div></div><div class="attention-grid"><button type="button" class="attention-card" data-attention-fallback="todo"><div class="attention-label">Do wykonania</div><div class="attention-value">0</div></button><button type="button" class="attention-card" data-attention-fallback="old"><div class="attention-label">Dawno nie prane</div><div class="attention-value">0</div></button><button type="button" class="attention-card" data-attention-fallback="unapproved"><div class="attention-label">Niezatwierdzone</div><div class="attention-value">0</div></button><button type="button" class="attention-card" data-attention-fallback="finance"><div class="attention-label">Faktury do zapłaty</div><div class="attention-value">0</div></button></div>';
   }
@@ -112,6 +139,10 @@
     document.addEventListener('pointermove',onMove,{capture:true,passive:false});
     document.addEventListener('pointerup',onUp,{capture:true,passive:false});
     document.addEventListener('pointercancel',clean,{capture:true,passive:true});
+    document.addEventListener('touchstart',onTouchStart,{capture:true,passive:true});
+    document.addEventListener('touchmove',onTouchMove,{capture:true,passive:false});
+    document.addEventListener('touchend',onTouchEnd,{capture:true,passive:false});
+    document.addEventListener('touchcancel',onTouchCancel,{capture:true,passive:true});
     document.addEventListener('click',e=>{
       if(!isAdmin()&&e.target.closest?.('[data-cf-photos]')){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();return}
       if(Date.now()<suppressClickUntil&&e.target.closest?.('#cfCompanyGrid>.cf-company-card')){e.preventDefault();e.stopImmediatePropagation()}

@@ -13,9 +13,23 @@ self.addEventListener('fetch', event => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin || !url.pathname.startsWith('/app/')) return;
 
-  // Pełnoekranowe moduły są samodzielnymi dokumentami.
-  if (url.pathname === '/app/weather.html' || url.pathname === '/app/calendar.html') {
+  if (url.pathname === '/app/weather.html') {
     event.respondWith(fetch(req, { cache: 'no-store' }));
+    return;
+  }
+
+  if (url.pathname === '/app/calendar.html') {
+    event.respondWith((async () => {
+      const response = await fetch(req, { cache: 'no-store' });
+      const type = response.headers.get('content-type') || '';
+      if (!response.ok || !type.includes('text/html')) return response;
+      let html = await response.text();
+      html = html.replace(/\/app\/calendar-engine\.js\?v=[^"']+/g, '/app/calendar-engine.js?v=20260917-2');
+      const headers = new Headers(response.headers);
+      headers.delete('content-length');
+      headers.set('cache-control', 'no-store, no-cache, must-revalidate');
+      return new Response(html, {status:response.status,statusText:response.statusText,headers});
+    })());
     return;
   }
 
@@ -26,7 +40,7 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text();
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.25.0');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.26.0');
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';
@@ -52,18 +66,14 @@ self.addEventListener('fetch', event => {
   return 'upcoming';
 }`;
 
-    if (html.includes(originalBucket)) {
-      html = html.replace(originalBucket, fixedBucket);
-    } else {
-      html = html.replace(/function cfReminderBucket\(r, now=new Date\(\)\)\{[\s\S]*?\n\}/, fixedBucket);
-    }
+    if (html.includes(originalBucket)) html = html.replace(originalBucket, fixedBucket);
+    else html = html.replace(/function cfReminderBucket\(r, now=new Date\(\)\)\{[\s\S]*?\n\}/, fixedBucket);
 
     html = html.replace("case 'todo': return r.zlecone && !r.data_prania;", "case 'todo': return !r.zatwierdzone;");
     html = html.replace("case 'todo': return !r.data_prania;", "case 'todo': return !r.zatwierdzone;");
     html = html.replace("const pendingOrders=records.filter(r=>r.zlecone && !r.data_prania).length;", "const pendingOrders=activeRecords().filter(r=>!r.zatwierdzone).length;");
     html = html.replace("const pendingOrders=records.filter(r=>!r.data_prania).length;", "const pendingOrders=activeRecords().filter(r=>!r.zatwierdzone).length;");
 
-    // Bezpieczny domyślny widok aktywnych wpisów: zawsze „Do wykonania”.
     html = html.replace("let mainStatusFilter = 'all';", "let mainStatusFilter = 'todo';");
     html = html.replace('<option value="todo">Do wykonania</option>', '<option value="todo" selected>Do wykonania</option>');
     html = html.replace(
@@ -71,7 +81,6 @@ self.addEventListener('fetch', event => {
       `async function cfEnterCompany(companyId){\n  if(!companyId) return;\n  mainStatusFilter = 'todo';\n  const cfMainStatusSelect = document.getElementById('mainStatusFilter');\n  if(cfMainStatusSelect) cfMainStatusSelect.value = 'todo';`
     );
 
-    // Pozostawiona zgodność z wcześniejszym linkiem do panelu firm.
     html = html.replace(
       `async function cfStartForCurrentUser(){\n  if(cfIsAdmin()){`,
       `async function cfStartForCurrentUser(){\n  if(cfIsAdmin()){\n    const cfForceCompanyChooser=new URLSearchParams(location.search).get('cfCompanyChooser')==='1';\n    if(cfForceCompanyChooser){\n      cfSetCompanyContext(null);\n      try{\n        const cfUrl=new URL(location.href);\n        cfUrl.searchParams.delete('cfCompanyChooser');\n        history.replaceState(null,'',cfUrl.pathname+cfUrl.search+cfUrl.hash);\n      }catch(_){ }\n      await cfShowCompanyChooser();\n      return;\n    }`
@@ -112,10 +121,7 @@ self.addEventListener('fetch', event => {
     html = html.replace(/<script src="\/app\/calendar-weather-v1218\.js\?v=[^"]+"><\/script>/g, '');
     html = html.replace(/<!-- CF_WEATHER_SLOT_START -->[\s\S]*?<!-- CF_WEATHER_SLOT_END -->/g, '');
 
-    html = html.replace(
-      '<div class="search-box cf-main-search-box">',
-      '<div class="search-box cf-main-search-box cf-main-search-row">'
-    );
+    html = html.replace('<div class="search-box cf-main-search-box">','<div class="search-box cf-main-search-box cf-main-search-row">');
 
     const weatherSlot = `<!-- CF_WEATHER_SLOT_START -->
 <style id="cfWeatherSlotBase">
@@ -126,14 +132,10 @@ self.addEventListener('fetch', event => {
 <!-- CF_WEATHER_SLOT_END -->`;
 
     const searchRowTag = /<([a-zA-Z][\w:-]*)([^>]*\bclass=["'][^"']*\bcf-main-search-row\b[^"']*["'][^>]*)>/;
-    if (searchRowTag.test(html)) {
-      html = html.replace(searchRowTag, `${weatherSlot}\n$&`);
-    } else {
-      const bodyOpen = /<body([^>]*)>/i;
-      html = html.replace(bodyOpen, `$&\n${weatherSlot}`);
-    }
+    if (searchRowTag.test(html)) html = html.replace(searchRowTag, `${weatherSlot}\n$&`);
+    else html = html.replace(/<body([^>]*)>/i, `$&\n${weatherSlot}`);
 
-    const injectedScripts = '<script src="/app/weather-v6.js?v=20260916-1"></script>\n<script src="/app/weather-refresh-v12311.js?v=20260916-1"></script>\n<script src="/app/layout-v11913.js?v=20260917-2"></script>\n<script src="/app/operations-v1200.js?v=20260915-1"></script>\n<script src="/app/photo-local-v1240.js?v=20260916-2"></script>\n<script src="/app/photo-local-ui-v1232.js?v=20260916-5"></script>\n<script src="/app/photo-camera-v1213.js?v=20260916-3"></script>\n<script src="/app/completion-guard-v1236.js?v=20260916-4"></script>\n<script src="/app/calendar-v1203.js?v=20260915-12"></script>\n<script src="/app/ui-v1209.js?v=20260915-3"></script>\n<script src="/app/calendar-add-v1215.js?v=20260915-2"></script>\n<script src="/app/calendar-weather-v1218.js?v=20260916-3"></script>';
+    const injectedScripts = '<script src="/app/weather-v6.js?v=20260916-1"></script>\n<script src="/app/weather-refresh-v12311.js?v=20260916-1"></script>\n<script src="/app/layout-v11913.js?v=20260917-2"></script>\n<script src="/app/operations-v1200.js?v=20260915-1"></script>\n<script src="/app/photo-local-v1240.js?v=20260916-2"></script>\n<script src="/app/photo-local-ui-v1232.js?v=20260916-5"></script>\n<script src="/app/photo-camera-v1213.js?v=20260916-3"></script>\n<script src="/app/completion-guard-v1236.js?v=20260916-4"></script>\n<script src="/app/calendar-v1203.js?v=20260917-2"></script>\n<script src="/app/ui-v1209.js?v=20260915-3"></script>\n<script src="/app/calendar-add-v1215.js?v=20260915-2"></script>\n<script src="/app/calendar-weather-v1218.js?v=20260916-3"></script>';
     if (html.includes('</body>')) html = html.replace('</body>', `${injectedScripts}\n</body>`);
     else html += injectedScripts;
 

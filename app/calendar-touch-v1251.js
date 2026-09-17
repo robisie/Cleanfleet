@@ -5,11 +5,10 @@
   function ensureStyle(){
     if(document.getElementById('cfCalTouch1251Style'))return;
     const s=document.createElement('style');s.id='cfCalTouch1251Style';s.textContent=`
-      #calendarBody .event{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+      #calendarBody .event{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none}
       #calendarBody .event.cf-touch-source{opacity:.35}
       .cf-touch-drag-ghost{position:fixed;z-index:400000;pointer-events:none;min-width:150px;max-width:260px;padding:9px 11px;border-radius:10px;background:#213028;color:#fff;border:1px solid #4b7058;border-left:5px solid #48a868;box-shadow:0 12px 35px rgba(0,0,0,.45);font:800 12px/1.2 system-ui,-apple-system,sans-serif;transform:translate(-50%,-115%)}
       #calendarBody [data-date].cf-touch-over{background:#23402d!important;box-shadow:inset 0 0 0 2px #5cc47b!important}
-      #calendarBody .event.reminder{touch-action:manipulation}
     `;document.head.appendChild(s);
   }
 

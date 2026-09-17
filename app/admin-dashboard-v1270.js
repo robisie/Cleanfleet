@@ -35,6 +35,13 @@
     arr.splice(from,1);const ti=arr.indexOf(target);if(ti<0)return;
     arr.splice(ti+(after?1:0),0,source);saveOrder(arr);
   }
+  function swap(source,target){
+    if(!source||!target||source===target)return;
+    const arr=visualCards(),a=arr.indexOf(source),b=arr.indexOf(target);
+    if(a<0||b<0)return;
+    [arr[a],arr[b]]=[arr[b],arr[a]];
+    saveOrder(arr);
+  }
   function afterTarget(el,x,y){
     const r=el.getBoundingClientRect(),sr=src?.getBoundingClientRect();
     const sameRow=sr?Math.abs(sr.top-r.top)<Math.max(20,r.height*.45):true;
@@ -70,8 +77,9 @@
     if(!src){cleanup();return}
     clearTimeout(pressTimer);if(!active){cleanup();return}
     e.preventDefault();e.stopPropagation();suppressClickUntil=Date.now()+650;
-    const source=src,target=over,x=e.clientX,y=e.clientY;
-    cleanup();if(target)reorder(source,target,afterTarget(target,x,y));
+    const source=src,target=over;
+    cleanup();
+    if(target)swap(source,target);
   }
   function onPointerCancel(){cleanup()}
 

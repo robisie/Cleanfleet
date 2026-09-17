@@ -11,6 +11,7 @@
       #cfCompanyGrid>.cf-company-card.cf-sort-source{opacity:.35}
       #cfCompanyGrid>.cf-company-card.cf-sort-over{box-shadow:inset 0 0 0 2px #a6c61b!important}
       .cf-admin-sort-ghost{position:fixed;z-index:500000;pointer-events:none;min-width:150px;max-width:260px;padding:12px 14px;border-radius:14px;background:#fff;color:#171a18;border:1px solid #a6c61b;box-shadow:0 18px 45px rgba(0,0,0,.25);font:800 12px/1.25 system-ui,-apple-system,sans-serif;transform:translate(-50%,-115%)}
+      body.cf-photo-admin-only [data-cf-photos]{display:none!important}
     `;document.head.appendChild(s);
   }
   const key=el=>el?.id?`id:${el.id}`:(el?.dataset?.companyId?`company:${el.dataset.companyId}`:null);
@@ -78,14 +79,45 @@
     suppressClickUntil=Date.now()+650;clean();
   }
 
+  function isAdmin(){
+    try{return typeof cfIsAdmin==='function' && !!cfIsAdmin();}
+    catch(_){return false;}
+  }
+  function applyPhotoAccess(){
+    const allowed=isAdmin();
+    document.body?.classList.toggle('cf-photo-admin-only',!allowed);
+    if(!allowed){
+      const overlay=document.getElementById('cfPhotoOverlay');
+      if(overlay?.classList.contains('open'))overlay.classList.remove('open');
+    }
+  }
+
+  function ensureAttentionVisible(){
+    const panel=document.getElementById('attentionPanel');
+    if(!panel)return;
+    let activeCompany=null;
+    try{activeCompany=typeof window.cfGetActiveCompanyId==='function'?window.cfGetActiveCompanyId():null}catch(_){activeCompany=null}
+    if(!activeCompany)return;
+    if(panel.classList.contains('show')&&panel.innerHTML.trim())return;
+    panel.classList.add('show');
+    panel.innerHTML='<div class="attention-head"><div class="attention-title">Wymaga uwagi</div></div><div class="attention-grid"><button type="button" class="attention-card" data-attention-fallback="todo"><div class="attention-label">Do wykonania</div><div class="attention-value">0</div></button><button type="button" class="attention-card" data-attention-fallback="old"><div class="attention-label">Dawno nie prane</div><div class="attention-value">0</div></button><button type="button" class="attention-card" data-attention-fallback="unapproved"><div class="attention-label">Niezatwierdzone</div><div class="attention-value">0</div></button><button type="button" class="attention-card" data-attention-fallback="finance"><div class="attention-label">Faktury do zapłaty</div><div class="attention-value">0</div></button></div>';
+  }
+
+  function refreshAux(){applyPhotoAccess();ensureAttentionVisible()}
   function findGrid(){const g=document.getElementById('cfCompanyGrid');if(g){bindGrid(g);return true}return false}
   function boot(){
-    style();findGrid();new MutationObserver(()=>findGrid()).observe(document.body,{childList:true,subtree:true});
+    style();findGrid();refreshAux();
+    new MutationObserver(()=>{findGrid();setTimeout(refreshAux,0)}).observe(document.body,{childList:true,subtree:true});
     document.addEventListener('pointerdown',onDown,{capture:true,passive:true});
     document.addEventListener('pointermove',onMove,{capture:true,passive:false});
     document.addEventListener('pointerup',onUp,{capture:true,passive:false});
     document.addEventListener('pointercancel',clean,{capture:true,passive:true});
-    document.addEventListener('click',e=>{if(Date.now()<suppressClickUntil&&e.target.closest?.('#cfCompanyGrid>.cf-company-card')){e.preventDefault();e.stopImmediatePropagation()}},true);
+    document.addEventListener('click',e=>{
+      if(!isAdmin()&&e.target.closest?.('[data-cf-photos]')){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();return}
+      if(Date.now()<suppressClickUntil&&e.target.closest?.('#cfCompanyGrid>.cf-company-card')){e.preventDefault();e.stopImmediatePropagation()}
+    },true);
+    let n=0;const t=setInterval(()=>{refreshAux();if(++n>80)clearInterval(t)},250);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshAux()},{passive:true});
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();

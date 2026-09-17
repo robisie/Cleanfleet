@@ -1,7 +1,7 @@
 (()=>{
   'use strict';
   const STORAGE='cf-admin-dashboard-order-v1';
-  let grid=null,dragEl=null,ghost=null,pressTimer=null,startX=0,startY=0,active=false,suppressClickUntil=0;
+  let grid=null,dragEl=null,ghost=null,pressTimer=null,startX=0,startY=0,active=false,suppressClickUntil=0,dropTarget=null;
 
   function style(){
     if(document.getElementById('cfAdminDashboard1270Style'))return;
@@ -16,36 +16,50 @@
   const key=el=>el?.id?`id:${el.id}`:(el?.dataset?.companyId?`company:${el.dataset.companyId}`:null);
   const cards=()=>grid?[...grid.children].filter(x=>x.classList?.contains('cf-company-card')):[];
   function saved(){try{const x=JSON.parse(localStorage.getItem(STORAGE)||'[]');return Array.isArray(x)?x:[]}catch(_){return[]}}
+  function visualCards(){return cards().sort((a,b)=>(Number(a.style.order)||0)-(Number(b.style.order)||0))}
   function applyOrder(){
     if(!grid)return;
     const order=saved(),rank=new Map(order.map((k,i)=>[k,i]));
     cards().forEach((el,i)=>{const k=key(el);el.style.order=String(rank.has(k)?rank.get(k):10000+i);el.draggable=true});
   }
-  function saveOrder(){
+  function saveOrder(arr=visualCards()){
     if(!grid)return;
-    const list=cards().sort((a,b)=>(Number(a.style.order)||0)-(Number(b.style.order)||0)).map(key).filter(Boolean);
+    arr.forEach((el,i)=>el.style.order=String(i));
+    const list=arr.map(key).filter(Boolean);
     try{localStorage.setItem(STORAGE,JSON.stringify(list))}catch(_){}
-    list.forEach((k,i)=>{const el=cards().find(x=>key(x)===k);if(el)el.style.order=String(i)});
   }
   function reorder(src,target,after){
     if(!src||!target||src===target)return;
-    const arr=cards().sort((a,b)=>(Number(a.style.order)||0)-(Number(b.style.order)||0));
-    const from=arr.indexOf(src),to0=arr.indexOf(target);if(from<0||to0<0)return;
-    arr.splice(from,1);const to=arr.indexOf(target)+(after?1:0);arr.splice(to,0,src);
-    arr.forEach((el,i)=>el.style.order=String(i));saveOrder();
+    const arr=visualCards();
+    const from=arr.indexOf(src);if(from<0)return;
+    arr.splice(from,1);
+    const targetIndex=arr.indexOf(target);if(targetIndex<0)return;
+    arr.splice(targetIndex+(after?1:0),0,src);
+    saveOrder(arr);
   }
-  function afterTarget(el,y){const r=el.getBoundingClientRect();return y>r.top+r.height/2}
-  function clearOver(){grid?.querySelectorAll('.cf-sort-over').forEach(x=>x.classList.remove('cf-sort-over'))}
+  function afterTarget(el,x,y){
+    const r=el.getBoundingClientRect();
+    const sameRow=Math.abs((dragEl?.getBoundingClientRect().top||0)-r.top)<Math.max(20,r.height*.45);
+    return sameRow?x>r.left+r.width/2:y>r.top+r.height/2;
+  }
+  function clearOver(){grid?.querySelectorAll('.cf-sort-over').forEach(x=>x.classList.remove('cf-sort-over'));dropTarget=null}
   function clean(){clearTimeout(pressTimer);pressTimer=null;clearOver();dragEl?.classList.remove('cf-sort-source');dragEl=null;active=false;ghost?.remove();ghost=null}
-  function moveGhost(x,y){if(ghost){ghost.style.left=x+'px';ghost.style.top=y+'px'}clearOver();const t=document.elementFromPoint(x,y)?.closest?.('#cfCompanyGrid>.cf-company-card');if(t&&t!==dragEl)t.classList.add('cf-sort-over')}
+  function targetAt(x,y){return document.elementFromPoint(x,y)?.closest?.('#cfCompanyGrid>.cf-company-card')||null}
+  function moveGhost(x,y){
+    if(ghost){ghost.style.left=x+'px';ghost.style.top=y+'px'}
+    grid?.querySelectorAll('.cf-sort-over').forEach(x=>x.classList.remove('cf-sort-over'));
+    const t=targetAt(x,y);
+    dropTarget=(t&&t!==dragEl)?t:null;
+    if(dropTarget)dropTarget.classList.add('cf-sort-over');
+  }
   function beginTouch(x,y){if(!dragEl)return;active=true;dragEl.classList.add('cf-sort-source');ghost=document.createElement('div');ghost.className='cf-admin-sort-ghost';ghost.textContent=(dragEl.textContent||'').trim().replace(/\s+/g,' ').slice(0,90);document.body.appendChild(ghost);moveGhost(x,y);if(navigator.vibrate)try{navigator.vibrate(18)}catch(_){}}
 
   function bindGrid(g){
     if(g.dataset.cfSort1270==='1'){grid=g;applyOrder();return}g.dataset.cfSort1270='1';grid=g;applyOrder();
     new MutationObserver(()=>setTimeout(applyOrder,0)).observe(g,{childList:true});
     g.addEventListener('dragstart',e=>{const el=e.target.closest?.('#cfCompanyGrid>.cf-company-card');if(!el)return;dragEl=el;el.classList.add('cf-sort-source');e.dataTransfer?.setData('text/plain',key(el)||'');if(e.dataTransfer)e.dataTransfer.effectAllowed='move'});
-    g.addEventListener('dragover',e=>{if(!dragEl)return;const t=e.target.closest?.('#cfCompanyGrid>.cf-company-card');if(!t||t===dragEl)return;e.preventDefault();clearOver();t.classList.add('cf-sort-over')});
-    g.addEventListener('drop',e=>{if(!dragEl)return;const t=e.target.closest?.('#cfCompanyGrid>.cf-company-card');e.preventDefault();if(t&&t!==dragEl)reorder(dragEl,t,afterTarget(t,e.clientY));clean()});
+    g.addEventListener('dragover',e=>{if(!dragEl)return;const t=e.target.closest?.('#cfCompanyGrid>.cf-company-card');if(!t||t===dragEl)return;e.preventDefault();grid.querySelectorAll('.cf-sort-over').forEach(x=>x.classList.remove('cf-sort-over'));dropTarget=t;t.classList.add('cf-sort-over')});
+    g.addEventListener('drop',e=>{if(!dragEl)return;const t=e.target.closest?.('#cfCompanyGrid>.cf-company-card')||dropTarget;e.preventDefault();const src=dragEl;if(t&&t!==src)reorder(src,t,afterTarget(t,e.clientX,e.clientY));clean()});
     g.addEventListener('dragend',clean);
   }
   function onDown(e){
@@ -55,7 +69,14 @@
     dragEl=el;startX=e.clientX;startY=e.clientY;pressTimer=setTimeout(()=>beginTouch(e.clientX,e.clientY),260);
   }
   function onMove(e){if(!dragEl)return;if(!active){if(Math.hypot(e.clientX-startX,e.clientY-startY)>9)clean();return}e.preventDefault();moveGhost(e.clientX,e.clientY)}
-  function onUp(e){if(!dragEl){clean();return}clearTimeout(pressTimer);if(!active){clean();return}e.preventDefault();e.stopPropagation();const t=document.elementFromPoint(e.clientX,e.clientY)?.closest?.('#cfCompanyGrid>.cf-company-card');const src=dragEl;if(t&&t!==src)reorder(src,t,afterTarget(t,e.clientY));suppressClickUntil=Date.now()+650;clean()}
+  function onUp(e){
+    if(!dragEl){clean();return}
+    clearTimeout(pressTimer);if(!active){clean();return}
+    e.preventDefault();e.stopPropagation();
+    const src=dragEl,t=dropTarget||targetAt(e.clientX,e.clientY);
+    if(t&&t!==src)reorder(src,t,afterTarget(t,e.clientX,e.clientY));
+    suppressClickUntil=Date.now()+650;clean();
+  }
 
   function findGrid(){const g=document.getElementById('cfCompanyGrid');if(g){bindGrid(g);return true}return false}
   function boot(){

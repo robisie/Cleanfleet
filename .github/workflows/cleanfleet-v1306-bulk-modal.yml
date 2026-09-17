@@ -1,0 +1,43 @@
+name: CleanFleet v1.30.6 bulk modal layout
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cleanfleet-v1306-bulk-modal.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Apply bulk modal layout patch
+        run: python3 .github/patch_v1306_bulk_modal.py
+      - name: Validate JavaScript
+        run: |
+          git diff --check
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          html=Path('app/index.html').read_text(encoding='utf-8')
+          blocks=re.findall(r'<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)</script>',html,re.I)
+          for i,b in enumerate(blocks):
+              if not b.strip():
+                  continue
+              p=Path(f'/tmp/cf-v1306-{i}.js')
+              p.write_text(b,encoding='utf-8')
+              subprocess.run(['node','--check',str(p)],check=True)
+          subprocess.run(['node','--check','app/sw.js'],check=True)
+          subprocess.run(['node','--check','app/admin-dashboard-v1270.js'],check=True)
+          PY
+      - name: Commit production patch
+        run: |
+          git config user.name 'robisie'
+          git config user.email 'robisie-fer@o2.pl'
+          git add -A
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'v1.30.6 improve bulk order modal layout'
+          git push

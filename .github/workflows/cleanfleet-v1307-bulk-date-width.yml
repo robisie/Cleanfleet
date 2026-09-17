@@ -1,0 +1,42 @@
+name: CleanFleet v1.30.7 bulk date width
+on:
+  push:
+    paths:
+      - '.github/workflows/cleanfleet-v1307-bulk-date-width.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Apply date width fix
+        run: python3 .github/scripts/patch_v1307_bulk_date_width.py
+      - name: Validate JavaScript
+        run: |
+          git diff --check
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          html=Path('app/index.html').read_text(encoding='utf-8')
+          blocks=re.findall(r'<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)</script>',html,re.I)
+          for i,b in enumerate(blocks):
+              if not b.strip(): continue
+              p=Path(f'/tmp/cf-{i}.js')
+              p.write_text(b,encoding='utf-8')
+              subprocess.run(['node','--check',str(p)],check=True)
+          subprocess.run(['node','--check','app/sw.js'],check=True)
+          subprocess.run(['node','--check','app/admin-dashboard-v1270.js'],check=True)
+          PY
+      - name: Commit production patch
+        run: |
+          git config user.name 'robisie'
+          git config user.email 'robisie-fer@o2.pl'
+          git add app/index.html app/sw.js app/admin-dashboard-v1270.js
+          git commit -m 'v1.30.7 fix bulk date field width on Safari iOS'
+          git rm .github/scripts/patch_v1307_bulk_date_width.py .github/workflows/cleanfleet-v1307-bulk-date-width.yml
+          git commit --amend --no-edit
+          git push

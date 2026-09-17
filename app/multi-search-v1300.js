@@ -63,7 +63,7 @@
     const unknown=rows.filter(x=>!x.found);
     const selectable=found.filter(x=>!x.active);
 
-    const foundHtml=found.length?found.map((x,i)=>{
+    const foundHtml=found.length?found.map(x=>{
       const status=x.active?'Już oczekuje na pranie':'Gotowy do dodania';
       return `<label class="record-card cf-bulk-search-row" style="margin-bottom:8px;display:block;${x.active?'opacity:.62;':''}">
         <div class="record-top" style="align-items:center;gap:10px;">
@@ -178,11 +178,20 @@
     return true;
   }
 
+  function isSearchButton(target){
+    const btn=target?.closest?.('button');
+    if(!btn) return false;
+    if(btn.id==='searchBtn') return true;
+    const onclick=String(btn.getAttribute('onclick')||'');
+    if(onclick.includes('doSearch')) return true;
+    return String(btn.textContent||'').trim().toUpperCase()==='SZUKAJ';
+  }
+
   function intercept(e){
     const input=document.getElementById('searchInput');
     if(!input) return;
     if(e.type==='click'){
-      if(!e.target.closest?.('#searchBtn')) return;
+      if(!isSearchButton(e.target)) return;
     }else if(e.type==='keydown'){
       if(e.target!==input || e.key!=='Enter') return;
     }else return;
@@ -193,7 +202,12 @@
     e.stopPropagation();
     e.stopImmediatePropagation();
     try{ if(typeof cfHideSearchSuggestions==='function') cfHideSearchSuggestions(); }catch(_){ }
-    showBulk(raw);
+    try{
+      showBulk(raw);
+    }catch(err){
+      console.error('CleanFleet bulk search:',err);
+      try{ showToast('Nie udało się uruchomić wyszukiwania wielu tablic.'); }catch(_){ }
+    }
   }
 
   function boot(){

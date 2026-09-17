@@ -150,5 +150,18 @@
     if(error)throw error;
   }
 
+  function loadScript(src,id){
+    return new Promise((resolve,reject)=>{
+      if(document.getElementById(id))return resolve();
+      const s=document.createElement('script');s.id=id;s.src=src;s.onload=resolve;s.onerror=reject;document.head.appendChild(s);
+    });
+  }
+
   window.CFCalendarEngine={loadSupabase,loadAll,moveWash,moveReminder,saveReminder,setReminderStatus,snoozeReminder,deleteReminder,isoDay};
+
+  if(location.pathname.endsWith('/app/calendar.html')){
+    loadScript('/app/reminder-form-v1251.js?v=20260917-1','cfReminderRange1251Script')
+      .then(()=>loadScript('/app/calendar-touch-v1251.js?v=20260917-1','cfCalendarTouch1251Script'))
+      .catch(err=>console.error('CleanFleet calendar enhancements:',err));
+  }
 })();

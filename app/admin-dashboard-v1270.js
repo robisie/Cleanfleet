@@ -39,42 +39,37 @@
         overflow:hidden!important;
         box-sizing:border-box!important;
       }
-      #cfCompanyGrid>.cf-company-card.cf-grid-company-tile>:not(button){
-        zoom:.88;
-      }
+      #cfCompanyGrid>.cf-company-card.cf-grid-company-tile>:not(button){zoom:.88}
       #cfCompanyGrid>.cf-company-card.cf-grid-company-tile h1,
       #cfCompanyGrid>.cf-company-card.cf-grid-company-tile h2,
       #cfCompanyGrid>.cf-company-card.cf-grid-company-tile h3,
       #cfCompanyGrid>.cf-company-card.cf-grid-company-tile p{
-        margin-top:0!important;
-        margin-bottom:3px!important;
-        line-height:1.08!important;
+        margin-top:0!important;margin-bottom:3px!important;line-height:1.08!important;
       }
-      #cfCompanyGrid>.cf-company-card.cf-grid-company-tile hr{
-        margin:6px 0!important;
-      }
+      #cfCompanyGrid>.cf-company-card.cf-grid-company-tile hr{margin:6px 0!important}
       #cfCompanyGrid>.cf-company-card.cf-grid-company-tile [class*="stat"],
       #cfCompanyGrid>.cf-company-card.cf-grid-company-tile [class*="metric"]{
-        row-gap:4px!important;
-        column-gap:8px!important;
-        line-height:1.05!important;
+        row-gap:4px!important;column-gap:8px!important;line-height:1.05!important;
+      }
+      .cf-grid-drag-handle{
+        display:none;position:absolute;z-index:12;border:1px solid #cdd2cf;background:rgba(255,255,255,.94);
+        color:#68716b;border-radius:9px;width:30px;height:30px;padding:0;align-items:center;justify-content:center;
+        font:900 18px/1 system-ui,-apple-system,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.08);
+        -webkit-tap-highlight-color:transparent;touch-action:none!important;
       }
       #cfCompanyGrid>.cf-company-card.cf-grid-source{opacity:.28}
       #cfCompanyGrid.cf-grid-dragging{
         background-image:linear-gradient(rgba(166,198,27,.065) 1px,transparent 1px),linear-gradient(90deg,rgba(166,198,27,.065) 1px,transparent 1px);
-        background-size:calc((100% - 60px)/6 + 12px) 180px;
-        border-radius:14px;
+        background-size:calc((100% - 60px)/6 + 12px) 180px;border-radius:14px;
       }
       .cf-admin-grid-placeholder{
         pointer-events:none;z-index:50;border:2px dashed #a6c61b;border-radius:14px;
-        background:rgba(166,198,27,.13);box-shadow:inset 0 0 0 1px rgba(166,198,27,.12);
-        position:relative;
+        background:rgba(166,198,27,.13);box-shadow:inset 0 0 0 1px rgba(166,198,27,.12);position:relative;
       }
       .cf-admin-grid-placeholder::after{
         content:'+';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
         width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-        background:#a6c61b;color:#fff;font:900 25px/1 system-ui,-apple-system,sans-serif;
-        box-shadow:0 4px 14px rgba(0,0,0,.18)
+        background:#a6c61b;color:#fff;font:900 25px/1 system-ui,-apple-system,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.18)
       }
       .cf-admin-grid-ghost{
         position:fixed;z-index:500000;pointer-events:none;min-width:150px;max-width:280px;padding:12px 14px;
@@ -90,9 +85,16 @@
       }
       @media(max-width:599px){
         #cfCompanyGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important;--cf-row-h:148px}
+        #cfCompanyGrid>.cf-company-card{touch-action:pan-y!important}
         #cfCompanyGrid.cf-grid-dragging{background-size:calc((100% - 12px)/2 + 12px) 160px}
-        #cfCompanyGrid>.cf-company-card.cf-grid-company-tile{padding:8px 10px!important}
-        #cfCompanyGrid>.cf-company-card.cf-grid-company-tile>:not(button){zoom:.8}
+        #cfCompanyGrid>.cf-company-card.cf-grid-company-tile{padding:7px 9px!important}
+        #cfCompanyGrid>.cf-company-card.cf-grid-company-tile>:not(button){zoom:.72}
+        #cfCompanyGrid>.cf-company-card.cf-grid-company-tile h1,
+        #cfCompanyGrid>.cf-company-card.cf-grid-company-tile h2,
+        #cfCompanyGrid>.cf-company-card.cf-grid-company-tile h3,
+        #cfCompanyGrid>.cf-company-card.cf-grid-company-tile p{margin-bottom:2px!important;line-height:1.02!important}
+        #cfCompanyGrid>.cf-company-card.cf-grid-company-tile hr{margin:4px 0!important}
+        .cf-grid-drag-handle{display:flex;right:6px;bottom:6px}
       }
     `;
     document.head.appendChild(s);
@@ -117,7 +119,12 @@
   function writeStore(v){try{localStorage.setItem(STORAGE,JSON.stringify(v))}catch(_){}}
   function bpKey(){return String(columns())}
   function readLayout(){const all=readStore();return all[bpKey()]&&typeof all[bpKey()]==='object'?all[bpKey()]:{}}
-  function saveLayout(layout){const all=readStore();all[bpKey()]=layout;writeStore(all)}
+  function saveLayout(layout,replace=false){
+    const all=readStore(),bp=bpKey();
+    const previous=all[bp]&&typeof all[bp]==='object'?all[bp]:{};
+    all[bp]=replace?layout:{...previous,...layout};
+    writeStore(all);
+  }
 
   function overlaps(a,b){return !(a.c+a.w<=b.c||b.c+b.w<=a.c||a.r+a.h<=b.r||b.r+b.h<=a.r)}
   function fits(pos,layout,ignoreKey=null){
@@ -140,12 +147,19 @@
     const list=cards();
     list.forEach(el=>{
       const k=key(el);if(!k)return;
-      const span=defaultSpan(el);
-      const old=saved[k];
+      const span=defaultSpan(el),old=saved[k];
       const wanted=old?{c:Number(old.c)||1,r:Number(old.r)||1,w:span.w,h:span.h}:null;
       out[k]=wanted&&fits(wanted,out)?wanted:firstFree(span,out);
     });
     return out;
+  }
+
+  function ensureHandle(el){
+    if(!el||el.querySelector(':scope > .cf-grid-drag-handle'))return;
+    const h=document.createElement('button');
+    h.type='button';h.className='cf-grid-drag-handle';h.setAttribute('aria-label','Przeciągnij kafelek');h.title='Przeciągnij kafelek';h.textContent='⠿';
+    h.addEventListener('click',e=>{e.preventDefault();e.stopPropagation()});
+    el.appendChild(h);
   }
 
   function applyLayout(){
@@ -154,10 +168,11 @@
     cards().forEach(el=>{
       const p=layout[key(el)];if(!p)return;
       el.classList.toggle('cf-grid-company-tile',!!el.dataset.companyId);
+      ensureHandle(el);
       el.style.order='';
       el.style.gridColumn=`${p.c} / span ${p.w}`;
       el.style.gridRow=`${p.r} / span ${p.h}`;
-      el.draggable=true;
+      el.draggable=columns()!==2;
     });
     saveLayout(layout);
   }
@@ -166,26 +181,18 @@
     if(!source||!cell)return;
     const sourceKey=key(source);if(!sourceKey)return;
     const current=normalizedLayout();
-    const span=defaultSpan(source);
-    const cols=columns();
+    const span=defaultSpan(source),cols=columns();
     const desired={c:Math.max(1,Math.min(cell.c,cols-span.w+1)),r:Math.max(1,cell.r),w:span.w,h:span.h};
-
     delete current[sourceKey];
-    const colliders=Object.entries(current)
-      .filter(([,p])=>overlaps(desired,p))
-      .map(([k])=>k);
+    const colliders=Object.entries(current).filter(([,p])=>overlaps(desired,p)).map(([k])=>k);
     colliders.forEach(k=>delete current[k]);
     current[sourceKey]=desired;
-
     colliders.forEach(k=>{
       const el=cards().find(x=>key(x)===k);if(!el)return;
-      const sp=defaultSpan(el);
-      current[k]=firstFree(sp,current,desired.r,desired.c);
+      current[k]=firstFree(defaultSpan(el),current,desired.r,desired.c);
     });
-
     saveLayout(current);
-    active=false;
-    applyLayout();
+    active=false;applyLayout();
   }
 
   function rowHeight(){
@@ -194,15 +201,11 @@
   }
   function cellAt(x,y,source){
     if(!grid)return null;
-    const rect=grid.getBoundingClientRect(),cols=columns();
-    const gap=parseFloat(getComputedStyle(grid).gap)||GAP;
-    const cw=(rect.width-gap*(cols-1))/cols;
-    const rh=rowHeight();
-    let c=Math.floor((x-rect.left)/(cw+gap))+1;
-    let r=Math.floor((y-rect.top)/(rh+gap))+1;
+    const rect=grid.getBoundingClientRect(),cols=columns(),gap=parseFloat(getComputedStyle(grid).gap)||GAP;
+    const cw=(rect.width-gap*(cols-1))/cols,rh=rowHeight();
+    let c=Math.floor((x-rect.left)/(cw+gap))+1,r=Math.floor((y-rect.top)/(rh+gap))+1;
     c=Math.max(1,Math.min(cols,c));r=Math.max(1,r);
-    const sp=defaultSpan(source);
-    c=Math.min(c,cols-sp.w+1);
+    const sp=defaultSpan(source);c=Math.min(c,cols-sp.w+1);
     return{c,r,w:sp.w,h:sp.h};
   }
 
@@ -215,32 +218,29 @@
   }
   function removePlaceholder(){placeholder?.remove();placeholder=null;lastCell=null}
   function cleanup(){
-    clearTimeout(pressTimer);pressTimer=null;
-    src?.classList.remove('cf-grid-source');
+    clearTimeout(pressTimer);pressTimer=null;src?.classList.remove('cf-grid-source');
     src=null;active=false;ghost?.remove();ghost=null;removePlaceholder();grid?.classList.remove('cf-grid-dragging');
   }
   function beginDrag(x,y){
     if(!src)return;
     active=true;src.classList.add('cf-grid-source');grid?.classList.add('cf-grid-dragging');
     ghost=document.createElement('div');ghost.className='cf-admin-grid-ghost';ghost.textContent=(src.textContent||'').trim().replace(/\s+/g,' ').slice(0,100);document.body.appendChild(ghost);
-    moveGhost(x,y);
-    if(navigator.vibrate)try{navigator.vibrate(20)}catch(_){}
+    moveGhost(x,y);if(navigator.vibrate)try{navigator.vibrate(20)}catch(_){}
   }
-  function moveGhost(x,y){
-    if(ghost){ghost.style.left=x+'px';ghost.style.top=y+'px'}
-    const cell=cellAt(x,y,src);if(cell)showPlaceholder(cell);
-  }
+  function moveGhost(x,y){if(ghost){ghost.style.left=x+'px';ghost.style.top=y+'px'}const cell=cellAt(x,y,src);if(cell)showPlaceholder(cell)}
   function interactiveTarget(target,item){
-    const control=target?.closest?.('a,input,select,textarea,[data-company-edit],.cf-company-edit');
-    if(control)return true;
-    const button=target?.closest?.('button');
-    return !!(button&&button!==item);
+    if(target?.closest?.('.cf-grid-drag-handle'))return false;
+    const control=target?.closest?.('a,input,select,textarea,[data-company-edit],.cf-company-edit');if(control)return true;
+    const button=target?.closest?.('button');return !!(button&&button!==item);
   }
 
   function onPointerDown(e){
     if(e.pointerType==='mouse'||!grid)return;
-    const item=e.target.closest?.('#cfCompanyGrid>.cf-company-card');if(!item||interactiveTarget(e.target,item))return;
-    src=item;startX=e.clientX;startY=e.clientY;pressTimer=setTimeout(()=>beginDrag(e.clientX,e.clientY),240);
+    const item=e.target.closest?.('#cfCompanyGrid>.cf-company-card');if(!item)return;
+    if(columns()===2&&!e.target.closest?.('.cf-grid-drag-handle'))return;
+    if(interactiveTarget(e.target,item))return;
+    src=item;startX=e.clientX;startY=e.clientY;
+    pressTimer=setTimeout(()=>beginDrag(e.clientX,e.clientY),columns()===2?90:240);
   }
   function onPointerMove(e){
     if(!src)return;
@@ -251,9 +251,7 @@
     if(!src){cleanup();return}
     clearTimeout(pressTimer);if(!active){cleanup();return}
     e.preventDefault();e.stopPropagation();suppressClickUntil=Date.now()+650;
-    const source=src,cell=cellAt(e.clientX,e.clientY,source)||lastCell;
-    placeAt(source,cell);
-    cleanup();
+    const source=src,cell=cellAt(e.clientX,e.clientY,source)||lastCell;placeAt(source,cell);cleanup();
   }
   function onPointerCancel(){cleanup()}
 
@@ -261,17 +259,13 @@
     if(!grid||grid.dataset.cfGridDesktop==='1')return;
     grid.dataset.cfGridDesktop='1';
     grid.addEventListener('dragstart',e=>{
+      if(columns()===2){e.preventDefault();return}
       const el=e.target.closest?.('#cfCompanyGrid>.cf-company-card');if(!el)return;
       src=el;active=true;el.classList.add('cf-grid-source');grid.classList.add('cf-grid-dragging');
       e.dataTransfer?.setData('text/plain',key(el)||'');if(e.dataTransfer)e.dataTransfer.effectAllowed='move';
     });
-    grid.addEventListener('dragover',e=>{
-      if(!src)return;e.preventDefault();const cell=cellAt(e.clientX,e.clientY,src);if(cell)showPlaceholder(cell);
-    });
-    grid.addEventListener('drop',e=>{
-      if(!src)return;e.preventDefault();e.stopPropagation();
-      const source=src,cell=cellAt(e.clientX,e.clientY,source)||lastCell;placeAt(source,cell);cleanup();
-    });
+    grid.addEventListener('dragover',e=>{if(!src)return;e.preventDefault();const cell=cellAt(e.clientX,e.clientY,src);if(cell)showPlaceholder(cell)});
+    grid.addEventListener('drop',e=>{if(!src)return;e.preventDefault();e.stopPropagation();const source=src,cell=cellAt(e.clientX,e.clientY,source)||lastCell;placeAt(source,cell);cleanup()});
     grid.addEventListener('dragend',cleanup);
   }
 

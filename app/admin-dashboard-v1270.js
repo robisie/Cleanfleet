@@ -7,9 +7,10 @@
     if(document.getElementById('cfAdminDashboard1270Style'))return;
     const s=document.createElement('style');s.id='cfAdminDashboard1270Style';s.textContent=`
       @media (min-width:900px){.wrap{max-width:1120px!important}}
-      #cfCompanyGrid>.cf-company-card{transition:transform .14s ease,box-shadow .14s ease,opacity .14s ease;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+      #cfCompanyGrid>.cf-company-card{position:relative;transition:transform .14s ease,box-shadow .14s ease,opacity .14s ease;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
       #cfCompanyGrid>.cf-company-card.cf-sort-source{opacity:.35}
       #cfCompanyGrid>.cf-company-card.cf-sort-over{box-shadow:inset 0 0 0 2px #a6c61b!important}
+      #cfCompanyGrid>.cf-company-card.cf-sort-over::after{content:'+';position:absolute;right:8px;top:8px;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#a6c61b;color:#fff;font:900 19px/1 system-ui,-apple-system,sans-serif;z-index:20;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.18)}
       .cf-admin-sort-ghost{position:fixed;z-index:500000;pointer-events:none;min-width:150px;max-width:260px;padding:12px 14px;border-radius:14px;background:#fff;color:#171a18;border:1px solid #a6c61b;box-shadow:0 18px 45px rgba(0,0,0,.25);font:800 12px/1.25 system-ui,-apple-system,sans-serif;transform:translate(-50%,-115%)}
       body.cf-photo-admin-only [data-cf-photos]{display:none!important}
     `;document.head.appendChild(s);
@@ -45,8 +46,34 @@
     return sameRow?x>r.left+r.width/2:y>r.top+r.height/2;
   }
   function clearOver(){grid?.querySelectorAll('.cf-sort-over').forEach(x=>x.classList.remove('cf-sort-over'));dropTarget=null}
-  function clean(){clearTimeout(pressTimer);pressTimer=null;clearOver();dragEl?.classList.remove('cf-sort-source');dragEl=null;active=false;touchId=null;ghost?.remove();ghost=null}
-  function targetAt(x,y){return document.elementFromPoint(x,y)?.closest?.('#cfCompanyGrid>.cf-company-card')||null}
+  function clean(){
+    clearTimeout(pressTimer);pressTimer=null;
+    clearOver();
+    if(dragEl){dragEl.classList.remove('cf-sort-source');dragEl.draggable=true}
+    dragEl=null;active=false;touchId=null;ghost?.remove();ghost=null;
+  }
+  function rectTargetAt(x,y){
+    if(!grid)return null;
+    const matches=cards().filter(el=>el!==dragEl).filter(el=>{
+      const r=el.getBoundingClientRect();
+      return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom;
+    });
+    if(matches.length)return matches[0];
+    let best=null,bestDist=Infinity;
+    cards().filter(el=>el!==dragEl).forEach(el=>{
+      const r=el.getBoundingClientRect();
+      const cx=Math.max(r.left,Math.min(x,r.right));
+      const cy=Math.max(r.top,Math.min(y,r.bottom));
+      const d=Math.hypot(x-cx,y-cy);
+      if(d<bestDist&&d<=18){bestDist=d;best=el}
+    });
+    return best;
+  }
+  function targetAt(x,y){
+    const dom=document.elementFromPoint(x,y)?.closest?.('#cfCompanyGrid>.cf-company-card')||null;
+    if(dom&&dom!==dragEl)return dom;
+    return rectTargetAt(x,y);
+  }
   function moveGhost(x,y){
     if(ghost){ghost.style.left=x+'px';ghost.style.top=y+'px'}
     grid?.querySelectorAll('.cf-sort-over').forEach(x=>x.classList.remove('cf-sort-over'));
@@ -56,7 +83,7 @@
   }
   function beginTouch(x,y){
     if(!dragEl)return;
-    active=true;dragEl.classList.add('cf-sort-source');
+    active=true;dragEl.classList.add('cf-sort-source');dragEl.draggable=false;
     ghost=document.createElement('div');ghost.className='cf-admin-sort-ghost';ghost.textContent=(dragEl.textContent||'').trim().replace(/\s+/g,' ').slice(0,90);document.body.appendChild(ghost);moveGhost(x,y);
     if(navigator.vibrate)try{navigator.vibrate(18)}catch(_){}
   }
@@ -71,7 +98,6 @@
     g.addEventListener('dragend',clean);
   }
 
-  // Pointer events zostają dla rysika/urządzeń innych niż klasyczny dotyk Safari.
   function onDown(e){
     if(e.pointerType==='mouse'||e.pointerType==='touch'||!grid)return;
     const el=e.target.closest?.('#cfCompanyGrid>.cf-company-card');if(!el||interactiveTarget(e.target))return;
@@ -88,12 +114,11 @@
     suppressClickUntil=Date.now()+650;clean();
   }
 
-  // Dedykowane touch events dla Safari / iPadOS.
   function touchById(list,id){for(const t of list||[]){if(t.identifier===id)return t}return null}
   function onTouchStart(e){
     if(!grid||touchId!==null||e.touches.length!==1)return;
     const el=e.target.closest?.('#cfCompanyGrid>.cf-company-card');if(!el||interactiveTarget(e.target))return;
-    const t=e.touches[0];touchId=t.identifier;dragEl=el;startX=t.clientX;startY=t.clientY;
+    const t=e.touches[0];touchId=t.identifier;dragEl=el;dragEl.draggable=false;startX=t.clientX;startY=t.clientY;
     clearTimeout(pressTimer);pressTimer=setTimeout(()=>beginTouch(t.clientX,t.clientY),280);
   }
   function onTouchMove(e){

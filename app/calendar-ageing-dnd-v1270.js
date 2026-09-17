@@ -2,7 +2,7 @@
   'use strict';
   let data=null,pressTimer=null,src=null,active=false,ghost=null,over=null,startX=0,startY=0,suppressClickUntil=0;
   const norm=v=>String(v||'').trim().toUpperCase();
-  function toast(msg){const h=document.getElementById('toastHost');if(!h)return;h.innerHTML=`<div class="toast">${String(msg).replace(/[&<>]/g,'')}</div>`;setTimeout(()=>h.innerHTML='',2300)}
+  function toast(msg){const h=document.getElementById('toastHost');if(!h)return;h.innerHTML=`<div class="toast">${String(msg).replace(/[&<>]/g,'')}</div>`;setTimeout(()=>h.innerHTML='',2600)}
   function style(){if(document.getElementById('cfAgeDnD1270Style'))return;const s=document.createElement('style');s.id='cfAgeDnD1270Style';s.textContent=`
     #ageOver .side-item[data-cf-age],#ageSoon .side-item[data-cf-age]{cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none}
     #ageOver .side-item.cf-age-source,#ageSoon .side-item.cf-age-source{opacity:.35}
@@ -29,29 +29,53 @@
     }));
   }
   async function schedule(el,date){
-    if(!el||!date)return;const companyId=el.dataset.companyId,plate=norm(el.dataset.plate),type=String(el.dataset.vehicleType||'');if(!companyId||!plate)return;
+    if(!el||!date)return;
+    const companyId=el.dataset.companyId,plate=norm(el.dataset.plate),type=String(el.dataset.vehicleType||'');
+    if(!companyId||!plate)return;
     try{
       const s=await window.CFCalendarEngine.loadSupabase();
       const {data:{user}}=await s.auth.getUser();
-      const {data:existing,error:qerr}=await s.from('wash_records').select('id,order_due_date,schedule_proposed_date').eq('company_id',companyId).eq('plate',plate).is('wash_date',null).order('created_at',{ascending:false}).limit(1);
+      const today=new Date().toISOString().slice(0,10);
+      const {data:existing,error:qerr}=await s.from('wash_records').select('id').eq('company_id',companyId).eq('plate',plate).is('wash_date',null).order('created_at',{ascending:false}).limit(1);
       if(qerr)throw qerr;
       if(existing?.length){
-        const row=existing[0];
-        const {error:uerr}=await s.from('wash_records').update({ordered:true,order_due_date:date,order_date:new Date().toISOString().slice(0,10),schedule_status:'confirmed'}).eq('id',row.id);
+        const {error:uerr}=await s.from('wash_records').update({ordered:true,order_date:today,order_due_date:date}).eq('id',existing[0].id);
         if(uerr)throw uerr;
       }else{
-        const id=crypto?.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(16).slice(2)}`;
-        const payload={id,company_id:companyId,created_by:user?.id||null,plate,type,brand:'',billing_category:null,ordered:true,ordered_by:'Kalendarz',order_date:new Date().toISOString().slice(0,10),order_due_date:date,priority:null,schedule_status:'confirmed',schedule_proposed_date:null,schedule_proposed_by:null,schedule_proposed_at:null,schedule_confirmed_by:user?.id||null,schedule_confirmed_at:new Date().toISOString(),schedule_note:'Zaplanowano z listy 183 dni',notes:'',wash_date:null,wash_start_time:null,wash_end_time:null,performed_by:'',cost:0,approved:false,paid:false,created_at:new Date().toISOString()};
-        const {error:ierr}=await s.from('wash_records').insert(payload);if(ierr)throw ierr;
+        const id=(window.crypto&&typeof window.crypto.randomUUID==='function')?window.crypto.randomUUID():`${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        const payload={
+          id,
+          company_id:companyId,
+          created_by:user?.id||null,
+          plate,
+          type,
+          brand:'',
+          ordered:true,
+          ordered_by:'Kalendarz',
+          order_date:today,
+          order_due_date:date,
+          notes:'',
+          performed_by:'',
+          cost:0,
+          approved:false,
+          paid:false,
+          created_at:new Date().toISOString()
+        };
+        const {error:ierr}=await s.from('wash_records').upsert([payload],{onConflict:'id'});
+        if(ierr)throw ierr;
       }
-      toast(`${plate} zaplanowano na ${date.split('-').reverse().join('.')}.`);document.getElementById('refresh')?.click();setTimeout(refreshData,500);
-    }catch(e){console.error('CleanFleet ageing schedule:',e);toast('Nie udało się utworzyć zlecenia prania.')}
+      toast(`${plate} zaplanowano na ${date.split('-').reverse().join('.')}.`);
+      document.getElementById('refresh')?.click();setTimeout(refreshData,500);
+    }catch(e){
+      console.error('CleanFleet ageing schedule:',e);
+      toast(`Nie udało się utworzyć zlecenia: ${e?.message||'błąd zapisu'}`);
+    }
   }
   function onDown(e){if(e.pointerType==='mouse')return;const el=e.target.closest?.('#ageOver .side-item[data-cf-age],#ageSoon .side-item[data-cf-age]');if(!el)return;src=el;startX=e.clientX;startY=e.clientY;pressTimer=setTimeout(()=>begin(e.clientX,e.clientY),260)}
   function onMove(e){if(!src)return;if(!active){if(Math.hypot(e.clientX-startX,e.clientY-startY)>9)cleanup();return}e.preventDefault();moveGhost(e.clientX,e.clientY)}
   function onUp(e){if(!src){cleanup();return}clearTimeout(pressTimer);if(!active){cleanup();return}e.preventDefault();e.stopPropagation();const el=src,date=over?.dataset?.date||null;suppressClickUntil=Date.now()+650;cleanup();if(date)schedule(el,date)}
   function desktop(){
-    document.addEventListener('dragstart',e=>{const el=e.target.closest?.('#ageOver .side-item[data-cf-age],#ageSoon .side-item[data-cf-age]');if(!el)return;src=el;e.dataTransfer?.setData('application/x-cf-age',JSON.stringify({company_id:el.dataset.companyId,plate:el.dataset.plate,type:el.dataset.vehicleType}));e.dataTransfer.effectAllowed='move'},true);
+    document.addEventListener('dragstart',e=>{const el=e.target.closest?.('#ageOver .side-item[data-cf-age],#ageSoon .side-item[data-cf-age]');if(!el)return;src=el;e.dataTransfer?.setData('application/x-cf-age',JSON.stringify({company_id:el.dataset.companyId,plate:el.dataset.plate,type:el.dataset.vehicleType}));if(e.dataTransfer)e.dataTransfer.effectAllowed='move'},true);
     document.addEventListener('dragover',e=>{const cell=e.target.closest?.('#calendarBody [data-date]');if(cell&&e.dataTransfer?.types?.includes('application/x-cf-age')){e.preventDefault();clearOver();over=cell;cell.classList.add('cf-age-over')}},true);
     document.addEventListener('drop',e=>{const cell=e.target.closest?.('#calendarBody [data-date]');if(!cell||!e.dataTransfer?.getData('application/x-cf-age'))return;e.preventDefault();e.stopPropagation();const el=src;cleanup();if(el)schedule(el,cell.dataset.date)},true);
     document.addEventListener('dragend',cleanup,true);

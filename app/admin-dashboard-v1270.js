@@ -31,7 +31,7 @@
     if(!src||!target||src===target)return;
     const arr=cards().sort((a,b)=>(Number(a.style.order)||0)-(Number(b.style.order)||0));
     const from=arr.indexOf(src),to0=arr.indexOf(target);if(from<0||to0<0)return;
-    arr.splice(from,1);let to=arr.indexOf(target)+(after?1:0);arr.splice(to,0,src);
+    arr.splice(from,1);const to=arr.indexOf(target)+(after?1:0);arr.splice(to,0,src);
     arr.forEach((el,i)=>el.style.order=String(i));saveOrder();
   }
   function afterTarget(el,y){const r=el.getBoundingClientRect();return y>r.top+r.height/2}
@@ -41,11 +41,11 @@
   function beginTouch(x,y){if(!dragEl)return;active=true;dragEl.classList.add('cf-sort-source');ghost=document.createElement('div');ghost.className='cf-admin-sort-ghost';ghost.textContent=(dragEl.textContent||'').trim().replace(/\s+/g,' ').slice(0,90);document.body.appendChild(ghost);moveGhost(x,y);if(navigator.vibrate)try{navigator.vibrate(18)}catch(_){}}
 
   function bindGrid(g){
-    if(g.dataset.cfSort1270==='1')return;g.dataset.cfSort1270='1';grid=g;applyOrder();
+    if(g.dataset.cfSort1270==='1'){grid=g;applyOrder();return}g.dataset.cfSort1270='1';grid=g;applyOrder();
     new MutationObserver(()=>setTimeout(applyOrder,0)).observe(g,{childList:true});
-    g.addEventListener('dragstart',e=>{const el=e.target.closest?.(':scope>.cf-company-card');if(!el)return;dragEl=el;el.classList.add('cf-sort-source');e.dataTransfer?.setData('text/plain',key(el)||'');e.dataTransfer.effectAllowed='move'});
-    g.addEventListener('dragover',e=>{if(!dragEl)return;const t=e.target.closest?.(':scope>.cf-company-card');if(!t||t===dragEl)return;e.preventDefault();clearOver();t.classList.add('cf-sort-over')});
-    g.addEventListener('drop',e=>{if(!dragEl)return;const t=e.target.closest?.(':scope>.cf-company-card');e.preventDefault();if(t&&t!==dragEl)reorder(dragEl,t,afterTarget(t,e.clientY));clean()});
+    g.addEventListener('dragstart',e=>{const el=e.target.closest?.('#cfCompanyGrid>.cf-company-card');if(!el)return;dragEl=el;el.classList.add('cf-sort-source');e.dataTransfer?.setData('text/plain',key(el)||'');if(e.dataTransfer)e.dataTransfer.effectAllowed='move'});
+    g.addEventListener('dragover',e=>{if(!dragEl)return;const t=e.target.closest?.('#cfCompanyGrid>.cf-company-card');if(!t||t===dragEl)return;e.preventDefault();clearOver();t.classList.add('cf-sort-over')});
+    g.addEventListener('drop',e=>{if(!dragEl)return;const t=e.target.closest?.('#cfCompanyGrid>.cf-company-card');e.preventDefault();if(t&&t!==dragEl)reorder(dragEl,t,afterTarget(t,e.clientY));clean()});
     g.addEventListener('dragend',clean);
   }
   function onDown(e){

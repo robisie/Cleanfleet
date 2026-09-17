@@ -10600,6 +10600,7 @@ function uid(){
       const dateOverlay=document.createElement('div');
       dateOverlay.className='overlay';
       dateOverlay.id='cfBulkDatesOverlay';
+      dateOverlay.style.zIndex='100000';
       dateOverlay.innerHTML=`<div class="sheet" style="max-width:560px;"><button class="close" id="cfBulkDatesClose">&times;</button><h2>Uzupełnij dane zlecenia</h2><div class="confirm-text" style="margin-bottom:14px;">Te same daty zostaną zapisane dla ${selected.length} zaznaczonych pojazdów.</div><div class="form-grid"><label><span>Data zlecenia</span><input type="date" id="cfBulkOrderDate" value="${cfBulkLocalDate()}" required></label><label><span>Termin wykonania</span><input type="date" id="cfBulkDueDate" required></label></div><div class="sheet-actions" style="margin-top:16px;"><button type="button" class="btn" id="cfBulkDatesCancel">Anuluj</button><button type="button" class="btn btn-solid" id="cfBulkDatesConfirm">Dodaj do prania</button></div></div>`;
       document.body.appendChild(dateOverlay);
       const closeDates=()=>dateOverlay.remove();

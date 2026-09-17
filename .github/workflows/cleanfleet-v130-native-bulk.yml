@@ -4,7 +4,8 @@ on:
   push:
     paths:
       - '.github/workflows/cleanfleet-v130-native-bulk.yml'
-      - '.github/scripts/patch_v130_native.py'
+      - '.github/scripts/patch_v130_native2.py'
+      - '.github/scripts/native_bulk_v130.jsfrag'
 permissions:
   contents: write
 jobs:
@@ -16,7 +17,7 @@ jobs:
           ref: main
           fetch-depth: 0
       - name: Apply patch
-        run: python3 .github/scripts/patch_v130_native.py
+        run: python3 .github/scripts/patch_v130_native2.py
       - name: Show diff
         run: git diff -- app/index.html app/sw.js
       - name: Commit and push

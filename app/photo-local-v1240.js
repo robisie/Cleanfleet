@@ -17,7 +17,7 @@
   const pad=n=>String(n).padStart(2,'0');
   const fmtDate=s=>{const d=s?new Date(`${s}T12:00:00`):new Date();return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()}`};
   const safeToken=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'INNE';
-  const typeToken=v=>{const s=String(v||'').trim().toUpperCase();if(s==='SOLÓWKA'||s==='SOLOWKA')return'SOLOWKA';if(s==='ZESTAW')return'ZESTAW';if(s==='BUS'||s==='BUS C')return'AUTOKAR';if(s==='DOSTAWCZY')return'DOSTAWCZY';if(s==='OSOBOWY')return'OSOBOWY';return safeToken(s||'INNE')};
+  const typeToken=v=>{const s=String(v||'').trim().toUpperCase();if(s==='SOLÓWKA'||s==='SOLOWKA')return'SOLOWKA';if(s==='ZESTAW')return'ZESTAW';if(s==='BUS')return'BUS';if(s==='BUS C')return'BUS-C';if(s==='DOSTAWCZY')return'DOSTAWCZY';if(s==='OSOBOWY')return'OSOBOWY';return safeToken(s||'INNE')};
   const extFor=(name,mime)=>{const n=String(name||'').toLowerCase();const m=n.match(/\.([a-z0-9]{2,5})$/);if(m)return m[1]==='jpeg'?'jpg':m[1];const t=String(mime||'').toLowerCase();if(t.includes('png'))return'png';if(t.includes('heic'))return'heic';if(t.includes('heif'))return'heif';return'jpg'};
 
   function openDb(){

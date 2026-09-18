@@ -72,6 +72,7 @@
   function deliverFiles(files){
     const list=[...(files||[])].filter(f=>f&&((f.type||'').startsWith('image/')||/\.(jpe?g|png|heic|heif|webp)$/i.test(f.name||'')));
     if(!list.length){toast('Nie wybrano plików graficznych.');return;}
+    if(window.cfPhotoSession?.addFiles){window.cfPhotoSession.addFiles(list);return;}
     const input=inputEl();if(!input)return;
     try{const dt=new DataTransfer();list.forEach(f=>dt.items.add(f));input.files=dt.files;input.dispatchEvent(new Event('change',{bubbles:true}));}
     catch(e){console.error('CleanFleet photo source deliver',e);toast('Nie udało się dodać wybranych zdjęć.');}
@@ -155,7 +156,7 @@
   }
 
   function deliverShots(){if(shots.length)deliverFiles(shots);}
-  function closeCamera(save){stopStream();overlay?.classList.remove('open');document.documentElement.style.overflow='';if(save)deliverShots();shots=[];updateCount();busy=false;}
+  function closeCamera(save){if(save&&busy)return;stopStream();overlay?.classList.remove('open');document.documentElement.style.overflow='';if(save)deliverShots();shots=[];updateCount();busy=false;}
 
   document.addEventListener('click',e=>{const b=e.target.closest?.('[data-photo-add]');if(!b)return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();showSourceSheet();},true);
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&overlay?.classList.contains('open'))stopStream()});

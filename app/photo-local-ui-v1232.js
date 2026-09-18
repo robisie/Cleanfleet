@@ -91,7 +91,7 @@
     btn.textContent='Wyczyść zdjęcia lokalne';
     btn.addEventListener('click',async e=>{
       e.preventDefault();e.stopPropagation();
-      if(!currentRecordId)return;
+      if(!currentRecordId||window.cfPhotoSession?.get()?.busy)return;
       const rows=(await allPhotos()).filter(x=>String(x.recordId)===String(currentRecordId));
       if(!rows.length){scheduleRefresh(0);return;}
       if(!confirm(`Usunąć wszystkie lokalne zdjęcia tego wpisu?\n\nPRZED + PO: ${rows.length} zdjęć\n\nTej operacji nie można cofnąć.`))return;
@@ -110,6 +110,8 @@
   }
 
   function events(){
+    document.addEventListener('cf:photos-open',e=>{currentRecordId=e.detail.recordId;ensureClearButton();scheduleRefresh(0);});
+    document.addEventListener('cf:photos-saved',()=>scheduleRefresh(0));
     document.addEventListener('click',e=>{
       const opener=e.target.closest?.('[data-cf-photos]');
       if(opener){

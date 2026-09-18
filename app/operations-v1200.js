@@ -181,23 +181,26 @@
   function ensurePhotoModal(){
     let o=document.getElementById('cfPhotoOverlay');if(o)return o;
     o=document.createElement('div');o.id='cfPhotoOverlay';o.className='cf-photo-overlay';o.setAttribute('aria-hidden','true');
-    o.innerHTML=`<div class="cf-photo-modal" role="dialog" aria-modal="true" aria-label="Zdjęcia wpisu"><div class="cf-photo-head"><div><div class="cf-photo-title" id="cfPhotoTitle">Zdjęcia</div><div class="cf-photo-sub" id="cfPhotoSub"></div></div><button type="button" class="cf-photo-close" data-photo-close aria-label="Zamknij">×</button></div><div class="cf-photo-body"><div class="cf-photo-tabs"><button type="button" class="cf-photo-tab active" data-photo-kind="przed">PRZED</button><button type="button" class="cf-photo-tab" data-photo-kind="po">PO</button></div><div class="cf-photo-actions"><button type="button" data-photo-add>📷 Dodaj zdjęcie</button><button type="button" class="primary" data-photo-save>Zapisz zdjęcia</button><input type="file" data-photo-input accept="image/*" multiple hidden></div><div class="cf-photo-status" data-photo-status></div><div class="cf-photo-section-title">Nowe zdjęcia przed zapisem</div><div class="cf-photo-grid" data-photo-pending></div><div class="cf-photo-section-title">Zapisane zdjęcia</div><div class="cf-photo-grid cf-photo-saved" data-photo-saved></div><div class="cf-photo-note">Zdjęcia są przypisane do tego wpisu i zapisywane prywatnie w folderze typu <strong>zdjecia / typ / data / tablica / przed|po</strong>.</div></div></div>`;
+    o.innerHTML=`<div class="cf-photo-modal" role="dialog" aria-modal="true" aria-label="Zdjęcia wpisu"><div class="cf-photo-head"><div><div class="cf-photo-title" id="cfPhotoTitle">Zdjęcia</div><div class="cf-photo-sub" id="cfPhotoSub"></div></div><button type="button" class="cf-photo-close" data-photo-close aria-label="Zamknij">×</button></div><div class="cf-photo-body"><div class="cf-photo-tabs"><button type="button" class="cf-photo-tab active" data-photo-kind="przed">PRZED</button><button type="button" class="cf-photo-tab" data-photo-kind="po">PO</button></div><div class="cf-photo-actions"><button type="button" data-photo-add>📷 Dodaj zdjęcie</button><button type="button" class="primary" data-photo-save>Zapisz zdjęcia</button><input type="file" data-photo-input accept="image/*" multiple hidden></div><div class="cf-photo-status" data-photo-status></div><div class="cf-photo-section-title">Nowe zdjęcia przed zapisem</div><div class="cf-photo-grid" data-photo-pending></div><div class="cf-photo-section-title">Zapisane zdjęcia</div><div class="cf-photo-grid cf-photo-saved" data-photo-saved></div><div class="cf-photo-note">Zdjęcia są zapisane tylko na tym urządzeniu. ZIP zawiera foldery <strong>typ / data / tablica / przed|po</strong>.</div></div></div>`;
     document.body.appendChild(o);
     o.addEventListener('click',e=>{if(e.target===o||e.target.closest('[data-photo-close]'))closePhotoModal();});
-    o.querySelectorAll('[data-photo-kind]').forEach(b=>b.addEventListener('click',()=>{if(!photoState)return;photoState.kind=b.dataset.photoKind;renderPhotoModal();}));
+    o.querySelectorAll('[data-photo-kind]').forEach(b=>b.addEventListener('click',()=>{if(!photoState||photoState.busy)return;photoState.kind=b.dataset.photoKind;renderPhotoModal();}));
     o.querySelector('[data-photo-add]')?.addEventListener('click',()=>o.querySelector('[data-photo-input]')?.click());
     o.querySelector('[data-photo-input]')?.addEventListener('change',onPhotoFiles);
     o.querySelector('[data-photo-save]')?.addEventListener('click',savePendingPhotos);
-    o.querySelector('[data-photo-pending]')?.addEventListener('click',e=>{const b=e.target.closest('[data-photo-remove]');if(!b||!photoState)return;const arr=photoState.pending[photoState.kind];const idx=Number(b.dataset.photoRemove);if(arr[idx])URL.revokeObjectURL(arr[idx].url);arr.splice(idx,1);renderPhotoModal();});
+    o.querySelector('[data-photo-pending]')?.addEventListener('click',e=>{const b=e.target.closest('[data-photo-remove]');if(!b||!photoState||photoState.busy)return;const arr=photoState.pending[photoState.kind];const idx=Number(b.dataset.photoRemove);if(arr[idx])URL.revokeObjectURL(arr[idx].url);arr.splice(idx,1);renderPhotoModal();});
     return o;
   }
 
   async function openPhotos(recordId){
+    if(!isAdmin())return;
+    if(photoState?.busy)return;
     const overlay=ensurePhotoModal();
     overlay.classList.add('open');
     overlay.setAttribute('aria-hidden','false');
     photoState={record:{id:recordId,plate:'',type:'',brand:''},kind:'przed',existing:[],pending:{przed:[],po:[]},signed:new Map(),busy:false};
     renderPhotoModal();
+    document.dispatchEvent(new CustomEvent('cf:photos-open',{detail:{recordId}}));
     const status=overlay.querySelector('[data-photo-status]');
     if(status)status.textContent='Zdjęcia są zapisywane lokalnie na tym urządzeniu.';
     if(!dbReady())return;
@@ -214,7 +217,7 @@
       if(status)status.textContent='Zdjęcia są zapisywane lokalnie na tym urządzeniu.';
     }
   }
-  function closePhotoModal(){const o=document.getElementById('cfPhotoOverlay');if(o){o.classList.remove('open');o.setAttribute('aria-hidden','true');}if(photoState){Object.values(photoState.pending).flat().forEach(x=>URL.revokeObjectURL(x.url));}photoState=null;}
+  function closePhotoModal(){if(photoState?.busy)return;const o=document.getElementById('cfPhotoOverlay');if(o){o.classList.remove('open');o.setAttribute('aria-hidden','true');}if(photoState){Object.values(photoState.pending).flat().forEach(x=>URL.revokeObjectURL(x.url));}photoState=null;}
   async function loadSignedUrls(){
     if(!photoState)return;
     const missing=photoState.existing.filter(r=>!photoState.signed.has(r.storage_path));
@@ -231,12 +234,30 @@
     o.querySelector('[data-photo-saved]').innerHTML=saved.length?saved.map(r=>{const u=s.signed.get(r.storage_path);return u?`<div class="cf-photo-thumb"><a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="Zapisane zdjęcie"></a></div>`:'';}).join(''):'<div class="cf-photo-sub">Brak zapisanych zdjęć.</div>';
     const save=o.querySelector('[data-photo-save]');save.disabled=s.busy||!arr.length;save.textContent=s.busy?'Zapisywanie…':'Zapisz zdjęcia';
     o.querySelector('[data-photo-add]').disabled=s.busy;
-    o.querySelector('[data-photo-status]').textContent=s.busy?'Wysyłanie zdjęć na serwer…':'';
+    o.querySelector('[data-photo-status]').textContent=s.busy?'Zapisywanie lokalnie…':'Zdjęcia są zapisywane lokalnie na tym urządzeniu.';
+    document.dispatchEvent(new CustomEvent('cf:photos-render'));
   }
-  function onPhotoFiles(e){
-    if(!photoState)return;const files=[...(e.target.files||[])];
-    files.forEach(file=>photoState.pending[photoState.kind].push({file,url:URL.createObjectURL(file)}));e.target.value='';renderPhotoModal();
+  function addPhotoFiles(files){
+    if(!photoState||photoState.busy)return false;
+    [...files].forEach(file=>photoState.pending[photoState.kind].push({file,url:URL.createObjectURL(file)}));
+    renderPhotoModal();return true;
   }
+  function onPhotoFiles(e){addPhotoFiles(e.target.files||[]);e.target.value='';}
+
+  // One pending queue shared by the camera, preview and local persistence.
+  window.cfPhotoSession={
+    get:()=>photoState,
+    addFiles:addPhotoFiles,
+    setBusy(value){if(photoState){photoState.busy=value;renderPhotoModal();}},
+    committed(recordId,kind,items){
+      if(!photoState||String(photoState.record.id)!==String(recordId))return;
+      photoState.pending[kind]=photoState.pending[kind].filter(item=>{
+        if(!items.includes(item))return true;
+        URL.revokeObjectURL(item.url);return false;
+      });
+      renderPhotoModal();
+    }
+  };
 
   async function jpegBlob(file){
     if(file.type==='image/jpeg'&&file.size<=3500000)return file;
@@ -253,21 +274,8 @@
     return `${slug(r.type)}/${date}/${plateSlug(r.plate)}`;
   }
   async function savePendingPhotos(){
-    const s=photoState;if(!s||s.busy)return;const kind=s.kind,items=[...s.pending[kind]];if(!items.length)return;
-    s.busy=true;renderPhotoModal();let savedCount=0;
-    try{
-      const base=photoBasePath();
-      for(let i=0;i<items.length;i++){
-        const src=items[i],blob=await jpegBlob(src.file);const name=`${Date.now()}-${Math.random().toString(36).slice(2,9)}.jpg`,path=`${base}/${kind}/${name}`;
-        const {data:meta,error:me}=await cfSupabase.from('wash_record_photos').insert({wash_record_id:s.record.id,kind,storage_path:path}).select('id,kind,storage_path,created_at').single();
-        if(me)throw me;
-        const {error:ue}=await cfSupabase.storage.from(PHOTO_BUCKET).upload(path,blob,{contentType:'image/jpeg',upsert:false,cacheControl:'3600'});
-        if(ue){await cfSupabase.from('wash_record_photos').delete().eq('id',meta.id);throw ue;}
-        s.existing.push(meta);savedCount++;URL.revokeObjectURL(src.url);
-      }
-      s.pending[kind]=[];await loadSignedUrls();toast(`Zapisano ${savedCount} ${savedCount===1?'zdjęcie':'zdjęcia'}.`);
-    }catch(e){console.error('CleanFleet photo upload',e);toast('Nie udało się zapisać wszystkich zdjęć.');}
-    finally{s.busy=false;renderPhotoModal();}
+    // Never fall back to server uploads when the local module fails to load.
+    toast('Moduł zapisu lokalnego nie jest gotowy. Odśwież aplikację.');
   }
 
   function bindPhotoButton(b,id){
@@ -342,3 +350,4 @@
   function start(){ensureStyles();ensurePhotoModal();initPhotoButtons();initCalendarObserver();}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
+

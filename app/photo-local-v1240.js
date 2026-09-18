@@ -4,13 +4,10 @@
   const DB_NAME='cleanfleet-photo-local-v1';
   const DB_VERSION=1;
   const STORE='photos';
-  const CLEANUP_KEY='cf-photo-storage-cleanup-v1240-done';
-  const BUCKET='zdjecia';
 
   let currentRecordId=null;
   let dbPromise=null;
   let busy=false;
-  const staged=new Map();
   const enc=new TextEncoder();
 
   const toast=m=>{try{typeof showToast==='function'?showToast(m):console.info(m)}catch(_){console.info(m)}};
@@ -54,36 +51,33 @@
   async function put(x){await tx('readwrite',s=>s.put(x));return x}
   async function del(id){await tx('readwrite',s=>s.delete(id))}
   async function all(){const db=await openDb();return new Promise((resolve,reject)=>{const t=db.transaction(STORE,'readonly'),r=t.objectStore(STORE).getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error)})}
-  async function byRecord(recordId){return (await all()).filter(x=>x.recordId===recordId).sort((a,b)=>a.createdAt-b.createdAt)}
+  async function byRecord(recordId){return (await all()).filter(x=>String(x.recordId)===String(recordId)).sort((a,b)=>a.createdAt-b.createdAt)}
   async function byRecordKind(recordId,kind){return (await byRecord(recordId)).filter(x=>x.kind===kind)}
 
-  function stageFiles(recordId,kind,files){
-    const k=keyFor(recordId,kind),a=staged.get(k)||[];
-    for(const f of files)a.push(f);
-    staged.set(k,a);
-  }
-  function removeStaged(recordId,kind,index){
-    const k=keyFor(recordId,kind),a=staged.get(k)||[];
-    if(index>=0&&index<a.length)a.splice(index,1);
-    staged.set(k,a);
-  }
-
   async function persistStaged(recordId,kind){
-    const k=keyFor(recordId,kind),files=[...(staged.get(k)||[])];
-    if(!files.length)return 0;
-    const ts=Date.now();
-    for(let i=0;i<files.length;i++){
-      const f=files[i],bytes=await f.arrayBuffer();
-      await put({id:uid(),recordId,kind,recordKind:keyFor(recordId,kind),name:f.name||`zdjecie-${i+1}.jpg`,mime:f.type||'image/jpeg',bytes:bytes.slice(0),createdAt:ts+i});
+    const session=window.cfPhotoSession?.get();
+    if(!session||String(session.record.id)!==String(recordId))return 0;
+    const items=[...session.pending[kind]];
+    if(!items.length)return 0;
+    const ts=Date.now(),rows=[];
+    for(let i=0;i<items.length;i++){
+      const f=items[i].file,bytes=await f.arrayBuffer();
+      rows.push({id:uid(),recordId,kind,recordKind:keyFor(recordId,kind),name:f.name||`zdjecie-${i+1}.jpg`,mime:f.type||'image/jpeg',bytes:bytes.slice(0),createdAt:ts+i});
     }
-    staged.delete(k);
-    return files.length;
+    // Commit the entire batch, or leave every pending photo available for retry.
+    await tx('readwrite',store=>rows.forEach(row=>store.put(row)));
+    window.cfPhotoSession.committed(recordId,kind,items);
+    return rows.length;
   }
 
   async function metadata(recordId){
-    if(typeof cfSupabase==='undefined')throw new Error('Brak dostępu do danych wpisu.');
-    const {data,error}=await cfSupabase.from('wash_records').select('plate,type,order_date,order_due_date,wash_date,schedule_proposed_date').eq('id',recordId).single();
-    if(error)throw error;
+    let data=window.cfPhotoSession?.get()?.record;
+    if(!data?.plate||String(data.id)!==String(recordId)){
+    if(typeof cfSupabase==='undefined'||!cfSupabase)throw new Error('Brak danych wpisu. Otwórz wpis przy połączeniu z internetem.');
+    const result=await cfSupabase.from('wash_records').select('plate,type,order_date,order_due_date,wash_date,schedule_proposed_date').eq('id',recordId).single();
+    if(result.error)throw result.error;
+    data=result.data;
+    }
     const date=data.wash_date||data.order_due_date||data.schedule_proposed_date||data.order_date||new Date().toISOString().slice(0,10);
     return{plate:safeToken(data.plate||'BEZ-TABLICY'),type:typeToken(data.type),date:fmtDate(date)};
   }
@@ -160,7 +154,10 @@
   async function renderLocal(){
     const m=document.getElementById('cfPhotoOverlay');if(!m||!m.classList.contains('open')||!currentRecordId)return;
     const box=ensureLocalBox();if(!box)return;
-    const allPhotos=await byRecord(currentRecordId),before=allPhotos.filter(x=>x.kind==='przed'),after=allPhotos.filter(x=>x.kind==='po'),kind=activeKind(),visible=kind==='po'?after:before;
+    const recordId=currentRecordId,kind=activeKind();
+    const allPhotos=await byRecord(recordId);
+    if(recordId!==currentRecordId||kind!==activeKind()||!m.classList.contains('open'))return;
+    const before=allPhotos.filter(x=>x.kind==='przed'),after=allPhotos.filter(x=>x.kind==='po'),visible=kind==='po'?after:before;
     box.querySelector('[data-local-counts]').textContent=`PRZED ${before.length} · PO ${after.length}`;
     box.querySelector('[data-local-meta]').textContent=before.length&&after.length?'Komplet gotowy do jednego ZIP-a.':before.length?'Zdjęcia PRZED zapisane lokalnie. Po praniu dodaj zdjęcia PO.':'Zdjęcia są przechowywane tylko na tym urządzeniu.';
     const exp=box.querySelector('[data-local-export]');exp.style.display=before.length&&after.length?'':'none';
@@ -175,57 +172,40 @@
 
   async function saveCurrent(){
     if(!currentRecordId||busy)return;
-    const kind=activeKind();busy=true;
-    const btn=document.querySelector('#cfPhotoOverlay [data-photo-save]');if(btn){btn.disabled=true;btn.textContent='Zapisywanie lokalnie…'}
+    const recordId=currentRecordId,kind=activeKind();busy=true;
+    window.cfPhotoSession?.setBusy(true);
+    let exportReady=false;
     try{
-      const n=await persistStaged(currentRecordId,kind);
-      if(!n){toast('Brak nowych zdjęć do zapisania.');return}
+      const n=await persistStaged(recordId,kind);
+      if(!n){toast('Brak nowych zdjęć do zapisania.');return;}
       toast(`Zapisano lokalnie ${n} ${n===1?'zdjęcie':'zdjęć'} ${kind.toUpperCase()}.`);
       await renderLocal();
-      const before=await byRecordKind(currentRecordId,'przed'),after=await byRecordKind(currentRecordId,'po');
-      if(kind==='po'&&before.length&&after.length)await exportCombined(currentRecordId);
-    }catch(e){console.error(e);toast(e?.message||'Nie udało się zapisać zdjęć lokalnie.')}finally{if(btn){btn.disabled=false;btn.textContent='Zapisz zdjęcia'}busy=false}
-  }
-
-  async function listAllStoragePaths(prefix=''){
-    const out=[];let offset=0;
-    while(true){
-      const {data,error}=await cfSupabase.storage.from(BUCKET).list(prefix,{limit:100,offset,sortBy:{column:'name',order:'asc'}});if(error)throw error;
-      const rows=data||[];if(!rows.length)break;
-      for(const item of rows){
-        const path=prefix?`${prefix}/${item.name}`:item.name;
-        if(item.id)out.push(path);else out.push(...await listAllStoragePaths(path));
-      }
-      if(rows.length<100)break;offset+=rows.length;
-    }
-    return out;
-  }
-  async function cleanupServerPhotosOnce(){
-    if(localStorage.getItem(CLEANUP_KEY)==='1')return;
-    for(let i=0;i<80;i++){if(typeof cfSupabase!=='undefined'&&cfSupabase?.storage)break;await new Promise(r=>setTimeout(r,250))}
-    if(typeof cfSupabase==='undefined'||!cfSupabase?.storage)return;
-    try{
-      const paths=await listAllStoragePaths('');
-      for(let i=0;i<paths.length;i+=50){const batch=paths.slice(i,i+50);const {error}=await cfSupabase.storage.from(BUCKET).remove(batch);if(error)throw error}
-      localStorage.setItem(CLEANUP_KEY,'1');
-      console.info(`CleanFleet: usunięto ${paths.length} starych plików zdjęć z serwera.`);
-    }catch(e){console.warn('CleanFleet cleanup zdjęć z serwera',e)}
+      const rows=await byRecord(recordId);
+      exportReady=rows.some(x=>x.kind==='przed')&&rows.some(x=>x.kind==='po');
+      document.dispatchEvent(new CustomEvent('cf:photos-saved',{detail:{recordId}}));
+    }catch(e){console.error(e);toast(e?.message||'Nie udało się zapisać zdjęć lokalnie.');}
+    finally{busy=false;window.cfPhotoSession?.setBusy(false);}
+    // Export obtains its own lock only after the local transaction completes.
+    if(exportReady)await exportCombined(recordId);
   }
 
   function events(){
+    document.addEventListener('cf:photos-open',e=>{
+      currentRecordId=e.detail.recordId;
+      renderLocal().catch(e=>toast(e?.message||'Nie udało się odczytać zdjęć lokalnych.'));
+    });
+    document.addEventListener('cf:photos-render',()=>{
+      renderLocal().catch(e=>toast(e?.message||'Nie udało się odczytać zdjęć lokalnych.'));
+    });
     document.addEventListener('click',e=>{
-      const op=e.target.closest?.('[data-cf-photos]');if(op){currentRecordId=op.dataset.cfPhotos||null;setTimeout(()=>renderLocal().catch(()=>{}),180);return}
-      const rm=e.target.closest?.('[data-photo-remove]');if(rm&&currentRecordId){removeStaged(currentRecordId,activeKind(),Number(rm.dataset.photoRemove));return}
-      const tab=e.target.closest?.('#cfPhotoOverlay .cf-photo-tab');if(tab){setTimeout(()=>renderLocal().catch(()=>{}),80);return}
-      const save=e.target.closest?.('[data-photo-save]');if(save&&currentRecordId){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();saveCurrent()}
+      const save=e.target.closest?.('[data-photo-save]');
+      if(save){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();saveCurrent();}
     },true);
-    document.addEventListener('change',e=>{const input=e.target.closest?.('[data-photo-input]');if(!input||!currentRecordId)return;const files=[...(input.files||[])];if(files.length)stageFiles(currentRecordId,activeKind(),files)},true)
   }
 
   async function start(){
     ensureStyles();events();
     try{await navigator.storage?.persist?.()}catch(_){ }
-    cleanupServerPhotosOnce();
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();

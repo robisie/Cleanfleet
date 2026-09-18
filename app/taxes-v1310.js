@@ -27,6 +27,8 @@
     s.id='cfTaxesV1310Style';
     s.textContent=`
       .cf-company-taxes-card{border-color:rgba(166,198,27,.42)!important;background:linear-gradient(145deg,rgba(166,198,27,.12),rgba(255,255,255,.98))!important}
+      .cf-company-taxes-card>div>strong,.cf-company-taxes-card>div>span{display:block!important}
+      .cf-company-taxes-card>div>span{margin-top:8px!important}
       .cf-taxes-sheet{max-width:980px!important;width:min(96vw,980px)!important;max-height:92vh!important;overflow:auto!important}
       .cf-taxes-head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;margin-bottom:14px;padding-right:62px}
       .cf-taxes-head h2{margin:0 0 5px}

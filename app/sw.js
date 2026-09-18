@@ -1,3 +1,4 @@
+// CleanFleet v1.30.24 — approved-and-paid filter release.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

@@ -79,7 +79,6 @@
         box-shadow:0 18px 45px rgba(0,0,0,.25);font:800 12px/1.25 system-ui,-apple-system,sans-serif;
         transform:translate(-50%,-115%)
       }
-      body[data-cf-role="fleet_employee"] [data-cf-photos],body[data-cf-role="cleanfleet_employee"] [data-cf-photos]{display:none!important}
       @media(max-width:899px){
         #cfCompanyGrid{grid-template-columns:repeat(4,minmax(0,1fr))!important;--cf-row-h:158px}
         #cfCompanyGrid.cf-grid-dragging{background-size:calc((100% - 36px)/4 + 12px) 170px}
@@ -171,7 +170,7 @@
     document.addEventListener('pointermove',onPointerMove,{capture:true,passive:false});
     document.addEventListener('pointerup',onPointerUp,{capture:true,passive:false});
     document.addEventListener('pointercancel',onPointerCancel,{capture:true,passive:true});
-    document.addEventListener('click',e=>{if(!isAdmin()&&e.target.closest?.('[data-cf-photos]')){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();return}if(Date.now()<suppressClickUntil&&e.target.closest?.('#cfCompanyGrid>.cf-company-card')){e.preventDefault();e.stopImmediatePropagation()}},true);
+    document.addEventListener('click',e=>{if(Date.now()<suppressClickUntil&&e.target.closest?.('#cfCompanyGrid>.cf-company-card')){e.preventDefault();e.stopImmediatePropagation()}},true);
     let lastCols=columns();
     window.addEventListener('resize',()=>{const c=columns();if(c!==lastCols){lastCols=c;setTimeout(applyLayout,50)}},{passive:true});
     let n=0;const t=setInterval(()=>{refreshAux();if(++n>80)clearInterval(t)},250);

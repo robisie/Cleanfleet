@@ -47,10 +47,12 @@
       .cf-taxes-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
       .cf-tax-card{border:1px solid var(--line);border-radius:14px;background:#fff;padding:13px;min-width:0}
       .cf-tax-card.paid{background:rgba(144,214,99,.10);border-color:rgba(92,170,57,.35)}
+      .cf-tax-card.overdue{background:rgba(255,92,72,.10);border-color:rgba(214,68,49,.38)}
       .cf-tax-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
       .cf-tax-card-head strong{font-size:15px}
       .cf-tax-status{font-size:10px;font-weight:800;border-radius:999px;padding:5px 8px;background:#f3f4f2;color:#5c625e}
       .cf-tax-status.paid{background:#dff3d3;color:#2f6d1d}
+      .cf-tax-status.overdue{background:#ffd9d4;color:#a62f20}
       .cf-tax-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
       .cf-tax-fields label{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:700;color:var(--ink-soft);min-width:0}
       .cf-tax-fields input{width:100%;box-sizing:border-box;min-width:0;border:1px solid var(--line);border-radius:9px;padding:10px 11px;background:#fff;color:var(--ink);font:600 13px system-ui,-apple-system,sans-serif}
@@ -170,9 +172,12 @@
     const amount=row?.amount??sug.amount??'';
     const due=row?.due_date??sug.due??'';
     const paid=row?.status==='paid';
+    const now=todayKey();
+    const today=new Date().toISOString().slice(0,10);
+    const overdue=!!(row && !paid && Number(row.period_year)===Number(state.year) && Number(row.period_month)<= (Number(state.year)<now.year?12:(Number(state.year)===now.year?now.month:0)) && row.due_date && String(row.due_date)<today);
     const source=sug.source?`Podpowiedź z ${monthLabel(sug.source.period_year,sug.source.period_month)}.`:'';
-    return `<section class="cf-tax-card ${paid?'paid':''}" data-cf-tax-type="${type.key}">
-      <div class="cf-tax-card-head"><strong>${esc(type.label)}</strong><span class="cf-tax-status ${paid?'paid':''}">${paid?'Opłacone':row?'Do zapłaty':'Do uzupełnienia'}</span></div>
+    return `<section class="cf-tax-card ${paid?'paid':overdue?'overdue':''}" data-cf-tax-type="${type.key}">
+      <div class="cf-tax-card-head"><strong>${esc(type.label)}</strong><span class="cf-tax-status ${paid?'paid':overdue?'overdue':''}">${paid?'Opłacone':overdue?'Zaległe':row?'Do zapłaty':'Do uzupełnienia'}</span></div>
       <div class="cf-tax-fields">
         <label>Kwota<input data-cf-tax-amount type="number" min="0" step="0.01" inputmode="decimal" value="${esc(amount)}" placeholder="0,00"></label>
         <label>Termin płatności<input data-cf-tax-due type="date" value="${esc(due)}"></label>

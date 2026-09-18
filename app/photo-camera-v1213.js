@@ -5,6 +5,7 @@
   let rearDevices=[],ultraDevice=null,mainDevice=null,teleDevice=null,currentLens='1';
 
   const toast=m=>{try{typeof showToast==='function'?showToast(m):console.info(m)}catch(_){console.info(m)}};
+  const cameraSize={width:{ideal:2560},height:{ideal:1920},aspectRatio:{ideal:4/3},resizeMode:{ideal:'none'}};
   const inputEl=()=>document.querySelector('#cfPhotoOverlay [data-photo-input]');
 
   function ensureStyle(){
@@ -17,11 +18,12 @@
       .cf-cam-cancel{background:#2c2c2c;color:#fff}.cf-cam-done{background:#9fbd17;color:#111}
       .cf-cam-count{font:800 14px/1.2 system-ui;text-align:center}
       .cf-cam-stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#000}
-      .cf-cam-video{width:100%;height:100%;object-fit:cover;background:#000}
+      .cf-cam-video{width:100%;height:100%;object-fit:contain;background:#000}
       .cf-cam-flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .12s}.cf-cam-flash.on{opacity:.65}
       .cf-cam-zoom{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:3;display:flex;gap:8px;padding:5px 7px;border-radius:999px;background:rgba(0,0,0,.48);backdrop-filter:blur(8px)}
       .cf-cam-zoom button{width:48px;height:36px;border:0;border-radius:999px;background:rgba(255,255,255,.16);color:#fff;font:800 13px/1 system-ui;cursor:pointer}
       .cf-cam-zoom button.active{background:#9fbd17;color:#111}.cf-cam-zoom button:disabled{opacity:.32;cursor:default}
+      .cf-cam-device{background:#161616;color:#fff;padding:8px 12px;font:12px system-ui}.cf-cam-device select{max-width:100%;background:#242424;color:#fff;border:1px solid #555;border-radius:8px;padding:8px}.cf-cam-lens-note{margin:6px 0 0;color:#ccc;font-size:11px}
       .cf-cam-bottom{min-height:112px;display:flex;align-items:center;justify-content:center;gap:24px;padding:14px;background:rgba(0,0,0,.78)}
       .cf-cam-switch{background:#2c2c2c;color:#fff;width:52px;height:52px;padding:0!important;border-radius:50%!important;font-size:24px!important}
       .cf-cam-shutter{width:76px;height:76px;padding:0!important;border-radius:50%!important;background:#fff!important;border:6px solid #777!important;box-shadow:0 0 0 3px #fff inset}
@@ -42,12 +44,20 @@
     overlay=document.createElement('div');overlay.className='cf-cam-overlay';overlay.innerHTML=`
       <div class="cf-cam-top"><button type="button" class="cf-cam-cancel">Anuluj</button><div class="cf-cam-count">0 zdjęć</div><button type="button" class="cf-cam-done">Gotowe</button></div>
       <div class="cf-cam-stage"><video class="cf-cam-video" autoplay playsinline muted></video><div class="cf-cam-flash"></div><div class="cf-cam-zoom"><button type="button" data-cam-zoom="0.5">0,5×</button><button type="button" data-cam-zoom="1">1×</button><button type="button" data-cam-zoom="2">2×</button></div></div>
+      <div class="cf-cam-device"><label>Obiektyw <select data-cam-device aria-label="Obiektyw aparatu"></select></label><div class="cf-cam-lens-note" data-cam-lens-note></div></div>
       <div class="cf-cam-bottom"><button type="button" class="cf-cam-switch" aria-label="Zmień kamerę">↻</button><button type="button" class="cf-cam-shutter" aria-label="Zrób zdjęcie"></button><div class="cf-cam-spacer"></div></div>`;
     document.body.appendChild(overlay);
     overlay.querySelector('.cf-cam-cancel').onclick=()=>closeCamera(false);
     overlay.querySelector('.cf-cam-done').onclick=()=>closeCamera(true);
     overlay.querySelector('.cf-cam-shutter').onclick=capture;
     overlay.querySelector('.cf-cam-switch').onclick=async()=>{if(busy)return;facing=facing==='environment'?'user':'environment';await startStream();};
+    overlay.querySelector('[data-cam-device]').onchange=async e=>{
+      if(busy)return;
+      const device=rearDevices.find(d=>d.deviceId===e.target.value);
+      if(!device)return;busy=true;
+      try{if(await openDevice(device)){currentLens=device.deviceId===ultraDevice?.deviceId?'0.5':device.deviceId===mainDevice?.deviceId?'1':'';if(currentLens==='0.5')await resetLensZoom();}else toast('Nie udało się przełączyć obiektywu.');}
+      finally{busy=false;updateZoomUi();}
+    };
     overlay.querySelectorAll('[data-cam-zoom]').forEach(b=>b.onclick=()=>setLens(b.dataset.camZoom));
     return overlay;
   }
@@ -104,14 +114,34 @@
   }
 
   async function openDevice(device){
-    if(!device?.deviceId)return false;stopStream();
-    try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{deviceId:{exact:device.deviceId},width:{ideal:1920},height:{ideal:2560}}});const v=ensureOverlay().querySelector('.cf-cam-video');v.srcObject=stream;await v.play();return true;}
-    catch(e){console.warn('CleanFleet camera device',e);return false;}
+    if(!device?.deviceId)return false;
+    const previousId=track()?.getSettings?.().deviceId;
+    stopStream();
+    async function connect(id){
+      stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{deviceId:{exact:id},...cameraSize}});
+      const v=ensureOverlay().querySelector('.cf-cam-video');v.srcObject=stream;await v.play();
+    }
+    try{await connect(device.deviceId);return true;}
+    catch(e){
+      console.warn('CleanFleet camera device',e);stopStream();
+      if(previousId){try{await connect(previousId);}catch(recovery){stopStream();console.warn('CleanFleet camera recovery',recovery);}}
+      return false;
+    }
+  }
+  async function resetLensZoom(){
+    const z=caps().zoom;
+    if(z&&Number.isFinite(z.min))await applyHardwareZoom(z.min);
   }
 
   async function applyHardwareZoom(value){const t=track();if(!t?.applyConstraints)return false;const c=caps(),z=c.zoom;if(!z||!Number.isFinite(z.min)||!Number.isFinite(z.max))return false;const n=Number(value);if(n<z.min-.001||n>z.max+.001)return false;try{await t.applyConstraints({advanced:[{zoom:n}]});return true}catch(_){return false}}
-  function zoomSupport(){if(facing!=='environment')return{'0.5':false,'1':false,'2':false};const c=caps(),z=c.zoom,hw=n=>!!z&&Number.isFinite(z.min)&&Number.isFinite(z.max)&&n>=z.min-.001&&n<=z.max+.001;return{'0.5':!!ultraDevice||hw(.5),'1':true,'2':!!teleDevice||hw(2)};}
-  function updateZoomUi(){if(!overlay)return;const box=overlay.querySelector('.cf-cam-zoom');box.style.display=facing==='environment'?'flex':'none';const support=zoomSupport();box.querySelectorAll('[data-cam-zoom]').forEach(b=>{const k=b.dataset.camZoom;b.disabled=!support[k];b.classList.toggle('active',k===currentLens);});}
+  function zoomSupport(){if(facing!=='environment')return{'0.5':false,'1':false,'2':false};const c=caps(),z=c.zoom,hw=n=>!!z&&Number.isFinite(z.min)&&Number.isFinite(z.max)&&n>=z.min-.001&&n<=z.max+.001;return{'0.5':!!ultraDevice,'1':true,'2':!!teleDevice||hw(2)};}
+  function updateZoomUi(){if(!overlay)return;
+    const select=overlay.querySelector('[data-cam-device]');select.replaceChildren();
+    for(const [i,d] of rearDevices.entries()){const option=document.createElement('option');option.value=d.deviceId;option.textContent=d.label||`Aparat ${i+1}`;select.appendChild(option);}
+    select.value=track()?.getSettings?.().deviceId||'';
+    overlay.querySelector('.cf-cam-device').style.display=facing==='environment'?'':'none';
+    overlay.querySelector('[data-cam-lens-note]').textContent=ultraDevice?'0,5× — obiektyw ultraszerokokątny. Podgląd pokazuje pełny kadr.':'Brak rozpoznanego obiektywu 0,5×. Wybierz obiektyw z listy lub użyj Aparatu iPhone / iPad.';
+const box=overlay.querySelector('.cf-cam-zoom');box.style.display=facing==='environment'?'flex':'none';const support=zoomSupport();box.querySelectorAll('[data-cam-zoom]').forEach(b=>{const k=b.dataset.camZoom;b.disabled=!support[k];b.classList.toggle('active',k===currentLens);});}
 
   async function setLens(value,silent=false){
     if(busy||facing!=='environment')return;busy=true;
@@ -119,13 +149,12 @@
       let ok=false;
       if(value==='0.5'){
         // Prefer the physical ultra-wide camera when Safari exposes it.
-        if(ultraDevice)ok=await openDevice(ultraDevice);
-        if(!ok)ok=await applyHardwareZoom(.5);
+        if(ultraDevice){ok=await openDevice(ultraDevice);if(ok)await resetLensZoom();}
       }
       else if(value==='1'){
         if(mainDevice)ok=await openDevice(mainDevice);
         if(!ok)ok=await applyHardwareZoom(1);
-        if(!ok)ok=true;
+        if(!mainDevice&&stream)ok=true;
       }
       else if(value==='2'){
         if(teleDevice)ok=await openDevice(teleDevice);
@@ -137,7 +166,7 @@
 
   async function startStream(){
     stopStream();if(!navigator.mediaDevices?.getUserMedia)throw new Error('Aparat w aplikacji nie jest dostępny na tym urządzeniu.');
-    stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:facing},width:{ideal:1920},height:{ideal:2560}}});
+    stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:facing},...cameraSize}});
     const v=ensureOverlay().querySelector('.cf-cam-video');v.srcObject=stream;await v.play();
     if(facing==='environment'){await discoverRearDevices();currentLens='1';updateZoomUi();await setLens('0.5',true);if(currentLens!=='0.5')updateZoomUi();}else{currentLens='1';updateZoomUi();}
   }

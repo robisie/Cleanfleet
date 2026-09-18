@@ -263,10 +263,30 @@
 
   function augmentPhotoButtons(){
     const list=document.getElementById('recordsList');if(!list)return;
+    const admin=isAdmin()||document.body?.dataset?.cfRole==='admin';
+    if(!admin){
+      list.querySelectorAll('[data-cf-photos]').forEach(b=>b.remove());
+      return;
+    }
     list.querySelectorAll('.record-card').forEach(card=>{
-      const opener=card.querySelector('[data-open]');if(!opener)return;const id=opener.dataset.open;if(!id||card.querySelector('[data-cf-photos]'))return;
+      const opener=card.querySelector('[data-open]');if(!opener)return;
+      const id=opener.dataset.open;
+      if(!id||card.querySelector('[data-cf-photos]'))return;
       const line=card.querySelector('.record-plate-line')||opener;
-      const b=document.createElement('button');b.type='button';b.className='cf-photo-btn';b.dataset.cfPhotos=id;b.textContent='Zdjęcia';b.title='Zdjęcia przed / po';line.appendChild(b);
+      const b=document.createElement('button');
+      b.type='button';
+      b.className='cf-photo-btn';
+      b.dataset.cfPhotos=id;
+      b.textContent='📷';
+      b.title='Zdjęcia PRZED / PO';
+      b.setAttribute('aria-label','Zdjęcia PRZED / PO');
+      b.addEventListener('click',e=>{
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        openPhotos(id);
+      });
+      line.appendChild(b);
     });
   }
   function initPhotoButtons(){
@@ -286,14 +306,7 @@
     };
     attach();
     const bodyObserver=new MutationObserver(()=>attach());
-    bodyObserver.observe(document.body,{childList:true,subtree:true});
-    document.addEventListener('click',e=>{
-      const b=e.target.closest?.('[data-cf-photos]');
-      if(!b)return;
-      if(!isAdmin()){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();return;}
-      e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
-      openPhotos(b.dataset.cfPhotos);
-    },true);
+    bodyObserver.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-cf-role']});
     window.cfOpenPhotos=openPhotos;
   }
 

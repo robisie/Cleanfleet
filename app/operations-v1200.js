@@ -199,10 +199,11 @@
     try{
       const {data:rec,error}=await cfSupabase.from('wash_records').select('id,company_id,plate,type,brand,order_date,order_due_date,wash_date,schedule_proposed_date').eq('id',recordId).maybeSingle();
       if(error)throw error;if(!rec)throw new Error('Nie znaleziono wpisu');
-      photoState={record:rec,kind:'przed',existing:[],pending:{przed:[],po:[]},signed:new Map(),busy:false};
-      renderPhotoModal();
-      overlay.querySelector('[data-photo-status]').textContent='Zdjęcia są zapisywane lokalnie na tym urządzeniu.';
-    }catch(e){console.error('CleanFleet photos',e);overlay.querySelector('[data-photo-status]').textContent='Nie udało się otworzyć zdjęć.';}
+      const {data:rows,error:pe}=await cfSupabase.from('wash_record_photos').select('id,kind,storage_path,created_at').eq('wash_record_id',recordId).order('created_at');
+      if(pe)throw pe;
+      photoState={record:rec,kind:'przed',existing:rows||[],pending:{przed:[],po:[]},signed:new Map(),busy:false};
+      await loadSignedUrls();renderPhotoModal();
+    }catch(e){console.error('CleanFleet photos',e);overlay.querySelector('[data-photo-status]').textContent='Nie udało się pobrać zdjęć.';}
   }
   function closePhotoModal(){const o=document.getElementById('cfPhotoOverlay');if(o){o.classList.remove('open');o.setAttribute('aria-hidden','true');}if(photoState){Object.values(photoState.pending).flat().forEach(x=>URL.revokeObjectURL(x.url));}photoState=null;}
   async function loadSignedUrls(){
@@ -272,7 +273,7 @@
     const list=document.getElementById('recordsList');if(!list)return;
     augmentPhotoButtons();
     const obs=new MutationObserver(()=>augmentPhotoButtons());obs.observe(list,{childList:true,subtree:true});
-    document.addEventListener('click',e=>{const b=e.target.closest('[data-cf-photos]');if(!b||!isAdmin())return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();openPhotos(b.dataset.cfPhotos);},true);
+    document.addEventListener('click',e=>{const b=e.target.closest('[data-cf-photos]');if(!b)return;e.preventDefault();e.stopPropagation();openPhotos(b.dataset.cfPhotos);},true);
   }
 
   function initCalendarObserver(){

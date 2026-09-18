@@ -36,6 +36,8 @@
       .cf-taxes-year button{min-width:42px}
       .cf-taxes-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:14px 0}
       .cf-taxes-kpi{border:1px solid var(--line);border-radius:12px;background:#fff;padding:12px;min-width:0}
+      .cf-taxes-kpi.overdue{background:rgba(255,92,72,.10);border-color:rgba(214,68,49,.38)}
+      .cf-taxes-kpi.overdue span,.cf-taxes-kpi.overdue small{color:#a62f20}
       .cf-taxes-kpi span{display:block;color:var(--ink-soft);font-size:11px;margin-bottom:5px}
       .cf-taxes-kpi strong{display:block;font-size:18px;overflow-wrap:anywhere}
       .cf-taxes-kpi small{display:block;margin-top:4px;color:var(--ink-soft);font-size:10px;line-height:1.2}
@@ -146,7 +148,7 @@
         <div class="cf-taxes-kpi"><span>Zapłacono w ${state.year}</span><strong>${esc(money(s.paid))}</strong></div>
         <div class="cf-taxes-kpi"><span>Do zapłaty w tym miesiącu</span><strong>${esc(money(s.thisMonth))}</strong></div>
         <div class="cf-taxes-kpi"><span>Płatności do końca roku</span><strong>${s.remaining}</strong></div>
-        <div class="cf-taxes-kpi"><span>Zaległe płatności</span><strong>${esc(money(s.overdueAmount))}</strong><small>${s.overdueCount ? `${s.overdueCount} ${s.overdueCount===1?'pozycja':'pozycje'}` : 'brak zaległości'}</small></div>
+        <div class="cf-taxes-kpi ${s.overdueCount?'overdue':''}"><span>Zaległe płatności</span><strong>${esc(money(s.overdueAmount))}</strong><small>${s.overdueCount ? `${s.overdueCount} ${s.overdueCount===1?'pozycja':'pozycje'}` : 'brak zaległości'}</small></div>
         <div class="cf-taxes-kpi"><span>Najbliższa płatność</span><strong>${s.next?`${esc(TYPES.find(t=>t.key===s.next.tax_type)?.label||s.next.tax_type)} · ${esc(money(s.next.amount))}`:'—'}</strong></div>`;
     }
 

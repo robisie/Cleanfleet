@@ -270,6 +270,17 @@
     finally{s.busy=false;renderPhotoModal();}
   }
 
+  function bindPhotoButton(b,id){
+    if(!b||!id||b.dataset.cfPhotoBound==='1')return;
+    b.dataset.cfPhotoBound='1';
+    b.addEventListener('click',e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      openPhotos(id);
+    });
+  }
+
   function augmentPhotoButtons(){
     const list=document.getElementById('recordsList');if(!list)return;
     const admin=isAdmin()||document.body?.dataset?.cfRole==='admin';
@@ -280,7 +291,14 @@
     list.querySelectorAll('.record-card').forEach(card=>{
       const opener=card.querySelector('[data-open]');if(!opener)return;
       const id=opener.dataset.open;
-      if(!id||card.querySelector('[data-cf-photos]'))return;
+      if(!id)return;
+
+      const existing=card.querySelector('[data-cf-photos]');
+      if(existing){
+        bindPhotoButton(existing,id);
+        return;
+      }
+
       const line=card.querySelector('.record-plate-line')||opener;
       const b=document.createElement('button');
       b.type='button';
@@ -289,12 +307,7 @@
       b.textContent='📷';
       b.title='Zdjęcia PRZED / PO';
       b.setAttribute('aria-label','Zdjęcia PRZED / PO');
-      b.addEventListener('click',e=>{
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        openPhotos(id);
-      });
+      bindPhotoButton(b,id);
       line.appendChild(b);
     });
   }

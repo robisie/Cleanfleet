@@ -79,7 +79,7 @@
         box-shadow:0 18px 45px rgba(0,0,0,.25);font:800 12px/1.25 system-ui,-apple-system,sans-serif;
         transform:translate(-50%,-115%)
       }
-      body.cf-photo-admin-only [data-cf-photos]{display:none!important}
+      body[data-cf-role="fleet_employee"] [data-cf-photos],body[data-cf-role="cleanfleet_employee"] [data-cf-photos]{display:none!important}
       @media(max-width:899px){
         #cfCompanyGrid{grid-template-columns:repeat(4,minmax(0,1fr))!important;--cf-row-h:158px}
         #cfCompanyGrid.cf-grid-dragging{background-size:calc((100% - 36px)/4 + 12px) 170px}
@@ -160,7 +160,7 @@
   async function restoreView(){if(viewBusy||!isAdmin())return;const saved=readView();if(!saved)return;viewBusy=true;try{if(saved.view==='admin'){if(!dashboardVisible()&&typeof cfShowCompanyChooser==='function')await cfShowCompanyChooser()}else if(saved.view==='company'&&saved.companyId&&typeof cfEnterCompany==='function'){const current=companyId();if(dashboardVisible()||String(current||'')!==String(saved.companyId))await cfEnterCompany(saved.companyId)}}catch(e){console.warn('[CleanFleet] restore view failed',e)}finally{viewBusy=false}}
   function markVersion(){document.querySelectorAll('body *').forEach(el=>{if(el.children.length===0&&/Wersja aplikacji:\s*v\d+\.\d+\.\d+/.test(el.textContent||''))el.textContent=(el.textContent||'').replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+/,'Wersja aplikacji: v1.30.12')})}
 
-  function applyPhotoAccess(){const allowed=isAdmin();document.body?.classList.toggle('cf-photo-admin-only',!allowed);if(!allowed){const o=document.getElementById('cfPhotoOverlay');if(o?.classList.contains('open'))o.classList.remove('open')}}
+  function applyPhotoAccess(){const allowed=isAdmin();document.body?.classList.remove('cf-photo-admin-only');if(!allowed){const o=document.getElementById('cfPhotoOverlay');if(o?.classList.contains('open'))o.classList.remove('open')}}
   function ensureAttentionVisible(){const panel=document.getElementById('attentionPanel');if(!panel)return;let activeCompany=null;try{activeCompany=typeof window.cfGetActiveCompanyId==='function'?window.cfGetActiveCompanyId():null}catch(_){activeCompany=null}if(!activeCompany)return;if(panel.classList.contains('show')&&panel.innerHTML.trim())return;panel.classList.add('show');panel.innerHTML='<div class="attention-head"><div class="attention-title">Wymaga uwagi</div></div><div class="attention-grid"><button type="button" class="attention-card"><div class="attention-label">Do wykonania</div><div class="attention-value">0</div></button><button type="button" class="attention-card"><div class="attention-label">Dawno nie prane</div><div class="attention-value">0</div></button><button type="button" class="attention-card"><div class="attention-label">Niezatwierdzone</div><div class="attention-value">0</div></button><button type="button" class="attention-card"><div class="attention-label">Faktury do zapłaty</div><div class="attention-value">0</div></button></div>'}
   function refreshAux(){applyPhotoAccess();ensureAttentionVisible();markVersion()}
 

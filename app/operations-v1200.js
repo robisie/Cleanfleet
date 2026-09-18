@@ -270,10 +270,31 @@
     });
   }
   function initPhotoButtons(){
-    const list=document.getElementById('recordsList');if(!list)return;
-    augmentPhotoButtons();
-    const obs=new MutationObserver(()=>augmentPhotoButtons());obs.observe(list,{childList:true,subtree:true});
-    document.addEventListener('click',e=>{const b=e.target.closest('[data-cf-photos]');if(!b)return;e.preventDefault();e.stopPropagation();openPhotos(b.dataset.cfPhotos);},true);
+    let observedList=null;
+    let listObserver=null;
+    const attach=()=>{
+      const list=document.getElementById('recordsList');
+      if(!list)return false;
+      augmentPhotoButtons();
+      if(list!==observedList){
+        try{listObserver?.disconnect()}catch(_){}
+        listObserver=new MutationObserver(()=>augmentPhotoButtons());
+        listObserver.observe(list,{childList:true,subtree:true});
+        observedList=list;
+      }
+      return true;
+    };
+    attach();
+    const bodyObserver=new MutationObserver(()=>attach());
+    bodyObserver.observe(document.body,{childList:true,subtree:true});
+    document.addEventListener('click',e=>{
+      const b=e.target.closest?.('[data-cf-photos]');
+      if(!b)return;
+      if(!isAdmin()){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();return;}
+      e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
+      openPhotos(b.dataset.cfPhotos);
+    },true);
+    window.cfOpenPhotos=openPhotos;
   }
 
   function initCalendarObserver(){

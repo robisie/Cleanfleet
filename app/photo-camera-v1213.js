@@ -56,13 +56,14 @@
   function showSourceSheet(){
     closeSourceSheet();ensureStyle();
     sourceSheet=document.createElement('div');sourceSheet.className='cf-photo-source-bg';
-    sourceSheet.innerHTML=`<div class="cf-photo-source-sheet" role="dialog" aria-modal="true" aria-label="Dodaj zdjęcia"><div class="cf-photo-source-title">Dodaj zdjęcia</div><div class="cf-photo-source-sub">Wybierz skąd chcesz dodać zdjęcia do bieżącej sekcji PRZED / PO.</div><button type="button" class="cf-photo-source-btn" data-photo-source="camera">📷 Aparat CleanFleet</button><button type="button" class="cf-photo-source-btn" data-photo-source="library">🖼️ Biblioteka zdjęć</button><button type="button" class="cf-photo-source-btn" data-photo-source="files">📁 Pliki / iCloud Drive</button><button type="button" class="cf-photo-source-btn cf-photo-source-cancel" data-photo-source="cancel">Anuluj</button></div>`;
+    sourceSheet.innerHTML=`<div class="cf-photo-source-sheet" role="dialog" aria-modal="true" aria-label="Dodaj zdjęcia"><div class="cf-photo-source-title">Dodaj zdjęcia</div><div class="cf-photo-source-sub">Wybierz skąd chcesz dodać zdjęcia do bieżącej sekcji PRZED / PO.</div><button type="button" class="cf-photo-source-btn" data-photo-source="camera-native">📷 Aparat iPhone / iPad</button><button type="button" class="cf-photo-source-btn" data-photo-source="camera">🎥 Aparat CleanFleet</button><button type="button" class="cf-photo-source-btn" data-photo-source="library">🖼️ Biblioteka zdjęć</button><button type="button" class="cf-photo-source-btn" data-photo-source="files">📁 Pliki / iCloud Drive</button><button type="button" class="cf-photo-source-btn cf-photo-source-cancel" data-photo-source="cancel">Anuluj</button></div>`;
     document.body.appendChild(sourceSheet);
     sourceSheet.addEventListener('click',e=>{
       if(e.target===sourceSheet){closeSourceSheet();return;}
       const b=e.target.closest('[data-photo-source]');if(!b)return;
       const src=b.dataset.photoSource;closeSourceSheet();
-      if(src==='camera')openCamera();
+      if(src==='camera-native')openNativeCamera();
+      else if(src==='camera')openCamera();
       else if(src==='library')openLibraryPicker();
       else if(src==='files')openFilesPicker();
     });
@@ -76,11 +77,12 @@
     catch(e){console.error('CleanFleet photo source deliver',e);toast('Nie udało się dodać wybranych zdjęć.');}
   }
 
-  function tempPicker({accept,multiple=true}){
-    const i=document.createElement('input');i.type='file';if(accept!==null)i.accept=accept;if(multiple)i.multiple=true;i.style.position='fixed';i.style.left='-9999px';i.style.opacity='0';
+  function tempPicker({accept,multiple=true,capture=null}){
+    const i=document.createElement('input');i.type='file';if(accept!==null)i.accept=accept;if(multiple)i.multiple=true;if(capture)i.setAttribute('capture',capture);i.style.position='fixed';i.style.left='-9999px';i.style.opacity='0';
     i.addEventListener('change',()=>{deliverFiles(i.files);setTimeout(()=>i.remove(),0)},{once:true});document.body.appendChild(i);i.click();
     setTimeout(()=>{if(document.body.contains(i))i.remove()},120000);
   }
+  function openNativeCamera(){tempPicker({accept:'image/*',multiple:false,capture:'environment'});}
   function openLibraryPicker(){tempPicker({accept:'image/*',multiple:true});}
   function openFilesPicker(){tempPicker({accept:null,multiple:true});}
 

@@ -65,7 +65,7 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text();
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.21');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.22');
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';
@@ -177,10 +177,10 @@ self.addEventListener('fetch', event => {
     const injectedScripts = '<script src="/app/weather-v6.js?v=20260916-1"></script>\n' +
       '<script src="/app/weather-refresh-v12311.js?v=20260916-1"></script>\n' +
       '<script src="/app/layout-v11913.js?v=20260917-2"></script>\n' +
-      '<script src="/app/operations-v1200.js?v=20260918-13021"></script>\n' +
-      '<script src="/app/photo-local-v1240.js?v=20260918-13021"></script>\n' +
-      '<script src="/app/photo-local-ui-v1232.js?v=20260918-13021"></script>\n' +
-      '<script src="/app/photo-camera-v1213.js?v=20260918-13021"></script>\n' +
+      '<script src="/app/operations-v1200.js?v=20260918-13022"></script>\n' +
+      '<script src="/app/photo-local-v1240.js?v=20260918-13022"></script>\n' +
+      '<script src="/app/photo-local-ui-v1232.js?v=20260918-13022"></script>\n' +
+      '<script src="/app/photo-camera-v1213.js?v=20260918-13022"></script>\n' +
       '<script src="/app/completion-guard-v1236.js?v=20260916-4"></script>\n' +
       '<script src="/app/calendar-v1203.js?v=20260917-2"></script>\n' +
       '<script src="/app/ui-v1209.js?v=20260915-3"></script>\n' +
@@ -189,7 +189,7 @@ self.addEventListener('fetch', event => {
       '<script src="/app/reminder-form-v1251.js?v=20260917-3"></script>\n' +
       '<script src="/app/calendar-today-tile-v1262.js?v=20260917-5"></script>\n' +
       '<script src="/app/taxes-v1310.js?v=20260918-6"></script>\n' +
-      '<script src="/app/admin-dashboard-v1270.js?v=20260918-25"></script>';
+      '<script src="/app/admin-dashboard-v1270.js?v=20260918-13022"></script>';
     if (html.includes('</body>')) html = html.replace('</body>', `${injectedScripts}\n</body>`);
     else html += injectedScripts;
 

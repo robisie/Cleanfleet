@@ -22,6 +22,8 @@
   const dbReady=()=>typeof cfSupabase!=='undefined'&&cfSupabase;
   const isAdmin=()=>{try{return typeof cfIsAdmin==='function'&&cfIsAdmin();}catch(_){return false;}};
 
+  const canUsePhotos=()=>{try{return window.cfCanUseRecordPhotos?.()===true;}catch(_){return false;}};
+
   function slug(v,fallback='inne'){
     const s=String(v||fallback).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
     return s||fallback;
@@ -193,7 +195,7 @@
   }
 
   async function openPhotos(recordId){
-    if(!isAdmin())return;
+    if(!canUsePhotos())return;
     if(photoState?.busy)return;
     const overlay=ensurePhotoModal();
     overlay.classList.add('open');
@@ -291,7 +293,7 @@
 
   function augmentPhotoButtons(){
     const list=document.getElementById('recordsList');if(!list)return;
-    const admin=isAdmin()||document.body?.dataset?.cfRole==='admin';
+    const admin=canUsePhotos();
     if(!admin){
       list.querySelectorAll('[data-cf-photos]').forEach(b=>b.remove());
       return;

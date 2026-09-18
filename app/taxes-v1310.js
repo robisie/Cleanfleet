@@ -122,7 +122,13 @@
     const startMonth=Number(year)===now.year?now.month:1;
     const remaining=yr.filter(r=>r.status!=='paid'&&Number(r.period_month)>=startMonth).length;
     const today=new Date().toISOString().slice(0,10);
-    const overdueRows=yr.filter(r=>r.status!=='paid'&&r.due_date&&String(r.due_date)<today);
+    const overdueMonthLimit=Number(year)<now.year?12:(Number(year)===now.year?now.month:0);
+    const overdueRows=yr.filter(r=>
+      r.status!=='paid' &&
+      Number(r.period_month)<=overdueMonthLimit &&
+      r.due_date &&
+      String(r.due_date)<today
+    );
     const overdueAmount=overdueRows.reduce((s,r)=>s+Number(r.amount||0),0);
     const next=yr.filter(r=>r.status!=='paid'&&r.due_date&&r.due_date>=today).sort((a,b)=>String(a.due_date).localeCompare(String(b.due_date)))[0]||null;
     return {paid,thisMonth,remaining,next,overdueAmount,overdueCount:overdueRows.length};

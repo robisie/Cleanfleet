@@ -28,14 +28,15 @@
     s.textContent=`
       .cf-company-taxes-card{border-color:rgba(166,198,27,.42)!important;background:linear-gradient(145deg,rgba(166,198,27,.12),rgba(255,255,255,.98))!important}
       .cf-taxes-sheet{max-width:980px!important;width:min(96vw,980px)!important;max-height:92vh!important;overflow:auto!important}
-      .cf-taxes-head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;margin-bottom:14px}
+      .cf-taxes-head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;margin-bottom:14px;padding-right:62px}
       .cf-taxes-head h2{margin:0 0 5px}
-      .cf-taxes-year{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+      .cf-taxes-year{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;flex:0 0 auto}
       .cf-taxes-year button{min-width:42px}
-      .cf-taxes-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0}
+      .cf-taxes-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:14px 0}
       .cf-taxes-kpi{border:1px solid var(--line);border-radius:12px;background:#fff;padding:12px;min-width:0}
       .cf-taxes-kpi span{display:block;color:var(--ink-soft);font-size:11px;margin-bottom:5px}
       .cf-taxes-kpi strong{display:block;font-size:18px;overflow-wrap:anywhere}
+      .cf-taxes-kpi small{display:block;margin-top:4px;color:var(--ink-soft);font-size:10px;line-height:1.2}
       .cf-taxes-months{display:flex;gap:7px;overflow:auto;padding:2px 0 10px;margin-bottom:8px;scrollbar-width:thin}
       .cf-taxes-month-btn{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 11px;font:700 11px/1 system-ui,-apple-system,sans-serif;white-space:nowrap;cursor:pointer}
       .cf-taxes-month-btn.active{background:#16150f;color:#fff;border-color:#16150f}
@@ -56,7 +57,8 @@
       .cf-tax-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
       .cf-tax-actions .btn{min-height:38px;padding:8px 12px}
       .cf-taxes-note{padding:10px 12px;border:1px solid rgba(166,198,27,.3);background:rgba(166,198,27,.07);border-radius:10px;font-size:11px;line-height:1.45;color:#555d57;margin-bottom:10px}
-      @media(max-width:700px){.cf-taxes-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.cf-taxes-grid{grid-template-columns:1fr}.cf-tax-fields{grid-template-columns:1fr}.cf-tax-fields input[type=date]{width:calc(100% - 22px)}}
+      @media(max-width:900px){.cf-taxes-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+      @media(max-width:700px){.cf-taxes-head{flex-direction:column;padding-right:54px}.cf-taxes-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.cf-taxes-grid{grid-template-columns:1fr}.cf-tax-fields{grid-template-columns:1fr}.cf-tax-fields input[type=date]{width:calc(100% - 22px)}}
     `;
     document.head.appendChild(s);
   }
@@ -117,8 +119,11 @@
     const thisMonth=yr.filter(r=>Number(year)===now.year&&Number(r.period_month)===now.month&&r.status!=='paid').reduce((s,r)=>s+Number(r.amount||0),0);
     const startMonth=Number(year)===now.year?now.month:1;
     const remaining=yr.filter(r=>r.status!=='paid'&&Number(r.period_month)>=startMonth).length;
-    const next=yr.filter(r=>r.status!=='paid'&&r.due_date&&r.due_date>=new Date().toISOString().slice(0,10)).sort((a,b)=>String(a.due_date).localeCompare(String(b.due_date)))[0]||null;
-    return {paid,thisMonth,remaining,next};
+    const today=new Date().toISOString().slice(0,10);
+    const overdueRows=yr.filter(r=>r.status!=='paid'&&r.due_date&&String(r.due_date)<today);
+    const overdueAmount=overdueRows.reduce((s,r)=>s+Number(r.amount||0),0);
+    const next=yr.filter(r=>r.status!=='paid'&&r.due_date&&r.due_date>=today).sort((a,b)=>String(a.due_date).localeCompare(String(b.due_date)))[0]||null;
+    return {paid,thisMonth,remaining,next,overdueAmount,overdueCount:overdueRows.length};
   }
 
   function render(){
@@ -131,6 +136,7 @@
         <div class="cf-taxes-kpi"><span>Zapłacono w ${state.year}</span><strong>${esc(money(s.paid))}</strong></div>
         <div class="cf-taxes-kpi"><span>Do zapłaty w tym miesiącu</span><strong>${esc(money(s.thisMonth))}</strong></div>
         <div class="cf-taxes-kpi"><span>Płatności do końca roku</span><strong>${s.remaining}</strong></div>
+        <div class="cf-taxes-kpi"><span>Zaległe płatności</span><strong>${esc(money(s.overdueAmount))}</strong><small>${s.overdueCount ? `${s.overdueCount} ${s.overdueCount===1?'pozycja':'pozycje'}` : 'brak zaległości'}</small></div>
         <div class="cf-taxes-kpi"><span>Najbliższa płatność</span><strong>${s.next?`${esc(TYPES.find(t=>t.key===s.next.tax_type)?.label||s.next.tax_type)} · ${esc(money(s.next.amount))}`:'—'}</strong></div>`;
     }
 

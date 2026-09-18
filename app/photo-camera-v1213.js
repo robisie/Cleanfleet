@@ -93,8 +93,9 @@
     try{
       const all=await navigator.mediaDevices.enumerateDevices();const cams=all.filter(d=>d.kind==='videoinput'),frontRx=/(front|user|facetime|selfie|przedn)/i;
       rearDevices=cams.filter(d=>!frontRx.test(d.label||''));
-      const ultraRx=/(ultra.?wide|ultra|0[.,]5|ultraszer|ultra.?szer)/i,teleRx=/(telephoto|tele|teleobiek|2x|3x|5x)/i;
-      ultraDevice=rearDevices.find(d=>ultraRx.test(d.label||''))||null;teleDevice=rearDevices.find(d=>teleRx.test(d.label||''))||null;
+      const ultraRx=/(ultra.?wide|ultra|0[.,]5|ultraszer|ultra.?szer|back.*ultra)/i,teleRx=/(telephoto|tele|teleobiek|2x|3x|5x)/i;
+      ultraDevice=rearDevices.find(d=>ultraRx.test(d.label||''))||null;
+      teleDevice=rearDevices.find(d=>teleRx.test(d.label||''))||null;
       mainDevice=rearDevices.find(d=>{const l=d.label||'';return !ultraRx.test(l)&&!teleRx.test(l)&&/(back camera|rear camera|tylna|wide camera|back dual|back triple)/i.test(l);})||rearDevices.find(d=>d.deviceId!==ultraDevice?.deviceId&&d.deviceId!==teleDevice?.deviceId)||rearDevices[0]||null;
     }catch(_){rearDevices=[];ultraDevice=mainDevice=teleDevice=null;}
   }
@@ -113,9 +114,20 @@
     if(busy||facing!=='environment')return;busy=true;
     try{
       let ok=false;
-      if(value==='0.5'){ok=await applyHardwareZoom(.5);if(!ok&&ultraDevice)ok=await openDevice(ultraDevice);}
-      else if(value==='1'){if(mainDevice)ok=await openDevice(mainDevice);if(!ok)ok=await applyHardwareZoom(1);if(!ok)ok=true;}
-      else if(value==='2'){if(teleDevice)ok=await openDevice(teleDevice);if(!ok)ok=await applyHardwareZoom(2);}
+      if(value==='0.5'){
+        // Prefer the physical ultra-wide camera when Safari exposes it.
+        if(ultraDevice)ok=await openDevice(ultraDevice);
+        if(!ok)ok=await applyHardwareZoom(.5);
+      }
+      else if(value==='1'){
+        if(mainDevice)ok=await openDevice(mainDevice);
+        if(!ok)ok=await applyHardwareZoom(1);
+        if(!ok)ok=true;
+      }
+      else if(value==='2'){
+        if(teleDevice)ok=await openDevice(teleDevice);
+        if(!ok)ok=await applyHardwareZoom(2);
+      }
       if(ok){currentLens=value;updateZoomUi();}else if(!silent)toast(`Tryb ${value.replace('.',',')}× nie jest udostępniony przez Safari na tym urządzeniu.`);
     }finally{busy=false}
   }

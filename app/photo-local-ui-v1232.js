@@ -26,8 +26,9 @@
     const db=await openDb();
     return new Promise((resolve,reject)=>{
       const tx=db.transaction(STORE,'readonly');
-      const req=tx.objectStore(STORE).getAll();
-      req.onsuccess=()=>resolve(req.result||[]);
+      const rows=[];const req=tx.objectStore(STORE).openCursor();
+      req.onsuccess=()=>{const c=req.result;if(!c)return;rows.push({id:c.value.id,recordId:c.value.recordId});c.continue()};
+      tx.oncomplete=()=>resolve(rows);
       req.onerror=()=>reject(req.error||new Error('Błąd odczytu zdjęć'));
     });
   }
@@ -60,7 +61,10 @@
     document.head.appendChild(s);
   }
 
+  let refreshing=false;
   async function refreshStates(){
+    if(refreshing){scheduleRefresh(100);return;}refreshing=true;
+    try{
     const rows=await allPhotos();
     const ids=new Set(rows.map(x=>String(x.recordId)));
     document.querySelectorAll('[data-cf-photos]').forEach(btn=>{
@@ -75,6 +79,7 @@
         btn.setAttribute('aria-label','Dodaj zdjęcia PRZED / PO');
       }
     });
+    }finally{refreshing=false;}
   }
 
   function scheduleRefresh(delay=50){
@@ -104,6 +109,7 @@
         const exp=box.querySelector('[data-local-export]');if(exp)exp.style.display='none';
       }
       if(typeof showToast==='function')showToast(`Usunięto lokalnie ${n} zdjęć.`);
+      document.dispatchEvent(new CustomEvent('cf:photos-render'));
       scheduleRefresh(0);
     });
     actions.appendChild(btn);
@@ -151,3 +157,4 @@
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
+

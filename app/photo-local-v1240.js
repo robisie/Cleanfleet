@@ -107,19 +107,18 @@
   async function makeCombinedZip(recordId){
     const items=await byRecord(recordId);
     const before=items.filter(x=>x.kind==='przed'),after=items.filter(x=>x.kind==='po');
-    if(!before.length||!after.length)throw new Error('Do ZIP-a potrzebne są zdjęcia PRZED i PO.');
     const meta=await metadata(recordId);
     const root=`${meta.type.toLowerCase()}/${meta.date}/${meta.plate}`;
-    const ordered=[...before.map((x,i)=>({x,path:`${root}/przed/${String(i+1).padStart(3,'0')}.${extFor(x.name,x.mime)}`})),...after.map((x,i)=>({x,path:`${root}/po/${String(i+1).padStart(3,'0')}.${extFor(x.name,x.mime)}`}))];
+    const ordered=[{path:`${root}/przed/`},{path:`${root}/po/`},...before.map((x,i)=>({x,path:`${root}/przed/${String(i+1).padStart(3,'0')}.${extFor(x.name,x.mime)}`})),...after.map((x,i)=>({x,path:`${root}/po/${String(i+1).padStart(3,'0')}.${extFor(x.name,x.mime)}`}))];
     const locals=[],centrals=[];let offset=0;const dt=dosDateTime();
     for(let i=0;i<ordered.length;i++){
       const {x,path}=ordered[i];showBuildProgress(i,ordered.length,`Przygotowanie ${path}`);
-      const row=await getPhoto(x.id);if(!row)throw new Error('Zdjęcie nie jest już dostępne.');
-      const source=row.blob||new Blob([row.bytes],{type:row.mime});
+      const row=x?await getPhoto(x.id):null;if(x&&!row)throw new Error('Zdjęcie nie jest już dostępne.');
+      const source=row?(row.blob||new Blob([row.bytes],{type:row.mime})):new Blob([]);
       const bytes=new Uint8Array(await source.arrayBuffer()),nameBytes=enc.encode(path),crc=crc32(bytes),size=bytes.byteLength;
       const local=new Blob([u32(0x04034b50),u16(20),u16(0x0800),u16(0),u16(dt.time),u16(dt.date),u32(crc),u32(size),u32(size),u16(nameBytes.length),u16(0),nameBytes,source]);
       locals.push(local);
-      const central=new Blob([u32(0x02014b50),u16(20),u16(20),u16(0x0800),u16(0),u16(dt.time),u16(dt.date),u32(crc),u32(size),u32(size),u16(nameBytes.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(offset),nameBytes]);
+      const central=new Blob([u32(0x02014b50),u16(20),u16(20),u16(0x0800),u16(0),u16(dt.time),u16(dt.date),u32(crc),u32(size),u32(size),u16(nameBytes.length),u16(0),u16(0),u16(0),u16(0),u32(path.endsWith('/')?0x10:0),u32(offset),nameBytes]);
       centrals.push(central);offset+=local.size;showBuildProgress(i+1,ordered.length,`Gotowe ${i+1} z ${ordered.length}`);await new Promise(r=>setTimeout(r,0));
     }
     const centralOffset=offset,centralSize=centrals.reduce((s,b)=>s+b.size,0),end=new Blob([u32(0x06054b50),u16(0),u16(0),u16(ordered.length),u16(ordered.length),u32(centralSize),u32(centralOffset),u16(0)]);
@@ -152,7 +151,7 @@
   function shareDialog(file,recordId){
     document.querySelector('.cf-local-zip-ready')?.remove();
     const el=document.createElement('div');el.className='cf-local-zip-ready';
-    el.innerHTML=`<div class="cf-local-zip-card"><h3>Paczka PRZED + PO gotowa</h3><div style="font-size:12px;font-weight:900;word-break:break-word">${file.name}</div><div style="font-size:10px;color:#6f756f;margin:5px 0 14px">${(file.size/1024/1024).toFixed(1)} MB · utworzono lokalnie</div><button data-local-share type="button">Udostępnij / zapisz do iCloud</button><button data-local-close type="button">Zamknij</button></div>`;
+    el.innerHTML=`<div class="cf-local-zip-card"><h3>Paczka zdjęć gotowa</h3><div style="font-size:12px;font-weight:900;word-break:break-word">${file.name}</div><div style="font-size:10px;color:#6f756f;margin:5px 0 14px">${(file.size/1024/1024).toFixed(1)} MB · utworzono lokalnie</div><button data-local-share type="button">Udostępnij / zapisz do iCloud</button><button data-local-close type="button">Zamknij</button></div>`;
     document.body.appendChild(el);
     el.querySelector('[data-local-close]').onclick=()=>el.remove();
     const share=el.querySelector('[data-local-share]'),close=el.querySelector('[data-local-close]');
@@ -167,7 +166,7 @@
   }
 
   async function exportCombined(recordId){
-    if(busy)return;busy=true;window.cfPhotoSession?.setBusy(true);
+    if(busy||window.cfPhotoSession?.get()?.busy)return;busy=true;window.cfPhotoSession?.setBusy(true);
     try{const file=await makeCombinedZip(recordId);clearBuildProgress();shareDialog(file,recordId)}catch(e){console.error(e);clearBuildProgress();toast(e?.message||'Nie udało się utworzyć ZIP-a.')}finally{busy=false;window.cfPhotoSession?.setBusy(false)}
   }
 
@@ -181,7 +180,7 @@
     const m=document.getElementById('cfPhotoOverlay');if(!m)return null;
     const anchor=m.querySelector('[data-photo-status]');if(!anchor)return null;
     let box=m.querySelector('.cf-photo-local');
-    if(!box){box=document.createElement('div');box.className='cf-photo-local';box.innerHTML='<div class="cf-photo-local-head"><span>Zdjęcia lokalne</span><span data-local-counts></span></div><div class="cf-photo-local-meta" data-local-meta></div><div data-local-progress></div><div class="cf-photo-local-grid" data-local-grid></div><div class="cf-photo-local-actions"><button class="primary" data-local-export type="button">Pobierz ZIP PRZED + PO</button></div>';anchor.insertAdjacentElement('afterend',box);box.querySelector('[data-local-export]').onclick=()=>currentRecordId&&exportCombined(currentRecordId)}
+    if(!box){box=document.createElement('div');box.className='cf-photo-local';box.innerHTML='<div class="cf-photo-local-head"><span>Zdjęcia lokalne</span><span data-local-counts></span></div><div class="cf-photo-local-meta" data-local-meta></div><div data-local-progress></div><div class="cf-photo-local-grid" data-local-grid></div><div class="cf-photo-local-actions"><button class="primary" data-local-export type="button">Pobierz ZIP</button></div>';anchor.insertAdjacentElement('afterend',box);box.querySelector('[data-local-export]').onclick=()=>currentRecordId&&exportCombined(currentRecordId)}
     return box;
   }
 
@@ -203,8 +202,8 @@
     if(version!==renderVersion||recordId!==currentRecordId||kind!==activeKind()||!m.classList.contains('open'))return;
     const before=allPhotos.filter(x=>x.kind==='przed'),after=allPhotos.filter(x=>x.kind==='po'),visible=kind==='po'?after:before;
     box.querySelector('[data-local-counts]').textContent=`PRZED ${before.length} · PO ${after.length}`;
-    box.querySelector('[data-local-meta]').textContent=before.length&&after.length?'Komplet gotowy do jednego ZIP-a.':before.length?'Zdjęcia PRZED zapisane lokalnie. Po praniu dodaj zdjęcia PO.':'Zdjęcia są przechowywane tylko na tym urządzeniu.';
-    const exp=box.querySelector('[data-local-export]');exp.style.display=before.length&&after.length?'':'none';
+    box.querySelector('[data-local-meta]').textContent=before.length&&after.length?'Komplet gotowy do jednego ZIP-a.':before.length?'Zdjęcia PRZED zapisane lokalnie. Po praniu dodaj zdjęcia PO.':'Możesz pobrać ZIP w każdej chwili. Brakujące zdjęcia oznaczają pusty folder PRZED lub PO.';
+    const exp=box.querySelector('[data-local-export]');exp.style.display='';exp.disabled=busy||!!window.cfPhotoSession?.get()?.busy;
     const grid=box.querySelector('[data-local-grid]');clearPreviews();
     for(const p of visible){
       const row=await getPhoto(p.id);if(!row)continue;
@@ -257,5 +256,6 @@
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
+
 
 

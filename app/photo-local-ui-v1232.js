@@ -106,7 +106,7 @@
         const counts=box.querySelector('[data-local-counts]');if(counts)counts.textContent='PRZED 0 · PO 0';
         const meta=box.querySelector('[data-local-meta]');if(meta)meta.textContent='Zdjęcia są przechowywane tylko na tym urządzeniu.';
         const grid=box.querySelector('[data-local-grid]');if(grid)grid.innerHTML='';
-        const exp=box.querySelector('[data-local-export]');if(exp)exp.style.display='none';
+        const exp=box.querySelector('[data-local-export]');if(exp)exp.style.display='';
       }
       if(typeof showToast==='function')showToast(`Usunięto lokalnie ${n} zdjęć.`);
       document.dispatchEvent(new CustomEvent('cf:photos-render'));
@@ -157,4 +157,5 @@
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
+
 

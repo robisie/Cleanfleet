@@ -127,23 +127,48 @@
     return new File([blob],`${meta.type}_${meta.plate}_${meta.date}.zip`,{type:'application/zip',lastModified:Date.now()});
   }
 
-  function shareDialog(file){
+  function cleanupDialog(recordId){
+    const el=document.createElement('div');el.className='cf-local-zip-ready';
+    el.innerHTML='<div class="cf-local-zip-card"><h3>Wyczyścić zdjęcia lokalne?</h3><p>Jeśli paczka ZIP została zapisana, możesz usunąć zdjęcia PRZED i PO tego wpisu z urządzenia. Tej operacji nie można cofnąć.</p><p data-cleanup-status role="status"></p><button data-local-cleanup type="button">Wyczyść zdjęcia lokalne tego wpisu</button><button data-local-close type="button">Zamknij</button></div>';
+    document.body.appendChild(el);
+    const clear=el.querySelector('[data-local-cleanup]'),close=el.querySelector('[data-local-close]'),status=el.querySelector('[data-cleanup-status]');
+    clear.style.background='#9fbd17';clear.style.color='#111';
+    close.onclick=()=>el.remove();
+    clear.onclick=async()=>{
+      if(busy||window.cfPhotoSession?.get()?.busy)return;
+      busy=true;clear.disabled=true;close.disabled=true;window.cfPhotoSession?.setBusy(true);
+      status.textContent='Czyszczenie zdjęć…';
+      let removed=false;
+      try{
+        const rows=await byRecord(recordId);
+        await tx('readwrite',store=>rows.forEach(row=>store.delete(row.id)));
+        removed=true;
+      }catch(e){console.error(e);status.textContent='Nie udało się wyczyścić zdjęć. Spróbuj ponownie.';}
+      finally{busy=false;clear.disabled=false;close.disabled=false;window.cfPhotoSession?.setBusy(false);}
+      if(removed){el.remove();document.dispatchEvent(new CustomEvent('cf:photos-saved',{detail:{recordId}}));renderLocal().catch(console.error);toast('Wyczyszczono zdjęcia lokalne tego wpisu.');}
+    };
+  }
+
+  function shareDialog(file,recordId){
     document.querySelector('.cf-local-zip-ready')?.remove();
     const el=document.createElement('div');el.className='cf-local-zip-ready';
     el.innerHTML=`<div class="cf-local-zip-card"><h3>Paczka PRZED + PO gotowa</h3><div style="font-size:12px;font-weight:900;word-break:break-word">${file.name}</div><div style="font-size:10px;color:#6f756f;margin:5px 0 14px">${(file.size/1024/1024).toFixed(1)} MB · utworzono lokalnie</div><button data-local-share type="button">Udostępnij / zapisz do iCloud</button><button data-local-close type="button">Zamknij</button></div>`;
     document.body.appendChild(el);
     el.querySelector('[data-local-close]').onclick=()=>el.remove();
-    el.querySelector('[data-local-share]').onclick=async()=>{
+    const share=el.querySelector('[data-local-share]'),close=el.querySelector('[data-local-close]');
+    share.onclick=async()=>{
+      if(share.disabled)return;share.disabled=true;close.disabled=true;
       try{
         if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]})))await navigator.share({files:[file],title:file.name});
         else{const u=URL.createObjectURL(file),a=document.createElement('a');a.href=u;a.download=file.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),30000)}
-      }catch(e){if(e?.name!=='AbortError'){console.error(e);toast('Nie udało się udostępnić ZIP-a.')}}
+        el.remove();cleanupDialog(recordId);
+      }catch(e){if(e?.name!=='AbortError'){console.error(e);toast('Nie udało się udostępnić ZIP-a.')}}finally{share.disabled=false;close.disabled=false;}
     };
   }
 
   async function exportCombined(recordId){
     if(busy)return;busy=true;window.cfPhotoSession?.setBusy(true);
-    try{const file=await makeCombinedZip(recordId);clearBuildProgress();shareDialog(file)}catch(e){console.error(e);clearBuildProgress();toast(e?.message||'Nie udało się utworzyć ZIP-a.')}finally{busy=false;window.cfPhotoSession?.setBusy(false)}
+    try{const file=await makeCombinedZip(recordId);clearBuildProgress();shareDialog(file,recordId)}catch(e){console.error(e);clearBuildProgress();toast(e?.message||'Nie udało się utworzyć ZIP-a.')}finally{busy=false;window.cfPhotoSession?.setBusy(false)}
   }
 
   function ensureStyles(){
@@ -232,4 +257,5 @@
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
+
 

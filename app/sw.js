@@ -179,7 +179,7 @@ self.addEventListener('fetch', event => {
       '<script src="/app/weather-refresh-v12311.js?v=20260916-1"></script>\n' +
       '<script src="/app/layout-v11913.js?v=20260917-2"></script>\n' +
       '<script src="/app/operations-v1200.js?v=20260919-13025"></script>\n' +
-      '<script src="/app/photo-local-v1240.js?v=20260919-13025"></script>\n' +
+      '<script src="/app/photo-local-v1240.js?v=20260919-13025-cleanup"></script>\n' +
       '<script src="/app/photo-local-ui-v1232.js?v=20260919-13025"></script>\n' +
       '<script src="/app/photo-camera-v1213.js?v=20260919-13025"></script>\n' +
       '<script src="/app/completion-guard-v1236.js?v=20260916-4"></script>\n' +
@@ -251,5 +251,6 @@ self.addEventListener('notificationclick', event => {
     if (self.clients.openWindow) await self.clients.openWindow(targetUrl.href);
   })());
 });
+
 
 

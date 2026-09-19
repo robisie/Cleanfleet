@@ -219,7 +219,7 @@
       if(status)status.textContent='Zdjęcia są zapisywane lokalnie na tym urządzeniu.';
     }
   }
-  function closePhotoModal(){if(photoState?.busy)return;const o=document.getElementById('cfPhotoOverlay');if(o){o.classList.remove('open');o.setAttribute('aria-hidden','true');}if(photoState){Object.values(photoState.pending).flat().forEach(x=>URL.revokeObjectURL(x.url));}photoState=null;}
+  function closePhotoModal(){if(photoState?.busy)return;const o=document.getElementById('cfPhotoOverlay');if(o){o.classList.remove('open');o.setAttribute('aria-hidden','true');o.querySelector('[data-photo-pending]')?.replaceChildren();}if(photoState){Object.values(photoState.pending).flat().forEach(x=>URL.revokeObjectURL(x.url));}photoState=null;document.dispatchEvent(new CustomEvent('cf:photos-close'));}
   async function loadSignedUrls(){
     if(!photoState)return;
     const missing=photoState.existing.filter(r=>!photoState.signed.has(r.storage_path));
@@ -239,11 +239,33 @@
     o.querySelector('[data-photo-status]').textContent=s.busy?'Zapisywanie lokalnie…':'Zdjęcia są zapisywane lokalnie na tym urządzeniu.';
     document.dispatchEvent(new CustomEvent('cf:photos-render'));
   }
-  function addPhotoFiles(files){
+  // Decode only one original at a time; keep full quality files for the ZIP.
+  window.cfPhotoThumbnail=async file=>{
+    let image=null,url=null,canvas=null;
+    try{
+      if(typeof createImageBitmap==='function'){
+        try{image=await createImageBitmap(file,{resizeWidth:320,resizeQuality:'low'})}catch(_){}
+      }
+      if(!image){url=URL.createObjectURL(file);image=new Image();image.src=url;await image.decode()}
+      const w=image.naturalWidth||image.width,h=image.naturalHeight||image.height,scale=Math.min(1,320/Math.max(w,h));
+      canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(w*scale));canvas.height=Math.max(1,Math.round(h*scale));
+      canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);
+      return await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.7));
+    }catch(e){console.warn('Photo thumbnail unavailable',e);return null}
+    finally{image?.close?.();if(url){image.src='';URL.revokeObjectURL(url)}if(canvas){canvas.width=0;canvas.height=0}}
+  };
+  async function addPhotoFiles(files){
     if(!photoState||photoState.busy)return false;
-    [...files].forEach(file=>photoState.pending[photoState.kind].push({file,url:URL.createObjectURL(file)}));
-    renderPhotoModal();return true;
+    const selected=[...files],state=photoState,kind=state.kind;state.busy=true;renderPhotoModal();
+    try{
+      for(const file of selected){
+        const thumbnail=await window.cfPhotoThumbnail(file);
+        state.pending[kind].push({file,thumbnail,url:thumbnail?URL.createObjectURL(thumbnail):''});
+      }
+      return true;
+    }finally{state.busy=false;renderPhotoModal()}
   }
+
   function onPhotoFiles(e){addPhotoFiles(e.target.files||[]);e.target.value='';}
 
   // One pending queue shared by the camera, preview and local persistence.
@@ -352,4 +374,5 @@
   function start(){ensureStyles();ensurePhotoModal();initPhotoButtons();initCalendarObserver();}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
+
 

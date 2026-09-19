@@ -170,6 +170,54 @@
     try{const file=await makeCombinedZip(recordId);clearBuildProgress();shareDialog(file,recordId)}catch(e){console.error(e);clearBuildProgress();toast(e?.message||'Nie udało się utworzyć ZIP-a.')}finally{busy=false;window.cfPhotoSession?.setBusy(false)}
   }
 
+  async function saveToPhotos(recordId){
+    if(busy||window.cfPhotoSession?.get()?.busy)return;
+    if(!navigator.share){toast('Ta przeglądarka nie udostępnia zapisu zdjęć przez menu systemowe.');return;}
+    busy=true;window.cfPhotoSession?.setBusy(true);
+    const el=document.createElement('div');el.className='cf-local-zip-ready';
+    el.innerHTML='<div class="cf-local-zip-card"><h3>Zapisz w Zdjęciach iPhone’a</h3><p>W menu systemowym wybierz „Zachowaj obrazy”. Zdjęcia lokalne pozostaną w CleanFleet.</p><p data-gallery-status role="status"></p><button data-local-share type="button" disabled>Zapisz w Zdjęciach</button><button data-local-close type="button">Zamknij</button></div>';
+    document.body.appendChild(el);
+    const status=el.querySelector('[data-gallery-status]'),share=el.querySelector('[data-local-share]'),close=el.querySelector('[data-local-close]');
+    let closed=false,sharing=false,files=[],rows=[],next=0,batchEnd=0;
+    function finish(){if(sharing)return;closed=true;files=[];rows=[];el.remove();busy=false;window.cfPhotoSession?.setBusy(false);}
+    close.onclick=finish;
+    async function prepare(){
+      share.disabled=true;files=[];status.textContent='Przygotowanie zdjęć…';
+      try{
+        const batch=[];let size=0;batchEnd=next;
+        // Only one modest batch is retained, including for older ArrayBuffer photos.
+        while(batchEnd<rows.length&&batch.length<8&&size<20*1024*1024){
+          const meta=rows[batchEnd],row=await getPhoto(meta.id);if(closed)return;
+          if(!row)throw new Error('Zdjęcie nie jest już dostępne. Otwórz zapis ponownie.');
+          const blob=row.blob||new Blob([row.bytes],{type:row.mime||'image/jpeg'});
+          batch.push(new File([blob],`${row.kind}-${String(batchEnd+1).padStart(3,'0')}.${extFor(row.name,row.mime)}`,{type:row.mime||blob.type||'image/jpeg'}));
+          size+=blob.size;batchEnd++;
+        }
+        if(closed)return;
+        if(!batch.length){status.textContent='Brak zapisanych zdjęć. Najpierw kliknij „Zapisz zdjęcia” przy wpisie.';return;}
+        if(navigator.canShare&&!navigator.canShare({files:batch}))throw new Error('System nie obsługuje udostępniania tych zdjęć w tej postaci. Możesz pobrać je jako ZIP.');
+        files=batch;status.textContent=`Zdjęcia ${next+1}–${batchEnd} z ${rows.length}. Wybierz „Zachowaj obrazy” w następnym oknie.`;
+        share.disabled=false;
+      }catch(e){if(!closed){console.error(e);status.textContent=e?.message||'Nie udało się przygotować zdjęć.';}}
+    }
+    share.onclick=async()=>{
+      if(closed||sharing||share.disabled||!files.length)return;
+      sharing=true;share.disabled=true;close.disabled=true;
+      try{
+        // Fresh user click preserves the activation required by iOS sharing.
+        await navigator.share({files});
+        next=batchEnd;files=[];
+        if(next<rows.length)await prepare();
+        else{status.textContent='Udostępnianie zakończone. Sprawdź zdjęcia w aplikacji Zdjęcia. Kopie lokalne nadal są w CleanFleet.';share.hidden=true;}
+      }catch(e){
+        if(e?.name!=='AbortError'){console.error(e);status.textContent='Nie udało się udostępnić zdjęć. Spróbuj ponownie.';}
+        share.disabled=false;
+      }finally{sharing=false;close.disabled=false;}
+    };
+    try{rows=await byRecord(recordId);if(!closed)await prepare();}
+    catch(e){if(!closed){console.error(e);status.textContent='Nie udało się odczytać zdjęć lokalnych.';}}
+  }
+
   function ensureStyles(){
     if(document.getElementById('cfPhotoLocal1240Style'))return;
     const s=document.createElement('style');s.id='cfPhotoLocal1240Style';s.textContent=`
@@ -180,7 +228,7 @@
     const m=document.getElementById('cfPhotoOverlay');if(!m)return null;
     const anchor=m.querySelector('[data-photo-status]');if(!anchor)return null;
     let box=m.querySelector('.cf-photo-local');
-    if(!box){box=document.createElement('div');box.className='cf-photo-local';box.innerHTML='<div class="cf-photo-local-head"><span>Zdjęcia lokalne</span><span data-local-counts></span></div><div class="cf-photo-local-meta" data-local-meta></div><div data-local-progress></div><div class="cf-photo-local-grid" data-local-grid></div><div class="cf-photo-local-actions"><button class="primary" data-local-export type="button">Pobierz ZIP</button></div>';anchor.insertAdjacentElement('afterend',box);box.querySelector('[data-local-export]').onclick=()=>currentRecordId&&exportCombined(currentRecordId)}
+    if(!box){box=document.createElement('div');box.className='cf-photo-local';box.innerHTML='<div class="cf-photo-local-head"><span>Zdjęcia lokalne</span><span data-local-counts></span></div><div class="cf-photo-local-meta" data-local-meta></div><div data-local-progress></div><div class="cf-photo-local-grid" data-local-grid></div><div class="cf-photo-local-actions"><button class="primary" data-local-export type="button">Pobierz ZIP</button><button data-local-gallery type="button">Zapisz w Zdjęciach iPhone’a</button></div>';anchor.insertAdjacentElement('afterend',box);box.querySelector('[data-local-export]').onclick=()=>currentRecordId&&exportCombined(currentRecordId);box.querySelector('[data-local-gallery]').onclick=()=>currentRecordId&&saveToPhotos(currentRecordId)}
     return box;
   }
 
@@ -220,19 +268,15 @@
     if(!currentRecordId||busy)return;
     const recordId=currentRecordId,kind=activeKind();busy=true;
     window.cfPhotoSession?.setBusy(true);
-    let exportReady=false;
     try{
       const n=await persistStaged(recordId,kind);
       if(!n){toast('Brak nowych zdjęć do zapisania.');return;}
       toast(`Zapisano lokalnie ${n} ${n===1?'zdjęcie':'zdjęć'} ${kind.toUpperCase()}.`);
       await renderLocal();
-      const rows=await byRecord(recordId);
-      exportReady=rows.some(x=>x.kind==='przed')&&rows.some(x=>x.kind==='po');
       document.dispatchEvent(new CustomEvent('cf:photos-saved',{detail:{recordId}}));
     }catch(e){console.error(e);toast(e?.message||'Nie udało się zapisać zdjęć lokalnie.');}
     finally{busy=false;window.cfPhotoSession?.setBusy(false);}
-    // Export obtains its own lock only after the local transaction completes.
-    if(exportReady)await exportCombined(recordId);
+    // ZIP is created only by the explicit export button.
   }
 
   function events(){
@@ -256,6 +300,7 @@
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
+
 
 
 

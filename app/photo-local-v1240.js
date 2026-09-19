@@ -42,7 +42,7 @@
     const db=await openDb();
     return new Promise((resolve,reject)=>{
       const t=db.transaction(STORE,mode),s=t.objectStore(STORE);
-      try{fn(s,t)}catch(e){reject(e);return}
+      try{fn(s,t)}catch(e){t.abort();reject(e);return}
       t.oncomplete=()=>resolve();
       t.onerror=()=>reject(t.error||new Error('Błąd lokalnej bazy'));
       t.onabort=()=>reject(t.error||new Error('Przerwano zapis lokalny'));
@@ -50,7 +50,14 @@
   }
   async function put(x){await tx('readwrite',s=>s.put(x));return x}
   async function del(id){await tx('readwrite',s=>s.delete(id))}
-  async function all(){const db=await openDb();return new Promise((resolve,reject)=>{const t=db.transaction(STORE,'readonly'),r=t.objectStore(STORE).getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error)})}
+  async function all(){
+    const db=await openDb();return new Promise((resolve,reject)=>{
+      const rows=[],t=db.transaction(STORE,'readonly'),r=t.objectStore(STORE).openCursor();
+      r.onsuccess=()=>{const c=r.result;if(!c)return;const {bytes,blob,thumbnail,...meta}=c.value;rows.push(meta);c.continue()};
+      t.oncomplete=()=>resolve(rows);t.onerror=()=>reject(t.error);t.onabort=()=>reject(t.error);
+    });
+  }
+  async function getPhoto(id){const db=await openDb();return new Promise((resolve,reject)=>{const r=db.transaction(STORE,'readonly').objectStore(STORE).get(id);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
   async function byRecord(recordId){return (await all()).filter(x=>String(x.recordId)===String(recordId)).sort((a,b)=>a.createdAt-b.createdAt)}
   async function byRecordKind(recordId,kind){return (await byRecord(recordId)).filter(x=>x.kind===kind)}
 
@@ -61,8 +68,8 @@
     if(!items.length)return 0;
     const ts=Date.now(),rows=[];
     for(let i=0;i<items.length;i++){
-      const f=items[i].file,bytes=await f.arrayBuffer();
-      rows.push({id:uid(),recordId,kind,recordKind:keyFor(recordId,kind),name:f.name||`zdjecie-${i+1}.jpg`,mime:f.type||'image/jpeg',bytes:bytes.slice(0),createdAt:ts+i});
+      const f=items[i].file;
+      rows.push({id:uid(),recordId,kind,recordKind:keyFor(recordId,kind),name:f.name||`zdjecie-${i+1}.jpg`,mime:f.type||'image/jpeg',blob:f,thumbnail:items[i].thumbnail,createdAt:ts+i});
     }
     // Commit the entire batch, or leave every pending photo available for retry.
     await tx('readwrite',store=>rows.forEach(row=>store.put(row)));
@@ -107,8 +114,10 @@
     const locals=[],centrals=[];let offset=0;const dt=dosDateTime();
     for(let i=0;i<ordered.length;i++){
       const {x,path}=ordered[i];showBuildProgress(i,ordered.length,`Przygotowanie ${path}`);
-      const bytes=new Uint8Array(x.bytes),nameBytes=enc.encode(path),crc=crc32(bytes),size=bytes.byteLength;
-      const local=new Blob([u32(0x04034b50),u16(20),u16(0x0800),u16(0),u16(dt.time),u16(dt.date),u32(crc),u32(size),u32(size),u16(nameBytes.length),u16(0),nameBytes,bytes]);
+      const row=await getPhoto(x.id);if(!row)throw new Error('Zdjęcie nie jest już dostępne.');
+      const source=row.blob||new Blob([row.bytes],{type:row.mime});
+      const bytes=new Uint8Array(await source.arrayBuffer()),nameBytes=enc.encode(path),crc=crc32(bytes),size=bytes.byteLength;
+      const local=new Blob([u32(0x04034b50),u16(20),u16(0x0800),u16(0),u16(dt.time),u16(dt.date),u32(crc),u32(size),u32(size),u16(nameBytes.length),u16(0),nameBytes,source]);
       locals.push(local);
       const central=new Blob([u32(0x02014b50),u16(20),u16(20),u16(0x0800),u16(0),u16(dt.time),u16(dt.date),u32(crc),u32(size),u32(size),u16(nameBytes.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(offset),nameBytes]);
       centrals.push(central);offset+=local.size;showBuildProgress(i+1,ordered.length,`Gotowe ${i+1} z ${ordered.length}`);await new Promise(r=>setTimeout(r,0));
@@ -133,8 +142,8 @@
   }
 
   async function exportCombined(recordId){
-    if(busy)return;busy=true;
-    try{const file=await makeCombinedZip(recordId);clearBuildProgress();shareDialog(file)}catch(e){console.error(e);clearBuildProgress();toast(e?.message||'Nie udało się utworzyć ZIP-a.')}finally{busy=false}
+    if(busy)return;busy=true;window.cfPhotoSession?.setBusy(true);
+    try{const file=await makeCombinedZip(recordId);clearBuildProgress();shareDialog(file)}catch(e){console.error(e);clearBuildProgress();toast(e?.message||'Nie udało się utworzyć ZIP-a.')}finally{busy=false;window.cfPhotoSession?.setBusy(false)}
   }
 
   function ensureStyles(){
@@ -151,23 +160,36 @@
     return box;
   }
 
+  let renderVersion=0,renderRunning=false,renderAgain=false;
+  let previewUrls=[];
+  function clearPreviews(){previewUrls.forEach(u=>URL.revokeObjectURL(u));previewUrls=[];document.querySelector('#cfPhotoOverlay [data-local-grid]')?.replaceChildren()}
   async function renderLocal(){
+    renderVersion++;
+    if(window.cfPhotoSession?.get()?.busy)return;
+    if(renderRunning){renderAgain=true;return;}
+    renderRunning=true;
+    try{do{renderAgain=false;await renderLocalOnce(renderVersion)}while(renderAgain)}finally{renderRunning=false}
+  }
+  async function renderLocalOnce(version){
     const m=document.getElementById('cfPhotoOverlay');if(!m||!m.classList.contains('open')||!currentRecordId)return;
     const box=ensureLocalBox();if(!box)return;
     const recordId=currentRecordId,kind=activeKind();
     const allPhotos=await byRecord(recordId);
-    if(recordId!==currentRecordId||kind!==activeKind()||!m.classList.contains('open'))return;
+    if(version!==renderVersion||recordId!==currentRecordId||kind!==activeKind()||!m.classList.contains('open'))return;
     const before=allPhotos.filter(x=>x.kind==='przed'),after=allPhotos.filter(x=>x.kind==='po'),visible=kind==='po'?after:before;
     box.querySelector('[data-local-counts]').textContent=`PRZED ${before.length} · PO ${after.length}`;
     box.querySelector('[data-local-meta]').textContent=before.length&&after.length?'Komplet gotowy do jednego ZIP-a.':before.length?'Zdjęcia PRZED zapisane lokalnie. Po praniu dodaj zdjęcia PO.':'Zdjęcia są przechowywane tylko na tym urządzeniu.';
     const exp=box.querySelector('[data-local-export]');exp.style.display=before.length&&after.length?'':'none';
-    const grid=box.querySelector('[data-local-grid]');grid.innerHTML='';
-    const urls=[];
+    const grid=box.querySelector('[data-local-grid]');clearPreviews();
     for(const p of visible){
-      const blob=new Blob([p.bytes],{type:p.mime||'image/jpeg'}),url=URL.createObjectURL(blob);urls.push(url);
-      const cell=document.createElement('div');cell.className='cf-photo-local-thumb';cell.innerHTML=`<img alt=""><button type="button" aria-label="Usuń">×</button>`;cell.querySelector('img').src=url;cell.querySelector('button').onclick=async()=>{await del(p.id);renderLocal()};grid.appendChild(cell)
+      const row=await getPhoto(p.id);if(!row)continue;
+      const blob=row.thumbnail||await window.cfPhotoThumbnail(row.blob||new Blob([row.bytes],{type:row.mime}));
+      if(version!==renderVersion||recordId!==currentRecordId||kind!==activeKind()||!m.classList.contains('open'))return;
+      const url=blob?URL.createObjectURL(blob):null;if(url)previewUrls.push(url);
+      const cell=document.createElement('div');cell.className='cf-photo-local-thumb';cell.innerHTML='<img alt="Zdjęcie"><button type="button" aria-label="Usuń">×</button>';
+      if(url)cell.querySelector('img').src=url;
+      cell.querySelector('button').onclick=async()=>{if(busy||window.cfPhotoSession?.get()?.busy)return;await del(p.id);document.dispatchEvent(new CustomEvent('cf:photos-saved'));await renderLocal()};grid.appendChild(cell);
     }
-    setTimeout(()=>urls.forEach(u=>URL.revokeObjectURL(u)),30000);
   }
 
   async function saveCurrent(){
@@ -190,6 +212,7 @@
   }
 
   function events(){
+    document.addEventListener('cf:photos-close',()=>{renderVersion++;clearPreviews()});
     document.addEventListener('cf:photos-open',e=>{
       currentRecordId=e.detail.recordId;
       renderLocal().catch(e=>toast(e?.message||'Nie udało się odczytać zdjęć lokalnych.'));
@@ -209,3 +232,4 @@
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
+

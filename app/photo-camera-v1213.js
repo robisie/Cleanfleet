@@ -2,6 +2,7 @@
   'use strict';
 
   let overlay=null,sourceSheet=null,stream=null,facing='environment',shots=[],busy=false;
+  let torchOn=false;
   let rearDevices=[],ultraDevice=null,mainDevice=null,teleDevice=null,currentLens='1';
 
   const toast=m=>{try{typeof showToast==='function'?showToast(m):console.info(m)}catch(_){console.info(m)}};
@@ -23,6 +24,7 @@
       .cf-cam-zoom{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:3;display:flex;gap:8px;padding:5px 7px;border-radius:999px;background:rgba(0,0,0,.48);backdrop-filter:blur(8px)}
       .cf-cam-zoom button{width:48px;height:36px;border:0;border-radius:999px;background:rgba(255,255,255,.16);color:#fff;font:800 13px/1 system-ui;cursor:pointer}
       .cf-cam-zoom button.active{background:#9fbd17;color:#111}.cf-cam-zoom button:disabled{opacity:.32;cursor:default}
+      .cf-cam-torch{min-width:70px;min-height:48px;border:1px solid #777;border-radius:14px;background:#222;color:#fff;font:700 12px system-ui;padding:8px}.cf-cam-torch[aria-pressed="true"]{background:#9fbd17;color:#111;border-color:#9fbd17}
       .cf-cam-device{background:#161616;color:#fff;padding:8px 12px;font:12px system-ui}.cf-cam-device select{max-width:100%;background:#242424;color:#fff;border:1px solid #555;border-radius:8px;padding:8px}.cf-cam-lens-note{margin:6px 0 0;color:#ccc;font-size:11px}
       .cf-cam-bottom{min-height:112px;display:flex;align-items:center;justify-content:center;gap:24px;padding:14px;background:rgba(0,0,0,.78)}
       .cf-cam-switch{background:#2c2c2c;color:#fff;width:52px;height:52px;padding:0!important;border-radius:50%!important;font-size:24px!important}
@@ -45,11 +47,12 @@
       <div class="cf-cam-top"><button type="button" class="cf-cam-cancel">Anuluj</button><div class="cf-cam-count">0 zdjęć</div><button type="button" class="cf-cam-done">Gotowe</button></div>
       <div class="cf-cam-stage"><video class="cf-cam-video" autoplay playsinline muted></video><div class="cf-cam-flash"></div><div class="cf-cam-zoom"><button type="button" data-cam-zoom="0.5">0,5×</button><button type="button" data-cam-zoom="1">1×</button><button type="button" data-cam-zoom="2">2×</button></div></div>
       <div class="cf-cam-device"><label>Obiektyw <select data-cam-device aria-label="Obiektyw aparatu"></select></label><div class="cf-cam-lens-note" data-cam-lens-note></div></div>
-      <div class="cf-cam-bottom"><button type="button" class="cf-cam-switch" aria-label="Zmień kamerę">↻</button><button type="button" class="cf-cam-shutter" aria-label="Zrób zdjęcie"></button><div class="cf-cam-spacer"></div></div>`;
+      <div class="cf-cam-bottom"><button type="button" class="cf-cam-switch" aria-label="Zmień kamerę">↻</button><button type="button" class="cf-cam-shutter" aria-label="Zrób zdjęcie"></button><button type="button" class="cf-cam-torch" aria-label="Włącz lampę" aria-pressed="false">⚡ Lampa</button></div>`;
     document.body.appendChild(overlay);
     overlay.querySelector('.cf-cam-cancel').onclick=()=>closeCamera(false);
     overlay.querySelector('.cf-cam-done').onclick=()=>closeCamera(true);
     overlay.querySelector('.cf-cam-shutter').onclick=capture;
+    overlay.querySelector('.cf-cam-torch').onclick=toggleTorch;
     overlay.querySelector('.cf-cam-switch').onclick=async()=>{if(busy)return;facing=facing==='environment'?'user':'environment';await startStream();};
     overlay.querySelector('[data-cam-device]').onchange=async e=>{
       if(busy)return;
@@ -98,9 +101,27 @@
   function openFilesPicker(){tempPicker({accept:null,multiple:true});}
 
   function updateCount(){if(!overlay)return;const n=shots.length;overlay.querySelector('.cf-cam-count').textContent=n===1?'1 zdjęcie':`${n} zdjęć`;}
-  function stopStream(){try{stream?.getTracks()?.forEach(t=>t.stop())}catch(_){ }stream=null;const v=overlay?.querySelector('.cf-cam-video');if(v)v.srcObject=null;}
+  function stopStream(){torchOn=false;try{stream?.getTracks()?.forEach(t=>t.stop())}catch(_){ }stream=null;const v=overlay?.querySelector('.cf-cam-video');if(v)v.srcObject=null;updateTorchUi();}
   function track(){return stream?.getVideoTracks?.()[0]||null;}
   function caps(){try{return track()?.getCapabilities?.()||{}}catch(_){return{}}}
+
+  function torchSupported(){const c=caps().torch;return c===true||(Array.isArray(c)&&c.includes(true));}
+  function updateTorchUi(){
+    const button=overlay?.querySelector('.cf-cam-torch');if(!button)return;
+    button.textContent=torchOn?'⚡ Wł.':'⚡ Lampa';
+    button.setAttribute('aria-pressed',String(torchOn));
+    button.setAttribute('aria-label',torchOn?'Wyłącz lampę':'Włącz lampę');
+    button.title=torchSupported()?'Stałe doświetlenie zdjęć':'Sterowanie lampą nie jest dostępne dla tego obiektywu';
+  }
+  async function toggleTorch(){
+    if(busy)return;
+    const t=track();
+    if(!torchSupported()||!t?.applyConstraints){toast('Ten obiektyw nie udostępnia lampy. Wybierz obiektyw 1× albo Aparat iPhone / iPad.');return;}
+    const next=!torchOn;busy=true;
+    try{await t.applyConstraints({advanced:[{torch:next}]});if(track()===t)torchOn=t.getSettings?.().torch??next;}
+    catch(e){console.warn('CleanFleet camera light',e);toast('Nie udało się przełączyć lampy. Spróbuj obiektywu 1×.');}
+    finally{busy=false;updateTorchUi();}
+  }
 
   async function discoverRearDevices(){
     try{
@@ -135,7 +156,7 @@
 
   async function applyHardwareZoom(value){const t=track();if(!t?.applyConstraints)return false;const c=caps(),z=c.zoom;if(!z||!Number.isFinite(z.min)||!Number.isFinite(z.max))return false;const n=Number(value);if(n<z.min-.001||n>z.max+.001)return false;try{await t.applyConstraints({advanced:[{zoom:n}]});return true}catch(_){return false}}
   function zoomSupport(){if(facing!=='environment')return{'0.5':false,'1':false,'2':false};const c=caps(),z=c.zoom,hw=n=>!!z&&Number.isFinite(z.min)&&Number.isFinite(z.max)&&n>=z.min-.001&&n<=z.max+.001;return{'0.5':!!ultraDevice,'1':true,'2':!!teleDevice||hw(2)};}
-  function updateZoomUi(){if(!overlay)return;
+  function updateZoomUi(){if(!overlay)return;updateTorchUi();
     const select=overlay.querySelector('[data-cam-device]');select.replaceChildren();
     for(const [i,d] of rearDevices.entries()){const option=document.createElement('option');option.value=d.deviceId;option.textContent=d.label||`Aparat ${i+1}`;select.appendChild(option);}
     select.value=track()?.getSettings?.().deviceId||'';
@@ -190,3 +211,4 @@ const box=overlay.querySelector('.cf-cam-zoom');box.style.display=facing==='envi
   document.addEventListener('click',e=>{const b=e.target.closest?.('[data-photo-add]');if(!b)return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();showSourceSheet();},true);
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&overlay?.classList.contains('open'))stopStream()});
 })();
+

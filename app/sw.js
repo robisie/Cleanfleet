@@ -1,4 +1,4 @@
-// CleanFleet v1.30.50 — vehicle card final visual refinements.
+// CleanFleet v1.30.51 — yearly summary uses multi-select vehicle filter cards.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -67,7 +67,7 @@ self.addEventListener('fetch', event => {
     let html = await response.text();
 
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.50');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.51');
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';

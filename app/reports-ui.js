@@ -80,93 +80,115 @@ function pdfCards(doc,cards,y,orientation='landscape'){
 }
 async function addSvgToPDF(doc,svg,y,width,maxHeight){const canvas=await svgCanvas(svg),h=Math.min(maxHeight,canvas.height/canvas.width*width);doc.addImage(canvas,'PNG',10,y,width,h,undefined,'FAST');canvas.width=canvas.height=0;return y+h;}
 
+
 function adminPdfHeader(doc,r,logo){
  const pw=doc.internal.pageSize.getWidth();
- doc.setFillColor(255,255,255);doc.rect(0,0,pw,37,'F');
- if(logo){try{const p=doc.getImageProperties(logo),ratio=p.width/p.height;let w=58,h=w/ratio;if(h>22){h=22;w=h*ratio;}doc.addImage(logo,'PNG',10,7,w,h,undefined,'FAST');}catch(_){}}
- doc.setTextColor(20,23,21);doc.setFontSize(15.5);doc.text(E.text(r.cfg.title),pw-10,15,{align:'right'});
- doc.setTextColor(96,105,115);doc.setFontSize(8.5);doc.text('Raport administratora · '+new Date(r.loadedAt).toLocaleString('pl-PL'),pw-10,23,{align:'right'});
- doc.setFillColor(147,183,13);doc.rect(0,36,pw,1.7,'F');doc.setTextColor(32,38,28);return 44;
+ doc.setFillColor(255,255,255);doc.rect(0,0,pw,36,'F');
+ doc.setTextColor(21,24,22);doc.setFontSize(15.5);doc.text(E.text(r.cfg.title),10,13);
+ doc.setTextColor(91,99,94);doc.setFontSize(8.2);
+ doc.text(E.text(C[r.cfg.source].label)+' · stan: '+new Date(r.loadedAt).toLocaleString('pl-PL'),10,21);
+ if(logo){
+   try{
+     const p=doc.getImageProperties(logo),ratio=p.width/p.height;let w=48,h=w/ratio;
+     if(h>19){h=19;w=h*ratio;}
+     doc.addImage(logo,'PNG',pw-10-w,7,w,h,undefined,'FAST');
+   }catch(_){}
+ }
+ doc.setDrawColor(224,229,225);doc.line(10,31,pw-10,31);
+ return 37;
 }
 function adminPdfFooter(doc,r){
  const pages=doc.getNumberOfPages(),pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight();
- for(let n=1;n<=pages;n++){doc.setPage(n);doc.setDrawColor(220,226,229);doc.line(10,ph-11,pw-10,ph-11);doc.setTextColor(92,101,115);doc.setFontSize(7);doc.text('CleanFleet · '+E.text(r.cfg.title),10,ph-6);doc.text(n+' / '+pages,pw-10,ph-6,{align:'right'});}
+ for(let n=1;n<=pages;n++){doc.setPage(n);doc.setDrawColor(220,226,229);doc.line(10,ph-10,pw-10,ph-10);doc.setTextColor(92,101,115);doc.setFontSize(6.8);doc.text('CleanFleet · '+E.text(r.cfg.title),10,ph-5.5);doc.text(n+' / '+pages,pw-10,ph-5.5,{align:'right'});}
  doc.setTextColor(32,38,28);
 }
-function adminPdfSection(doc,title,y,color=[147,183,13]){
- doc.setFillColor(...color);doc.roundedRect(10,y-3,2.2,8,1.1,1.1,'F');
- doc.setTextColor(24,28,25);doc.setFontSize(11.5);doc.text(E.text(title),16,y+3);return y+9;
+function adminPdfFilterLine(doc,r,y){
+ const pw=doc.internal.pageSize.getWidth(),parts=describe(r);
+ const line=parts.join(' · ');
+ doc.setTextColor(84,92,87);doc.setFontSize(7.5);
+ const lines=doc.splitTextToSize(line,pw-20);
+ doc.text(lines,10,y);
+ return y+lines.length*3.5+3;
 }
-function adminPdfMetricCards(doc,metrics,y){
- const pw=doc.internal.pageSize.getWidth(),gap=4,cols=Math.min(4,Math.max(1,metrics.length)),cw=(pw-20-gap*(cols-1))/cols,ch=24;
- metrics.forEach((m,i)=>{const col=i%cols,row=Math.floor(i/cols),x=10+col*(cw+gap),yy=y+row*(ch+4);
-   doc.setFillColor(255,255,255);doc.setDrawColor(229,234,229);doc.roundedRect(x,yy,cw,ch,3,3,'FD');
-   doc.setFillColor(239,246,229);doc.circle(x+9,yy+12,5.7,'F');doc.setFillColor(147,183,13);doc.circle(x+9,yy+12,2,'F');
-   doc.setTextColor(94,103,113);doc.setFontSize(7.1);doc.text(doc.splitTextToSize(E.text(m.label),cw-24).slice(0,2),x+18,yy+8);
-   doc.setTextColor(20,23,21);doc.setFontSize(11.3);doc.text(E.text(metricText(m)),x+18,yy+18);
+function adminPdfKpis(doc,metrics,y){
+ const pw=doc.internal.pageSize.getWidth(),gap=3,cards=metrics.slice(0,4),cw=(pw-20-gap*3)/4,ch=25;
+ cards.forEach((m,i)=>{
+   const x=10+i*(cw+gap);
+   doc.setFillColor(255,255,255);doc.setDrawColor(210,217,211);doc.setLineWidth(.3);doc.roundedRect(x,y,cw,ch,2.5,2.5,'FD');
+   doc.setTextColor(52,58,54);doc.setFontSize(8);doc.text(doc.splitTextToSize(E.text(m.label),cw-8).slice(0,2),x+4,y+7);
+   doc.setTextColor(35,55,20);doc.setFontSize(13);doc.text(E.text(metricText(m)),x+4,y+17);
+   doc.setTextColor(68,76,70);doc.setFontSize(6.7);doc.text('Sprawdź dane →',x+4,y+22.5);
  });
- return y+Math.ceil(metrics.length/cols)*(ch+4);
+ return y+ch+5;
 }
-async function adminPdfChartCard(doc,r,y,logo){
- const pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight(),metric=r.metrics.find(m=>m.id===r.cfg.chartMetric);
+function adminPdfExplain(doc,y){
+ const pw=doc.internal.pageSize.getWidth();
+ const t='Średnie pomijają brakujące kwoty. Unikalny pojazd = firma + rejestracja. Częstotliwość to liczba wykonanych prań na unikalny pojazd w wybranym zbiorze. Odstępy obejmują tylko kolejne prania tego samego pojazdu w tym zbiorze; kilka prań jednego dnia daje odstęp 0 dni.';
+ doc.setTextColor(96,103,98);doc.setFontSize(6.9);const lines=doc.splitTextToSize(t,pw-20);doc.text(lines,10,y);return y+lines.length*3.2+4;
+}
+function adminPdfBarChart(doc,r,y){
  if(r.cfg.chart==='none'||!r.groups.length)return y;
- if(y>112){doc.addPage();y=adminPdfHeader(doc,r,logo);}
- const title='Wykres · '+(metric?.label||'wynik');
- doc.setFillColor(255,255,255);doc.setDrawColor(229,234,229);doc.roundedRect(10,y,pw-20,82,3,3,'FD');
- doc.setFillColor(147,183,13);doc.roundedRect(15,y+7,2,8,1,1,'F');doc.setTextColor(24,28,25);doc.setFontSize(11);doc.text(title,21,y+13);
- let chart=chartSVG(r);
- if(r.cfg.chart==='share'){
-   const total=r.groups.reduce((sum,g)=>sum+(g.metrics.find(m=>m.id===r.cfg.chartMetric)?.value||0),0);
-   if(total>0&&!r.groups.some(g=>(g.metrics.find(m=>m.id===r.cfg.chartMetric)?.value||0)<0)){
-     const part={...r,groups:r.groups.map(g=>({...g,label:g.label+' ('+fmt((g.metrics.find(m=>m.id===r.cfg.chartMetric)?.value||0)/total*100)+'%)'})),cfg:{...r.cfg,chart:'bar'}};
-     chart=chartSVG(part);
-   }
- }
- if(chart.startsWith('<svg')){const canvas=await svgCanvas(chart);const maxW=pw-30,maxH=58,h=Math.min(maxH,canvas.height/canvas.width*maxW);doc.addImage(canvas,'PNG',15,y+19,maxW,h,undefined,'FAST');canvas.width=canvas.height=0;}
- else{doc.setTextColor(96,105,115);doc.setFontSize(8);doc.text('Brak danych do wykresu.',15,y+32);}
- return y+90;
+ const pw=doc.internal.pageSize.getWidth(),metricId=r.cfg.chartMetric,items=r.groups.map(g=>({label:g.label,value:Number(g.metrics.find(m=>m.id===metricId)?.value||0)}));
+ const max=Math.max(1,...items.map(x=>Math.abs(x.value))),hasNeg=items.some(x=>x.value<0);
+ const rowH=9,h=Math.max(16,items.length*rowH+5),labelW=49,valueW=18,barX=10+labelW+3,barW=pw-20-labelW-valueW-8;
+ doc.setFillColor(255,255,255);doc.setDrawColor(233,236,233);doc.roundedRect(10,y,pw-20,h,2.5,2.5,'FD');
+ items.forEach((it,i)=>{
+   const yy=y+7+i*rowH;
+   doc.setTextColor(45,50,47);doc.setFontSize(7.2);doc.text(E.text(it.label).slice(0,34),13,yy);
+   doc.setFillColor(239,242,240);doc.roundedRect(barX,yy-4.3,barW,5.2,2,2,'F');
+   const valW=Math.max(1.5,barW*Math.abs(it.value)/max);
+   const color=vrpColors[i%vrpColors.length].match(/\w\w/g).map(z=>parseInt(z,16));
+   doc.setFillColor(...color);
+   if(hasNeg&&it.value<0)doc.roundedRect(barX+barW-valW,yy-4.3,valW,5.2,2,2,'F');else doc.roundedRect(barX,yy-4.3,valW,5.2,2,2,'F');
+   doc.setTextColor(26,31,28);doc.setFontSize(7.3);doc.text(fmt(it.value),pw-13,yy,{align:'right'});
+ });
+ return y+h+5;
 }
-function adminTableOptions(doc,r,logo){
- return{
-  margin:{top:44,bottom:16,left:10,right:10},
-  styles:{font:'CleanFleet',fontStyle:'normal',fontSize:7.4,cellPadding:2.4,overflow:'linebreak',valign:'top',textColor:[35,39,36],lineColor:[232,236,233],lineWidth:.15},
-  headStyles:{fillColor:[245,248,246],textColor:[31,36,32],fontStyle:'normal',lineColor:[210,221,209],lineWidth:.2},
-  alternateRowStyles:{fillColor:[250,251,250]},
-  rowPageBreak:'avoid',showHead:'everyPage',
-  didDrawPage:()=>adminPdfHeader(doc,r,logo)
- };
+function adminPdfGroupTable(doc,r,metrics,y,logo){
+ const rows=r.groups.map(g=>[g.label,...metrics.map(m=>metricText(g.metrics.find(x=>x.id===m.id)))]);
+ doc.autoTable({
+   head:[['Grupa',...metrics.map(m=>m.label)]],body:rows,startY:y,
+   margin:{top:38,bottom:15,left:10,right:10},
+   styles:{font:'CleanFleet',fontStyle:'normal',fontSize:7.1,cellPadding:2.2,overflow:'linebreak',textColor:[35,39,36],lineColor:[225,230,226],lineWidth:.15},
+   headStyles:{fillColor:[241,246,235],textColor:[31,38,27],fontStyle:'normal'},
+   alternateRowStyles:{fillColor:[252,252,251]},rowPageBreak:'avoid',showHead:'everyPage',
+   didDrawPage:()=>{if(doc.internal.getCurrentPageInfo().pageNumber>1)adminPdfHeader(doc,r,logo);}
+ });
+ return doc.lastAutoTable.finalY+6;
+}
+function adminPdfSourceTable(doc,r,y,logo){
+ const cols=r.cfg.columns,pw=doc.internal.pageSize.getWidth();
+ for(let i=0;i<cols.length;i+=10){
+   const chunk=cols.slice(i,i+10);
+   if(i||y>145){doc.addPage();y=adminPdfHeader(doc,r,logo);}
+   doc.setTextColor(23,27,24);doc.setFontSize(11.5);doc.text('DANE ŹRÓDŁOWE ('+r.rows.length+')',10,y);y+=6;
+   if(cols.length>10){doc.setTextColor(96,103,98);doc.setFontSize(6.8);doc.text('Kolumny '+(i+1)+'–'+Math.min(i+10,cols.length)+' · numer wiersza łączy części tabeli',10,y);y+=4;}
+   doc.autoTable({
+     head:[['Szczegóły',...chunk.map(k=>r.fields[k]?.label||k)]],
+     body:r.rows.map((row,n)=>['Otwórz',...chunk.map(k=>display(row[k]))]),
+     startY:y,margin:{top:38,bottom:15,left:10,right:10},
+     styles:{font:'CleanFleet',fontStyle:'normal',fontSize:6.4,cellPadding:2.1,overflow:'linebreak',valign:'top',textColor:[31,35,32],lineColor:[229,233,230],lineWidth:.12},
+     headStyles:{fillColor:[241,246,235],textColor:[31,38,27],fontStyle:'normal'},
+     alternateRowStyles:{fillColor:[252,252,251]},rowPageBreak:'avoid',showHead:'everyPage',
+     didDrawPage:()=>{if(doc.internal.getCurrentPageInfo().pageNumber>1)adminPdfHeader(doc,r,logo);}
+   });
+   y=doc.lastAutoTable.finalY+6;
+ }
+ return y;
 }
 async function exportPDF(r){
- const doc=setupPDF('landscape'),pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight(),logo=await lightLogoSrc();let y=adminPdfHeader(doc,r,logo);
- const desc=describe(r);
- if(desc.length){
-   doc.setFillColor(248,250,249);doc.setDrawColor(230,235,231);doc.roundedRect(10,y,pw-20,Math.max(18,8+desc.length*5),3,3,'FD');
-   doc.setTextColor(96,105,115);doc.setFontSize(7.6);let dy=y+7;
-   for(const t of desc){const lines=doc.splitTextToSize(E.text(t),pw-28);doc.text(lines,14,dy);dy+=lines.length*3.6+1;}
-   y=Math.max(y+20,dy+3);
- }
- y=adminPdfSection(doc,'Podsumowanie',y+4);
- const ms=selectedMetrics(r);y=adminPdfMetricCards(doc,ms,y);
- y=await adminPdfChartCard(doc,r,y+3,logo);
-
- if(r.groups.length>1||(r.cfg.groups||[]).length){
-   if(y>145){doc.addPage();y=adminPdfHeader(doc,r,logo);}
-   y=adminPdfSection(doc,'Porównanie grup',y+2,[22,179,154]);
-   doc.autoTable({head:[['Grupa',...ms.map(m=>m.label)]],body:r.groups.map(g=>[g.label,...ms.map(m=>metricText(g.metrics.find(x=>x.id===m.id))) ]),startY:y,...adminTableOptions(doc,r,logo)});
-   y=doc.lastAutoTable.finalY+8;
- }
-
- if(y>150){doc.addPage();y=adminPdfHeader(doc,r,logo);}
- y=adminPdfSection(doc,'Dane raportu · '+r.rows.length+' rekordów',y+2,[58,142,219]);
- const cols=r.cfg.columns;
- for(let i=0;i<cols.length;i+=6){
-   const chunk=cols.slice(i,i+6);
-   if(i){doc.addPage();y=adminPdfHeader(doc,r,logo);y=adminPdfSection(doc,'Dane raportu · '+r.rows.length+' rekordów',y+2,[58,142,219]);}
-   if(cols.length>6){doc.setTextColor(96,105,115);doc.setFontSize(7.2);doc.text('Kolumny '+(i+1)+'–'+Math.min(i+6,cols.length)+' · numer wiersza łączy części tabeli',10,y);y+=5;}
-   doc.autoTable({head:[['Lp.',...chunk.map(k=>r.fields[k]?.label||k)]],body:r.rows.map((row,n)=>[n+1,...chunk.map(k=>display(row[k]))]),startY:y,...adminTableOptions(doc,r,logo)});
-   y=doc.lastAutoTable.finalY+7;
- }
- adminPdfFooter(doc,r);doc.save(safeName(r.cfg.title)+'.pdf');return doc;
+ const doc=setupPDF('landscape'),pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight(),logo=await lightLogoSrc();
+ let y=adminPdfHeader(doc,r,logo);
+ y=adminPdfFilterLine(doc,r,y);
+ const ms=selectedMetrics(r);
+ y=adminPdfKpis(doc,ms,y);
+ y=adminPdfExplain(doc,y);
+ y=adminPdfBarChart(doc,r,y);
+ y=adminPdfGroupTable(doc,r,ms.slice(0,4),y,logo);
+ y=adminPdfSourceTable(doc,r,y+2,logo);
+ adminPdfFooter(doc,r);
+ doc.save(safeName(r.cfg.title)+'.pdf');
+ return doc;
 }
 function pairsForVehicle(done){const gaps=[];for(let i=1;i<done.length;i++){const days=(Date.parse(done[i].wash_date+'T00:00:00Z')-Date.parse(done[i-1].wash_date+'T00:00:00Z'))/86400000;if(Number.isFinite(days)&&days>=0)gaps.push(days);}return gaps;}
 function grouped(rows,key,value=()=>1){const m=new Map();for(const r of rows){const k=key(r)||'Brak danych';m.set(k,(m.get(k)||0)+Number(value(r)||0));}return [...m].map(([label,value])=>({label,value})).sort((a,b)=>String(a.label).localeCompare(String(b.label),'pl',{numeric:true}));}

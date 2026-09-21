@@ -79,15 +79,94 @@ function pdfCards(doc,cards,y,orientation='landscape'){
  const pw=doc.internal.pageSize.getWidth(),margin=10,gap=3,cols=orientation==='portrait'?2:Math.min(4,cards.length||1),cw=(pw-margin*2-gap*(cols-1))/cols,ch=21;cards.forEach((c,i)=>{const col=i%cols,row=Math.floor(i/cols),x=margin+col*(cw+gap),cy=y+row*(ch+gap);doc.setFillColor(244,247,237);doc.setDrawColor(222,231,211);doc.roundedRect(x,cy,cw,ch,2,2,'FD');doc.setTextColor(96,108,89);doc.setFontSize(7.3);doc.text(doc.splitTextToSize(c.label,cw-6).slice(0,2),x+3,cy+5);doc.setTextColor(48,64,13);doc.setFontSize(12);doc.text(E.text(c.value),x+3,cy+16);});doc.setTextColor(32,38,28);return y+Math.ceil(cards.length/cols)*(ch+gap);
 }
 async function addSvgToPDF(doc,svg,y,width,maxHeight){const canvas=await svgCanvas(svg),h=Math.min(maxHeight,canvas.height/canvas.width*width);doc.addImage(canvas,'PNG',10,y,width,h,undefined,'FAST');canvas.width=canvas.height=0;return y+h;}
+
+function adminPdfHeader(doc,r,logo){
+ const pw=doc.internal.pageSize.getWidth();
+ doc.setFillColor(255,255,255);doc.rect(0,0,pw,37,'F');
+ if(logo){try{const p=doc.getImageProperties(logo),ratio=p.width/p.height;let w=58,h=w/ratio;if(h>22){h=22;w=h*ratio;}doc.addImage(logo,'PNG',10,7,w,h,undefined,'FAST');}catch(_){}}
+ doc.setTextColor(20,23,21);doc.setFontSize(15.5);doc.text(E.text(r.cfg.title),pw-10,15,{align:'right'});
+ doc.setTextColor(96,105,115);doc.setFontSize(8.5);doc.text('Raport administratora · '+new Date(r.loadedAt).toLocaleString('pl-PL'),pw-10,23,{align:'right'});
+ doc.setFillColor(147,183,13);doc.rect(0,36,pw,1.7,'F');doc.setTextColor(32,38,28);return 44;
+}
+function adminPdfFooter(doc,r){
+ const pages=doc.getNumberOfPages(),pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight();
+ for(let n=1;n<=pages;n++){doc.setPage(n);doc.setDrawColor(220,226,229);doc.line(10,ph-11,pw-10,ph-11);doc.setTextColor(92,101,115);doc.setFontSize(7);doc.text('CleanFleet · '+E.text(r.cfg.title),10,ph-6);doc.text(n+' / '+pages,pw-10,ph-6,{align:'right'});}
+ doc.setTextColor(32,38,28);
+}
+function adminPdfSection(doc,title,y,color=[147,183,13]){
+ doc.setFillColor(...color);doc.roundedRect(10,y-3,2.2,8,1.1,1.1,'F');
+ doc.setTextColor(24,28,25);doc.setFontSize(11.5);doc.text(E.text(title),16,y+3);return y+9;
+}
+function adminPdfMetricCards(doc,metrics,y){
+ const pw=doc.internal.pageSize.getWidth(),gap=4,cols=Math.min(4,Math.max(1,metrics.length)),cw=(pw-20-gap*(cols-1))/cols,ch=24;
+ metrics.forEach((m,i)=>{const col=i%cols,row=Math.floor(i/cols),x=10+col*(cw+gap),yy=y+row*(ch+4);
+   doc.setFillColor(255,255,255);doc.setDrawColor(229,234,229);doc.roundedRect(x,yy,cw,ch,3,3,'FD');
+   doc.setFillColor(239,246,229);doc.circle(x+9,yy+12,5.7,'F');doc.setFillColor(147,183,13);doc.circle(x+9,yy+12,2,'F');
+   doc.setTextColor(94,103,113);doc.setFontSize(7.1);doc.text(doc.splitTextToSize(E.text(m.label),cw-24).slice(0,2),x+18,yy+8);
+   doc.setTextColor(20,23,21);doc.setFontSize(11.3);doc.text(E.text(metricText(m)),x+18,yy+18);
+ });
+ return y+Math.ceil(metrics.length/cols)*(ch+4);
+}
+async function adminPdfChartCard(doc,r,y,logo){
+ const pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight(),metric=r.metrics.find(m=>m.id===r.cfg.chartMetric);
+ if(r.cfg.chart==='none'||!r.groups.length)return y;
+ if(y>112){doc.addPage();y=adminPdfHeader(doc,r,logo);}
+ const title='Wykres · '+(metric?.label||'wynik');
+ doc.setFillColor(255,255,255);doc.setDrawColor(229,234,229);doc.roundedRect(10,y,pw-20,82,3,3,'FD');
+ doc.setFillColor(147,183,13);doc.roundedRect(15,y+7,2,8,1,1,'F');doc.setTextColor(24,28,25);doc.setFontSize(11);doc.text(title,21,y+13);
+ let chart=chartSVG(r);
+ if(r.cfg.chart==='share'){
+   const total=r.groups.reduce((sum,g)=>sum+(g.metrics.find(m=>m.id===r.cfg.chartMetric)?.value||0),0);
+   if(total>0&&!r.groups.some(g=>(g.metrics.find(m=>m.id===r.cfg.chartMetric)?.value||0)<0)){
+     const part={...r,groups:r.groups.map(g=>({...g,label:g.label+' ('+fmt((g.metrics.find(m=>m.id===r.cfg.chartMetric)?.value||0)/total*100)+'%)'})),cfg:{...r.cfg,chart:'bar'}};
+     chart=chartSVG(part);
+   }
+ }
+ if(chart.startsWith('<svg')){const canvas=await svgCanvas(chart);const maxW=pw-30,maxH=58,h=Math.min(maxH,canvas.height/canvas.width*maxW);doc.addImage(canvas,'PNG',15,y+19,maxW,h,undefined,'FAST');canvas.width=canvas.height=0;}
+ else{doc.setTextColor(96,105,115);doc.setFontSize(8);doc.text('Brak danych do wykresu.',15,y+32);}
+ return y+90;
+}
+function adminTableOptions(doc,r,logo){
+ return{
+  margin:{top:44,bottom:16,left:10,right:10},
+  styles:{font:'CleanFleet',fontStyle:'normal',fontSize:7.4,cellPadding:2.4,overflow:'linebreak',valign:'top',textColor:[35,39,36],lineColor:[232,236,233],lineWidth:.15},
+  headStyles:{fillColor:[245,248,246],textColor:[31,36,32],fontStyle:'normal',lineColor:[210,221,209],lineWidth:.2},
+  alternateRowStyles:{fillColor:[250,251,250]},
+  rowPageBreak:'avoid',showHead:'everyPage',
+  didDrawPage:()=>adminPdfHeader(doc,r,logo)
+ };
+}
 async function exportPDF(r){
- const doc=setupPDF('landscape'),pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight();let y=pdfHeader(doc,r.cfg.title,'Raport administratora · '+new Date(r.loadedAt).toLocaleString('pl-PL'));
- doc.setFontSize(8.5);doc.setTextColor(83,94,78);for(const text of describe(r)){const lines=doc.splitTextToSize(text,pw-20);doc.text(lines,10,y);y+=lines.length*4+1;}y+=2;
- const ms=selectedMetrics(r);y=pdfCards(doc,ms.map(m=>({label:m.label,value:metricText(m)})),y,'landscape');
- if(r.cfg.chart!=='none'&&r.groups.length){if(y>112){doc.addPage();y=42;}doc.setFontSize(11);doc.setTextColor(32,38,28);doc.text('Wykres',10,y);y+=5;const chart=chartSVG(r);if(chart.startsWith('<svg'))y=await addSvgToPDF(doc,chart,y,pw-20,65);y+=6;}
- if(r.groups.length>1||(r.cfg.groups||[]).length){if(y>145){doc.addPage();y=42;}doc.setFontSize(11);doc.text('Porównanie grup',10,y);y+=4;doc.autoTable({head:[['Grupa',...ms.map(m=>m.label)]],body:r.groups.map(g=>[g.label,...ms.map(m=>metricText(g.metrics.find(x=>x.id===m.id)))]),startY:y,margin:{top:40,bottom:16,left:10,right:10},styles:{font:'CleanFleet',fontStyle:'normal',fontSize:7.6,cellPadding:2,overflow:'linebreak'},headStyles:{fillColor:[80,104,22],textColor:[255,255,255],fontStyle:'normal'},alternateRowStyles:{fillColor:[245,247,240]},rowPageBreak:'avoid',showHead:'everyPage'});y=doc.lastAutoTable.finalY+7;}
- if(y>160){doc.addPage();y=42;}doc.setFontSize(11);doc.text('Dane raportu · '+r.rows.length+' rekordów',10,y);y+=4;
- const cols=r.cfg.columns;for(let i=0;i<cols.length;i+=6){const chunk=cols.slice(i,i+6);if(i&&y>145){doc.addPage();y=42;}if(cols.length>6){doc.setTextColor(96,105,90);doc.setFontSize(7.5);doc.text('Kolumny '+(i+1)+'–'+Math.min(i+6,cols.length)+' · numer wiersza łączy części tabeli',10,y);y+=4;doc.setTextColor(32,38,28);}doc.autoTable({head:[['Lp.',...chunk.map(k=>r.fields[k]?.label||k)]],body:r.rows.map((row,n)=>[n+1,...chunk.map(k=>display(row[k]))]),startY:y,margin:{top:40,bottom:16,left:10,right:10},styles:{font:'CleanFleet',fontStyle:'normal',fontSize:7.6,cellPadding:2.2,overflow:'linebreak'},headStyles:{fillColor:[80,104,22],textColor:[255,255,255],fontStyle:'normal'},alternateRowStyles:{fillColor:[245,247,240]},rowPageBreak:'avoid',showHead:'everyPage'});y=doc.lastAutoTable.finalY+7;}
- addFooters(doc,r.cfg.title);doc.save(safeName(r.cfg.title)+'.pdf');return doc;
+ const doc=setupPDF('landscape'),pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight(),logo=await lightLogoSrc();let y=adminPdfHeader(doc,r,logo);
+ const desc=describe(r);
+ if(desc.length){
+   doc.setFillColor(248,250,249);doc.setDrawColor(230,235,231);doc.roundedRect(10,y,pw-20,Math.max(18,8+desc.length*5),3,3,'FD');
+   doc.setTextColor(96,105,115);doc.setFontSize(7.6);let dy=y+7;
+   for(const t of desc){const lines=doc.splitTextToSize(E.text(t),pw-28);doc.text(lines,14,dy);dy+=lines.length*3.6+1;}
+   y=Math.max(y+20,dy+3);
+ }
+ y=adminPdfSection(doc,'Podsumowanie',y+4);
+ const ms=selectedMetrics(r);y=adminPdfMetricCards(doc,ms,y);
+ y=await adminPdfChartCard(doc,r,y+3,logo);
+
+ if(r.groups.length>1||(r.cfg.groups||[]).length){
+   if(y>145){doc.addPage();y=adminPdfHeader(doc,r,logo);}
+   y=adminPdfSection(doc,'Porównanie grup',y+2,[22,179,154]);
+   doc.autoTable({head:[['Grupa',...ms.map(m=>m.label)]],body:r.groups.map(g=>[g.label,...ms.map(m=>metricText(g.metrics.find(x=>x.id===m.id))) ]),startY:y,...adminTableOptions(doc,r,logo)});
+   y=doc.lastAutoTable.finalY+8;
+ }
+
+ if(y>150){doc.addPage();y=adminPdfHeader(doc,r,logo);}
+ y=adminPdfSection(doc,'Dane raportu · '+r.rows.length+' rekordów',y+2,[58,142,219]);
+ const cols=r.cfg.columns;
+ for(let i=0;i<cols.length;i+=6){
+   const chunk=cols.slice(i,i+6);
+   if(i){doc.addPage();y=adminPdfHeader(doc,r,logo);y=adminPdfSection(doc,'Dane raportu · '+r.rows.length+' rekordów',y+2,[58,142,219]);}
+   if(cols.length>6){doc.setTextColor(96,105,115);doc.setFontSize(7.2);doc.text('Kolumny '+(i+1)+'–'+Math.min(i+6,cols.length)+' · numer wiersza łączy części tabeli',10,y);y+=5;}
+   doc.autoTable({head:[['Lp.',...chunk.map(k=>r.fields[k]?.label||k)]],body:r.rows.map((row,n)=>[n+1,...chunk.map(k=>display(row[k]))]),startY:y,...adminTableOptions(doc,r,logo)});
+   y=doc.lastAutoTable.finalY+7;
+ }
+ adminPdfFooter(doc,r);doc.save(safeName(r.cfg.title)+'.pdf');return doc;
 }
 function pairsForVehicle(done){const gaps=[];for(let i=1;i<done.length;i++){const days=(Date.parse(done[i].wash_date+'T00:00:00Z')-Date.parse(done[i-1].wash_date+'T00:00:00Z'))/86400000;if(Number.isFinite(days)&&days>=0)gaps.push(days);}return gaps;}
 function grouped(rows,key,value=()=>1){const m=new Map();for(const r of rows){const k=key(r)||'Brak danych';m.set(k,(m.get(k)||0)+Number(value(r)||0));}return [...m].map(([label,value])=>({label,value})).sort((a,b)=>String(a.label).localeCompare(String(b.label),'pl',{numeric:true}));}

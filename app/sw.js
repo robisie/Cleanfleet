@@ -1,4 +1,4 @@
-// CleanFleet v1.30.38 — admin PDF reports redesigned to match vehicle card.ned vehicle card preview and PDF.
+// CleanFleet v1.30.39 — restore admin reports open handler.n PDF reports redesigned to match vehicle card.ned vehicle card preview and PDF.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -66,7 +66,7 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text();
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.38');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.39');
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';

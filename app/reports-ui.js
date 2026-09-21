@@ -221,16 +221,49 @@ function vehicleEntryHtml(r,index){
  const status=vehicleStatus(r),pending=!r.wash_date,fields=[['Typ',r.type],['Wykonał',r.performed_by],['Zlecił',r.ordered_by],['Kwota',E.number(r.cost)==null?'—':fmt(r.cost)+' zł'],['Termin',r.order_due_date],['Kategoria',r.billing_category],['Zatwierdzone',display(r.approved)],['Zapłacone',display(r.paid)]];
  return'<article class="vrp-entry"><div class="vrp-entry-top"><div class="vrp-entry-no">'+(index+1)+'</div><div class="vrp-entry-date"><span>Data</span><strong>'+esc(r.wash_date||r.order_date||String(r.created_at||'').slice(0,10)||'—')+'</strong></div><span class="vrp-status '+(pending?'waiting':'done')+'">'+esc(status)+'</span></div><div class="vrp-entry-grid">'+fields.map(x=>'<div><span>'+esc(x[0])+'</span><strong>'+esc(display(x[1]))+'</strong></div>').join('')+'</div><div class="vrp-notes"><span>Opis / uwagi</span><strong>'+esc(display(r.notes))+'</strong></div></article>';
 }
-function vrpPageHeader(v,logo){return'<header class="vrp-page-head">'+(logo?'<img class="vrp-logo" src="'+esc(logo)+'" alt="CleanFleet">':'<strong class="vrp-logo-text">Clean<span>Fleet</span></strong>')+'<div><h1>Karta pojazdu · '+esc(v.plate)+'</h1><p>Kompletna historia usług · '+esc(new Date().toLocaleDateString('pl-PL'))+'</p></div></header><div class="vrp-greenline"></div>';}
-function vrpFooter(v,n,total){return'<footer class="vrp-footer"><span>CleanFleet · '+esc(v.plate)+'</span><span>'+n+' / '+total+'</span></footer>';}
+
+function vrpPlateHtml(plate){
+ return '<div class="vrp-real-plate"><div class="vrp-eu"><span class="vrp-stars">★ ★<br>★ ★</span><b>PL</b></div><strong>'+esc(plate)+'</strong></div>';
+}
+function vrpHorizontalBars(items,money=false){
+ if(!items.length)return'<div class="vrp-empty">Brak danych do wykresu.</div>';
+ const max=Math.max(1,...items.map(x=>Math.abs(Number(x.value)||0)));
+ return'<div class="vrp-hbars">'+items.map((x,i)=>{const v=Number(x.value)||0,p=Math.max(2,Math.abs(v)/max*100);return'<div class="vrp-hbar-row"><span>'+esc(String(x.label))+'</span><div class="vrp-hbar-track"><i style="width:'+p+'%;background:'+vrpColors[i%vrpColors.length]+'"></i></div><b>'+esc(fmt(v)+(money?' zł':''))+'</b></div>';}).join('')+'</div>';
+}
+function vrpSummaryTable(title,items,money=false){
+ if(!items.length)return'';
+ return'<section class="vrp-report-block"><h3>'+esc(title)+'</h3><div class="vrp-table-wrap"><table class="vrp-report-table"><thead><tr><th>Grupa</th><th>'+(money?'Wartość':'Liczba')+'</th></tr></thead><tbody>'+items.map(x=>'<tr><td>'+esc(x.label)+'</td><td>'+esc(fmt(x.value)+(money?' zł':''))+'</td></tr>').join('')+'</tbody></table></div></section>';
+}
+function vrpHistoryTable(rows){
+ return'<section class="vrp-report-block"><h3>DANE ŹRÓDŁOWE ('+rows.length+')</h3><div class="vrp-table-wrap"><table class="vrp-report-table vrp-history-table"><thead><tr><th>Data</th><th>Typ</th><th>Wykonał</th><th>Zlecił</th><th>Kwota</th><th>Termin</th><th>Kategoria</th><th>Status</th><th>Zatw.</th><th>Zapł.</th><th>Opis / uwagi</th></tr></thead><tbody>'+(rows.length?rows.map(r=>'<tr><td>'+esc(r.wash_date||r.order_date||String(r.created_at||'').slice(0,10)||'—')+'</td><td>'+esc(display(r.type))+'</td><td>'+esc(display(r.performed_by))+'</td><td>'+esc(display(r.ordered_by))+'</td><td>'+esc(E.number(r.cost)==null?'—':fmt(r.cost)+' zł')+'</td><td>'+esc(display(r.order_due_date))+'</td><td>'+esc(display(r.billing_category))+'</td><td>'+esc(vehicleStatus(r))+'</td><td>'+esc(display(r.approved))+'</td><td>'+esc(display(r.paid))+'</td><td>'+esc(display(r.notes))+'</td></tr>').join(''):'<tr><td colspan="11">Brak historii usług.</td></tr>')+'</tbody></table></div></section>';
+}
 function vehiclePreviewHtml(m,logo){
- const v=m.vehicle,c=m.company,historyChunks=[];for(let i=0;i<m.rows.length;i+=2)historyChunks.push(m.rows.slice(i,i+2));if(!historyChunks.length)historyChunks.push([]);
- const total=2+historyChunks.length,pages=[];
- const info=vehicleInfoFields(v);
- pages.push('<section class="vrp-sheet">'+vrpPageHeader(v,logo)+'<div class="vrp-body"><section class="vrp-identity-card"><div class="vrp-identity-main"><div class="vrp-plate">'+esc(v.plate)+'</div>'+(v.fleet_number?'<div class="vrp-fleet">'+esc(v.fleet_number)+'</div>':'')+'</div><div class="vrp-company"><span>Firma / klient</span><strong>'+esc(c?.short_name||c?.name||'—')+'</strong></div><div class="vrp-info-grid">'+info.map(x=>'<div><span>'+esc(x[0])+'</span><strong>'+esc(x[1])+'</strong></div>').join('')+'</div></section><section class="vrp-section"><h2><i></i>Podsumowanie</h2><div class="vrp-stats">'+vehicleStatsCards(m).map((x,i)=>'<div class="vrp-stat"><span>'+esc(x[0])+'</span><strong>'+esc(x[1])+'</strong><b class="vrp-stat-icon">'+['●','▣','▣','●','▥','◷','◀','▶'][i]+'</b></div>').join('')+'</div></section><section class="vrp-chart-card compact"><div class="vrp-card-title"><h2><i></i>Liczba prań w miesiącach</h2><span class="vrp-legend-pill"><b></b>Liczba prań</span></div>'+vrpBarChart(m.monthlyCount,false)+'</section></div>'+vrpFooter(v,1,total)+'</section>');
- pages.push('<section class="vrp-sheet">'+vrpPageHeader(v,logo)+'<div class="vrp-body"><section class="vrp-chart-card"><div class="vrp-card-title"><h2><i></i>Wartość usług w miesiącach</h2><span class="vrp-legend-pill"><b></b>Wartość usług (zł)</span></div>'+vrpBarChart(m.monthlyValue,true)+'</section><section class="vrp-chart-card teal"><div class="vrp-card-title"><h2><i></i>Usługi według wykonawców</h2></div>'+vrpDonut(m.performers)+'</section><section class="vrp-chart-card blue"><div class="vrp-card-title"><h2><i></i>Typy / kategorie usług</h2></div>'+vrpDonut(m.types)+'</section></div>'+vrpFooter(v,2,total)+'</section>');
- historyChunks.forEach((chunk,idx)=>pages.push('<section class="vrp-sheet">'+vrpPageHeader(v,logo)+'<div class="vrp-body"><section class="vrp-section vrp-history-section"><h2><i></i>Kompletna historia · '+m.rows.length+' wpisów</h2><div class="vrp-history">'+(chunk.length?chunk.map((r,j)=>vehicleEntryHtml(r,idx*2+j)).join(''):'<div class="vrp-empty">Ten pojazd nie ma jeszcze historii usług.</div>')+'</div></section></div>'+vrpFooter(v,idx+3,total)+'</section>'));
- return'<div class="vrp-shell"><div class="vrp-toolbar"><span>Podgląd karty pojazdu · '+esc(v.plate)+'</span><div><button data-vrp="close">Zamknij</button><button class="primary" data-vrp="download">Pobierz PDF</button></div></div>'+pages.join('')+'</div>';
+ const v=m.vehicle,c=m.company;
+ const meta=[
+   'Firma / klient: '+display(c?.short_name||c?.name),
+   'Typ: '+display(v.type),
+   'Marka: '+display(v.brand),
+   'Model: '+display(v.model),
+   'Rok: '+display(v.production_year),
+   'Tabor: '+display(v.fleet_number),
+   'Kierowca: '+display(v.driver_name)
+ ];
+ return'<div class="vrp-shell">'+
+   '<div class="vrp-toolbar"><span>Podgląd karty pojazdu · '+esc(v.plate)+'</span><div><button data-vrp="close">Zamknij</button><button class="primary" data-vrp="download">Pobierz PDF</button></div></div>'+
+   '<section class="vrp-report-sheet">'+
+     '<header class="vrp-report-head"><div><h1>Karta pojazdu</h1><p>Kompletna historia usług · stan: '+esc(new Date().toLocaleString('pl-PL'))+'</p></div>'+(logo?'<img src="'+esc(logo)+'" alt="CleanFleet">':'<strong class="vrp-logo-text">Clean<span>Fleet</span></strong>')+'</header>'+
+     '<div class="vrp-report-line"></div>'+
+     '<div class="vrp-vehicle-line">'+vrpPlateHtml(v.plate)+'<div class="vrp-meta-line">'+meta.map(x=>'<span>'+esc(x)+'</span>').join('<b>·</b>')+'</div></div>'+
+     '<div class="vrp-kpis">'+vehicleStatsCards(m).map(x=>'<div class="vrp-kpi"><span>'+esc(x[0])+'</span><strong>'+esc(x[1])+'</strong></div>').join('')+'</div>'+
+     '<p class="vrp-explain">Statystyki obejmują wykonane usługi tego pojazdu. Odstępy liczone są między kolejnymi datami wykonania. Historia na końcu zawiera również wpisy oczekujące.</p>'+
+     '<section class="vrp-report-block"><h3>Liczba prań w miesiącach</h3>'+vrpHorizontalBars(m.monthlyCount,false)+'</section>'+
+     '<section class="vrp-report-block"><h3>Wartość usług w miesiącach</h3>'+vrpHorizontalBars(m.monthlyValue,true)+'</section>'+
+     vrpSummaryTable('Usługi według wykonawców',m.performers,false)+
+     vrpSummaryTable('Typy / kategorie usług',m.types,false)+
+     vrpHistoryTable(m.rows)+
+     '<footer class="vrp-report-footer"><span>CleanFleet · Karta pojazdu · '+esc(v.plate)+'</span><span>Podgląd</span></footer>'+
+   '</section>'+
+ '</div>';
 }
 function pdfRoundCard(doc,x,y,w,h,fill=[255,255,255],stroke=[226,232,226],r=3){doc.setFillColor(...fill);doc.setDrawColor(...stroke);doc.roundedRect(x,y,w,h,r,r,'FD');}
 function pdfText(doc,text,x,y,size=9,color=[28,32,29],align){doc.setTextColor(...color);doc.setFontSize(size);doc.text(E.text(text),x,y,align?{align}:undefined);}
@@ -285,9 +318,21 @@ async function vehicleReportPDF(m){
  const card=(x,y,w,h,fill=[255,255,255],stroke=[210,217,211],rad=2.5)=>{
    doc.setFillColor(...fill);doc.setDrawColor(...stroke);doc.setLineWidth(.3);doc.roundedRect(x,y,w,h,rad,rad,'FD');
  };
+ const drawPlate=(x,y,w=58,h=14)=>{
+   const blueW=9;
+   doc.setFillColor(255,255,255);doc.setDrawColor(25,28,27);doc.setLineWidth(.7);doc.roundedRect(x,y,w,h,1.6,1.6,'FD');
+   doc.setFillColor(0,51,153);doc.rect(x+.7,y+.7,blueW-1.4,h-1.4,'F');
+   doc.setFillColor(255,204,0);
+   const cx=x+blueW/2,cy=y+4.2,rr=2.45;
+   for(let i=0;i<12;i++){const a=-Math.PI/2+i*Math.PI*2/12;doc.circle(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr,.28,'F');}
+   doc.setTextColor(255,255,255);doc.setFontSize(5.1);doc.setFont('helvetica','bold');doc.text('PL',cx,y+h-2.2,{align:'center'});
+   doc.setTextColor(12,14,13);doc.setFontSize(15.5);doc.setFont('helvetica','bold');doc.text(String(v.plate||''),x+blueW+(w-blueW)/2,y+h*.69,{align:'center'});
+   if(window.CFReportFont)doc.setFont('CleanFleet','normal');else doc.setFont('helvetica','normal');
+ };
+
  const header=()=>{
    doc.setFillColor(255,255,255);doc.rect(0,0,pw,36,'F');
-   txt('Karta pojazdu · '+v.plate,margin,13,15.5,ink);
+   txt('Karta pojazdu',margin,13,15.5,ink);
    txt('Kompletna historia usług · stan: '+new Date().toLocaleString('pl-PL'),margin,21,8.2,muted);
    if(logo){try{const p=doc.getImageProperties(logo),ratio=p.width/p.height;let w=48,h=w/ratio;if(h>19){h=19;w=h*ratio;}doc.addImage(logo,'PNG',pw-margin-w,7,w,h,undefined,'FAST');}catch(_){}}
    doc.setDrawColor(...line);doc.line(margin,31,pw-margin,31);
@@ -305,7 +350,7 @@ async function vehicleReportPDF(m){
    if(y+needed>ph-16){doc.addPage();return header();}
    return y;
  };
- const metaLine=(y)=>{
+ const metaLine=(y,x=margin,w=contentW)=>{
    const parts=[
      'Firma / klient: '+display(c?.short_name||c?.name),
      'Typ: '+display(v.type),
@@ -316,8 +361,8 @@ async function vehicleReportPDF(m){
      'Kierowca: '+display(v.driver_name)
    ];
    doc.setTextColor(...muted);doc.setFontSize(7.5);
-   const lines=doc.splitTextToSize(parts.join(' · '),contentW);
-   doc.text(lines,margin,y);
+   const lines=doc.splitTextToSize(parts.join(' · '),w);
+   doc.text(lines,x,y);
    return y+lines.length*3.5+4;
  };
  const metricCards=(y)=>{
@@ -366,7 +411,10 @@ async function vehicleReportPDF(m){
  };
 
  let y=header();
- y=metaLine(y);
+ const plateY=y;
+ drawPlate(margin,plateY,58,14);
+ const metaBottom=metaLine(plateY+4,margin+64,contentW-64);
+ y=Math.max(plateY+18,metaBottom);
 
  y=metricCards(y);
 

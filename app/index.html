@@ -12774,7 +12774,7 @@ function uid(){
     footer();
     const safePerformer=String(view.performerLabel||'wszyscy').replace(/[^a-zA-Z0-9._-]+/g,'_');
     const safeType=view.activeType==='__ALL__'?'wszystkie':String(view.activeType).replace(/[^a-zA-Z0-9._-]+/g,'_');
-    doc.save(\`CleanFleet-podsumowanie-\${view.month}-\${safePerformer}-\${safeType}.pdf\`);
+    doc.save(`CleanFleet-podsumowanie-${view.month}-${safePerformer}-${safeType}.pdf`);
     return doc;
   }
 

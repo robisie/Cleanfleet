@@ -1,4 +1,4 @@
-// CleanFleet v1.30.54 — add TERMIN UPŁYNĄŁ filter to active entries.
+// CleanFleet v1.30.55 — vehicle-from-search flow and report-card toggle fix.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -67,7 +67,7 @@ self.addEventListener('fetch', event => {
     let html = await response.text();
 
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.54');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.55');
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';

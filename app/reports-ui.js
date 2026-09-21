@@ -308,157 +308,104 @@ function addVehicleFooters(doc,v){
  const pages=doc.getNumberOfPages(),pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight();for(let n=1;n<=pages;n++){doc.setPage(n);doc.setDrawColor(220,226,229);doc.line(10,ph-11,pw-10,ph-11);pdfText(doc,'CleanFleet · '+v.plate,10,ph-6,7,[92,101,115]);pdfText(doc,n+' / '+pages,pw-10,ph-6,7,[92,101,115],'right');}
 }
 async function vehicleReportPDF(m){
- const doc=setupPDF('landscape'),pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight(),v=m.vehicle,c=m.company,logo=await lightLogoSrc();
- const margin=10,contentW=pw-margin*2,ink=[21,24,22],muted=[91,99,94],line=[224,229,225],pale=[241,246,235],soft=[252,252,251];
- const colors=['#93b70d','#16b39a','#3a8edb','#f0a51a','#7458c8','#df6d74'];
+ if(!window.jspdf?.jsPDF) throw new Error('Biblioteka PDF jest niedostępna. Odśwież aplikację.');
+ if(!window.html2canvas) throw new Error('Biblioteka podglądu PDF jest niedostępna. Odśwież aplikację.');
 
- const txt=(text,x,y,size=9,color=ink,align)=>{
-   doc.setTextColor(...color);doc.setFontSize(size);doc.text(E.text(text),x,y,align?{align}:undefined);
- };
- const card=(x,y,w,h,fill=[255,255,255],stroke=[210,217,211],rad=2.5)=>{
-   doc.setFillColor(...fill);doc.setDrawColor(...stroke);doc.setLineWidth(.3);doc.roundedRect(x,y,w,h,rad,rad,'FD');
- };
- const drawPlate=(x,y,w=58,h=14)=>{
-   const blueW=9;
-   doc.setFillColor(255,255,255);doc.setDrawColor(25,28,27);doc.setLineWidth(.7);doc.roundedRect(x,y,w,h,1.6,1.6,'FD');
-   doc.setFillColor(0,51,153);doc.rect(x+.7,y+.7,blueW-1.4,h-1.4,'F');
-   doc.setFillColor(255,204,0);
-   const cx=x+blueW/2,cy=y+4.2,rr=2.45;
-   for(let i=0;i<12;i++){const a=-Math.PI/2+i*Math.PI*2/12;doc.circle(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr,.28,'F');}
-   doc.setTextColor(255,255,255);doc.setFontSize(5.1);doc.setFont('helvetica','bold');doc.text('PL',cx,y+h-2.2,{align:'center'});
-   doc.setTextColor(12,14,13);doc.setFontSize(15.5);doc.setFont('helvetica','bold');doc.text(String(v.plate||''),x+blueW+(w-blueW)/2,y+h*.69,{align:'center'});
-   if(window.CFReportFont)doc.setFont('CleanFleet','normal');else doc.setFont('helvetica','normal');
- };
+ const {jsPDF}=window.jspdf;
+ const logo=await lightLogoSrc();
 
- const header=()=>{
-   doc.setFillColor(255,255,255);doc.rect(0,0,pw,36,'F');
-   txt('Karta pojazdu',margin,13,15.5,ink);
-   txt('Kompletna historia usług · stan: '+new Date().toLocaleString('pl-PL'),margin,21,8.2,muted);
-   if(logo){try{const p=doc.getImageProperties(logo),ratio=p.width/p.height;let w=48,h=w/ratio;if(h>19){h=19;w=h*ratio;}doc.addImage(logo,'PNG',pw-margin-w,7,w,h,undefined,'FAST');}catch(_){}}
-   doc.setDrawColor(...line);doc.line(margin,31,pw-margin,31);
-   return 37;
- };
- const footer=()=>{
-   const pages=doc.getNumberOfPages();
-   for(let n=1;n<=pages;n++){
-     doc.setPage(n);doc.setDrawColor(220,226,229);doc.line(margin,ph-10,pw-margin,ph-10);
-     txt('CleanFleet · Karta pojazdu · '+v.plate,margin,ph-5.5,6.8,[92,101,115]);
-     txt(n+' / '+pages,pw-margin,ph-5.5,6.8,[92,101,115],'right');
+ // Use exactly the same HTML/CSS that is shown in the accepted vehicle-card preview.
+ // This keeps the generated PDF visually identical to the preview instead of maintaining
+ // a second, separate jsPDF layout.
+ let source=document.querySelector('#cfVehicleReportPreview .vrp-report-sheet');
+ let tempHost=null;
+ if(!source){
+   tempHost=document.createElement('div');
+   tempHost.className='vrp-pdf-render-host';
+   tempHost.style.cssText='position:fixed;left:-100000px;top:0;width:1180px;background:#eef1ef;pointer-events:none;z-index:-1;';
+   tempHost.innerHTML=vehiclePreviewHtml(m,logo);
+   document.body.appendChild(tempHost);
+   source=tempHost.querySelector('.vrp-report-sheet');
+ }
+ if(!source) throw new Error('Nie udało się przygotować widoku karty pojazdu.');
+
+ // Clone only the report itself; toolbar/actions are intentionally excluded.
+ const wrap=document.createElement('div');
+ wrap.className='vrp-pdf-render-host';
+ wrap.style.cssText='position:fixed;left:-100000px;top:0;width:1180px;background:#eef1ef;padding:0;pointer-events:none;z-index:-1;';
+ const clone=source.cloneNode(true);
+ clone.style.width='1180px';
+ clone.style.maxWidth='none';
+ clone.style.margin='0';
+ clone.style.borderRadius='0';
+ clone.style.boxShadow='none';
+ wrap.appendChild(clone);
+ document.body.appendChild(wrap);
+
+ try{
+   if(document.fonts?.ready) await document.fonts.ready;
+   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+
+   const canvas=await window.html2canvas(clone,{
+     scale:2,
+     useCORS:true,
+     backgroundColor:'#ffffff',
+     logging:false,
+     imageTimeout:15000,
+     scrollX:0,
+     scrollY:0,
+     windowWidth:1180
+   });
+
+   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4',compress:true});
+   const pageW=doc.internal.pageSize.getWidth();
+   const pageH=doc.internal.pageSize.getHeight();
+   const marginX=8;
+   const marginY=8;
+   const printableW=pageW-marginX*2;
+   const printableH=pageH-marginY*2;
+
+   // Convert physical A4 content height to source-canvas pixels and crop page-by-page.
+   const pxPerMm=canvas.width/printableW;
+   const slicePx=Math.max(1,Math.floor(printableH*pxPerMm));
+   let sy=0,page=0;
+
+   while(sy<canvas.height){
+     const sh=Math.min(slicePx,canvas.height-sy);
+     const slice=document.createElement('canvas');
+     slice.width=canvas.width;
+     slice.height=sh;
+     const ctx=slice.getContext('2d');
+     ctx.fillStyle='#fff';
+     ctx.fillRect(0,0,slice.width,slice.height);
+     ctx.drawImage(canvas,0,sy,canvas.width,sh,0,0,canvas.width,sh);
+
+     if(page>0) doc.addPage('a4','landscape');
+     const imgH=sh/pxPerMm;
+     doc.addImage(slice.toDataURL('image/jpeg',0.96),'JPEG',marginX,marginY,printableW,imgH,undefined,'FAST');
+
+     sy+=sh;
+     page++;
    }
- };
- const ensure=(y,needed=25)=>{
-   if(y+needed>ph-16){doc.addPage();return header();}
-   return y;
- };
- const metaLine=(y,x=margin,w=contentW)=>{
-   const parts=[
-     'Firma / klient: '+display(c?.short_name||c?.name),
-     'Typ: '+display(v.type),
-     'Marka: '+display(v.brand),
-     'Model: '+display(v.model),
-     'Rok: '+display(v.production_year),
-     'Tabor: '+display(v.fleet_number),
-     'Kierowca: '+display(v.driver_name)
-   ];
-   doc.setTextColor(...muted);doc.setFontSize(7.5);
-   const lines=doc.splitTextToSize(parts.join(' · '),w);
-   doc.text(lines,x,y);
-   return y+lines.length*3.5+4;
- };
- const metricCards=(y)=>{
-   const cards=vehicleStatsCards(m),gap=3,cw=(contentW-gap*3)/4,ch=25;
-   cards.forEach((it,i)=>{
-     const col=i%4,row=Math.floor(i/4),x=margin+col*(cw+gap),yy=y+row*(ch+3);
-     card(x,yy,cw,ch);
-     txt(it[0],x+4,yy+7,8,[52,58,54]);
-     txt(it[1],x+4,yy+18,13,[35,55,20]);
-   });
-   return y+2*(ch+3)+2;
- };
- const barChart=(title,items,money,y)=>{
-   if(!items.length)return y;
-   const rowH=8,h=Math.max(18,items.length*rowH+7),labelW=49,valueW=23,barX=margin+labelW+3,barW=contentW-labelW-valueW-8;
-   y=ensure(y,h+5);
-   card(margin,y,contentW,h,[255,255,255],[233,236,233],2.5);
-   const max=Math.max(1,...items.map(x=>Math.abs(Number(x.value)||0)));
-   items.forEach((it,i)=>{
-     const yy=y+7+i*rowH,val=Number(it.value)||0;
-     txt(String(it.label).slice(0,34),margin+3,yy,6.8,[45,50,47]);
-     doc.setFillColor(239,242,240);doc.roundedRect(barX,yy-4,barW,4.8,2,2,'F');
-     const rgb=colors[i%colors.length].match(/\w\w/g).map(z=>parseInt(z,16));doc.setFillColor(...rgb);
-     doc.roundedRect(barX,yy-4,Math.max(1.4,barW*Math.abs(val)/max),4.8,2,2,'F');
-     txt(fmt(val)+(money?' zł':''),pw-margin-3,yy,6.8,ink,'right');
-   });
-   // Title sits above the chart, same quiet hierarchy as the accepted reports.
-   txt(title,margin,y-2,7.2,muted);
-   return y+h+6;
- };
- const simpleTable=(title,items,y,money=false)=>{
-   if(!items.length)return y;
-   y=ensure(y,28);
-   txt(title,margin,y,9.5,ink);y+=4;
-   doc.autoTable({
-     head:[['Grupa',money?'Wartość':'Liczba']],
-     body:items.map(x=>[x.label,fmt(x.value)+(money?' zł':'')]),
-     startY:y,margin:{top:38,bottom:15,left:margin,right:margin},
-     styles:{font:'CleanFleet',fontStyle:'normal',fontSize:7.1,cellPadding:2.2,overflow:'linebreak',textColor:[35,39,36],lineColor:[225,230,226],lineWidth:.15},
-     headStyles:{fillColor:pale,textColor:[31,38,27],fontStyle:'normal'},
-     alternateRowStyles:{fillColor:soft},
-     rowPageBreak:'avoid',showHead:'everyPage',
-     didDrawPage:()=>{if(doc.internal.getCurrentPageInfo().pageNumber>1)header();}
-   });
-   return doc.lastAutoTable.finalY+6;
- };
 
- let y=header();
- const plateY=y;
- drawPlate(margin,plateY,58,14);
- const metaBottom=metaLine(plateY+4,margin+64,contentW-64);
- y=Math.max(plateY+18,metaBottom);
+   // Small neutral page-number footer, matching the preview's restrained footer language.
+   const pages=doc.getNumberOfPages();
+   for(let p=1;p<=pages;p++){
+     doc.setPage(p);
+     doc.setDrawColor(220,226,229);
+     doc.line(marginX,pageH-5.5,pageW-marginX,pageH-5.5);
+     doc.setTextColor(102,112,131);
+     doc.setFontSize(6.6);
+     doc.text('CleanFleet · Karta pojazdu · '+E.text(m.vehicle.plate),marginX,pageH-2.2);
+     doc.text(p+' / '+pages,pageW-marginX,pageH-2.2,{align:'right'});
+   }
 
- y=metricCards(y);
-
- doc.setTextColor(...muted);doc.setFontSize(6.9);
- const note=doc.splitTextToSize('Statystyki obejmują wykonane usługi tego pojazdu. Odstępy liczone są między kolejnymi datami wykonania. Historia na końcu zawiera również wpisy oczekujące.',contentW);
- doc.text(note,margin,y);y+=note.length*3.2+5;
-
- y=barChart('Liczba prań w miesiącach',m.monthlyCount,false,y);
- y=barChart('Wartość usług w miesiącach',m.monthlyValue,true,y);
-
- y=simpleTable('Usługi według wykonawców',m.performers,y,false);
- y=simpleTable('Typy / kategorie usług',m.types,y,false);
-
- y=ensure(y,35);
- txt('DANE ŹRÓDŁOWE ('+m.rows.length+')',margin,y,11.5,ink);y+=6;
-
- const history=m.rows.map(r=>[
-   r.wash_date||r.order_date||String(r.created_at||'').slice(0,10)||'—',
-   display(r.type),
-   display(r.performed_by),
-   display(r.ordered_by),
-   E.number(r.cost)==null?'—':fmt(r.cost)+' zł',
-   display(r.order_due_date),
-   display(r.billing_category),
-   vehicleStatus(r),
-   display(r.approved),
-   display(r.paid),
-   display(r.notes)
- ]);
- doc.autoTable({
-   head:[['Data','Typ','Wykonał','Zlecił','Kwota','Termin','Kategoria','Status','Zatw.','Zapł.','Opis / uwagi']],
-   body:history.length?history:[['—','—','—','—','—','—','—','Brak historii','—','—','—']],
-   startY:y,margin:{top:38,bottom:15,left:margin,right:margin},
-   styles:{font:'CleanFleet',fontStyle:'normal',fontSize:5.9,cellPadding:1.8,overflow:'linebreak',valign:'top',textColor:[31,35,32],lineColor:[229,233,230],lineWidth:.12},
-   columnStyles:{0:{cellWidth:22},1:{cellWidth:18},2:{cellWidth:20},3:{cellWidth:20},4:{cellWidth:18},5:{cellWidth:20},6:{cellWidth:24},7:{cellWidth:30},8:{cellWidth:13},9:{cellWidth:13},10:{cellWidth:'auto'}},
-   headStyles:{fillColor:pale,textColor:[31,38,27],fontStyle:'normal'},
-   alternateRowStyles:{fillColor:soft},
-   rowPageBreak:'avoid',showHead:'everyPage',
-   didDrawPage:()=>{if(doc.internal.getCurrentPageInfo().pageNumber>1)header();}
- });
-
- footer();
- doc.save('CleanFleet_'+safeName(v.plate)+'_karta_pojazdu.pdf');
- return doc;
+   doc.save('CleanFleet_'+safeName(m.vehicle.plate)+'_karta_pojazdu.pdf');
+   return doc;
+ }finally{
+   wrap.remove();
+   if(tempHost) tempHost.remove();
+ }
 }
 async function open(b){bridge=b;if(!b.isAdmin()){reset();return;}try{guard();const id=await identity();if(owner&&owner!==id)reset();owner=id;if(host){host.hidden=false;return;}render();notice('Pobieram wartości filtrów…');busy(true);data=await load(cfg.source);renderFilters();notice('Wybierz zakres danych, grupowanie i kliknij „Generuj”.');}catch(e){if(host)notice(e.message||String(e),true);}finally{busy(false);}}
 async function loadVehicleModel(b,plate,companyId){bridge=b;const id=await identity();const [vehicles,washes,companies]=await Promise.all([all('vehicles',{plate,company_id:companyId},false),all('wash_records',{plate,company_id:companyId},false),all('companies',{id:companyId},false)]);if(await identity()!==id)throw Error('Sesja zmieniła się. Spróbuj ponownie.');const vehicle=vehicles[0];if(!vehicle)throw Error('Brak dostępu do pojazdu.');return vehicleModel(vehicle,washes,companies[0]);}

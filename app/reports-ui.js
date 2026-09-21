@@ -163,8 +163,8 @@ function adminPdfSourceTable(doc,r,y,logo){
    doc.setTextColor(23,27,24);doc.setFontSize(11.5);doc.text('DANE ŹRÓDŁOWE ('+r.rows.length+')',10,y);y+=6;
    if(cols.length>10){doc.setTextColor(96,103,98);doc.setFontSize(6.8);doc.text('Kolumny '+(i+1)+'–'+Math.min(i+10,cols.length)+' · numer wiersza łączy części tabeli',10,y);y+=4;}
    doc.autoTable({
-     head:[['Szczegóły',...chunk.map(k=>r.fields[k]?.label||k)]],
-     body:r.rows.map((row,n)=>['Otwórz',...chunk.map(k=>display(row[k]))]),
+     head:[[...chunk.map(k=>r.fields[k]?.label||k)]],
+     body:r.rows.map(row=>chunk.map(k=>display(row[k]))),
      startY:y,margin:{top:38,bottom:15,left:10,right:10},
      styles:{font:'CleanFleet',fontStyle:'normal',fontSize:6.4,cellPadding:2.1,overflow:'linebreak',valign:'top',textColor:[31,35,32],lineColor:[229,233,230],lineWidth:.12},
      headStyles:{fillColor:[241,246,235],textColor:[31,38,27],fontStyle:'normal'},

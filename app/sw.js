@@ -1,4 +1,4 @@
-// CleanFleet v1.30.52 — automatic red PRZEDAWNIONY status for missed scheduled washes.
+// CleanFleet v1.30.53 — rename expired schedule status to TERMIN UPŁYNĄŁ.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -67,7 +67,7 @@ self.addEventListener('fetch', event => {
     let html = await response.text();
 
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.52');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.53');
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';

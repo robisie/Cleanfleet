@@ -276,84 +276,135 @@ function addVehicleFooters(doc,v){
 }
 async function vehicleReportPDF(m){
  const doc=setupPDF('landscape'),pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight(),v=m.vehicle,c=m.company,logo=await lightLogoSrc();
- const margin=10,contentW=pw-margin*2,muted=[91,99,94],ink=[21,24,22],line=[224,229,225],pale=[241,246,235],colors=['#93b70d','#16b39a','#3a8edb','#f0a51a','#7458c8','#df6d74'];
+ const margin=10,contentW=pw-margin*2,ink=[21,24,22],muted=[91,99,94],line=[224,229,225],pale=[241,246,235],soft=[252,252,251];
+ const colors=['#93b70d','#16b39a','#3a8edb','#f0a51a','#7458c8','#df6d74'];
 
+ const txt=(text,x,y,size=9,color=ink,align)=>{
+   doc.setTextColor(...color);doc.setFontSize(size);doc.text(E.text(text),x,y,align?{align}:undefined);
+ };
+ const card=(x,y,w,h,fill=[255,255,255],stroke=[210,217,211],rad=2.5)=>{
+   doc.setFillColor(...fill);doc.setDrawColor(...stroke);doc.setLineWidth(.3);doc.roundedRect(x,y,w,h,rad,rad,'FD');
+ };
  const header=()=>{
    doc.setFillColor(255,255,255);doc.rect(0,0,pw,36,'F');
-   doc.setTextColor(...ink);doc.setFontSize(15.5);doc.text('Karta pojazdu · '+E.text(v.plate),margin,13);
-   doc.setTextColor(...muted);doc.setFontSize(8.2);doc.text('Kompletna historia usług · stan: '+new Date().toLocaleString('pl-PL'),margin,21);
+   txt('Karta pojazdu · '+v.plate,margin,13,15.5,ink);
+   txt('Kompletna historia usług · stan: '+new Date().toLocaleString('pl-PL'),margin,21,8.2,muted);
    if(logo){try{const p=doc.getImageProperties(logo),ratio=p.width/p.height;let w=48,h=w/ratio;if(h>19){h=19;w=h*ratio;}doc.addImage(logo,'PNG',pw-margin-w,7,w,h,undefined,'FAST');}catch(_){}}
    doc.setDrawColor(...line);doc.line(margin,31,pw-margin,31);
    return 37;
  };
  const footer=()=>{
    const pages=doc.getNumberOfPages();
-   for(let n=1;n<=pages;n++){doc.setPage(n);doc.setDrawColor(220,226,229);doc.line(margin,ph-10,pw-margin,ph-10);doc.setTextColor(92,101,115);doc.setFontSize(6.8);doc.text('CleanFleet · Karta pojazdu · '+E.text(v.plate),margin,ph-5.5);doc.text(n+' / '+pages,pw-margin,ph-5.5,{align:'right'});}
+   for(let n=1;n<=pages;n++){
+     doc.setPage(n);doc.setDrawColor(220,226,229);doc.line(margin,ph-10,pw-margin,ph-10);
+     txt('CleanFleet · Karta pojazdu · '+v.plate,margin,ph-5.5,6.8,[92,101,115]);
+     txt(n+' / '+pages,pw-margin,ph-5.5,6.8,[92,101,115],'right');
+   }
  };
- const card=(x,y,w,h,fill=[255,255,255],stroke=[210,217,211],rad=2.5)=>{doc.setFillColor(...fill);doc.setDrawColor(...stroke);doc.setLineWidth(.3);doc.roundedRect(x,y,w,h,rad,rad,'FD');};
- const metaLine=()=>{
+ const ensure=(y,needed=25)=>{
+   if(y+needed>ph-16){doc.addPage();return header();}
+   return y;
+ };
+ const metaLine=(y)=>{
    const parts=[
-     'Firma / klient: '+E.text(c?.short_name||c?.name||'—'),
-     'Typ: '+display(v.type),'Marka: '+display(v.brand),'Model: '+display(v.model),
-     'Rok: '+display(v.production_year),'Tabor: '+display(v.fleet_number),'Kierowca: '+display(v.driver_name)
+     'Firma / klient: '+display(c?.short_name||c?.name),
+     'Typ: '+display(v.type),
+     'Marka: '+display(v.brand),
+     'Model: '+display(v.model),
+     'Rok: '+display(v.production_year),
+     'Tabor: '+display(v.fleet_number),
+     'Kierowca: '+display(v.driver_name)
    ];
-   doc.setTextColor(...muted);doc.setFontSize(7.4);const lines=doc.splitTextToSize(parts.join(' · '),contentW);doc.text(lines,margin,y);return y+lines.length*3.5+3;
+   doc.setTextColor(...muted);doc.setFontSize(7.5);
+   const lines=doc.splitTextToSize(parts.join(' · '),contentW);
+   doc.text(lines,margin,y);
+   return y+lines.length*3.5+4;
  };
- const kpis=(y0)=>{
-   const cards=vehicleStatsCards(m),gap=3,cw=(contentW-gap*3)/4,ch=22;
-   cards.forEach((it,i)=>{const col=i%4,row=Math.floor(i/4),x=margin+col*(cw+gap),yy=y0+row*(ch+3);card(x,yy,cw,ch);doc.setTextColor(52,58,54);doc.setFontSize(7.7);doc.text(doc.splitTextToSize(E.text(it[0]),cw-8).slice(0,2),x+4,yy+7);doc.setTextColor(35,55,20);doc.setFontSize(11.8);doc.text(E.text(it[1]),x+4,yy+16);});
-   return y0+2*(ch+3)+3;
+ const metricCards=(y)=>{
+   const cards=vehicleStatsCards(m),gap=3,cw=(contentW-gap*3)/4,ch=25;
+   cards.forEach((it,i)=>{
+     const col=i%4,row=Math.floor(i/4),x=margin+col*(cw+gap),yy=y+row*(ch+3);
+     card(x,yy,cw,ch);
+     txt(it[0],x+4,yy+7,8,[52,58,54]);
+     txt(it[1],x+4,yy+18,13,[35,55,20]);
+   });
+   return y+2*(ch+3)+2;
  };
- const chart=(title,items,money,y0)=>{
-   if(!items.length)return y0;
-   const rows=items,rowH=8,h=Math.max(18,rows.length*rowH+7);
-   if(y0+h>ph-18){doc.addPage();y0=header();}
-   card(margin,y0,contentW,h,[255,255,255],[233,236,233],2.5);
-   const max=Math.max(1,...rows.map(x=>Math.abs(Number(x.value)||0))),labelW=48,valueW=22,barX=margin+labelW+3,barW=contentW-labelW-valueW-8;
-   doc.setTextColor(...ink);doc.setFontSize(8);doc.text(title,margin+3,y0+6);
-   rows.forEach((it,i)=>{const yy=y0+13+i*rowH,val=Number(it.value)||0;doc.setTextColor(45,50,47);doc.setFontSize(6.8);doc.text(E.text(it.label).slice(0,32),margin+3,yy);doc.setFillColor(239,242,240);doc.roundedRect(barX,yy-4,barW,4.8,2,2,'F');const rgb=colors[i%colors.length].match(/\w\w/g).map(z=>parseInt(z,16));doc.setFillColor(...rgb);doc.roundedRect(barX,yy-4,Math.max(1.4,barW*Math.abs(val)/max),4.8,2,2,'F');doc.setTextColor(...ink);doc.setFontSize(6.8);doc.text(fmt(val)+(money?' zł':''),pw-margin-3,yy,{align:'right'});});
-   return y0+h+5;
+ const barChart=(title,items,money,y)=>{
+   if(!items.length)return y;
+   const rowH=8,h=Math.max(18,items.length*rowH+7),labelW=49,valueW=23,barX=margin+labelW+3,barW=contentW-labelW-valueW-8;
+   y=ensure(y,h+5);
+   card(margin,y,contentW,h,[255,255,255],[233,236,233],2.5);
+   const max=Math.max(1,...items.map(x=>Math.abs(Number(x.value)||0)));
+   items.forEach((it,i)=>{
+     const yy=y+7+i*rowH,val=Number(it.value)||0;
+     txt(String(it.label).slice(0,34),margin+3,yy,6.8,[45,50,47]);
+     doc.setFillColor(239,242,240);doc.roundedRect(barX,yy-4,barW,4.8,2,2,'F');
+     const rgb=colors[i%colors.length].match(/\w\w/g).map(z=>parseInt(z,16));doc.setFillColor(...rgb);
+     doc.roundedRect(barX,yy-4,Math.max(1.4,barW*Math.abs(val)/max),4.8,2,2,'F');
+     txt(fmt(val)+(money?' zł':''),pw-margin-3,yy,6.8,ink,'right');
+   });
+   // Title sits above the chart, same quiet hierarchy as the accepted reports.
+   txt(title,margin,y-2,7.2,muted);
+   return y+h+6;
  };
- const groupTable=(title,items,y0,money=false)=>{
-   if(!items.length)return y0;
-   if(y0>145){doc.addPage();y0=header();}
-   doc.setTextColor(...ink);doc.setFontSize(9);doc.text(title,margin,y0);y0+=4;
-   doc.autoTable({head:[['Grupa',money?'Wartość':'Liczba']],body:items.map(x=>[x.label,fmt(x.value)+(money?' zł':'')]),startY:y0,margin:{top:38,bottom:15,left:margin,right:margin},styles:{font:'CleanFleet',fontStyle:'normal',fontSize:7.1,cellPadding:2.2,textColor:[35,39,36],lineColor:[225,230,226],lineWidth:.15},headStyles:{fillColor:pale,textColor:[31,38,27],fontStyle:'normal'},alternateRowStyles:{fillColor:[252,252,251]},rowPageBreak:'avoid',showHead:'everyPage',didDrawPage:()=>{if(doc.internal.getCurrentPageInfo().pageNumber>1)header();}});
+ const simpleTable=(title,items,y,money=false)=>{
+   if(!items.length)return y;
+   y=ensure(y,28);
+   txt(title,margin,y,9.5,ink);y+=4;
+   doc.autoTable({
+     head:[['Grupa',money?'Wartość':'Liczba']],
+     body:items.map(x=>[x.label,fmt(x.value)+(money?' zł':'')]),
+     startY:y,margin:{top:38,bottom:15,left:margin,right:margin},
+     styles:{font:'CleanFleet',fontStyle:'normal',fontSize:7.1,cellPadding:2.2,overflow:'linebreak',textColor:[35,39,36],lineColor:[225,230,226],lineWidth:.15},
+     headStyles:{fillColor:pale,textColor:[31,38,27],fontStyle:'normal'},
+     alternateRowStyles:{fillColor:soft},
+     rowPageBreak:'avoid',showHead:'everyPage',
+     didDrawPage:()=>{if(doc.internal.getCurrentPageInfo().pageNumber>1)header();}
+   });
    return doc.lastAutoTable.finalY+6;
  };
 
  let y=header();
- y=metaLine();
- y=kpis(y);
+ y=metaLine(y);
+
+ y=metricCards(y);
 
  doc.setTextColor(...muted);doc.setFontSize(6.9);
- const explain=doc.splitTextToSize('Statystyki obejmują wykonane usługi tego pojazdu. Odstępy liczone są między kolejnymi datami wykonania. Historia poniżej zawiera również wpisy oczekujące.',contentW);
- doc.text(explain,margin,y);y+=explain.length*3.2+4;
+ const note=doc.splitTextToSize('Statystyki obejmują wykonane usługi tego pojazdu. Odstępy liczone są między kolejnymi datami wykonania. Historia na końcu zawiera również wpisy oczekujące.',contentW);
+ doc.text(note,margin,y);y+=note.length*3.2+5;
 
- y=chart('Liczba prań w miesiącach',m.monthlyCount,false,y);
- y=chart('Wartość usług w miesiącach',m.monthlyValue,true,y);
- y=groupTable('Usługi według wykonawców',m.performers,y,false);
- y=groupTable('Typy / kategorie usług',m.types,y,false);
+ y=barChart('Liczba prań w miesiącach',m.monthlyCount,false,y);
+ y=barChart('Wartość usług w miesiącach',m.monthlyValue,true,y);
 
- if(y>145){doc.addPage();y=header();}
- doc.setTextColor(...ink);doc.setFontSize(11.5);doc.text('DANE ŹRÓDŁOWE ('+m.rows.length+')',margin,y);y+=6;
+ y=simpleTable('Usługi według wykonawców',m.performers,y,false);
+ y=simpleTable('Typy / kategorie usług',m.types,y,false);
 
- const history=m.rows.map((r,i)=>[
-   i+1,
+ y=ensure(y,35);
+ txt('DANE ŹRÓDŁOWE ('+m.rows.length+')',margin,y,11.5,ink);y+=6;
+
+ const history=m.rows.map(r=>[
    r.wash_date||r.order_date||String(r.created_at||'').slice(0,10)||'—',
-   display(r.type),display(r.performed_by),display(r.ordered_by),
+   display(r.type),
+   display(r.performed_by),
+   display(r.ordered_by),
    E.number(r.cost)==null?'—':fmt(r.cost)+' zł',
-   display(r.order_due_date),display(r.billing_category),vehicleStatus(r),
-   display(r.approved),display(r.paid),display(r.notes)
+   display(r.order_due_date),
+   display(r.billing_category),
+   vehicleStatus(r),
+   display(r.approved),
+   display(r.paid),
+   display(r.notes)
  ]);
  doc.autoTable({
-   head:[['Lp.','Data','Typ','Wykonał','Zlecił','Kwota','Termin','Kategoria','Status','Zatw.','Zapł.','Opis / uwagi']],
-   body:history.length?history:[[1,'—','—','—','—','—','—','—','Brak historii','—','—','—']],
+   head:[['Data','Typ','Wykonał','Zlecił','Kwota','Termin','Kategoria','Status','Zatw.','Zapł.','Opis / uwagi']],
+   body:history.length?history:[['—','—','—','—','—','—','—','Brak historii','—','—','—']],
    startY:y,margin:{top:38,bottom:15,left:margin,right:margin},
-   styles:{font:'CleanFleet',fontStyle:'normal',fontSize:5.7,cellPadding:1.8,overflow:'linebreak',valign:'top',textColor:[31,35,32],lineColor:[229,233,230],lineWidth:.12},
-   columnStyles:{0:{cellWidth:8},1:{cellWidth:20},2:{cellWidth:18},3:{cellWidth:20},4:{cellWidth:20},5:{cellWidth:18},6:{cellWidth:20},7:{cellWidth:24},8:{cellWidth:30},9:{cellWidth:12},10:{cellWidth:12},11:{cellWidth:'auto'}},
+   styles:{font:'CleanFleet',fontStyle:'normal',fontSize:5.9,cellPadding:1.8,overflow:'linebreak',valign:'top',textColor:[31,35,32],lineColor:[229,233,230],lineWidth:.12},
+   columnStyles:{0:{cellWidth:22},1:{cellWidth:18},2:{cellWidth:20},3:{cellWidth:20},4:{cellWidth:18},5:{cellWidth:20},6:{cellWidth:24},7:{cellWidth:30},8:{cellWidth:13},9:{cellWidth:13},10:{cellWidth:'auto'}},
    headStyles:{fillColor:pale,textColor:[31,38,27],fontStyle:'normal'},
-   alternateRowStyles:{fillColor:[252,252,251]},rowPageBreak:'avoid',showHead:'everyPage',
+   alternateRowStyles:{fillColor:soft},
+   rowPageBreak:'avoid',showHead:'everyPage',
    didDrawPage:()=>{if(doc.internal.getCurrentPageInfo().pageNumber>1)header();}
  });
 

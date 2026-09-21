@@ -1,4 +1,4 @@
-// CleanFleet v1.30.40 — monthly summary PDF matched to new report style.
+// CleanFleet v1.30.41 — monthly PDF moved out of runtime HTML patch.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -73,7 +73,7 @@ self.addEventListener('fetch', event => {
       cfMonthPdfReplacement
     );
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.40');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.41');
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';

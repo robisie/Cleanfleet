@@ -1,4 +1,4 @@
-// CleanFleet v1.30.50 — vehicle card cleanup.
+// CleanFleet v1.30.50 — vehicle card final visual refinements.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

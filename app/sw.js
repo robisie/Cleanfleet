@@ -1,4 +1,4 @@
-// CleanFleet v1.30.32 — approved-and-paid filter release.
+// CleanFleet v1.30.33 — approved-and-paid filter release.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -66,7 +66,7 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text();
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.32');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.33');
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';
@@ -251,6 +251,7 @@ self.addEventListener('notificationclick', event => {
     if (self.clients.openWindow) await self.clients.openWindow(targetUrl.href);
   })());
 });
+
 
 
 

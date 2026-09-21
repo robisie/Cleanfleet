@@ -1,4 +1,4 @@
-// CleanFleet v1.30.42 — fix startup syntax error and remove monthly runtime rewrite.
+// CleanFleet v1.30.43 — recovery release with direct versioning and SW cache bust.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -67,7 +67,7 @@ self.addEventListener('fetch', event => {
     let html = await response.text();
 
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.42');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.43');
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';

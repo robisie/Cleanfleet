@@ -1,4 +1,4 @@
-// CleanFleet v1.30.35 — interactive monthly vehicle-type filters.
+// CleanFleet v1.30.36 — PDF export for the visible monthly summary.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -66,7 +66,7 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text();
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.35');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.36');
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';
@@ -251,7 +251,6 @@ self.addEventListener('notificationclick', event => {
     if (self.clients.openWindow) await self.clients.openWindow(targetUrl.href);
   })());
 });
-
 
 
 

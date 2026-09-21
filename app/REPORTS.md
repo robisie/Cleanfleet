@@ -1,4 +1,4 @@
-# Raporty administratora — v1.30.33
+# Raporty administratora — v1.30.34
 
 Moduł działa na oddzielnym zestawie danych pobranym przez istniejący klient Supabase z sesją użytkownika. Nie przełącza aktywnej firmy, nie zmienia wpisów, zdjęć ani raportów klientów. Brak migracji bazy. Biblioteki XLSX, jsPDF i AutoTable pochodzą z istniejącej aplikacji. Dodano lokalną czcionkę z polskimi znakami i jej licencję.
 
@@ -21,13 +21,15 @@ Połączenia nie mnożą wierszy. Pozycja faktury jest unikalna według `wash_re
 
 Administrator otwiera Raporty z kafelka panelu. Zarobki wymagają odblokowania istniejącego modułu PIN. Reguły RLS zachowane; przypomnienia i podatki są własne. Dane i widok raportów usuwane z pamięci przy wylogowaniu / zmianie użytkownika lub roli. Szablony zapisują wyłącznie konfigurację, lokalnie i osobno dla użytkownika; nie synchronizują się między urządzeniami.
 
-Drill-down otwiera widoki tylko do odczytu bez zmiany kontekstu firmy. Powrót zachowuje konfigurację i stronę tabeli. PDF i XLSX eksportują cały raport nadrzędny, nie tylko aktualną stronę lub drill-down (komunikat jest przy tabeli). XLSX zawiera pełne kolumny danych i autofilter. PDF korzysta z wybranych kolumn; długie zestawy kolumn dzielone na części powiązane numerem wiersza. Wykres udziałowy ma w PDF postać słupków z procentami, zachowując mianownik całego raportu. Bardzo duże zbiory obciążą pamięć urządzenia — obliczenia są po stronie klienta.
+Drill-down otwiera widoki tylko do odczytu bez zmiany kontekstu firmy. Powrót zachowuje konfigurację i stronę tabeli. PDF i XLSX eksportują cały raport nadrzędny, nie tylko aktualną stronę lub drill-down (komunikat jest przy tabeli). XLSX zawiera pełne kolumny danych i autofilter. Widoczny wybór „Dane widoczne w tabeli i PDF” steruje tabelą ekranową oraz PDF; skrót ustawia rejestrację, datę prania, zlecającego i opis. PDF ma graficzny nagłówek z logo aplikacji, kafelki, wykresy i mniejsze tytuły. Długie zestawy kolumn dzielone są na części powiązane numerem wiersza. Wykres udziałowy ma w PDF postać słupków z procentami, zachowując mianownik całego raportu. Bardzo duże zbiory obciążą pamięć urządzenia — obliczenia są po stronie klienta.
+
+Karta pojazdu otwiera najpierw responsywny podgląd raportu. Dopiero przycisk „Pobierz PDF” tworzy plik. Raport pojazdu korzysta z tego samego zbioru wpisów do statystyk i wykresów, pokazuje rzeczywiste dane pojazdu, daty, wartości, odstępy, wykonawców i typy oraz kompletną historię bez limitu rekordów. Brak historii i pojedyncza usługa nie wytwarzają fikcyjnych odstępów.
 
 Zdjęcia lokalne nie są dostępne w tabeli serwerowej zdjęć. Nie wymyślamy podtypu pojazdu ani rodzaju usługi: katalog zawiera tylko istniejące pola, m.in. `type` i `billing_category`.
 
 ## Weryfikacja wydania
 
-Przeprowadzono porównanie silnika z niezależnym SQL na rzeczywistych danych: liczby, suma/średnia, unikalne pojazdy, typy, wykonawcy, firmy, kombinacja okres + wiele typów + zatwierdzenie oraz średnie odstępy. Zweryfikowano zachowanie filtrów i szczegółów w testach DOM, powrót, szablony, blokadę PIN, zmianę roli i błędy niekompletnych danych. XLSX ponownie odczytany: zgodność liczby wierszy, sum, typów liczb/dat/boolean i autofilter. PDF wygenerowany rzeczywistym jsPDF/AutoTable, wyciągnięty tekst i sprawdzony render: polskie znaki, strony, tabela, karta pojazdu. Przetestowane SVG dla trzech wykresów i eksport do PDF; rasteryzacja w teście lokalnym przez Sharp.
+Przeprowadzono porównanie silnika z niezależnym SQL na rzeczywistych danych: liczby, suma/średnia, unikalne pojazdy, typy, wykonawcy, firmy, kombinacja okres + wiele typów + zatwierdzenie oraz średnie odstępy. Zweryfikowano zachowanie filtrów i szczegółów w testach DOM, powrót, szablony, blokadę PIN, zmianę roli i błędy niekompletnych danych. XLSX ponownie odczytany: zgodność liczby wierszy, sum, typów liczb/dat/boolean i autofilter. PDF wygenerowany rzeczywistym jsPDF/AutoTable, wyciągnięty tekst i sprawdzony render: polskie znaki, strony, tabela, logo oraz karta pojazdu. Przetestowano pojazd bez historii, z jednym wpisem i ze 125 wpisami, obliczenia statystyk, sumy wykresów, podgląd przed pobraniem oraz wielostronicowy PDF bez obcinania historii. Przetestowane SVG dla trzech wykresów i eksport do PDF; rasteryzacja w teście lokalnym przez Sharp.
 
 Przeglądarka produkcyjna wymaga logowania. Nie wykonano pełnego testu zalogowanego administratora na produkcji ani testu na fizycznym iPhonie/iPadzie. Responsywne reguły obejmują telefon (520 px), tablet (900 px) i desktop; walidacja wizualna na tych urządzeniach pozostaje do wykonania.
 

@@ -235,7 +235,7 @@ function vrpSummaryTable(title,items,money=false){
  return'<section class="vrp-report-block"><h3>'+esc(title)+'</h3><div class="vrp-table-wrap"><table class="vrp-report-table"><thead><tr><th>Grupa</th><th>'+(money?'Wartość':'Liczba')+'</th></tr></thead><tbody>'+items.map(x=>'<tr><td>'+esc(x.label)+'</td><td>'+esc(fmt(x.value)+(money?' zł':''))+'</td></tr>').join('')+'</tbody></table></div></section>';
 }
 function vrpHistoryTable(rows){
- return'<section class="vrp-report-block"><h3>DANE ŹRÓDŁOWE ('+rows.length+')</h3><div class="vrp-table-wrap"><table class="vrp-report-table vrp-history-table"><thead><tr><th>Data</th><th>Typ</th><th>Wykonał</th><th>Zlecił</th><th>Kwota</th><th>Termin</th><th>Kategoria</th><th>Status</th><th>Zatw.</th><th>Zapł.</th><th>Opis / uwagi</th></tr></thead><tbody>'+(rows.length?rows.map(r=>'<tr><td>'+esc(r.wash_date||r.order_date||String(r.created_at||'').slice(0,10)||'—')+'</td><td>'+esc(display(r.type))+'</td><td>'+esc(display(r.performed_by))+'</td><td>'+esc(display(r.ordered_by))+'</td><td>'+esc(E.number(r.cost)==null?'—':fmt(r.cost)+' zł')+'</td><td>'+esc(display(r.order_due_date))+'</td><td>'+esc(display(r.billing_category))+'</td><td>'+esc(vehicleStatus(r))+'</td><td>'+esc(display(r.approved))+'</td><td>'+esc(display(r.paid))+'</td><td>'+esc(display(r.notes))+'</td></tr>').join(''):'<tr><td colspan="11">Brak historii usług.</td></tr>')+'</tbody></table></div></section>';
+ return'<section class="vrp-report-block"><h3>HISTORIA</h3><div class="vrp-table-wrap"><table class="vrp-report-table vrp-history-table"><thead><tr><th>Data</th><th>Typ</th><th>Wykonał</th><th>Zlecił</th><th>Kwota</th><th>Termin</th><th>Kategoria</th><th>Status</th><th>Zatw.</th><th>Zapł.</th><th>Opis / uwagi</th></tr></thead><tbody>'+(rows.length?rows.map(r=>'<tr><td>'+esc(r.wash_date||r.order_date||String(r.created_at||'').slice(0,10)||'—')+'</td><td>'+esc(display(r.type))+'</td><td>'+esc(display(r.performed_by))+'</td><td>'+esc(display(r.ordered_by))+'</td><td>'+esc(E.number(r.cost)==null?'—':fmt(r.cost)+' zł')+'</td><td>'+esc(display(r.order_due_date))+'</td><td>'+esc(display(r.billing_category))+'</td><td>'+esc(vehicleStatus(r))+'</td><td>'+esc(display(r.approved))+'</td><td>'+esc(display(r.paid))+'</td><td>'+esc(display(r.notes))+'</td></tr>').join(''):'<tr><td colspan="11">Brak historii usług.</td></tr>')+'</tbody></table></div></section>';
 }
 function vehiclePreviewHtml(m,logo){
  const v=m.vehicle,c=m.company;
@@ -259,7 +259,6 @@ function vehiclePreviewHtml(m,logo){
      '<section class="vrp-report-block"><h3>Liczba prań w miesiącach</h3>'+vrpHorizontalBars(m.monthlyCount,false)+'</section>'+
      '<section class="vrp-report-block"><h3>Wartość usług w miesiącach</h3>'+vrpHorizontalBars(m.monthlyValue,true)+'</section>'+
      vrpSummaryTable('Usługi według wykonawców',m.performers,false)+
-     vrpSummaryTable('Typy / kategorie usług',m.types,false)+
      vrpHistoryTable(m.rows)+
      '<footer class="vrp-report-footer"><span>CleanFleet · Karta pojazdu · '+esc(v.plate)+'</span><span>Podgląd</span></footer>'+
    '</section>'+

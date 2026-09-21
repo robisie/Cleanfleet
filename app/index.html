@@ -12625,77 +12625,156 @@ function uid(){
       doc.addFont('CleanFleet.ttf','CleanFleet','normal');
       doc.setFont('CleanFleet');
     }
+
     const pageWidth=doc.internal.pageSize.getWidth(),pageHeight=doc.internal.pageSize.getHeight();
-    const margin=12,contentWidth=pageWidth-margin*2;
-    doc.setFillColor(22,21,15);doc.rect(0,0,pageWidth,32,'F');
-    doc.setFillColor(164,189,16);doc.rect(0,32,pageWidth,3,'F');
-    const logo=document.querySelector('.app-logo')?.src||'';
-    if(logo){
-      try{
-        const props=doc.getImageProperties(logo),ratio=props.width/props.height;
-        let logoW=50,logoH=logoW/ratio;if(logoH>20){logoH=20;logoW=logoH*ratio;}
-        doc.setFillColor(255,255,255);doc.roundedRect(margin-2,5,logoW+4,logoH+4,2,2,'F');
-        doc.addImage(logo,'PNG',margin,7,logoW,logoH,undefined,'FAST');
-      }catch(_){ }
-    }
-    doc.setTextColor(255,255,255);doc.setFontSize(15);doc.text('Podsumowanie miesiąca',pageWidth-margin,13,{align:'right'});
-    doc.setTextColor(190,199,183);doc.setFontSize(8.5);doc.text('CleanFleet · '+cfMonthReportPdfLabel(view.month),pageWidth-margin,21,{align:'right'});
-    doc.setTextColor(22,21,15);
-
-    let y=42;
-    const filterGap=4,filterW=(contentWidth-filterGap)/2;
-    const filterCard=(x,label,value)=>{
-      doc.setFillColor(246,246,242);doc.setDrawColor(215,215,207);doc.roundedRect(x,y,filterW,16,2,2,'FD');
-      doc.setTextColor(105,110,100);doc.setFontSize(7);doc.text(label.toUpperCase(),x+4,y+5);
-      doc.setTextColor(30,31,27);doc.setFontSize(10);doc.text(String(value||'—'),x+4,y+12);
+    const margin=10,contentWidth=pageWidth-margin*2;
+    const colors={
+      green:[147,183,13], teal:[22,179,154], blue:[58,142,219], amber:[240,165,26],
+      violet:[116,88,200], red:[223,109,116], ink:[20,23,21], muted:[96,105,115],
+      line:[229,234,229], pale:[247,249,247], paleGreen:[239,246,229]
     };
-    filterCard(margin,'Miesiąc',cfMonthReportPdfLabel(view.month));
-    filterCard(margin+filterW+filterGap,'Wykonał',view.performerLabel||'Wszyscy');
-    y+=22;
+    const palette=[colors.green,colors.teal,colors.blue,colors.amber,colors.violet,colors.red];
 
+    const rawLogo=document.querySelector('.app-logo')?.src||'';
+    const lightLogo=await (async()=>{
+      if(!rawLogo) return '';
+      try{
+        return await new Promise(resolve=>{
+          const img=new Image();img.crossOrigin='anonymous';
+          img.onload=()=>{
+            try{
+              const c=document.createElement('canvas');c.width=img.naturalWidth||img.width;c.height=img.naturalHeight||img.height;
+              const ctx=c.getContext('2d',{willReadFrequently:true});ctx.clearRect(0,0,c.width,c.height);ctx.drawImage(img,0,0);
+              const d=ctx.getImageData(0,0,c.width,c.height);
+              for(let i=0;i<d.data.length;i+=4){
+                const r=d.data[i],g=d.data[i+1],b=d.data[i+2],a=d.data[i+3];
+                if(a>20&&r>205&&g>205&&b>205&&Math.max(r,g,b)-Math.min(r,g,b)<34){
+                  d.data[i]=22;d.data[i+1]=25;d.data[i+2]=22;
+                }
+              }
+              ctx.putImageData(d,0,0);resolve(c.toDataURL('image/png'));
+            }catch(_){resolve(rawLogo);}
+          };
+          img.onerror=()=>resolve(rawLogo);img.src=rawLogo;
+        });
+      }catch(_){return rawLogo;}
+    })();
+
+    const txt=(text,x,y,size=9,color=colors.ink,align)=>{
+      doc.setTextColor(...color);doc.setFontSize(size);doc.text(String(text??''),x,y,align?{align}:undefined);
+    };
+    const card=(x,y,w,h,fill=[255,255,255],stroke=colors.line,r=3)=>{
+      doc.setFillColor(...fill);doc.setDrawColor(...stroke);doc.roundedRect(x,y,w,h,r,r,'FD');
+    };
+    const header=()=>{
+      doc.setFillColor(255,255,255);doc.rect(0,0,pageWidth,37,'F');
+      if(lightLogo){
+        try{
+          const p=doc.getImageProperties(lightLogo),ratio=p.width/p.height;let w=57,h=w/ratio;
+          if(h>22){h=22;w=h*ratio;}
+          doc.addImage(lightLogo,'PNG',margin,7,w,h,undefined,'FAST');
+        }catch(_){}
+      }
+      txt('Podsumowanie miesiąca',pageWidth-margin,15,15,colors.ink,'right');
+      txt('CleanFleet · '+cfMonthReportPdfLabel(view.month),pageWidth-margin,23,8.5,colors.muted,'right');
+      doc.setFillColor(...colors.green);doc.rect(0,36,pageWidth,1.7,'F');
+      return 44;
+    };
+    const section=(title,y,color=colors.green)=>{
+      doc.setFillColor(...color);doc.roundedRect(margin,y-3,2.2,8,1.1,1.1,'F');
+      txt(title,margin+6,y+3,11.5,colors.ink);return y+9;
+    };
+    const footer=()=>{
+      const pages=doc.getNumberOfPages();
+      for(let p=1;p<=pages;p++){
+        doc.setPage(p);doc.setDrawColor(220,226,229);doc.line(margin,pageHeight-11,pageWidth-margin,pageHeight-11);
+        txt('CleanFleet · Podsumowanie miesiąca',margin,pageHeight-6,7,colors.muted);
+        txt(p+' / '+pages,pageWidth-margin,pageHeight-6,7,colors.muted,'right');
+      }
+    };
+
+    let y=header();
+
+    const filterGap=4,filterW=(contentWidth-filterGap)/2;
+    [['Miesiąc',cfMonthReportPdfLabel(view.month)],['Wykonał',view.performerLabel||'Wszyscy']].forEach((it,i)=>{
+      const x=margin+i*(filterW+filterGap);card(x,y,filterW,18,colors.pale,colors.line,3);
+      txt(it[0],x+4,y+6,7,colors.muted);txt(it[1]||'—',x+4,y+14,10,colors.ink);
+    });
+    y+=25;
+
+    y=section('Podsumowanie',y);
     const typeOrder=['SOLÓWKA','ZESTAW','BUS','BUS C','OSOBOWE'];
-    const typeKeys=[...typeOrder,...Object.keys(view.vehicleTypeCounts).filter(type=>!typeOrder.includes(type))]
-      .filter((type,index,array)=>array.indexOf(type)===index&&Object.prototype.hasOwnProperty.call(view.vehicleTypeCounts,type));
-    const typeCards=[{type:'__ALL__',label:'Liczba prań',value:view.baseCount},...typeKeys.map(type=>({type,label:type,value:view.vehicleTypeCounts[type]}))];
-    const cols=4,gap=3,cardW=(contentWidth-gap*(cols-1))/cols,cardH=18;
-    typeCards.forEach((card,index)=>{
-      const col=index%cols,row=Math.floor(index/cols),x=margin+col*(cardW+gap),cy=y+row*(cardH+gap),active=view.activeType===card.type;
-      doc.setFillColor(...(active?[239,245,215]:[255,255,255]));doc.setDrawColor(...(active?[164,189,16]:[218,219,212]));doc.setLineWidth(active?.6:.25);doc.roundedRect(x,cy,cardW,cardH,2,2,'FD');
-      doc.setTextColor(active?82:108,active?104:112,active?0:103);doc.setFontSize(6.8);doc.text(String(card.label).toUpperCase(),x+3,cy+5);
-      doc.setTextColor(25,26,22);doc.setFontSize(12);doc.text(String(card.value),x+3,cy+14);
+    const typeKeys=[...typeOrder,...Object.keys(view.vehicleTypeCounts||{}).filter(type=>!typeOrder.includes(type))]
+      .filter((type,index,array)=>array.indexOf(type)===index&&Object.prototype.hasOwnProperty.call(view.vehicleTypeCounts||{},type));
+    const summaryCards=[
+      {label:'Liczba prań',value:view.baseCount,color:colors.green},
+      ...typeKeys.map((type,i)=>({label:type,value:view.vehicleTypeCounts[type],color:palette[(i+1)%palette.length]})),
+      {label:'Wartość',value:fmtMoney(view.total),color:colors.blue},
+      {label:'Do zapłaty',value:fmtMoney(view.outstanding),color:colors.amber}
+    ];
+    const cols=2,gap=4,cw=(contentWidth-gap)/2,ch=22;
+    summaryCards.forEach((it,i)=>{
+      const col=i%2,row=Math.floor(i/2),x=margin+col*(cw+gap),cy=y+row*(ch+4);
+      card(x,cy,cw,ch,[255,255,255],colors.line,3);
+      doc.setFillColor(...colors.paleGreen);doc.circle(x+9,cy+11,5.7,'F');
+      doc.setFillColor(...it.color);doc.circle(x+9,cy+11,2,'F');
+      txt(it.label,x+18,cy+8,7.3,colors.muted);
+      txt(it.value,x+18,cy+17,11.2,colors.ink);
     });
-    y+=Math.ceil(typeCards.length/cols)*(cardH+gap)+3;
+    y+=Math.ceil(summaryCards.length/2)*(ch+4)+3;
 
-    const moneyGap=4,moneyW=(contentWidth-moneyGap)/2;
-    [['Wartość',fmtMoney(view.total)],['Do zapłaty',fmtMoney(view.outstanding)]].forEach((card,index)=>{
-      const x=margin+index*(moneyW+moneyGap);doc.setFillColor(255,255,255);doc.setDrawColor(218,219,212);doc.setLineWidth(.25);doc.roundedRect(x,y,moneyW,20,2,2,'FD');
-      doc.setTextColor(108,112,103);doc.setFontSize(7);doc.text(card[0].toUpperCase(),x+4,y+6);
-      doc.setTextColor(25,26,22);doc.setFontSize(12);doc.text(card[1],x+4,y+15);
-    });
-    y+=27;
+    if(typeKeys.length){
+      if(y>210){doc.addPage();y=header();}
+      y=section('Struktura typów pojazdów',y,colors.teal);
+      const chartH=Math.min(58,18+typeKeys.length*8);
+      card(margin,y,contentWidth,chartH,[255,255,255],colors.line,3);
+      const max=Math.max(1,...typeKeys.map(k=>Number(view.vehicleTypeCounts[k])||0));
+      typeKeys.slice(0,6).forEach((type,i)=>{
+        const value=Number(view.vehicleTypeCounts[type])||0,yy=y+10+i*8,barX=margin+52,barW=contentWidth-78;
+        txt(type,margin+5,yy+2,7.4,colors.ink);
+        doc.setFillColor(237,241,239);doc.roundedRect(barX,yy-3,barW,5,2.5,2.5,'F');
+        doc.setFillColor(...palette[i%palette.length]);doc.roundedRect(barX,yy-3,Math.max(2,barW*value/max),5,2.5,2.5,'F');
+        txt(value,pageWidth-margin-5,yy+2,7.6,colors.ink,'right');
+      });
+      y+=chartH+7;
+    }
 
-    const tableRows=view.rows.map(r=>[r.typ||'—',r.tablica||'—',fmtDate(r.data_prania),fmtMoney(r.koszt),r.zaplacone?'TAK':'NIE']);
+    if(y>212){doc.addPage();y=header();}
+    y=section('Szczegóły usług · '+view.rows.length+' wpisów',y,colors.blue);
+
+    const tableRows=view.rows.map(r=>[
+      r.typ||'—',r.tablica||'—',fmtDate(r.data_prania),fmtMoney(r.koszt),r.zaplacone?'TAK':'NIE'
+    ]);
     doc.autoTable({
-      head:[['Typ','Tablica','Data prania','Kwota','Rozliczone']],body:tableRows,startY:y,
-      margin:{top:14,bottom:20,left:margin,right:margin},
-      styles:{font:window.CFReportFont?'CleanFleet':'helvetica',fontStyle:'normal',fontSize:8.2,textColor:[35,36,31],cellPadding:2.5,lineColor:[224,224,218],lineWidth:{bottom:.2},overflow:'linebreak'},
-      headStyles:{fillColor:[80,104,22],textColor:[255,255,255],fontStyle:'normal'},
-      alternateRowStyles:{fillColor:[247,247,243]},rowPageBreak:'avoid',showHead:'everyPage'
+      head:[['Typ','Tablica','Data prania','Kwota','Rozliczone']],
+      body:tableRows,
+      startY:y,
+      margin:{top:44,bottom:18,left:margin,right:margin},
+      styles:{
+        font:window.CFReportFont?'CleanFleet':'helvetica',fontStyle:'normal',fontSize:8,
+        textColor:[35,39,36],cellPadding:2.5,lineColor:[232,236,233],lineWidth:.15,overflow:'linebreak',valign:'middle'
+      },
+      headStyles:{fillColor:[245,248,246],textColor:[31,36,32],fontStyle:'normal',lineColor:[210,221,209],lineWidth:.2},
+      alternateRowStyles:{fillColor:[250,251,250]},
+      rowPageBreak:'avoid',showHead:'everyPage',
+      didDrawPage:()=>header()
     });
     y=doc.lastAutoTable.finalY+7;
+
     const busSum=view.rows.filter(r=>String(r.typ||'').trim().toUpperCase()==='BUS').reduce((sum,r)=>sum+(Number(r.koszt)||0),0);
     const otherSum=view.rows.filter(r=>String(r.typ||'').trim().toUpperCase()!=='BUS').reduce((sum,r)=>sum+(Number(r.koszt)||0),0);
-    if(y>pageHeight-35){doc.addPage();y=22;}
-    [['Suma - Bus',busSum],['Suma - pozostałe',otherSum]].forEach(([label,value],index)=>{
-      const cy=y+index*11;doc.setDrawColor(205,207,198);doc.line(margin,cy,pageWidth-margin,cy);doc.setFontSize(9);doc.setTextColor(30,31,27);doc.text(label,margin,cy+7);doc.text(fmtMoney(value),pageWidth-margin,cy+7,{align:'right'});
+    if(y>pageHeight-48){doc.addPage();y=header();}
+    y=section('Rozliczenie',y,colors.amber);
+    [['Suma - Bus',busSum,colors.teal],['Suma - pozostałe',otherSum,colors.blue]].forEach((it,i)=>{
+      const x=margin+i*(filterW+filterGap);card(x,y,filterW,22,[255,255,255],colors.line,3);
+      doc.setFillColor(...it[2]);doc.roundedRect(x,y,3,22,1.5,1.5,'F');
+      txt(it[0],x+8,y+8,7.5,colors.muted);txt(fmtMoney(it[1]),x+8,y+17,11,colors.ink);
     });
-    const pages=doc.getNumberOfPages();
-    for(let page=1;page<=pages;page++){
-      doc.setPage(page);doc.setDrawColor(222,224,216);doc.line(margin,pageHeight-12,pageWidth-margin,pageHeight-12);doc.setTextColor(105,110,100);doc.setFontSize(7);doc.text('CleanFleet · Podsumowanie miesiąca',margin,pageHeight-7);doc.text(page+' / '+pages,pageWidth-margin,pageHeight-7,{align:'right'});
-    }
+
+    footer();
     const safePerformer=String(view.performerLabel||'wszyscy').replace(/[^a-zA-Z0-9._-]+/g,'_');
     const safeType=view.activeType==='__ALL__'?'wszystkie':String(view.activeType).replace(/[^a-zA-Z0-9._-]+/g,'_');
-    doc.save(`CleanFleet-podsumowanie-${view.month}-${safePerformer}-${safeType}.pdf`);
+    doc.save(\`CleanFleet-podsumowanie-\${view.month}-\${safePerformer}-\${safeType}.pdf\`);
     return doc;
   }
 

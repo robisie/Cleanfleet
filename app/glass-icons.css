@@ -1,4 +1,4 @@
-/* CleanFleet v1.30.56 — wspólna warstwa ikon 3D Glass. */
+/* CleanFleet v1.30.57 — selektywna warstwa ikon 3D Glass. */
 .cf-glass-icon{
   display:inline-block;
   width:24px;
@@ -42,17 +42,6 @@ button.cf-has-glass-icon,
 .cf-company-utility-card>.cf-glass-icon{margin:-4px auto 1px;}
 .cf-company-utility-card>div{min-width:0;}
 
-.cf-search-input-wrap{position:relative;}
-.cf-search-input-wrap>.cf-glass-icon{
-  position:absolute;
-  z-index:2;
-  left:10px;
-  top:50%;
-  width:25px;
-  height:25px;
-  transform:translateY(-50%);
-}
-.cf-search-input-wrap.cf-glass-icon-host>input{padding-left:42px!important;}
 .main-filters>.cf-glass-icon{width:24px;height:24px;flex-basis:24px;}
 
 .cf-glass-status{display:inline-flex!important;align-items:center;gap:5px;}
@@ -75,12 +64,20 @@ button.cf-has-glass-icon,
 .cf-chat-send.cf-has-glass-icon{
   gap:0;
 }
-#plateCameraBtn>.cf-glass-icon{width:30px;height:30px;flex-basis:30px;}
+#plateCameraBtn>.cf-glass-icon{width:36px;height:36px;flex-basis:36px;}
+.cf-record-photo-btn>.cf-glass-icon{width:30px;height:30px;flex-basis:30px;}
+#menuBtn.cf-has-glass-icon{width:44px!important;height:44px!important;min-width:44px!important;padding:4px!important;}
+#menuBtn>.cf-glass-icon{width:34px;height:34px;flex-basis:34px;}
 #cfChatFab.cf-has-glass-icon{display:flex;align-items:center;justify-content:center;}
-#cfChatFab>.cf-glass-icon{width:44px;height:44px;flex-basis:44px;}
+#cfChatFab>.cf-glass-icon{width:50px;height:50px;flex-basis:50px;transform:translateY(-2px);}
 #cfChatBadge{position:absolute;}
 
+/* Menu główne zawsze otwiera się i wyrównuje od lewej krawędzi. */
+.menu-drawer{left:0!important;right:auto!important;transform:translateX(-100%)!important;box-shadow:8px 0 24px rgba(22,21,15,.15)!important;}
+.menu-overlay.open .menu-drawer{transform:translateX(0)!important;}
+
 @media(max-width:620px){
+  .main-filters>.cf-glass-icon{display:none!important;}
   .cf-glass-icon--tile{width:42px;height:42px;flex-basis:42px;}
   .cf-company-utility-card>.cf-glass-icon{margin:-2px auto 0;}
   .cf-company-utility-card strong{line-height:1.05!important;}
@@ -88,11 +85,12 @@ button.cf-has-glass-icon,
   .menu-item-title>.cf-glass-icon{width:27px;height:27px;flex-basis:27px;}
   .cf-glass-icon--heading{width:30px;height:30px;flex-basis:30px;}
   .cf-profile-identity>.cf-glass-icon{width:38px;height:38px;flex-basis:38px;}
+  #menuBtn.cf-has-glass-icon{width:42px!important;height:42px!important;min-width:42px!important;}
+  #menuBtn>.cf-glass-icon{width:32px;height:32px;flex-basis:32px;}
+  #plateCameraBtn>.cf-glass-icon{width:34px;height:34px;flex-basis:34px;}
 }
 
 @media(max-width:359px){
   .cf-glass-icon{width:21px;height:21px;flex-basis:21px;}
   .cf-glass-icon--tile{width:38px;height:38px;flex-basis:38px;}
-  .cf-search-input-wrap>.cf-glass-icon{width:22px;height:22px;}
-  .cf-search-input-wrap.cf-glass-icon-host>input{padding-left:38px!important;}
 }

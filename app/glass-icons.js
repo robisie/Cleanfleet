@@ -1,4 +1,4 @@
-/* CleanFleet v1.30.56 — niedestrukcyjna warstwa ikon 3D Glass. */
+/* CleanFleet v1.30.57 — selektywna, niedestrukcyjna warstwa ikon 3D Glass. */
 (()=>{
   'use strict';
 
@@ -18,30 +18,18 @@
     accept:'46-akceptuj.png',reject:'47-odrzuc-anuluj.png',back:'48-wroc.png',close:'49-zamknij.png',menu:'50-menu.png',search:'51-szukaj.png',filter:'52-filtr.png'
   };
 
+  // Wyjątki zaakceptowane przez użytkownika: menu oraz kafle narzędzi administratora.
+  // Pozostałe przyciski dostają Glass wyłącznie wtedy, gdy wcześniej miały ikonę.
   const explicit={
-    menuBtn:'menu',searchBtn:'search',plateCameraBtn:'plateCamera',cfRefreshBtn:'fleetUpdate',cfCompanyContextBtn:'companies',
-    btnMonth:'statistics',btnYear:'statistics',btnAll:'vehicle',financeBtn:'payments',statsBtn:'financialStats',exportPdfBtn:'pdf',fleetUpdateBtn:'fleetUpdate',
+    menuBtn:'menu',plateCameraBtn:'plateCamera',financeBtn:'payments',statsBtn:'financialStats',exportPdfBtn:'pdf',fleetUpdateBtn:'fleetUpdate',
     exportExcelBtn:'backup',importBtn:'restore',cfNotificationsBtn:'notifications',cfChangeNotificationsBtn:'changes',cfCompaniesBtn:'companies',cfEmployeesBtn:'employees',
-    cfHeaderChangeNotificationsBtn:'changes',btnBottomMenu:'menu',menuClose:'close',closeBottomMenu:'close',cfCompanyUsersCard:'employees',
+    cfCompanyUsersCard:'employees',
     cfCompanyPurchasesCard:'purchases',cfCompanyEarningsCard:'earnings',cfCompanyRemindersCard:'reminders',cfCompanyReportsCard:'reports',
-    cfCompanyStatisticsCard:'statistics',cfCompanyAddCard:'addCompany',cfChatFab:'mainChat',cfChatClose:'close',cfChatSend:'send',
-    cfChatAttachmentClear:'close',cfProfileAdd:'addWash',cfProfileEdit:'editVehicle',cfProfilePdf:'pdf',cfProfileHistory:'history',
-    addWashBtn:'addWash',deleteVehicleBtn:'deleteVehicle',cfVehicleBack:'back',cfHistoryBackBtn:'back',cfVehicleEditBackBtn:'back',
-    cfInlineAcceptSchedule:'accept',cfInlineCounterSchedule:'calendar',cfInlineRejectSchedule:'reject',cfInlineEmployeeConfirmSchedule:'accept',
-    cfInlineEmployeeRejectSchedule:'reject',cfAdminConfirmedDateBtn:'scheduled',cfApproveRequest:'accept',cfRejectRequest:'reject',cfBackRequest:'back',
-    cfBackSchedule:'back',cfBackCompleted:'back',cfOpenEmployeesFromNotification:'employees',cfBackEmployeeRegistered:'back',
-    cfReportPdfBtn:'pdf',cfReportXlsBtn:'xlsx',cfReportPreviewBack:'back',cfReportPreviewDownload:'reportDocument',chooseInvoiceBtn:'attachment',
-    continueInvoiceBtn:'reportDocument',pdfGenerateBtn:'reportDocument',pdfDownloadBtn:'pdf',pdfMailBtn:'send',pdfBackBtn:'back',
-    openMailShare:'send',downloadInvoiceAttachmentBtn:'attachment',deleteInvoiceBtn:'remove',backFinanceBtn:'back',downloadInvoicePdfFromPreview:'pdf',
-    closeInvoicePdfPreviewBtn:'close',confirmCancel:'reject',confirmOk:'accept',cfBulkAddWash:'addWash',cfBulkDatesCancel:'reject',cfBulkDatesConfirm:'addWash'
+    cfCompanyStatisticsCard:'statistics',cfCompanyAddCard:'addCompany',cfChatFab:'mainChat'
   };
 
   const selectorRules=[
-    ['[data-company-edit],.cf-company-card-edit','edit'],['[data-edit-history-id]','edit'],['[data-delete-history-id]','remove'],
-    ['[data-employee-delete],[data-employee-delete-global]','remove'],['[data-cf-delete-note]','remove'],['[data-cf-photos][data-local-has="1"]','localPhotos'],['[data-cf-photos]','photos'],
-    ['[data-record-chat]','entryChat'],['[data-invoice-attachment]','attachment'],['[data-reminder-done],[data-reminder-paid]','accept'],
-    ['.cf-modal-back-btn,.cf-native-back-action','back'],['.cf-modal-close-btn,.close,.cf-cal-close','close'],['.history-button[data-history-plate]','history'],
-    ['.cf-company-card[data-company-id]','companies']
+    ['[data-cf-photos][data-local-has="1"]','localPhotos'],['[data-cf-photos]','photos']
   ];
 
   const leadingGlyph=/^\s*(?:(?:[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}](?:\uFE0F|\u200D[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}])*)|[←→↻×✕✓✔✎➤☰⠿+])\s*/u;
@@ -56,6 +44,14 @@
   }
   function textFor(el){
     return normalize([el?.textContent,el?.getAttribute?.('aria-label'),el?.getAttribute?.('title')].filter(Boolean).join(' '));
+  }
+  function hadVisualIcon(el){
+    if(!el)return false;
+    if(el.querySelector?.(':scope > svg,:scope > [aria-hidden="true"],:scope > .cf-bell-icon'))return true;
+    return leadingGlyph.test(el.textContent||'');
+  }
+  function excluded(el){
+    return !!el?.matches?.('#cfHeaderChangeNotificationsBtn,[data-record-chat],.history-button[data-history-plate],#cfProfileHistory,#btnMonth,#btnYear,#btnAll,#btnBottomMenu,[data-bottom-action],.attention-card,.cf-company-card[data-company-id],#cfCompanyCalendarCard,#cfCalendarTile,#searchBtn,#cfCompanySearchBtn');
   }
   function stripLeading(host){
     if(!host)return;
@@ -171,24 +167,21 @@
     if(root?.matches?.('button,[role="button"]'))nodes.push(root);
     root?.querySelectorAll?.('button,[role="button"]').forEach(x=>nodes.push(x));
     nodes.forEach(el=>{
-      if(weather(el)||el.classList.contains('cf-grid-drag-handle'))return;
+      if(weather(el)||excluded(el)||el.classList.contains('cf-grid-drag-handle'))return;
       let key=explicit[el.id]||null;
       if(!key){for(const [selector,value] of selectorRules){if(el.matches(selector)){key=value;break;}}}
+      if(!key&&!hadVisualIcon(el))return;
       key=dynamicExplicit(el,key)||keyFromText(el);
       if(key)decorate(el,key,sizeFor(el,key));
     });
   }
   function decorateSpecial(root){
     const query=(selector)=>{const out=[];if(root?.matches?.(selector))out.push(root);root?.querySelectorAll?.(selector).forEach(x=>out.push(x));return out;};
-    query('.cf-search-input-wrap').forEach(el=>decorate(el,'vehicleSearch','medium'));
     query('.main-filters').forEach(el=>decorate(el,'filter','compact'));
-    query('.cf-profile-identity').forEach(el=>decorate(el,'vehicle','medium'));
-    query('.cf-vehicle-history-title').forEach(el=>decorate(el,'history','heading'));
-    query('.record-meta strong,.history-status-pill,.cf-reminder-when').forEach(el=>{const key=keyFromText(el);if(key){decorate(el,key,'compact');el.classList.add('cf-glass-status');}});
-    query('#reportOverlay h2,.overlay .sheet h2,.cf-chat-head>span').forEach(el=>{const key=keyFromText(el);if(key){decorate(el,key,'heading');el.classList.add('cf-glass-heading');}});
-    query('.finance-card').forEach(el=>{const label=normalize(el.querySelector('.finance-card-label')?.textContent);const key=/dostawc/.test(label)?'van':/ciężar|ciezar/.test(label)?'truck':/autokar|bus/.test(label)?'coach':null;if(key)decorate(el,key,'heading');});
-    query('.cf-change-notification-main strong').forEach(el=>{const key=keyFromText(el);if(key){decorate(el,key,'compact');el.classList.add('cf-glass-status');}});
+    query('.record-meta strong,.history-status-pill').forEach(el=>{const key=keyFromText(el);if(['awaiting','scheduled','expired'].includes(key)){decorate(el,key,'compact');el.classList.add('cf-glass-status');}});
+    query('.cf-chat-head>span').forEach(el=>{if(hadVisualIcon(el)){decorate(el,'mainChat','heading');el.classList.add('cf-glass-heading');}});
     query('#cfChatAttachmentText,.cf-chat-vehicle').forEach(el=>decorate(el,'vehicleMessage','compact'));
+    query('[data-record-chat]').forEach(el=>stripLeading(el));
   }
   function scan(root=document){
     if(applying)return;applying=true;

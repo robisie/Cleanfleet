@@ -1,4 +1,4 @@
-// CleanFleet v1.30.56 — complete 3D Glass icon layer.
+// CleanFleet v1.30.57 — selective 3D Glass icon refinement.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -67,13 +67,13 @@ self.addEventListener('fetch', event => {
     let html = await response.text();
 
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.56');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.57');
 
     if (!html.includes('/app/glass-icons.css')) {
-      html = html.replace('</head>', '<link rel="stylesheet" href="/app/glass-icons.css?v=13056">\n</head>');
+      html = html.replace('</head>', '<link rel="stylesheet" href="/app/glass-icons.css?v=13057">\n</head>');
     }
     if (!html.includes('/app/glass-icons.js')) {
-      html = html.replace('</body>', '<script src="/app/glass-icons.js?v=13056"><\/script>\n</body>');
+      html = html.replace('</body>', '<script src="/app/glass-icons.js?v=13057"><\/script>\n</body>');
     }
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
@@ -259,5 +259,4 @@ self.addEventListener('notificationclick', event => {
     if (self.clients.openWindow) await self.clients.openWindow(targetUrl.href);
   })());
 });
-
 

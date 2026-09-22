@@ -1,4 +1,4 @@
-/* CleanFleet v1.30.60 — selektywna warstwa ikon 3D Glass. */
+/* CleanFleet v1.30.61 — selektywna warstwa ikon 3D Glass. */
 .cf-glass-icon{
   display:inline-block;
   width:24px;
@@ -81,6 +81,10 @@ button.cf-has-glass-icon,
 /* Menu otwiera się po prawej, a jego treść jest wyrównana do lewej. */
 .menu-drawer{left:auto!important;right:0!important;transform:translateX(100%)!important;box-shadow:-8px 0 24px rgba(22,21,15,.15)!important;}
 .menu-overlay.open .menu-drawer{transform:translateX(0)!important;}
+.menu-drawer .menu-item.cf-has-glass-icon{
+  align-items:stretch!important;
+  justify-content:flex-start!important;
+}
 .menu-drawer .menu-item,.menu-drawer .menu-item-title,.menu-drawer .menu-item-sub{text-align:left!important;}
 .menu-drawer .menu-item-title{justify-content:flex-start!important;width:100%;}
 .menu-drawer .menu-item-title.cf-glass-icon-host + .menu-item-sub{margin-left:39px!important;}

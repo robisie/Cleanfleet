@@ -106,7 +106,7 @@
 
   function defaultSpan(el){
     const id=el?.id||'';
-    if(id==='cfCompanyWeatherCard')return{w:2,h:1};
+    if(id==='cfCompanyWeatherCard')return{w:2,h:columns()===2?2:1};
     if(el?.dataset?.companyId)return{w:2,h:1};
     return{w:1,h:1};
   }

@@ -51,6 +51,7 @@
     .day .rain{grid-area:rain;text-align:right;margin:2px 0 0;font-size:9px;white-space:nowrap}
     .day .conf{display:none}
     .forecast-hourly .hourly{display:flex;flex-direction:column;gap:8px;max-height:860px;overflow-x:hidden;overflow-y:auto;padding:0 5px 0 0;cursor:grab;scrollbar-width:thin}
+    .forecast-hourly .hourly::after{content:'';display:block;flex:0 0 calc(100% - 58px)}
     .forecast-hourly .hourly.dragging{cursor:grabbing}
     .forecast-hourly .hour{display:grid;grid-template-columns:42px 32px 42px minmax(76px,1fr) minmax(72px,1fr) 50px;grid-template-areas:"time ico temp wet wind humidity";align-items:center;gap:5px;min-width:0;padding:9px 8px;text-align:left}
     .forecast-hourly .hour .time{grid-area:time;font-size:11px}
@@ -158,7 +159,7 @@
     const current=hourly.querySelector('[data-current-hour="1"]');
     if(window.matchMedia('(min-width:901px)').matches){
       hourly.style.paddingRight='5px';
-      hourly.style.paddingBottom=current?`${Math.max(0,hourly.clientHeight-current.offsetHeight-8)}px`:'0px';
+      hourly.style.paddingBottom='0px';
       hourly.scrollLeft=0;
       hourly.scrollTop=current?Math.max(0,current.offsetTop-hourly.offsetTop):0;
       return;

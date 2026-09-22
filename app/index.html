@@ -13372,33 +13372,49 @@ function uid(){
       let saving=false;
       const addBtn=document.getElementById('cfVehicleCreateBtn');
       const addWashBtn=document.getElementById('cfVehicleCreateWashBtn');
-      const setSaving=on=>{
+      const setSaving=(on,action='')=>{
         saving=on;
-        if(addBtn){addBtn.disabled=on;addBtn.textContent=on?'ZAPISUJĘ…':'DODAJ POJAZD';}
-        if(addWashBtn){addWashBtn.disabled=on;addWashBtn.textContent=on?'ZAPISUJĘ…':'DODAJ PRANIE';}
+        if(addBtn){
+          addBtn.disabled=on;
+          addBtn.textContent=on&&action==='vehicle'?'ZAPISUJĘ…':'DODAJ POJAZD';
+        }
+        if(addWashBtn){
+          addWashBtn.disabled=on;
+          addWashBtn.textContent=on&&action==='wash'?'ZAPISUJĘ…':'DODAJ PRANIE';
+        }
+      };
+      const runVehicleRequest=async makeRequest=>{
+        const controller=new AbortController();
+        const timer=setTimeout(()=>controller.abort(),15000);
+        try{
+          return await makeRequest(controller.signal);
+        }catch(error){
+          if(error?.name==='AbortError'){
+            throw new Error('Przekroczono czas zapisu. Sprawdź połączenie i spróbuj ponownie.');
+          }
+          throw error;
+        }finally{
+          clearTimeout(timer);
+        }
       };
       const createVehicle=async openWash=>{
         if(saving)return;
         const data=readVehicleForm();
         if(!data)return;
-        setSaving(true);
+        setSaving(true,openWash?'wash':'vehicle');
         try{
-          const {data:existing,error:checkError}=await cfSupabase
-            .from('vehicles')
-            .select('plate')
-            .eq('plate',data.newPlate)
-            .limit(1);
-          if(checkError)throw checkError;
-          if(registry[data.newPlate] || (existing&&existing.length)){
+          if(registry[data.newPlate] || cfRemoteVehiclePlates.has(data.newPlate)){
             const duplicateError=new Error(`Pojazd ${data.newPlate} już istnieje w bazie.`);
             duplicateError.code='CF_DUPLICATE_VEHICLE';
             throw duplicateError;
           }
   
-          const {error}=await cfSupabase.from('vehicles').insert({
-            ...data.payload,
-            company_id:cfActiveCompanyId
-          });
+          // Jedno żądanie zapisu. Limit czasu zapobiega pozostaniu przycisku
+          // w stanie „Zapisuję…” przy zerwanym połączeniu Safari/iPadOS.
+          const {error}=await runVehicleRequest(signal=>cfSupabase
+            .from('vehicles')
+            .insert({...data.payload,company_id:cfActiveCompanyId})
+            .abortSignal(signal));
           if(error)throw error;
   
           applyVehicleLocally(data);
@@ -13417,7 +13433,9 @@ function uid(){
           setSaving(false);
         }
       };
+      // „Dodaj pojazd” zapisuje wyłącznie pojazd.
       addBtn?.addEventListener('click',()=>createVehicle(false));
+      // „Dodaj pranie” zapisuje pojazd, a następnie otwiera formularz prania.
       addWashBtn?.addEventListener('click',()=>createVehicle(true));
       return;
     }
@@ -15676,8 +15694,6 @@ cfEntryOpisObserver.observe(document.body,{childList:true,subtree:true});
 <script src="/app/photo-camera-v1213.js?v=20260919-13032"></script>
 </body>
 </html>
-
-
 
 
 

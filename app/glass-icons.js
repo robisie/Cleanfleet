@@ -1,4 +1,4 @@
-/* CleanFleet v1.30.57 — selektywna, niedestrukcyjna warstwa ikon 3D Glass. */
+/* CleanFleet v1.30.58 — selektywna, niedestrukcyjna warstwa ikon 3D Glass. */
 (()=>{
   'use strict';
 
@@ -25,7 +25,7 @@
     exportExcelBtn:'backup',importBtn:'restore',cfNotificationsBtn:'notifications',cfChangeNotificationsBtn:'changes',cfCompaniesBtn:'companies',cfEmployeesBtn:'employees',
     cfCompanyUsersCard:'employees',
     cfCompanyPurchasesCard:'purchases',cfCompanyEarningsCard:'earnings',cfCompanyRemindersCard:'reminders',cfCompanyReportsCard:'reports',
-    cfCompanyStatisticsCard:'statistics',cfCompanyAddCard:'addCompany',cfChatFab:'mainChat'
+    cfCompanyStatisticsCard:'statistics',cfCompanyAddCard:'addCompany',cfCompanyTaxesCard:'payments',cfChatFab:'mainChat'
   };
 
   const selectorRules=[
@@ -51,7 +51,7 @@
     return leadingGlyph.test(el.textContent||'');
   }
   function excluded(el){
-    return !!el?.matches?.('#cfHeaderChangeNotificationsBtn,[data-record-chat],.history-button[data-history-plate],#cfProfileHistory,#btnMonth,#btnYear,#btnAll,#btnBottomMenu,[data-bottom-action],.attention-card,.cf-company-card[data-company-id],#cfCompanyCalendarCard,#cfCalendarTile,#searchBtn,#cfCompanySearchBtn');
+    return !!el?.matches?.('#cfHeaderChangeNotificationsBtn,[data-record-chat],.history-button[data-history-plate],#cfProfileHistory,#btnMonth,#btnYear,#btnAll,#btnBottomMenu,[data-bottom-action],.attention-card,.cf-company-card[data-company-id],#cfCompanyCalendarCard,#cfCalendarTile,#searchBtn,#cfCompanySearchBtn,.cf-modal-back-btn,.cf-native-back-action,button[id^="cfBack"],button[id$="BackBtn"],.cf-company-card-edit,#cfReminderAddBtn,#cfReports button');
   }
   function stripLeading(host){
     if(!host)return;
@@ -66,6 +66,19 @@
         else break;
       }
     }
+  }
+  function plainTextAction(el){
+    const visible=normalize(el?.textContent);
+    return /(?:^|\s)(?:edytuj|usuń)(?:\s|$)/.test(visible)
+      || el?.id==='cfReminderAddBtn'
+      || !!el?.matches?.('#cfReports [data-action="add-filter"],#cfReports [data-action="add-group"]');
+  }
+  function clearGlass(el){
+    const host=hostFor(el);
+    host?.querySelector?.(':scope > .cf-glass-icon')?.remove();
+    host?.classList?.remove('cf-glass-icon-host');
+    el?.classList?.remove('cf-has-glass-icon');
+    if(el?.dataset)delete el.dataset.cfGlassIcon;
   }
   function createIcon(key,size='compact'){
     const file=FILES[key];if(!file)return null;
@@ -167,6 +180,7 @@
     if(root?.matches?.('button,[role="button"]'))nodes.push(root);
     root?.querySelectorAll?.('button,[role="button"]').forEach(x=>nodes.push(x));
     nodes.forEach(el=>{
+      if(plainTextAction(el)){clearGlass(el);el.classList.add('cf-text-only-action');stripLeading(el);return;}
       if(weather(el)||excluded(el)||el.classList.contains('cf-grid-drag-handle'))return;
       let key=explicit[el.id]||null;
       if(!key){for(const [selector,value] of selectorRules){if(el.matches(selector)){key=value;break;}}}

@@ -24,7 +24,7 @@
   .day{min-width:105px;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:16px;padding:12px 10px;text-align:center;cursor:pointer;transition:.18s transform,.18s border-color,.18s background}.day:hover{transform:translateY(-2px)}.day.active{border-color:var(--green);background:#1a2820}.day .dow{font-size:11px;color:var(--muted);font-weight:800}.day .date{font-size:10px;color:#748178;margin-top:3px}.day .ico{font-size:28px;margin:8px 0}.day .temps{font-size:14px;font-weight:900}.day .temps span{color:var(--muted);font-weight:700}.day .rain{font-size:10px;color:var(--blue);margin-top:5px}.day .conf{margin-top:7px;font-size:9px;color:var(--muted)}
   .section{margin-top:16px;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px}.section h2{font-size:15px;margin:0 0 14px}.section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.section-head h2{margin:0}.work-pill{border-radius:999px;padding:7px 11px;font-size:11px;font-weight:900;background:#213226;color:#9fe0b4;border:1px solid #31523c}
   .metrics{display:grid;grid-template-columns:repeat(8,minmax(110px,1fr));gap:10px}.metric{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:12px}.metric span{display:block;font-size:10px;color:var(--muted);margin-bottom:5px}.metric strong{font-size:17px}
-  .hourly{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(88px,1fr);gap:8px;overflow-x:auto;padding-bottom:8px}.hour{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:10px;text-align:center}.hour .time{font-size:10px;color:var(--muted);font-weight:800}.hour .ico{font-size:23px;margin:5px 0}.hour .temp{font-size:14px;font-weight:900}.hour .small{font-size:9px;color:var(--muted);margin-top:4px}.hour .wet{color:var(--blue)}
+  .hourly{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(88px,1fr);gap:8px;overflow-x:auto;padding-bottom:8px;cursor:grab;scrollbar-width:thin;overscroll-behavior-x:contain}.hourly.dragging{cursor:grabbing;user-select:none}.hour{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:10px;text-align:center}.hour.current{border-color:#72d393;background:#23382b;box-shadow:0 0 0 2px rgba(72,168,104,.34)}.hour.current .time{color:#b7f2c9}.hour .time{font-size:10px;color:var(--muted);font-weight:800}.hour .ico{font-size:23px;margin:5px 0}.hour .temp{font-size:14px;font-weight:900}.hour .small{font-size:9px;color:var(--muted);margin-top:4px}.hour .wet{color:var(--blue)}
   .models{display:grid;grid-template-columns:repeat(4,minmax(160px,1fr));gap:10px}.model{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:12px}.model h3{font-size:12px;margin:0 0 8px}.model-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}.model-grid div{font-size:10px;color:var(--muted)}.model-grid strong{display:block;color:var(--text);font-size:12px;margin-top:2px}
   .loading,.error{min-height:70vh;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);font-weight:700}.error{color:#ef9b9b}
   .hidden{display:none!important}
@@ -94,6 +94,27 @@
   const fmtDate=s=>new Date(s+'T12:00:00').toLocaleDateString('pl-PL',{weekday:'long',day:'2-digit',month:'long'});
   const shortDate=s=>new Date(s+'T12:00:00').toLocaleDateString('pl-PL',{weekday:'short',day:'2-digit',month:'2-digit'});
   const n=(v,s='')=>v==null?'—':`${v}${s}`;
+  function warsawNow(){
+    const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Warsaw',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).formatToParts(new Date()).filter(p=>p.type!=='literal').map(p=>[p.type,p.value]));
+    return {date:`${parts.year}-${parts.month}-${parts.day}`,hour:Number(parts.hour)};
+  }
+
+  const hourly=$('hourly');
+  let hourlyDrag=false,hourlyMoved=false,hourlyStartX=0,hourlyStartScroll=0;
+  hourly.addEventListener('pointerdown',e=>{
+    if(e.pointerType!=='mouse'||e.button!==0)return;
+    hourlyDrag=true;hourlyMoved=false;hourlyStartX=e.clientX;hourlyStartScroll=hourly.scrollLeft;
+    hourly.classList.add('dragging');hourly.setPointerCapture?.(e.pointerId);
+  });
+  hourly.addEventListener('pointermove',e=>{
+    if(!hourlyDrag)return;
+    const delta=e.clientX-hourlyStartX;
+    if(Math.abs(delta)>3)hourlyMoved=true;
+    if(hourlyMoved){e.preventDefault();hourly.scrollLeft=hourlyStartScroll-delta;}
+  });
+  const stopHourlyDrag=()=>{hourlyDrag=false;hourly.classList.remove('dragging');};
+  hourly.addEventListener('pointerup',stopHourlyDrag);
+  hourly.addEventListener('pointercancel',stopHourlyDrag);
 
   function heroLabel(d){
     if((d.gust||0)>=55)return'Wietrznie / trudniejsze warunki';
@@ -129,8 +150,12 @@
       ['Opady',n(d.rain,' mm')],['Ryzyko opadów',n(d.pop,'%')],['Wiatr',n(d.wind,' km/h')],['Porywy',n(d.gust,' km/h')]
     ].map(([a,b])=>`<div class="metric"><span>${a}</span><strong>${b}</strong></div>`).join('');
 
-    const hours=forecast.hourly(d.date);
-    $('hourly').innerHTML=hours.map(h=>`<div class="hour"><div class="time">${h.hour}</div><div class="ico">${h.icon}</div><div class="temp">${n(h.temp,'°')}</div><div class="small wet">${n(h.pop,'%')} · ${n(h.rain,' mm')}</div><div class="small">💨 ${n(h.wind,' km/h')}</div><div class="small">💧 ${n(h.humidity,'%')}</div></div>`).join('')||'<div class="hour">Brak danych godzinowych</div>';
+    const hours=forecast.hourly(d.date),now=warsawNow(),isToday=d.date===now.date;
+    hourly.innerHTML=hours.map(h=>{const current=isToday&&Number.parseInt(h.hour,10)===now.hour;return`<div class="hour${current?' current':''}"${current?' data-current-hour="1" aria-current="time"':''}><div class="time">${h.hour}</div><div class="ico">${h.icon}</div><div class="temp">${n(h.temp,'°')}</div><div class="small wet">${n(h.pop,'%')} · ${n(h.rain,' mm')}</div><div class="small">💨 ${n(h.wind,' km/h')}</div><div class="small">💧 ${n(h.humidity,'%')}</div></div>`;}).join('')||'<div class="hour">Brak danych godzinowych</div>';
+    requestAnimationFrame(()=>{
+      const current=hourly.querySelector('[data-current-hour="1"]');
+      hourly.scrollLeft=current?Math.max(0,current.offsetLeft-hourly.offsetLeft):0;
+    });
 
     $('models').innerHTML=d.models.map(m=>`<div class="model"><h3>${m.model.label}</h3><div class="model-grid"><div>Max<strong>${n(m.tmax,'°C')}</strong></div><div>Min<strong>${n(m.tmin,'°C')}</strong></div><div>Opady<strong>${n(m.rain,' mm')}</strong></div><div>Ryzyko<strong>${n(m.pop,'%')}</strong></div><div>Wiatr<strong>${n(m.wind,' km/h')}</strong></div><div>Porywy<strong>${n(m.gust,' km/h')}</strong></div></div></div>`).join('');
 

@@ -1,4 +1,4 @@
-/* CleanFleet v1.30.57 — selektywna warstwa ikon 3D Glass. */
+/* CleanFleet v1.30.58 — selektywna warstwa ikon 3D Glass. */
 .cf-glass-icon{
   display:inline-block;
   width:24px;
@@ -30,6 +30,7 @@ button.cf-has-glass-icon,
 .menu-item-title.cf-glass-icon-host{display:flex;align-items:center;gap:9px;}
 .menu-item-title>.cf-glass-icon{width:30px;height:30px;flex-basis:30px;}
 .cf-legacy-icon-hidden{display:none!important;}
+.cf-text-only-action>svg,.cf-text-only-action>[aria-hidden="true"]{display:none!important;}
 .cf-has-glass-icon>svg{display:none!important;}
 .cf-has-glass-icon[data-cf-photos]::after{content:none!important;display:none!important;}
 
@@ -64,17 +65,24 @@ button.cf-has-glass-icon,
 .cf-chat-send.cf-has-glass-icon{
   gap:0;
 }
-#plateCameraBtn>.cf-glass-icon{width:36px;height:36px;flex-basis:36px;}
-.cf-record-photo-btn>.cf-glass-icon{width:30px;height:30px;flex-basis:30px;}
-#menuBtn.cf-has-glass-icon{width:44px!important;height:44px!important;min-width:44px!important;padding:4px!important;}
-#menuBtn>.cf-glass-icon{width:34px;height:34px;flex-basis:34px;}
-#cfChatFab.cf-has-glass-icon{display:flex;align-items:center;justify-content:center;}
-#cfChatFab>.cf-glass-icon{width:50px;height:50px;flex-basis:50px;transform:translateY(-2px);}
+#plateCameraBtn.cf-has-glass-icon{width:52px!important;height:52px!important;min-width:52px!important;min-height:52px!important;padding:0!important;}
+.cf-record-photo-btn.cf-has-glass-icon{width:46px!important;height:46px!important;min-width:46px!important;min-height:46px!important;padding:0!important;}
+#plateCameraBtn>.cf-glass-icon{width:42px;height:42px;flex-basis:42px;}
+.cf-record-photo-btn>.cf-glass-icon{width:38px;height:38px;flex-basis:38px;}
+#menuBtn.cf-has-glass-icon{width:50px!important;height:50px!important;min-width:50px!important;padding:3px!important;}
+#menuBtn>.cf-glass-icon{width:42px;height:42px;flex-basis:42px;}
+#cfChatFab.cf-has-glass-icon{display:flex;align-items:center;justify-content:center;width:62px!important;height:62px!important;min-width:62px!important;padding:0!important;background:#fff!important;}
+#cfChatFab>.cf-glass-icon{width:56px;height:56px;flex-basis:56px;transform:none;}
 #cfChatBadge{position:absolute;}
+#cfChatSend.cf-has-glass-icon{background:#fff!important;color:#198754!important;border:1px solid #d7ddd8!important;padding:0!important;}
+#cfChatSend>.cf-glass-icon{width:34px;height:34px;flex-basis:34px;}
+.cf-company-card-edit{font-size:24px!important;}
 
-/* Menu główne zawsze otwiera się i wyrównuje od lewej krawędzi. */
-.menu-drawer{left:0!important;right:auto!important;transform:translateX(-100%)!important;box-shadow:8px 0 24px rgba(22,21,15,.15)!important;}
+/* Menu otwiera się po prawej, a jego treść jest wyrównana do lewej. */
+.menu-drawer{left:auto!important;right:0!important;transform:translateX(100%)!important;box-shadow:-8px 0 24px rgba(22,21,15,.15)!important;}
 .menu-overlay.open .menu-drawer{transform:translateX(0)!important;}
+.menu-drawer .menu-item,.menu-drawer .menu-item-title,.menu-drawer .menu-item-sub{text-align:left!important;}
+.menu-drawer .menu-item-title{justify-content:flex-start!important;width:100%;}
 
 @media(max-width:620px){
   .main-filters>.cf-glass-icon{display:none!important;}
@@ -85,9 +93,13 @@ button.cf-has-glass-icon,
   .menu-item-title>.cf-glass-icon{width:27px;height:27px;flex-basis:27px;}
   .cf-glass-icon--heading{width:30px;height:30px;flex-basis:30px;}
   .cf-profile-identity>.cf-glass-icon{width:38px;height:38px;flex-basis:38px;}
-  #menuBtn.cf-has-glass-icon{width:42px!important;height:42px!important;min-width:42px!important;}
-  #menuBtn>.cf-glass-icon{width:32px;height:32px;flex-basis:32px;}
-  #plateCameraBtn>.cf-glass-icon{width:34px;height:34px;flex-basis:34px;}
+  #menuBtn.cf-has-glass-icon{width:46px!important;height:46px!important;min-width:46px!important;}
+  #menuBtn>.cf-glass-icon{width:38px;height:38px;flex-basis:38px;}
+  #plateCameraBtn>.cf-glass-icon{width:40px;height:40px;flex-basis:40px;}
+  #plateCameraBtn.cf-has-glass-icon{width:50px!important;height:50px!important;min-width:50px!important;min-height:50px!important;}
+  .cf-record-photo-btn.cf-has-glass-icon{width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;}
+  #cfChatFab.cf-has-glass-icon{width:58px!important;height:58px!important;min-width:58px!important;}
+  #cfChatFab>.cf-glass-icon{width:52px;height:52px;flex-basis:52px;}
 }
 
 @media(max-width:359px){

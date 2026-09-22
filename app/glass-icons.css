@@ -1,0 +1,98 @@
+/* CleanFleet v1.30.56 — wspólna warstwa ikon 3D Glass. */
+.cf-glass-icon{
+  display:inline-block;
+  width:24px;
+  height:24px;
+  flex:0 0 24px;
+  object-fit:contain;
+  object-position:center;
+  vertical-align:middle;
+  pointer-events:none;
+  user-select:none;
+  -webkit-user-drag:none;
+}
+.cf-glass-icon-host{
+  min-width:0;
+}
+button.cf-has-glass-icon,
+.cf-glass-icon-host:not(.menu-item-title):not(.cf-search-input-wrap):not(.main-filters){
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+}
+.cf-glass-icon--compact{width:20px;height:20px;flex-basis:20px;}
+.cf-glass-icon--medium{width:28px;height:28px;flex-basis:28px;}
+.cf-glass-icon--heading{width:34px;height:34px;flex-basis:34px;}
+.cf-glass-icon--tile{width:52px;height:52px;flex-basis:52px;}
+.cf-glass-icon--fab{width:42px;height:42px;flex-basis:42px;}
+
+.menu-item-title.cf-glass-icon-host{display:flex;align-items:center;gap:9px;}
+.menu-item-title>.cf-glass-icon{width:30px;height:30px;flex-basis:30px;}
+.cf-legacy-icon-hidden{display:none!important;}
+.cf-has-glass-icon>svg{display:none!important;}
+.cf-has-glass-icon[data-cf-photos]::after{content:none!important;display:none!important;}
+
+.cf-company-utility-card.cf-has-glass-icon{
+  flex-direction:column;
+  justify-content:center;
+  gap:2px;
+  text-align:center;
+}
+.cf-company-utility-card>.cf-glass-icon{margin:-4px auto 1px;}
+.cf-company-utility-card>div{min-width:0;}
+
+.cf-search-input-wrap{position:relative;}
+.cf-search-input-wrap>.cf-glass-icon{
+  position:absolute;
+  z-index:2;
+  left:10px;
+  top:50%;
+  width:25px;
+  height:25px;
+  transform:translateY(-50%);
+}
+.cf-search-input-wrap.cf-glass-icon-host>input{padding-left:42px!important;}
+.main-filters>.cf-glass-icon{width:24px;height:24px;flex-basis:24px;}
+
+.cf-glass-status{display:inline-flex!important;align-items:center;gap:5px;}
+.cf-glass-heading{display:flex!important;align-items:center;gap:8px;}
+.cf-glass-heading>.cf-glass-icon{margin:-4px 0;}
+.cf-profile-identity.cf-glass-icon-host{display:flex;align-items:center;gap:9px;}
+.cf-profile-identity>.cf-glass-icon{width:44px;height:44px;flex:0 0 44px;}
+.finance-card.cf-has-glass-icon{flex-direction:column;gap:2px;}
+.finance-card>.cf-glass-icon{width:34px;height:34px;flex-basis:34px;}
+
+#plateCameraBtn.cf-has-glass-icon,
+.history-edit-btn.cf-has-glass-icon,
+.history-delete-btn.cf-has-glass-icon,
+.cf-record-photo-btn.cf-has-glass-icon,
+.cf-modal-back-btn.cf-has-glass-icon,
+.cf-native-back-action.cf-has-glass-icon,
+.cf-modal-close-btn.cf-has-glass-icon,
+.close.cf-has-glass-icon,
+.cf-chat-close.cf-has-glass-icon,
+.cf-chat-send.cf-has-glass-icon{
+  gap:0;
+}
+#plateCameraBtn>.cf-glass-icon{width:30px;height:30px;flex-basis:30px;}
+#cfChatFab.cf-has-glass-icon{display:flex;align-items:center;justify-content:center;}
+#cfChatFab>.cf-glass-icon{width:44px;height:44px;flex-basis:44px;}
+#cfChatBadge{position:absolute;}
+
+@media(max-width:620px){
+  .cf-glass-icon--tile{width:42px;height:42px;flex-basis:42px;}
+  .cf-company-utility-card>.cf-glass-icon{margin:-2px auto 0;}
+  .cf-company-utility-card strong{line-height:1.05!important;}
+  .cf-company-utility-card span{line-height:1.15!important;}
+  .menu-item-title>.cf-glass-icon{width:27px;height:27px;flex-basis:27px;}
+  .cf-glass-icon--heading{width:30px;height:30px;flex-basis:30px;}
+  .cf-profile-identity>.cf-glass-icon{width:38px;height:38px;flex-basis:38px;}
+}
+
+@media(max-width:359px){
+  .cf-glass-icon{width:21px;height:21px;flex-basis:21px;}
+  .cf-glass-icon--tile{width:38px;height:38px;flex-basis:38px;}
+  .cf-search-input-wrap>.cf-glass-icon{width:22px;height:22px;}
+  .cf-search-input-wrap.cf-glass-icon-host>input{padding-left:38px!important;}
+}

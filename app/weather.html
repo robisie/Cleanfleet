@@ -101,6 +101,11 @@
 
   const hourly=$('hourly');
   let hourlyDrag=false,hourlyMoved=false,hourlyStartX=0,hourlyStartScroll=0;
+  function alignCurrentHour(){
+    const current=hourly.querySelector('[data-current-hour="1"]');
+    hourly.style.paddingRight=current?`${Math.max(0,hourly.clientWidth-current.offsetWidth-8)}px`:'0px';
+    hourly.scrollLeft=current?Math.max(0,current.offsetLeft-hourly.offsetLeft):0;
+  }
   hourly.addEventListener('pointerdown',e=>{
     if(e.pointerType!=='mouse'||e.button!==0)return;
     hourlyDrag=true;hourlyMoved=false;hourlyStartX=e.clientX;hourlyStartScroll=hourly.scrollLeft;
@@ -115,6 +120,7 @@
   const stopHourlyDrag=()=>{hourlyDrag=false;hourly.classList.remove('dragging');};
   hourly.addEventListener('pointerup',stopHourlyDrag);
   hourly.addEventListener('pointercancel',stopHourlyDrag);
+  window.addEventListener('resize',()=>requestAnimationFrame(alignCurrentHour),{passive:true});
 
   function heroLabel(d){
     if((d.gust||0)>=55)return'Wietrznie / trudniejsze warunki';
@@ -152,10 +158,7 @@
 
     const hours=forecast.hourly(d.date),now=warsawNow(),isToday=d.date===now.date;
     hourly.innerHTML=hours.map(h=>{const current=isToday&&Number.parseInt(h.hour,10)===now.hour;return`<div class="hour${current?' current':''}"${current?' data-current-hour="1" aria-current="time"':''}><div class="time">${h.hour}</div><div class="ico">${h.icon}</div><div class="temp">${n(h.temp,'°')}</div><div class="small wet">${n(h.pop,'%')} · ${n(h.rain,' mm')}</div><div class="small">💨 ${n(h.wind,' km/h')}</div><div class="small">💧 ${n(h.humidity,'%')}</div></div>`;}).join('')||'<div class="hour">Brak danych godzinowych</div>';
-    requestAnimationFrame(()=>{
-      const current=hourly.querySelector('[data-current-hour="1"]');
-      hourly.scrollLeft=current?Math.max(0,current.offsetLeft-hourly.offsetLeft):0;
-    });
+    requestAnimationFrame(alignCurrentHour);
 
     $('models').innerHTML=d.models.map(m=>`<div class="model"><h3>${m.model.label}</h3><div class="model-grid"><div>Max<strong>${n(m.tmax,'°C')}</strong></div><div>Min<strong>${n(m.tmin,'°C')}</strong></div><div>Opady<strong>${n(m.rain,' mm')}</strong></div><div>Ryzyko<strong>${n(m.pop,'%')}</strong></div><div>Wiatr<strong>${n(m.wind,' km/h')}</strong></div><div>Porywy<strong>${n(m.gust,' km/h')}</strong></div></div></div>`).join('');
 

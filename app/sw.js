@@ -1,4 +1,4 @@
-// CleanFleet v1.30.61 — menu alignment and mobile weather tile sizing.
+// CleanFleet v1.30.62 — stabilne odświeżanie sesji i status daty do ustalenia.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -67,15 +67,15 @@ self.addEventListener('fetch', event => {
     let html = await response.text();
 
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.61');
-    html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13061');
-    html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13061');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.62');
+    html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13062');
+    html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13062');
 
     if (!html.includes('/app/glass-icons.css')) {
-      html = html.replace('</head>', '<link rel="stylesheet" href="/app/glass-icons.css?v=13061">\n</head>');
+      html = html.replace('</head>', '<link rel="stylesheet" href="/app/glass-icons.css?v=13062">\n</head>');
     }
     if (!html.includes('/app/glass-icons.js')) {
-      html = html.replace('</body>', '<script src="/app/glass-icons.js?v=13061"><\/script>\n</body>');
+      html = html.replace('</body>', '<script src="/app/glass-icons.js?v=13062"><\/script>\n</body>');
     }
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
@@ -191,7 +191,7 @@ self.addEventListener('fetch', event => {
       '<script src="/app/operations-v1200.js?v=20260919-13032"></script>\n' +
       '<script src="/app/photo-local-v1240.js?v=20260919-13032"></script>\n' +
       '<script src="/app/photo-local-ui-v1232.js?v=20260919-13032"></script>\n' +
-      '<script src="/app/photo-camera-v1213.js?v=20260922-13061"></script>\n' +
+      '<script src="/app/photo-camera-v1213.js?v=20260922-13062"></script>\n' +
       '<script src="/app/completion-guard-v1236.js?v=20260916-4"></script>\n' +
       '<script src="/app/calendar-v1203.js?v=20260917-2"></script>\n' +
       '<script src="/app/ui-v1209.js?v=20260915-3"></script>\n' +
@@ -200,7 +200,7 @@ self.addEventListener('fetch', event => {
       '<script src="/app/reminder-form-v1251.js?v=20260917-3"></script>\n' +
       '<script src="/app/calendar-today-tile-v1262.js?v=20260917-5"></script>\n' +
       '<script src="/app/taxes-v1310.js?v=20260918-6"></script>\n' +
-      '<script src="/app/admin-dashboard-v1270.js?v=20260922-13061"></script>';
+      '<script src="/app/admin-dashboard-v1270.js?v=20260922-13062"></script>';
     if (html.includes('</body>')) html = html.replace('</body>', `${injectedScripts}\n</body>`);
     else html += injectedScripts;
 

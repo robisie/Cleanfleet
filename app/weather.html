@@ -158,10 +158,12 @@
     const current=hourly.querySelector('[data-current-hour="1"]');
     if(window.matchMedia('(min-width:901px)').matches){
       hourly.style.paddingRight='5px';
+      hourly.style.paddingBottom=current?`${Math.max(0,hourly.clientHeight-current.offsetHeight-8)}px`:'0px';
       hourly.scrollLeft=0;
       hourly.scrollTop=current?Math.max(0,current.offsetTop-hourly.offsetTop):0;
       return;
     }
+    hourly.style.paddingBottom='8px';
     hourly.style.paddingRight=current?`${Math.max(0,hourly.clientWidth-current.offsetWidth-8)}px`:'0px';
     hourly.scrollLeft=current?Math.max(0,current.offsetLeft-hourly.offsetLeft):0;
   }

@@ -1,4 +1,4 @@
-// CleanFleet v1.30.59 — selective 3D Glass icon and interface refinement.
+// CleanFleet v1.30.60 — vehicle creation reliability and interface refinement.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -67,15 +67,15 @@ self.addEventListener('fetch', event => {
     let html = await response.text();
 
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.59');
-    html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13059');
-    html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13059');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.60');
+    html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13060');
+    html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13060');
 
     if (!html.includes('/app/glass-icons.css')) {
-      html = html.replace('</head>', '<link rel="stylesheet" href="/app/glass-icons.css?v=13059">\n</head>');
+      html = html.replace('</head>', '<link rel="stylesheet" href="/app/glass-icons.css?v=13060">\n</head>');
     }
     if (!html.includes('/app/glass-icons.js')) {
-      html = html.replace('</body>', '<script src="/app/glass-icons.js?v=13059"><\/script>\n</body>');
+      html = html.replace('</body>', '<script src="/app/glass-icons.js?v=13060"><\/script>\n</body>');
     }
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
@@ -191,7 +191,7 @@ self.addEventListener('fetch', event => {
       '<script src="/app/operations-v1200.js?v=20260919-13032"></script>\n' +
       '<script src="/app/photo-local-v1240.js?v=20260919-13032"></script>\n' +
       '<script src="/app/photo-local-ui-v1232.js?v=20260919-13032"></script>\n' +
-      '<script src="/app/photo-camera-v1213.js?v=20260922-13059"></script>\n' +
+      '<script src="/app/photo-camera-v1213.js?v=20260922-13060"></script>\n' +
       '<script src="/app/completion-guard-v1236.js?v=20260916-4"></script>\n' +
       '<script src="/app/calendar-v1203.js?v=20260917-2"></script>\n' +
       '<script src="/app/ui-v1209.js?v=20260915-3"></script>\n' +

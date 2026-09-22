@@ -1,4 +1,4 @@
-/* CleanFleet v1.30.59 — selektywna warstwa ikon 3D Glass. */
+/* CleanFleet v1.30.60 — selektywna warstwa ikon 3D Glass. */
 .cf-glass-icon{
   display:inline-block;
   width:24px;
@@ -72,7 +72,7 @@ button.cf-has-glass-icon,
 #menuBtn.cf-has-glass-icon{width:50px!important;height:50px!important;min-width:50px!important;padding:3px!important;}
 #menuBtn>.cf-glass-icon{width:42px;height:42px;flex-basis:42px;}
 #cfChatFab.cf-has-glass-icon{display:flex;align-items:center;justify-content:center;width:62px!important;height:62px!important;min-width:62px!important;padding:0!important;background:#fff!important;}
-#cfChatFab>.cf-glass-icon{width:72px;height:72px;flex-basis:72px;max-width:none;transform:translateY(-2px);}
+#cfChatFab>.cf-glass-icon{width:72px;height:72px;flex-basis:72px;max-width:none;transform:translateY(-12px);}
 #cfChatBadge{position:absolute;}
 #cfChatSend.cf-has-glass-icon{background:#fff!important;color:#198754!important;border:1px solid #d7ddd8!important;padding:0!important;}
 #cfChatSend>.cf-glass-icon{width:34px;height:34px;flex-basis:34px;}

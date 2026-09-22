@@ -1,4 +1,4 @@
-// CleanFleet v1.30.55 — vehicle-from-search flow and report-card toggle fix.
+// CleanFleet v1.30.56 — complete 3D Glass icon layer.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -67,7 +67,14 @@ self.addEventListener('fetch', event => {
     let html = await response.text();
 
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.55');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.56');
+
+    if (!html.includes('/app/glass-icons.css')) {
+      html = html.replace('</head>', '<link rel="stylesheet" href="/app/glass-icons.css?v=13056">\n</head>');
+    }
+    if (!html.includes('/app/glass-icons.js')) {
+      html = html.replace('</body>', '<script src="/app/glass-icons.js?v=13056"><\/script>\n</body>');
+    }
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
   if(r.status==='done' || r.status==='cancelled') return 'done';
@@ -252,7 +259,5 @@ self.addEventListener('notificationclick', event => {
     if (self.clients.openWindow) await self.clients.openWindow(targetUrl.href);
   })());
 });
-
-
 
 

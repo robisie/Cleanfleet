@@ -212,3 +212,28 @@ const box=overlay.querySelector('.cf-cam-zoom');box.style.display=facing==='envi
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&overlay?.classList.contains('open'))stopStream()});
 })();
 
+// CleanFleet v1.30.56 — bootstrap warstwy ikon i odświeżenie Service Workera.
+(()=>{
+  'use strict';
+  const VERSION='1.30.56';
+  const start=()=>{
+    const version=document.getElementById('cfAppVersion');
+    if(version)version.textContent=`Wersja aplikacji: v${VERSION}`;
+
+    if(!document.querySelector('link[href*="/app/glass-icons.css"]')){
+      const link=document.createElement('link');
+      link.rel='stylesheet';link.href='/app/glass-icons.css?v=13056';
+      document.head.appendChild(link);
+    }
+    if(!document.querySelector('script[src*="/app/glass-icons.js"]')){
+      const script=document.createElement('script');
+      script.src='/app/glass-icons.js?v=13056';script.defer=true;
+      document.body.appendChild(script);
+    }
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('/app/sw.js?v=20260922-13056',{updateViaCache:'none'})
+        .then(registration=>registration.update()).catch(error=>console.warn('CleanFleet icon SW update:',error));
+    }
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+})();

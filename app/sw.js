@@ -1,4 +1,4 @@
-// CleanFleet v1.30.93 — prevent iPhone edit-form scroll jump during description auto-sizing.
+// CleanFleet v1.30.94 — lock background scrolling behind modal windows.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

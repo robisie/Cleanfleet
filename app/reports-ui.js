@@ -43,7 +43,6 @@ function columnGroup(key,def){
  if(def?.type==='date'||def?.type==='datetime'||/(^|_)(date|at|time)$/.test(key)||/data|termin|godzin|początek|koniec/.test(label))return'dates';
  if(key==='id'||key==='company_id'||key==='created_by'||key==='user_id'||key==='schedule_proposed_by'||key==='schedule_confirmed_by'||/_id$/.test(key)||/\(id\)/i.test(def?.label||''))return'advanced';
  if(def?.type==='boolean'||['approved','paid','completed','ordered','priority','billing_category','schedule_status','status','active','assigned_driver'].includes(key)||/status|zapł|zatwier|wykonan|priorytet|rozlicz/.test(label))return'status';
- if(cfg.source==='invoices'||cfg.source==='invoice_items')return'basic';
  return'basic';
 }
 function pickerLabel(group,label){
@@ -71,10 +70,9 @@ function columnPreset(name,defs){
  return (sets[name]||[]).filter(key=>defs[key]);
 }
 function updateColumnPickerState(){
- const count=$('#rColumns input:checked').length;
- const total=$('.r-column-count');
- total.forEach(el=>el.textContent='Wybrano: '+count);
- $('.r-column-group').forEach(group=>{
+ const count=$$('#rColumns input:checked').length;
+ $$('.r-column-count').forEach(el=>el.textContent='Wybrano: '+count);
+ $$('.r-column-group').forEach(group=>{
   const selected=group.querySelectorAll('input:checked').length;
   const el=group.querySelector('[data-group-selected]');
   if(el)el.textContent=String(selected);
@@ -82,7 +80,7 @@ function updateColumnPickerState(){
 }
 function filterColumnPicker(value){
  const q=String(value||'').trim().toLocaleLowerCase('pl');
- $('.r-column-group').forEach(group=>{
+ $$('.r-column-group').forEach(group=>{
   let visible=0;
   group.querySelectorAll('[data-column-label]').forEach(label=>{
    const match=!q||String(label.dataset.search||'').includes(q);

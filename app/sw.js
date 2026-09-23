@@ -1,4 +1,4 @@
-// CleanFleet v1.30.69 — fix employee account activation workflow.
+// CleanFleet v1.30.70 — fix employee activation backend compatibility and version sync.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -67,7 +67,7 @@ self.addEventListener('fetch', event => {
     let html = await response.text();
 
 
-    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.69');
+    html = html.replace(/Wersja aplikacji:\s*v\d+\.\d+\.\d+(?:\s*beta)?/g, 'Wersja aplikacji: v1.30.70');
     html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13068');
     html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13068');
 

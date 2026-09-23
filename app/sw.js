@@ -1,4 +1,4 @@
-// CleanFleet v1.30.90 — force fresh report assets; prevent Safari stale report JS.
+// CleanFleet v1.30.91 — larger edit-form time fields and auto-growing service description.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

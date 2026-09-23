@@ -1,4 +1,4 @@
-// CleanFleet v1.30.96 — vehicle wash summary result mode with PDF/XLSX export.
+// CleanFleet v1.30.97 — vehicle history counts only completed washes.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

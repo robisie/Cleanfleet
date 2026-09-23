@@ -1,4 +1,4 @@
-// CleanFleet v1.30.94 — lock background scrolling behind modal windows.
+// CleanFleet v1.30.95 — categorized report fields with presets and search.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -70,8 +70,8 @@ self.addEventListener('fetch', event => {
     if (!response.ok || !type.includes('text/html')) return response;
 
     let html = await response.text(); 
-    html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13090');
-    html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13090');
+    html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13095');
+    html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13095');
 
     if (!html.includes('/app/glass-icons.css')) {
       html = html.replace('</head>', '<link rel="stylesheet" href="/app/glass-icons.css?v=13068">\n</head>');

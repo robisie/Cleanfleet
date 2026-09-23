@@ -1,4 +1,4 @@
-// CleanFleet v1.30.97 — vehicle history counts only completed washes.
+// CleanFleet v1.30.98 — BUS checkbox completes directly without completion dialog.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

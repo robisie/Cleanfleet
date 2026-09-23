@@ -491,7 +491,31 @@
     }
   }
 
-  document.addEventListener('click',e=>{
+  async function quickCompleteBus(id){
+    const rec=(typeof records!=='undefined'&&Array.isArray(records))
+      ? records.find(r=>String(r?.id||'')===String(id))
+      : null;
+
+    const {error}=await cfSupabase
+      .from('wash_records')
+      .update({approved:true})
+      .eq('id',id);
+
+    if(error)throw error;
+
+    if(rec) rec.zatwierdzone=true;
+
+    if(typeof loadAll==='function'){
+      await loadAll();
+    }else{
+      try{if(typeof renderAttentionPanel==='function')renderAttentionPanel();}catch(_){}
+      try{if(typeof renderRecords==='function')renderRecords();}catch(_){}
+    }
+
+    toast('Oznaczono jako wykonane');
+  }
+
+  document.addEventListener('click',async e=>{
     const btn=e.target.closest?.('[data-toggle-zatw]');
     if(!btn)return;
     const id=String(btn.getAttribute('data-toggle-zatw')||'');
@@ -508,6 +532,22 @@
       toast('Zakończyć pranie może administrator lub Pracownik CleanFleet z dostępem do tej firmy.');
       return;
     }
+
+    const rec=(typeof records!=='undefined'&&Array.isArray(records))
+      ? records.find(r=>String(r?.id||'')===id)
+      : null;
+    const type=String(rec?.typ||'').trim().toUpperCase();
+
+    if(type==='BUS'){
+      try{
+        await quickCompleteBus(id);
+      }catch(err){
+        console.error('CleanFleet quick BUS completion:',err);
+        toast(err?.message||'Nie udało się oznaczyć prania jako wykonanego.');
+      }
+      return;
+    }
+
     openCompletion(id);
   },true);
 

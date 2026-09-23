@@ -1,4 +1,4 @@
-// CleanFleet v1.30.99 — company entries sorted by schedule state and completion date.
+// CleanFleet v1.30.100 — secure wash-time updates for CleanFleet employees.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

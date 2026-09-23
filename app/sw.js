@@ -1,4 +1,4 @@
-// CleanFleet v1.30.87 — employee activation and multi-company access.
+// CleanFleet v1.30.88 — report PDF white background and CleanFleet logo.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -65,8 +65,8 @@ self.addEventListener('fetch', event => {
     if (!response.ok || !type.includes('text/html')) return response;
 
     let html = await response.text(); 
-    html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13069');
-    html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13079');
+    html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13088');
+    html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13088');
 
     if (!html.includes('/app/glass-icons.css')) {
       html = html.replace('</head>', '<link rel="stylesheet" href="/app/glass-icons.css?v=13068">\n</head>');

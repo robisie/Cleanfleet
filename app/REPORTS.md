@@ -1,4 +1,4 @@
-# Raporty administratora — v1.30.34
+# Raporty administratora — v1.30.89
 
 Moduł działa na oddzielnym zestawie danych pobranym przez istniejący klient Supabase z sesją użytkownika. Nie przełącza aktywnej firmy, nie zmienia wpisów, zdjęć ani raportów klientów. Brak migracji bazy. Biblioteki XLSX, jsPDF i AutoTable pochodzą z istniejącej aplikacji. Dodano lokalną czcionkę z polskimi znakami i jej licencję.
 
@@ -26,6 +26,10 @@ Drill-down otwiera widoki tylko do odczytu bez zmiany kontekstu firmy. Powrót z
 Karta pojazdu otwiera najpierw responsywny podgląd raportu. Dopiero przycisk „Pobierz PDF” tworzy plik. Raport pojazdu korzysta z tego samego zbioru wpisów do statystyk i wykresów, pokazuje rzeczywiste dane pojazdu, daty, wartości, odstępy, wykonawców i typy oraz kompletną historię bez limitu rekordów. Brak historii i pojedyncza usługa nie wytwarzają fikcyjnych odstępów.
 
 Zdjęcia lokalne nie są dostępne w tabeli serwerowej zdjęć. Nie wymyślamy podtypu pojazdu ani rodzaju usługi: katalog zawiera tylko istniejące pola, m.in. `type` i `billing_category`.
+
+## Zmiany v1.30.89
+
+Podgląd raportu nie pokazuje logo; logo pozostaje wyłącznie w pliku PDF. Naprawiono błąd wiązania kafelków metryk, który zatrzymywał renderowanie sekcji „Dane źródłowe”. Eksport PDF raportu administratora korzysta z natywnego jsPDF/AutoTable zamiast rasteryzacji całego widoku przez html2canvas, dzięki czemu tekst, obramowania i tabele pozostają ostre przy powiększaniu i druku. Tło PDF jest białe.
 
 ## Weryfikacja wydania
 

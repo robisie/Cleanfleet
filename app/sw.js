@@ -1,4 +1,4 @@
-// CleanFleet v1.30.70 — version display no longer rewritten by Service Worker.
+// CleanFleet v1.30.71 — employee activation and multi-company access.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

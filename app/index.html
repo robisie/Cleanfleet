@@ -10230,6 +10230,18 @@ function uid(){
               <button type="button" class="btn btn-secondary" id="clearWashDateBtn">Wyczyść</button>
             </div>
 
+            ${rec && rec.data_prania ? `
+            <!-- Godziny zapisane przy zakończeniu prania -->
+            <div class="field grid-c1">
+              <label>Godzina rozpoczęcia</label>
+              <input type="time" id="f_wash_start_time" value="${escapeHtml(rec.wash_start_time||'')}">
+            </div>
+            <div class="field grid-c2">
+              <label>Godzina zakończenia</label>
+              <input type="time" id="f_wash_end_time" value="${escapeHtml(rec.wash_end_time||'')}">
+            </div>
+            ` : ''}
+
             <!-- Wiersz 9: kto wykonał | koszt -->
             <div class="field grid-c1">
               <label>Kto wykonał</label>
@@ -10275,6 +10287,10 @@ function uid(){
     if(clearWashDateBtn){
       clearWashDateBtn.addEventListener('click', () => {
         document.getElementById('f_data_prania').value = '';
+        const startTime=document.getElementById('f_wash_start_time');
+        const endTime=document.getElementById('f_wash_end_time');
+        if(startTime) startTime.value='';
+        if(endTime) endTime.value='';
       });
     }
 
@@ -10454,6 +10470,8 @@ function uid(){
     const uwagi = document.getElementById('f_uwagi').value.trim();
     const opis_wykonania = document.getElementById('f_opis_uslugi')?.value.trim() || '';
     const data_prania = document.getElementById('f_data_prania').value;
+    const wash_start_time = document.getElementById('f_wash_start_time')?.value || '';
+    const wash_end_time = document.getElementById('f_wash_end_time')?.value || '';
     const kto_wykonal = document.getElementById('f_kto_wykonal').value.trim();
     const koszt = parseFloat(document.getElementById('f_koszt').value) || 0;
     const billing_category = document.getElementById('f_grupa_rozliczeniowa')?.value || null;
@@ -10465,6 +10483,11 @@ function uid(){
 
     if(priorityRaw !== '' && (!Number.isFinite(Number(priorityRaw)) || Number(priorityRaw) < 1)){
       showToast('Priorytet musi być liczbą większą od zera.');
+      return;
+    }
+
+    if((wash_start_time && !wash_end_time) || (!wash_start_time && wash_end_time)){
+      showToast('Podaj zarówno godzinę rozpoczęcia, jak i zakończenia prania.');
       return;
     }
 
@@ -10562,7 +10585,7 @@ function uid(){
       const rec = records.find(x=>x.id===editingId);
       if(rec && (!cfEmployeeOwn(rec) || rec.data_prania || rec.zatwierdzone || rec.zaplacone)){
         try{
-          await cfSubmitChangeRequest(rec.id,'edit',{tablica:plate,typ,marka,billing_category,zlecone,kto_zlecil,data_zlecenia,data_zlecenia_do,priority,uwagi,opis_wykonania,data_prania,kto_wykonal,koszt},'Prośba pracownika floty o zmianę wykonanego wpisu.');
+          await cfSubmitChangeRequest(rec.id,'edit',{tablica:plate,typ,marka,billing_category,zlecone,kto_zlecil,data_zlecenia,data_zlecenia_do,priority,uwagi,opis_wykonania,data_prania,wash_start_time,wash_end_time,kto_wykonal,koszt},'Prośba pracownika floty o zmianę wykonanego wpisu.');
           closeModal();
           showToast('Wysłano wniosek do administratora');
         }catch(e){ showToast('Nie udało się wysłać wniosku: '+(e?.message||'błąd')); }
@@ -10583,7 +10606,7 @@ function uid(){
 
     if(editingId){
       const rec = records.find(x => x.id === editingId);
-      Object.assign(rec, { tablica: plate, typ, marka, billing_category, zlecone, kto_zlecil, data_zlecenia, data_zlecenia_do, priority, uwagi, opis_wykonania, data_prania, kto_wykonal, koszt });
+      Object.assign(rec, { tablica: plate, typ, marka, billing_category, zlecone, kto_zlecil, data_zlecenia, data_zlecenia_do, priority, uwagi, opis_wykonania, data_prania, wash_start_time, wash_end_time, kto_wykonal, koszt });
     } else {
       records.push({
         id: uid(),
@@ -10598,7 +10621,7 @@ function uid(){
         schedule_confirmed_by: (!cfIsFleetEmployee() && zlecone && data_zlecenia_do) ? cfCurrentUserId : null,
         schedule_confirmed_at: (!cfIsFleetEmployee() && zlecone && data_zlecenia_do) ? new Date().toISOString() : null,
         schedule_note: '',
-        uwagi, opis_wykonania:'', data_prania, kto_wykonal, koszt,
+        uwagi, opis_wykonania:'', data_prania, wash_start_time, wash_end_time, kto_wykonal, koszt,
         zatwierdzone: false,
         zaplacone: false,
         created_at: Date.now()

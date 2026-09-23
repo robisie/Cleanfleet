@@ -115,14 +115,15 @@ function adminPdfFilterLine(doc,r,y){
  return y+lines.length*3.5+3;
 }
 function adminPdfKpis(doc,metrics,y){
- const pw=doc.internal.pageSize.getWidth(),gap=3,cards=metrics.slice(0,4),cw=(pw-20-gap*3)/4,ch=25;
+ const pw=doc.internal.pageSize.getWidth(),gap=2.4,cards=metrics,cols=Math.min(6,Math.max(1,cards.length)),cw=(pw-20-gap*(cols-1))/cols,ch=25,rowGap=3;
  cards.forEach((m,i)=>{
-   const x=10+i*(cw+gap);
-   doc.setFillColor(255,255,255);doc.setDrawColor(210,217,211);doc.setLineWidth(.3);doc.roundedRect(x,y,cw,ch,2.5,2.5,'FD');
-   doc.setTextColor(52,58,54);doc.setFontSize(8);doc.text(doc.splitTextToSize(E.text(m.label),cw-8).slice(0,2),x+4,y+7);
-   doc.setTextColor(35,55,20);doc.setFontSize(13);doc.text(E.text(metricText(m)),x+4,y+17);
+   const col=i%cols,row=Math.floor(i/cols),x=10+col*(cw+gap),yy=y+row*(ch+rowGap);
+   doc.setFillColor(255,255,255);doc.setDrawColor(210,217,211);doc.setLineWidth(.3);doc.roundedRect(x,yy,cw,ch,2.5,2.5,'FD');
+   doc.setTextColor(52,58,54);doc.setFontSize(cols>=6?6.7:8);doc.text(doc.splitTextToSize(E.text(m.label),cw-8).slice(0,2),x+4,yy+7);
+   doc.setTextColor(35,55,20);doc.setFontSize(cols>=6?11.5:13);doc.text(E.text(metricText(m)),x+4,yy+17);
  });
- return y+ch+5;
+ const rows=Math.max(1,Math.ceil(cards.length/cols));
+ return y+rows*ch+(rows-1)*rowGap+5;
 }
 function adminPdfExplain(doc,y){
  const pw=doc.internal.pageSize.getWidth();
@@ -152,7 +153,7 @@ function adminPdfGroupTable(doc,r,metrics,y,logo){
  doc.autoTable({
    head:[['Grupa',...metrics.map(m=>m.label)]],body:rows,startY:y,
    margin:{top:38,bottom:15,left:10,right:10},
-   styles:{font:'CleanFleet',fontStyle:'normal',fontSize:7.1,cellPadding:2.2,overflow:'linebreak',textColor:[35,39,36],lineColor:[225,230,226],lineWidth:.15},
+   styles:{font:'CleanFleet',fontStyle:'normal',fontSize:metrics.length>=6?6.3:7.1,cellPadding:metrics.length>=6?1.8:2.2,overflow:'linebreak',textColor:[35,39,36],lineColor:[225,230,226],lineWidth:.15},
    headStyles:{fillColor:[241,246,235],textColor:[31,38,27],fontStyle:'normal'},
    alternateRowStyles:{fillColor:[252,252,251]},rowPageBreak:'avoid',showHead:'everyPage',
    didDrawPage:()=>{if(doc.internal.getCurrentPageInfo().pageNumber>1)adminPdfHeader(doc,r,logo);}
@@ -187,7 +188,7 @@ async function exportPDF(r){
  y=adminPdfKpis(doc,ms,y);
  y=adminPdfExplain(doc,y);
  y=adminPdfBarChart(doc,r,y);
- y=adminPdfGroupTable(doc,r,ms.slice(0,4),y,logo);
+ y=adminPdfGroupTable(doc,r,ms,y,logo);
  y=adminPdfSourceTable(doc,r,y+2,logo);
  adminPdfFooter(doc,r);
  doc.save(safeName(r.cfg.title)+'.pdf');

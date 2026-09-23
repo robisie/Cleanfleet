@@ -207,10 +207,10 @@ function reportPdfAllRowsHtml(r){
  }
  const sortLabel=k=>esc(defs[k]?.label||k)+(sortField===k?(sortDir===1?' ↑':' ↓'):'');
  return '<div class="r-barline"><h2>Dane źródłowe <small>('+rows.length+')</small></h2></div>'+
-   '<div class="r-scroll"><table><thead><tr><th>Szczegóły</th>'+
-   cols.map(k=>'<th><button class="link" type="button">'+sortLabel(k)+'</button></th>').join('')+
+   '<div class="r-scroll"><table><thead><tr>'+
+   cols.map(k=>'<th>'+sortLabel(k)+'</th>').join('')+
    '</tr></thead><tbody>'+
-   rows.map(row=>'<tr><td><button class="link" type="button">Otwórz</button></td>'+
+   rows.map(row=>'<tr>'+
      cols.map(k=>'<td>'+esc(display(row[k]))+'</td>').join('')+'</tr>').join('')+
    '</tbody></table></div>';
 }
@@ -227,6 +227,7 @@ function buildReportPdfStage(r){
  if(rowsBox)rowsBox.innerHTML=reportPdfAllRowsHtml(r);
 
  stage.querySelectorAll('[data-action="pdf"],[data-action="xlsx"],[data-action="prev"],[data-action="next"],[data-action="back-report"]').forEach(el=>el.remove());
+ stage.querySelectorAll('.r-card small').forEach(el=>el.remove());
  stage.querySelectorAll('.r-flex').forEach(el=>{if(!el.children.length&&!el.textContent.trim())el.remove();});
 
  const css=document.createElement('style');

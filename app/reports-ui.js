@@ -180,8 +180,8 @@ function adminPdfSourceTable(doc,r,y,logo){
  }
  return y;
 }
-async function exportPDF(r){
- const doc=setupPDF('landscape'),pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight(),logo=await lightLogoSrc();
+async function exportPDFVectorFallback(r){
+ const doc=setupPDF('landscape'),logo=await lightLogoSrc();
  let y=adminPdfHeader(doc,r,logo);
  y=adminPdfFilterLine(doc,r,y);
  const ms=selectedMetrics(r);
@@ -193,6 +193,129 @@ async function exportPDF(r){
  adminPdfFooter(doc,r);
  doc.save(safeName(r.cfg.title)+'.pdf');
  return doc;
+}
+
+function reportPdfAllRowsHtml(r){
+ let rows=[...(r.rows||[])],cols=[...(r.cfg.columns||[])],defs=r.fields||{};
+ if(sortField){
+   rows.sort((a,b)=>{
+     const x=a[sortField],y=b[sortField];
+     return sortDir*(typeof x==='number'&&typeof y==='number'
+       ? x-y
+       : display(x).localeCompare(display(y),'pl',{numeric:true}));
+   });
+ }
+ const sortLabel=k=>esc(defs[k]?.label||k)+(sortField===k?(sortDir===1?' ↑':' ↓'):'');
+ return '<div class="r-barline"><h2>Dane źródłowe <small>('+rows.length+')</small></h2></div>'+
+   '<div class="r-scroll"><table><thead><tr><th>Szczegóły</th>'+
+   cols.map(k=>'<th><button class="link" type="button">'+sortLabel(k)+'</button></th>').join('')+
+   '</tr></thead><tbody>'+
+   rows.map(row=>'<tr><td><button class="link" type="button">Otwórz</button></td>'+
+     cols.map(k=>'<td>'+esc(display(row[k]))+'</td>').join('')+'</tr>').join('')+
+   '</tbody></table></div>';
+}
+
+function buildReportPdfStage(r){
+ const source=$('#rResults');
+ if(!source)throw Error('Brak podglądu raportu do eksportu.');
+ const stage=document.createElement('div');
+ stage.className='cf-report-pdf-stage';
+ stage.style.cssText='position:fixed;left:-100000px;top:0;width:1360px;padding:18px;background:#f3f5ef;box-sizing:border-box;pointer-events:none;z-index:-1;';
+ stage.innerHTML=source.innerHTML;
+
+ const rowsBox=stage.querySelector('#rRows');
+ if(rowsBox)rowsBox.innerHTML=reportPdfAllRowsHtml(r);
+
+ stage.querySelectorAll('[data-action="pdf"],[data-action="xlsx"],[data-action="prev"],[data-action="next"],[data-action="back-report"]').forEach(el=>el.remove());
+ stage.querySelectorAll('.r-flex').forEach(el=>{if(!el.children.length&&!el.textContent.trim())el.remove();});
+
+ const css=document.createElement('style');
+ css.textContent=
+   '.cf-report-pdf-stage .r-scroll{overflow:visible!important;max-height:none!important;}'+
+   '.cf-report-pdf-stage .r-chart{overflow:visible!important;max-height:none!important;}'+
+   '.cf-report-pdf-stage th{position:static!important;}'+
+   '.cf-report-pdf-stage .r-box{break-inside:avoid;}'+
+   '.cf-report-pdf-stage button{cursor:default!important;}'+
+   '.cf-report-pdf-stage tbody tr:hover{background:transparent!important;}';
+ stage.prepend(css);
+ host.appendChild(stage);
+ return stage;
+}
+
+function reportPdfBreaks(stage,cssPageHeight){
+ const rootRect=stage.getBoundingClientRect(),height=stage.scrollHeight;
+ const candidates=new Set([height]);
+ const addBottom=el=>{
+   const r=el.getBoundingClientRect();
+   const y=Math.round(r.bottom-rootRect.top);
+   if(y>0&&y<height)candidates.add(y);
+ };
+ stage.querySelectorAll('.r-box,#rRows thead tr,#rRows tbody tr').forEach(addBottom);
+ const ys=[...candidates].sort((a,b)=>a-b);
+ const breaks=[0];
+ let start=0;
+ while(start<height-2){
+   const target=Math.min(height,start+cssPageHeight);
+   let end=ys.filter(y=>y>start+80&&y<=target).at(-1);
+   if(!end)end=target;
+   if(end<=start+2)end=Math.min(height,start+cssPageHeight);
+   breaks.push(end);
+   start=end;
+ }
+ if(breaks.at(-1)<height)breaks.push(height);
+ return breaks;
+}
+
+async function exportPDF(r){
+ if(!root.jspdf?.jsPDF||!root.html2canvas)return exportPDFVectorFallback(r);
+ const stage=buildReportPdfStage(r);
+ try{
+   if(document.fonts?.ready)await document.fonts.ready;
+   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+
+   const rect=stage.getBoundingClientRect();
+   const doc=new root.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+   const pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight();
+   const margin=8,usableW=pw-margin*2,usableH=ph-margin*2;
+   const cssPageHeight=rect.width*(usableH/usableW);
+   const breaks=reportPdfBreaks(stage,cssPageHeight);
+
+   const canvas=await root.html2canvas(stage,{
+     scale:1,
+     useCORS:true,
+     allowTaint:false,
+     backgroundColor:'#f3f5ef',
+     logging:false,
+     windowWidth:Math.ceil(rect.width),
+     windowHeight:Math.ceil(stage.scrollHeight)
+   });
+   const ratio=canvas.width/rect.width;
+
+   for(let i=0;i<breaks.length-1;i++){
+     const cssStart=breaks[i],cssEnd=breaks[i+1];
+     const sy=Math.max(0,Math.round(cssStart*ratio));
+     const sh=Math.min(canvas.height-sy,Math.max(1,Math.round((cssEnd-cssStart)*ratio)));
+     const slice=document.createElement('canvas');
+     slice.width=canvas.width;
+     slice.height=sh;
+     const ctx=slice.getContext('2d');
+     ctx.fillStyle='#f3f5ef';
+     ctx.fillRect(0,0,slice.width,slice.height);
+     ctx.drawImage(canvas,0,sy,canvas.width,sh,0,0,canvas.width,sh);
+     if(i)doc.addPage('a4','landscape');
+     const imgH=(sh/canvas.width)*usableW;
+     doc.addImage(slice.toDataURL('image/png'),'PNG',margin,margin,usableW,Math.min(imgH,usableH),undefined,'FAST');
+     slice.width=slice.height=1;
+   }
+   canvas.width=canvas.height=1;
+   doc.save(safeName(r.cfg.title)+'.pdf');
+   return doc;
+ }catch(err){
+   console.error('CleanFleet HTML report PDF:',err);
+   return exportPDFVectorFallback(r);
+ }finally{
+   stage.remove();
+ }
 }
 function pairsForVehicle(done){const gaps=[];for(let i=1;i<done.length;i++){const days=(Date.parse(done[i].wash_date+'T00:00:00Z')-Date.parse(done[i-1].wash_date+'T00:00:00Z'))/86400000;if(Number.isFinite(days)&&days>=0)gaps.push(days);}return gaps;}
 function grouped(rows,key,value=()=>1){const m=new Map();for(const r of rows){const k=key(r)||'Brak danych';m.set(k,(m.get(k)||0)+Number(value(r)||0));}return [...m].map(([label,value])=>({label,value})).sort((a,b)=>String(a.label).localeCompare(String(b.label),'pl',{numeric:true}));}

@@ -384,7 +384,10 @@
       };
 
       renderServices(false);
-      if(!(Number(row.cost)>0)) costEl.value=(Math.round(selectedTotal()*100)/100).toFixed(2);
+      {
+        const initialServicesTotal=Math.round(selectedTotal()*100)/100;
+        if(initialServicesTotal>0 || !(Number(row.cost)>0)) costEl.value=initialServicesTotal.toFixed(2);
+      }
       syncDuration();
       syncCostHint();
       overlay.querySelector('#cfCompleteStart')?.addEventListener('input',syncDuration);

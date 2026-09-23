@@ -77,8 +77,8 @@
       #cfCompleteStart,
       #cfCompleteEnd{
         display:block!important;
-        width:100%!important;
-        max-width:100%!important;
+        width:calc(100% - 32px)!important;
+        max-width:calc(100% - 32px)!important;
         min-width:0!important;
         height:36px!important;
         min-height:36px!important;
@@ -117,25 +117,28 @@
       .cf-completion-invalid{border-color:#c94b42!important;box-shadow:0 0 0 2px rgba(201,75,66,.10)!important}
       .cf-service-catalog-sheet{max-width:700px!important;width:min(700px,96vw)!important;max-height:90vh;overflow:auto}
       .cf-service-catalog-list{display:grid;gap:8px;margin-top:14px}
-      .cf-service-catalog-row{display:grid;grid-template-columns:minmax(0,1fr) 120px auto;gap:8px;align-items:center;padding:9px;border:1px solid var(--line);border-radius:9px;background:#fff}
+      .cf-service-catalog-row{display:grid;grid-template-columns:minmax(0,1fr) 120px auto auto;gap:8px;align-items:center;padding:9px;border:1px solid var(--line);border-radius:9px;background:#fff}
       .cf-service-catalog-row input[type="text"],.cf-service-catalog-row input[type="number"]{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid var(--line-strong);border-radius:7px;font:13px 'Inter',sans-serif}
       .cf-service-active{display:flex;align-items:center;gap:6px;font-size:11px;white-space:nowrap}
       .cf-service-active input{width:17px;height:17px;accent-color:var(--green-ink)}
+      .cf-service-delete{min-width:38px;height:38px;padding:0 10px!important;font-size:18px!important;line-height:1!important}
+      .cf-service-default-note{grid-column:1/-1;font-size:10px;color:var(--green-ink);font-weight:700}
       .cf-service-catalog-add{margin-top:10px}
       @media(max-width:600px){
         .cf-completion-grid,.cf-completion-services{grid-template-columns:1fr}
         .cf-completion-span-2{grid-column:auto}
         .cf-completion-total-row{grid-template-columns:1fr}
         .cf-completion-total-row .btn{width:100%}
-        .cf-service-catalog-row{grid-template-columns:1fr 110px}
-        .cf-service-active{grid-column:1/-1}
+        .cf-service-catalog-row{grid-template-columns:minmax(0,1fr) 100px auto}
+        .cf-service-active{grid-column:1/3}
+        .cf-service-delete{grid-column:3;grid-row:1/3;align-self:center}
       }
     `;
     document.head.appendChild(style);
   }
 
   async function fetchCatalog(activeOnly=true){
-    let q=cfSupabase.from('cf_service_catalog').select('id,name,price,active,sort_order').order('sort_order',{ascending:true}).order('name',{ascending:true});
+    let q=cfSupabase.from('cf_service_catalog').select('id,name,price,active,sort_order,is_default,exclusive').order('sort_order',{ascending:true}).order('name',{ascending:true});
     if(activeOnly)q=q.eq('active',true);
     const {data,error}=await q;
     if(error)throw error;
@@ -146,6 +149,7 @@
     if(!isAdmin()){toast('Cennik może edytować tylko administrator.');return;}
     injectStyles();
     let rows;
+    const deletedIds=new Set();
     try{rows=await fetchCatalog(false);}
     catch(err){console.error('CleanFleet service catalog:',err);toast('Nie udało się pobrać cennika.');return;}
 
@@ -175,12 +179,22 @@
         <input type="text" data-service-name value="${esc(r.name||'')}" placeholder="Nazwa usługi">
         <input type="number" data-service-price min="0" step="0.01" inputmode="decimal" value="${Number(r.price)||0}" placeholder="0,00">
         <label class="cf-service-active"><input type="checkbox" data-service-active ${r.active!==false?'checked':''}> Aktywna</label>
+        <button class="btn btn-outline cf-service-delete" type="button" data-service-delete="${index}" aria-label="Usuń usługę" title="Usuń usługę">×</button>
+        ${r.is_default?'<div class="cf-service-default-note">Domyślna przy zakończeniu prania · wyklucza pozostałe pozycje</div>':''}
       </div>`).join('');
+      list.querySelectorAll('[data-service-delete]').forEach(btn=>btn.addEventListener('click',()=>{
+        const idx=Number(btn.dataset.serviceDelete);
+        const row=rows[idx];
+        if(!row)return;
+        if(row.id)deletedIds.add(String(row.id));
+        rows.splice(idx,1);
+        render();
+      }));
     };
     render();
 
     overlay.querySelector('#cfServiceCatalogAdd')?.addEventListener('click',()=>{
-      rows.push({id:null,name:'',price:0,active:true,sort_order:(rows.length+1)*10});
+      rows.push({id:null,name:'',price:0,active:true,sort_order:(rows.length+1)*10,is_default:false,exclusive:false});
       render();
       list.lastElementChild?.querySelector('[data-service-name]')?.focus();
     });
@@ -202,15 +216,19 @@
       btn.disabled=true;
       btn.textContent='Zapisuję…';
       try{
+        for(const id of deletedIds){
+          const {error}=await cfSupabase.from('cf_service_catalog').delete().eq('id',id);
+          if(error)throw error;
+        }
         for(const row of payload){
           if(row.id){
             const {error}=await cfSupabase.from('cf_service_catalog').update({
-              name:row.name,price:row.price,active:row.active,sort_order:row.sort_order,updated_at:new Date().toISOString()
+              name:row.name,price:row.price,active:row.active,sort_order:row.sort_order,is_default:!!row.is_default,exclusive:!!row.exclusive,updated_at:new Date().toISOString()
             }).eq('id',row.id);
             if(error)throw error;
           }else{
             const {error}=await cfSupabase.from('cf_service_catalog').insert({
-              name:row.name,price:row.price,active:row.active,sort_order:row.sort_order
+              name:row.name,price:row.price,active:row.active,sort_order:row.sort_order,is_default:!!row.is_default,exclusive:!!row.exclusive
             });
             if(error)throw error;
           }
@@ -318,7 +336,10 @@
       },0);
 
       const renderServices=(preserveSelected=true)=>{
-        const current=preserveSelected?new Set(selectedIds()):new Set(savedIds);
+        const defaults=new Set(catalogRows.filter(x=>x.is_default).map(x=>String(x.id)));
+        const current=preserveSelected
+          ? new Set(selectedIds())
+          : (savedIds.size ? new Set(savedIds) : defaults);
         if(!catalogRows.length){
           servicesEl.innerHTML='<div class="cf-completion-empty">Brak aktywnych usług w cenniku. Administrator może dodać je przez „Cennik usług”.</div>';
           return;
@@ -326,7 +347,7 @@
         servicesEl.innerHTML=catalogRows.map(item=>{
           const checked=current.has(String(item.id));
           return `<label class="cf-completion-service">
-            <input type="checkbox" value="${esc(item.id)}" ${checked?'checked':''}>
+            <input type="checkbox" value="${esc(item.id)}" data-exclusive="${item.exclusive?'1':'0'}" ${checked?'checked':''}>
             <span class="cf-completion-service-main">
               <span class="cf-completion-service-name">${esc(item.name)}</span>
               <span class="cf-completion-service-price">${money(item.price)}</span>
@@ -334,6 +355,15 @@
           </label>`;
         }).join('');
         servicesEl.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.addEventListener('change',()=>{
+          if(cb.checked){
+            if(cb.dataset.exclusive==='1'){
+              servicesEl.querySelectorAll('input[type="checkbox"]').forEach(other=>{
+                if(other!==cb)other.checked=false;
+              });
+            }else{
+              servicesEl.querySelectorAll('input[type="checkbox"][data-exclusive="1"]').forEach(other=>{other.checked=false;});
+            }
+          }
           if(!manualTouched)costEl.value=(Math.round(selectedTotal()*100)/100).toFixed(2);
           syncCostHint();
         }));
@@ -354,6 +384,7 @@
       };
 
       renderServices(false);
+      if(!(Number(row.cost)>0)) costEl.value=(Math.round(selectedTotal()*100)/100).toFixed(2);
       syncDuration();
       syncCostHint();
       overlay.querySelector('#cfCompleteStart')?.addEventListener('input',syncDuration);
@@ -478,4 +509,5 @@
   },true);
 
   window.cfOpenWashCompletion=openCompletion;
+  window.cfShowServiceCatalog=()=>openCatalogManager();
 })();

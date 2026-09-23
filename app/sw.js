@@ -1,4 +1,4 @@
-// CleanFleet v1.30.82 — employee activation and multi-company access.
+// CleanFleet v1.30.83 — employee activation and multi-company access.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

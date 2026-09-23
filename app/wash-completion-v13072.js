@@ -80,15 +80,17 @@
         width:100%!important;
         max-width:100%!important;
         min-width:0!important;
-        height:42px!important;
-        padding:9px 12px!important;
+        height:36px!important;
+        min-height:36px!important;
+        max-height:36px!important;
+        padding:4px 10px!important;
         box-sizing:border-box!important;
         border:1px solid var(--line-strong)!important;
         border-radius:8px!important;
         background:#fff!important;
         color:var(--ink,#16150f)!important;
-        font-size:14px!important;
-        line-height:1.2!important;
+        font-size:13px!important;
+        line-height:1.1!important;
       }
       .cf-completion-span-2{grid-column:1/-1}
       .cf-completion-duration{min-height:42px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#f8f7f3;font-size:12px}

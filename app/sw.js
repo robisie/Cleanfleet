@@ -1,4 +1,4 @@
-// CleanFleet v1.30.77 — employee activation and multi-company access.
+// CleanFleet v1.30.78 — employee activation and multi-company access.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -66,7 +66,7 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text(); 
     html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13068');
-    html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13068');
+    html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13078');
 
     if (!html.includes('/app/glass-icons.css')) {
       html = html.replace('</head>', '<link rel="stylesheet" href="/app/glass-icons.css?v=13068">\n</head>');

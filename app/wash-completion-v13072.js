@@ -66,7 +66,30 @@
       .cf-completion-head h2{margin-bottom:5px}
       .cf-completion-plate{display:inline-flex;align-items:center;padding:5px 9px;border:1px solid var(--line-strong);border-radius:6px;background:#fff;font:800 13px/1 'JetBrains Mono',monospace;letter-spacing:.04em}
       .cf-completion-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}
-      .cf-completion-grid .field{margin:0}
+      .cf-completion-grid .field{margin:0;min-width:0}
+      .cf-completion-grid .field input,
+      .cf-completion-grid .field textarea{box-sizing:border-box}
+      #cfCompleteDate{
+        width:calc(100% - 32px)!important;
+        max-width:calc(100% - 32px)!important;
+        min-width:0!important;
+      }
+      #cfCompleteStart,
+      #cfCompleteEnd{
+        display:block!important;
+        width:100%!important;
+        max-width:100%!important;
+        min-width:0!important;
+        height:42px!important;
+        padding:9px 12px!important;
+        box-sizing:border-box!important;
+        border:1px solid var(--line-strong)!important;
+        border-radius:8px!important;
+        background:#fff!important;
+        color:var(--ink,#16150f)!important;
+        font-size:14px!important;
+        line-height:1.2!important;
+      }
       .cf-completion-span-2{grid-column:1/-1}
       .cf-completion-duration{min-height:42px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#f8f7f3;font-size:12px}
       .cf-completion-duration strong{font-size:14px}
@@ -87,6 +110,9 @@
       .cf-completion-total-hint{margin-top:5px;font-size:10px;color:var(--ink-soft)}
       .cf-completion-total-hint.manual{color:#9c6400;font-weight:700}
       .cf-completion-existing-note{margin-top:14px;padding:10px 12px;border-left:3px solid var(--line-strong);background:#faf9f5;font-size:11px;color:var(--ink-soft);line-height:1.45}
+      .cf-completion-error{display:none;margin-top:12px;padding:10px 12px;border:1px solid #c94b42;border-radius:8px;background:#fff4f2;color:#9c302b;font-size:12px;font-weight:700;line-height:1.35}
+      .cf-completion-error.show{display:block}
+      .cf-completion-invalid{border-color:#c94b42!important;box-shadow:0 0 0 2px rgba(201,75,66,.10)!important}
       .cf-service-catalog-sheet{max-width:700px!important;width:min(700px,96vw)!important;max-height:90vh;overflow:auto}
       .cf-service-catalog-list{display:grid;gap:8px;margin-top:14px}
       .cf-service-catalog-row{display:grid;grid-template-columns:minmax(0,1fr) 120px auto;gap:8px;align-items:center;padding:9px;border:1px solid var(--line);border-radius:9px;background:#fff}
@@ -265,6 +291,7 @@
           </div>
         </div>
 
+        <div class="cf-completion-error" id="cfCompleteError" role="alert"></div>
         <div class="sheet-actions">
           <button class="btn btn-outline" data-close type="button">Anuluj</button>
           <button class="btn btn-solid" id="cfCompleteSave" type="button">Zapisz i oznacz jako wykonane</button>
@@ -336,6 +363,28 @@
         syncCostHint();
       });
 
+      const errorEl=overlay.querySelector('#cfCompleteError');
+      const clearFormError=()=>{
+        errorEl?.classList.remove('show');
+        if(errorEl) errorEl.textContent='';
+        overlay.querySelectorAll('.cf-completion-invalid').forEach(el=>el.classList.remove('cf-completion-invalid'));
+      };
+      const showFormError=(message,el)=>{
+        if(errorEl){
+          errorEl.textContent=message;
+          errorEl.classList.add('show');
+          errorEl.scrollIntoView({block:'nearest',behavior:'smooth'});
+        }else{
+          toast(message);
+        }
+        if(el){
+          el.classList.add('cf-completion-invalid');
+          try{el.focus({preventScroll:true});}catch(_){try{el.focus();}catch(__){}}
+        }
+      };
+      overlay.querySelectorAll('input,textarea').forEach(el=>el.addEventListener('input',clearFormError));
+      servicesEl.addEventListener('change',clearFormError);
+
       overlay.querySelector('#cfCompleteCatalogBtn')?.addEventListener('click',()=>openCatalogManager(async()=>{
         const keep=new Set(selectedIds());
         catalogRows=await fetchCatalog(true);
@@ -355,12 +404,18 @@
         const cost=Number(String(costEl.value||'').replace(',','.'));
         const notes=overlay.querySelector('#cfCompleteNotes').value.trim();
 
-        if(!washDate){toast('Podaj datę prania.');return;}
-        if(!start||!end){toast('Podaj godzinę rozpoczęcia i zakończenia prania.');return;}
-        if(durationMinutes(start,end)===null||durationMinutes(start,end)<=0){toast('Sprawdź godziny prania.');return;}
-        if(!performer){toast('Podaj, kto wykonał pranie.');return;}
-        if(!serviceIds.length){toast('Zaznacz co najmniej jeden zakres wykonanych prac.');return;}
-        if(!Number.isFinite(cost)||cost<0){toast('Podaj poprawną kwotę.');return;}
+        clearFormError();
+        const dateEl=overlay.querySelector('#cfCompleteDate');
+        const startEl=overlay.querySelector('#cfCompleteStart');
+        const endEl=overlay.querySelector('#cfCompleteEnd');
+        const performerEl=overlay.querySelector('#cfCompletePerformer');
+        if(!washDate){showFormError('Podaj datę prania.',dateEl);return;}
+        if(!start){showFormError('Podaj godzinę rozpoczęcia prania.',startEl);return;}
+        if(!end){showFormError('Podaj godzinę zakończenia prania.',endEl);return;}
+        if(durationMinutes(start,end)===null||durationMinutes(start,end)<=0){showFormError('Sprawdź godzinę rozpoczęcia i zakończenia prania.',endEl);return;}
+        if(!performer){showFormError('Podaj, kto wykonał pranie.',performerEl);return;}
+        if(!serviceIds.length){showFormError('Zaznacz co najmniej jeden zakres wykonanych prac.',servicesEl);return;}
+        if(!Number.isFinite(cost)||cost<0){showFormError('Podaj poprawną kwotę.',costEl);return;}
 
         saveBtn.disabled=true;
         saveBtn.textContent='Zapisuję…';
@@ -387,7 +442,7 @@
           toast(`Pranie zakończone · ${durationLabel(start,end)} · ${money(cost)}`);
         }catch(err){
           console.error('CleanFleet complete wash:',err);
-          toast(err?.message||'Nie udało się zakończyć prania.');
+          showFormError(err?.message||'Nie udało się zakończyć prania.');
           saveBtn.disabled=false;
           saveBtn.textContent='Zapisz i oznacz jako wykonane';
         }

@@ -1,4 +1,4 @@
-// CleanFleet v1.30.89 — report rows restored; PDF exported as vector.
+// CleanFleet v1.30.90 — force fresh report assets; prevent Safari stale report JS.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -9,9 +9,14 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   const req = event.request;
-  if (req.mode !== 'navigate') return;
-
   const url = new URL(req.url);
+
+  if (url.origin === self.location.origin && (url.pathname === '/app/reports-ui.js' || url.pathname === '/app/reports.css')) {
+    event.respondWith(fetch(req, { cache: 'no-store' }));
+    return;
+  }
+
+  if (req.mode !== 'navigate') return;
   if (url.origin !== self.location.origin || !url.pathname.startsWith('/app/')) return;
 
   if (url.pathname === '/app/weather.html') {
@@ -65,8 +70,8 @@ self.addEventListener('fetch', event => {
     if (!response.ok || !type.includes('text/html')) return response;
 
     let html = await response.text(); 
-    html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13089');
-    html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13089');
+    html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13090');
+    html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13090');
 
     if (!html.includes('/app/glass-icons.css')) {
       html = html.replace('</head>', '<link rel="stylesheet" href="/app/glass-icons.css?v=13068">\n</head>');

@@ -1,4 +1,4 @@
-// CleanFleet v1.30.92 — correct 32px width rule and subtle time-field sizing.
+// CleanFleet v1.30.93 — prevent iPhone edit-form scroll jump during description auto-sizing.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

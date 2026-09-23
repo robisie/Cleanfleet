@@ -1,4 +1,4 @@
-// CleanFleet v1.30.98 — BUS checkbox completes directly without completion dialog.
+// CleanFleet v1.30.99 — company entries sorted by schedule state and completion date.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

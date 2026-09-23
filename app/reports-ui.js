@@ -228,6 +228,7 @@ function buildReportPdfStage(r){
 
  stage.querySelectorAll('[data-action="pdf"],[data-action="xlsx"],[data-action="prev"],[data-action="next"],[data-action="back-report"]').forEach(el=>el.remove());
  stage.querySelectorAll('.r-card small').forEach(el=>el.remove());
+ stage.querySelectorAll('[data-row]').forEach(el=>el.remove());
  stage.querySelectorAll('.r-flex').forEach(el=>{if(!el.children.length&&!el.textContent.trim())el.remove();});
 
  const css=document.createElement('style');
@@ -236,6 +237,8 @@ function buildReportPdfStage(r){
    '.cf-report-pdf-stage .r-chart{overflow:visible!important;max-height:none!important;}'+
    '.cf-report-pdf-stage th{position:static!important;}'+
    '.cf-report-pdf-stage .r-box{break-inside:avoid;}'+
+   '.cf-report-pdf-stage .r-card small{display:none!important;}'+
+   '.cf-report-pdf-stage [data-row]{display:none!important;}'+
    '.cf-report-pdf-stage button{cursor:default!important;}'+
    '.cf-report-pdf-stage tbody tr:hover{background:transparent!important;}';
  stage.prepend(css);

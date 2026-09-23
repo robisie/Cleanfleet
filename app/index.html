@@ -1311,6 +1311,35 @@ body[data-cf-role="cleanfleet_employee"] #plateCameraBtn{
   font:14px/1.15 'Inter',sans-serif;
 }
 
+/* iPhone: stabilne przewijanie okna „Edytuj wpis”. Safari zmienia vh podczas
+   chowania/pokazywania pasków, więc formularz używa stabilnego viewportu. */
+@media(max-width:639px){
+  #formOverlay{
+    overflow:hidden;
+    overscroll-behavior:none;
+  }
+  #formOverlay .sheet{
+    width:100%;
+    max-height:calc(100vh - 70px - env(safe-area-inset-bottom)) !important;
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    overscroll-behavior-y:contain;
+    -webkit-overflow-scrolling:touch;
+    scroll-behavior:auto !important;
+    overflow-anchor:none;
+  }
+  #formOverlay .sheet-actions{
+    scroll-margin-bottom:18px;
+  }
+}
+@supports(height:100svh){
+  @media(max-width:639px){
+    #formOverlay .sheet{
+      max-height:calc(100svh - 70px - env(safe-area-inset-bottom)) !important;
+    }
+  }
+}
+
 #cfVehicleEditOverlay{z-index:15000!important;}
 .cf-vehicle-edit-sheet{max-width:760px;max-height:92vh;overflow:auto;}
 .cf-vehicle-edit-grid{
@@ -10416,6 +10445,24 @@ function uid(){
     document.getElementById('formOverlay').addEventListener('click', (e) => {
       if(e.target.id === 'formOverlay') closeModal();
     });
+
+    // iOS Safari: jeżeli przy przewinięciu na dół nadal aktywne jest pole formularza,
+    // dotknięcie przycisku potrafi najpierw przewinąć modal z powrotem do tego pola.
+    // Zdejmujemy focus przed obsługą dolnych akcji i zachowujemy aktualny scroll.
+    const editSheet=document.querySelector('#formOverlay .sheet');
+    const editActions=document.querySelector('#formOverlay .sheet-actions');
+    const keepEditScrollOnAction=()=>{
+      if(!editSheet) return;
+      const y=editSheet.scrollTop;
+      const active=document.activeElement;
+      if(active && editSheet.contains(active) && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)){
+        try{active.blur();}catch(_){}
+        requestAnimationFrame(()=>{ editSheet.scrollTop=y; });
+      }
+    };
+    editActions?.addEventListener('touchstart',keepEditScrollOnAction,{passive:true});
+    editActions?.addEventListener('pointerdown',keepEditScrollOnAction);
+
     document.querySelector('[data-close]').addEventListener('click', closeModal);
     document.getElementById('saveBtn').addEventListener('click', () => submitForm());
 

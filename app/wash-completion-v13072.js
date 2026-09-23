@@ -39,13 +39,22 @@
     }catch(_){}
     console.info(message);
   }
+  function currentRole(){
+    const role=document.body?.getAttribute('data-cf-role')||'';
+    if(role) return role;
+    try{
+      if(typeof cfIsAdmin==='function'&&cfIsAdmin()) return 'admin';
+      if(typeof cfIsCleanFleetEmployee==='function'&&cfIsCleanFleetEmployee()) return 'cleanfleet_employee';
+      if(typeof cfIsFleetEmployee==='function'&&cfIsFleetEmployee()) return 'fleet_employee';
+    }catch(_){}
+    return '';
+  }
   function canComplete(){
-    try{return (typeof cfIsAdmin==='function'&&cfIsAdmin())||(typeof cfIsCleanFleetEmployee==='function'&&cfIsCleanFleetEmployee());}
-    catch(_){return false;}
+    const role=currentRole();
+    return role==='admin'||role==='cleanfleet_employee';
   }
   function isAdmin(){
-    try{return typeof cfIsAdmin==='function'&&cfIsAdmin();}
-    catch(_){return false;}
+    return currentRole()==='admin';
   }
   function injectStyles(){
     if(document.getElementById(STYLE_ID))return;

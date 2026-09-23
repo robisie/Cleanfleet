@@ -1,4 +1,4 @@
-// CleanFleet v1.30.91 — larger edit-form time fields and auto-growing service description.
+// CleanFleet v1.30.92 — correct 32px width rule and subtle time-field sizing.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

@@ -227,8 +227,8 @@ function buildReportPdfStage(r){
  if(rowsBox)rowsBox.innerHTML=reportPdfAllRowsHtml(r);
 
  stage.querySelectorAll('[data-action="pdf"],[data-action="xlsx"],[data-action="prev"],[data-action="next"],[data-action="back-report"]').forEach(el=>el.remove());
- stage.querySelectorAll('.r-card small').forEach(el=>el.remove());
- stage.querySelectorAll('[data-row]').forEach(el=>el.remove());
+ stage.querySelectorAll('.r-card small,[data-metric] small').forEach(el=>el.remove());
+ stage.querySelectorAll('#rRows [data-row],[data-row]').forEach(el=>el.remove());
  stage.querySelectorAll('.r-flex').forEach(el=>{if(!el.children.length&&!el.textContent.trim())el.remove();});
 
  const css=document.createElement('style');

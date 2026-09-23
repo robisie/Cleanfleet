@@ -43,8 +43,7 @@ function bind(){host.onclick=async ev=>{const b=ev.target.closest('[data-action]
  $('#rTemplate').onchange=async ev=>{const t=templates()[+ev.target.value];if(ev.target.value===''||!t)return;cfg=JSON.parse(JSON.stringify(t.cfg));result=null;data={};render();try{busy(true);data=await load(cfg.source);renderFilters();notice('Szablon wczytany. Możesz zmienić okres i wygenerować raport.');}catch(e){notice(e.message,true);}finally{busy(false);}};
  for(const id of ['#rAmount','#rDistinct'])$(id).onchange=()=>{readConfig();render();dirty();};$$('#rConfig input,#rConfig select').forEach(el=>el.addEventListener('change',dirty));$$('#rColumns input').forEach(el=>el.addEventListener('change',()=>{readConfig();const c=$('.r-column-count');if(c)c.textContent='Wybrano: '+cfg.columns.length;}));}
 function selectedMetrics(r=result){return r.metrics.filter(m=>r.cfg.metricIds.includes(m.id));}
-function renderResult(){if(!result)return;const ms=selectedMetrics();$('#rResults').innerHTML='<section class="r-box"><div class="r-barline"><div><h2>'+esc(result.cfg.title)+'</h2><p class="r-muted">'+esc(C[result.cfg.source].label)+' · stan: '+esc(new Date(result.loadedAt).toLocaleString('pl-PL'))+'</p></div><img class="r-report-logo" id="rReportLogo" alt="CleanFleet" hidden><div class="r-flex"><button data-action="pdf">PDF</button><button data-action="xlsx">XLSX</button></div></div><p class="r-muted">'+esc(describe(result).join(' · '))+'</p><div class="r-cards">'+ms.map(m=>'<button class="r-card" data-metric="'+esc(m.id)+'"><span>'+esc(m.label)+'</span><strong>'+metricText(m)+'</strong><small>Sprawdź dane →</small></button>').join('')+'</div><p class="r-muted">Średnie pomijają brakujące kwoty. Unikalny pojazd = firma + rejestracja. Częstotliwość to liczba wykonanych prań na unikalny pojazd w wybranym zbiorze. Odstępy obejmują tylko kolejne prania tego samego pojazdu w tym zbiorze; kilka prań jednego dnia daje odstęp 0 dni.</p><div class="r-chart" id="rChartView">'+chartSVG(result)+'</div><div class="r-scroll"><table><thead><tr><th>Grupa</th>'+ms.map(m=>'<th>'+esc(m.label)+'</th>').join('')+'</tr></thead><tbody>'+result.groups.map((g,i)=>'<tr><td><button class="link" data-group="'+i+'">'+esc(g.label)+'</button></td>'+ms.map(m=>{const gm=g.metrics.find(x=>x.id===m.id);return'<td><button class="link" data-group="'+i+'" data-gmetric="'+m.id+'">'+metricText(gm)+'</button></td>';}).join('')+'</tr>').join('')+'</tbody></table></div></section><section class="r-box" id="rRows"></section>';
- lightLogoSrc().then(src=>{const img=$('#rReportLogo');if(img&&src){img.src=src;img.hidden=false;}}).catch(()=>{});
+function renderResult(){if(!result)return;const ms=selectedMetrics();$('#rResults').innerHTML='<section class="r-box"><div class="r-barline"><div><h2>'+esc(result.cfg.title)+'</h2><p class="r-muted">'+esc(C[result.cfg.source].label)+' · stan: '+esc(new Date(result.loadedAt).toLocaleString('pl-PL'))+'</p></div><div class="r-flex"><button data-action="pdf">PDF</button><button data-action="xlsx">XLSX</button></div></div><p class="r-muted">'+esc(describe(result).join(' · '))+'</p><div class="r-cards">'+ms.map(m=>'<button class="r-card" data-metric="'+esc(m.id)+'"><span>'+esc(m.label)+'</span><strong>'+metricText(m)+'</strong><small>Sprawdź dane →</small></button>').join('')+'</div><p class="r-muted">Średnie pomijają brakujące kwoty. Unikalny pojazd = firma + rejestracja. Częstotliwość to liczba wykonanych prań na unikalny pojazd w wybranym zbiorze. Odstępy obejmują tylko kolejne prania tego samego pojazdu w tym zbiorze; kilka prań jednego dnia daje odstęp 0 dni.</p><div class="r-chart" id="rChartView">'+chartSVG(result)+'</div><div class="r-scroll"><table><thead><tr><th>Grupa</th>'+ms.map(m=>'<th>'+esc(m.label)+'</th>').join('')+'</tr></thead><tbody>'+result.groups.map((g,i)=>'<tr><td><button class="link" data-group="'+i+'">'+esc(g.label)+'</button></td>'+ms.map(m=>{const gm=g.metrics.find(x=>x.id===m.id);return'<td><button class="link" data-group="'+i+'" data-gmetric="'+m.id+'">'+metricText(gm)+'</button></td>';}).join('')+'</tr>').join('')+'</tbody></table></div></section><section class="r-box" id="rRows"></section>';
  $('[data-metric]').forEach(b=>b.onclick=()=>drill(result.metrics.find(m=>m.id===b.dataset.metric),null));$$('[data-group]').forEach(b=>{const action=()=>{const g=result.groups[+b.dataset.group];const m=b.dataset.gmetric?g.metrics.find(x=>x.id===b.dataset.gmetric):{rows:g.rows,label:g.label};drill(m,g);};b.onclick=action;b.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();action();}};});renderRows();}
 function drill(m,g){guard();const title=(g?g.label+' · ':'')+m.label;viewRows={rows:m.rows,title,metric:m};page=0;sortField='';renderRows();$('#rRows').scrollIntoView({block:'start'});}
 function renderRows(){const pane=$('#rRows');if(!pane||!result)return;let rows=[...(viewRows?.rows||result.rows)],cols=result.cfg.columns,defs=result.fields;const m=viewRows?.metric;let kind='rows';if(m?.kind==='vehicles'){kind='vehicles';rows=E.distinctVehicles(rows);cols=['company_name','plate'];defs={company_name:{label:'Firma'},plate:{label:'Rejestracja'}};}else if(m?.kind==='distinct'){kind='distinct';const grouped=new Map();for(const r of rows){const k=E.text(r[m.field]);if(!grouped.has(k))grouped.set(k,{[m.field]:r[m.field],_count:0,rows:[]});grouped.get(k)._count++;grouped.get(k).rows.push(r);}rows=[...grouped.values()];cols=[m.field,'_count'];defs={...defs,_count:{label:'Liczba rekordów'}};}else if(m?.kind==='interval'){kind='pairs';rows=(m.pairs||[]).map(p=>({company_name:p.to.company_name,plate:p.to.plate,from_date:p.from.wash_date,to_date:p.to.wash_date,days:p.days,from_id:p.from.id,to_id:p.to.id}));cols=['company_name','plate','from_date','to_date','days','from_id','to_id'];defs=Object.fromEntries(['Firma','Rejestracja','Poprzednie pranie','Kolejne pranie','Odstęp (dni)','Poprzedni wpis','Kolejny wpis'].map((v,i)=>[cols[i],{label:v}]));}
@@ -273,58 +272,7 @@ function reportPdfBreaks(stage,cssPageHeight){
 }
 
 async function exportPDF(r){
- if(!root.jspdf?.jsPDF||!root.html2canvas)return exportPDFVectorFallback(r);
- const stage=buildReportPdfStage(r);
- try{
-   const reportLogo=stage.querySelector('.r-report-logo');
-   const lightLogo=await lightLogoSrc();
-   if(reportLogo&&lightLogo){reportLogo.src=lightLogo;reportLogo.hidden=false;try{if(reportLogo.decode)await reportLogo.decode();}catch(_){}}
-   if(document.fonts?.ready)await document.fonts.ready;
-   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-
-   const rect=stage.getBoundingClientRect();
-   const doc=new root.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-   const pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight();
-   const margin=8,usableW=pw-margin*2,usableH=ph-margin*2;
-   const cssPageHeight=rect.width*(usableH/usableW);
-   const breaks=reportPdfBreaks(stage,cssPageHeight);
-
-   const canvas=await root.html2canvas(stage,{
-     scale:1,
-     useCORS:true,
-     allowTaint:false,
-     backgroundColor:'#ffffff',
-     logging:false,
-     windowWidth:Math.ceil(rect.width),
-     windowHeight:Math.ceil(stage.scrollHeight)
-   });
-   const ratio=canvas.width/rect.width;
-
-   for(let i=0;i<breaks.length-1;i++){
-     const cssStart=breaks[i],cssEnd=breaks[i+1];
-     const sy=Math.max(0,Math.round(cssStart*ratio));
-     const sh=Math.min(canvas.height-sy,Math.max(1,Math.round((cssEnd-cssStart)*ratio)));
-     const slice=document.createElement('canvas');
-     slice.width=canvas.width;
-     slice.height=sh;
-     const ctx=slice.getContext('2d');
-     ctx.fillStyle='#ffffff';
-     ctx.fillRect(0,0,slice.width,slice.height);
-     ctx.drawImage(canvas,0,sy,canvas.width,sh,0,0,canvas.width,sh);
-     if(i)doc.addPage('a4','landscape');
-     const imgH=(sh/canvas.width)*usableW;
-     doc.addImage(slice.toDataURL('image/png'),'PNG',margin,margin,usableW,Math.min(imgH,usableH),undefined,'FAST');
-     slice.width=slice.height=1;
-   }
-   canvas.width=canvas.height=1;
-   doc.save(safeName(r.cfg.title)+'.pdf');
-   return doc;
- }catch(err){
-   console.error('CleanFleet HTML report PDF:',err);
-   return exportPDFVectorFallback(r);
- }finally{
-   stage.remove();
- }
+ return exportPDFVectorFallback(r);
 }
 function pairsForVehicle(done){const gaps=[];for(let i=1;i<done.length;i++){const days=(Date.parse(done[i].wash_date+'T00:00:00Z')-Date.parse(done[i-1].wash_date+'T00:00:00Z'))/86400000;if(Number.isFinite(days)&&days>=0)gaps.push(days);}return gaps;}
 function grouped(rows,key,value=()=>1){const m=new Map();for(const r of rows){const k=key(r)||'Brak danych';m.set(k,(m.get(k)||0)+Number(value(r)||0));}return [...m].map(([label,value])=>({label,value})).sort((a,b)=>String(a.label).localeCompare(String(b.label),'pl',{numeric:true}));}

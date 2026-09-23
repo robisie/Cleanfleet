@@ -43,8 +43,9 @@ function bind(){host.onclick=async ev=>{const b=ev.target.closest('[data-action]
  $('#rTemplate').onchange=async ev=>{const t=templates()[+ev.target.value];if(ev.target.value===''||!t)return;cfg=JSON.parse(JSON.stringify(t.cfg));result=null;data={};render();try{busy(true);data=await load(cfg.source);renderFilters();notice('Szablon wczytany. Możesz zmienić okres i wygenerować raport.');}catch(e){notice(e.message,true);}finally{busy(false);}};
  for(const id of ['#rAmount','#rDistinct'])$(id).onchange=()=>{readConfig();render();dirty();};$$('#rConfig input,#rConfig select').forEach(el=>el.addEventListener('change',dirty));$$('#rColumns input').forEach(el=>el.addEventListener('change',()=>{readConfig();const c=$('.r-column-count');if(c)c.textContent='Wybrano: '+cfg.columns.length;}));}
 function selectedMetrics(r=result){return r.metrics.filter(m=>r.cfg.metricIds.includes(m.id));}
-function renderResult(){if(!result)return;const ms=selectedMetrics();$('#rResults').innerHTML='<section class="r-box"><div class="r-barline"><div><h2>'+esc(result.cfg.title)+'</h2><p class="r-muted">'+esc(C[result.cfg.source].label)+' · stan: '+esc(new Date(result.loadedAt).toLocaleString('pl-PL'))+'</p></div><div class="r-flex"><button data-action="pdf">PDF</button><button data-action="xlsx">XLSX</button></div></div><p class="r-muted">'+esc(describe(result).join(' · '))+'</p><div class="r-cards">'+ms.map(m=>'<button class="r-card" data-metric="'+esc(m.id)+'"><span>'+esc(m.label)+'</span><strong>'+metricText(m)+'</strong><small>Sprawdź dane →</small></button>').join('')+'</div><p class="r-muted">Średnie pomijają brakujące kwoty. Unikalny pojazd = firma + rejestracja. Częstotliwość to liczba wykonanych prań na unikalny pojazd w wybranym zbiorze. Odstępy obejmują tylko kolejne prania tego samego pojazdu w tym zbiorze; kilka prań jednego dnia daje odstęp 0 dni.</p><div class="r-chart" id="rChartView">'+chartSVG(result)+'</div><div class="r-scroll"><table><thead><tr><th>Grupa</th>'+ms.map(m=>'<th>'+esc(m.label)+'</th>').join('')+'</tr></thead><tbody>'+result.groups.map((g,i)=>'<tr><td><button class="link" data-group="'+i+'">'+esc(g.label)+'</button></td>'+ms.map(m=>{const gm=g.metrics.find(x=>x.id===m.id);return'<td><button class="link" data-group="'+i+'" data-gmetric="'+m.id+'">'+metricText(gm)+'</button></td>';}).join('')+'</tr>').join('')+'</tbody></table></div></section><section class="r-box" id="rRows"></section>';
- $$('[data-metric]').forEach(b=>b.onclick=()=>drill(result.metrics.find(m=>m.id===b.dataset.metric),null));$$('[data-group]').forEach(b=>{const action=()=>{const g=result.groups[+b.dataset.group];const m=b.dataset.gmetric?g.metrics.find(x=>x.id===b.dataset.gmetric):{rows:g.rows,label:g.label};drill(m,g);};b.onclick=action;b.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();action();}};});renderRows();}
+function renderResult(){if(!result)return;const ms=selectedMetrics();$('#rResults').innerHTML='<section class="r-box"><div class="r-barline"><div><h2>'+esc(result.cfg.title)+'</h2><p class="r-muted">'+esc(C[result.cfg.source].label)+' · stan: '+esc(new Date(result.loadedAt).toLocaleString('pl-PL'))+'</p></div><img class="r-report-logo" id="rReportLogo" alt="CleanFleet" hidden><div class="r-flex"><button data-action="pdf">PDF</button><button data-action="xlsx">XLSX</button></div></div><p class="r-muted">'+esc(describe(result).join(' · '))+'</p><div class="r-cards">'+ms.map(m=>'<button class="r-card" data-metric="'+esc(m.id)+'"><span>'+esc(m.label)+'</span><strong>'+metricText(m)+'</strong><small>Sprawdź dane →</small></button>').join('')+'</div><p class="r-muted">Średnie pomijają brakujące kwoty. Unikalny pojazd = firma + rejestracja. Częstotliwość to liczba wykonanych prań na unikalny pojazd w wybranym zbiorze. Odstępy obejmują tylko kolejne prania tego samego pojazdu w tym zbiorze; kilka prań jednego dnia daje odstęp 0 dni.</p><div class="r-chart" id="rChartView">'+chartSVG(result)+'</div><div class="r-scroll"><table><thead><tr><th>Grupa</th>'+ms.map(m=>'<th>'+esc(m.label)+'</th>').join('')+'</tr></thead><tbody>'+result.groups.map((g,i)=>'<tr><td><button class="link" data-group="'+i+'">'+esc(g.label)+'</button></td>'+ms.map(m=>{const gm=g.metrics.find(x=>x.id===m.id);return'<td><button class="link" data-group="'+i+'" data-gmetric="'+m.id+'">'+metricText(gm)+'</button></td>';}).join('')+'</tr>').join('')+'</tbody></table></div></section><section class="r-box" id="rRows"></section>';
+ lightLogoSrc().then(src=>{const img=$('#rReportLogo');if(img&&src){img.src=src;img.hidden=false;}}).catch(()=>{});
+ $('[data-metric]').forEach(b=>b.onclick=()=>drill(result.metrics.find(m=>m.id===b.dataset.metric),null));$$('[data-group]').forEach(b=>{const action=()=>{const g=result.groups[+b.dataset.group];const m=b.dataset.gmetric?g.metrics.find(x=>x.id===b.dataset.gmetric):{rows:g.rows,label:g.label};drill(m,g);};b.onclick=action;b.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();action();}};});renderRows();}
 function drill(m,g){guard();const title=(g?g.label+' · ':'')+m.label;viewRows={rows:m.rows,title,metric:m};page=0;sortField='';renderRows();$('#rRows').scrollIntoView({block:'start'});}
 function renderRows(){const pane=$('#rRows');if(!pane||!result)return;let rows=[...(viewRows?.rows||result.rows)],cols=result.cfg.columns,defs=result.fields;const m=viewRows?.metric;let kind='rows';if(m?.kind==='vehicles'){kind='vehicles';rows=E.distinctVehicles(rows);cols=['company_name','plate'];defs={company_name:{label:'Firma'},plate:{label:'Rejestracja'}};}else if(m?.kind==='distinct'){kind='distinct';const grouped=new Map();for(const r of rows){const k=E.text(r[m.field]);if(!grouped.has(k))grouped.set(k,{[m.field]:r[m.field],_count:0,rows:[]});grouped.get(k)._count++;grouped.get(k).rows.push(r);}rows=[...grouped.values()];cols=[m.field,'_count'];defs={...defs,_count:{label:'Liczba rekordów'}};}else if(m?.kind==='interval'){kind='pairs';rows=(m.pairs||[]).map(p=>({company_name:p.to.company_name,plate:p.to.plate,from_date:p.from.wash_date,to_date:p.to.wash_date,days:p.days,from_id:p.from.id,to_id:p.to.id}));cols=['company_name','plate','from_date','to_date','days','from_id','to_id'];defs=Object.fromEntries(['Firma','Rejestracja','Poprzednie pranie','Kolejne pranie','Odstęp (dni)','Poprzedni wpis','Kolejny wpis'].map((v,i)=>[cols[i],{label:v}]));}
  if(sortField)rows.sort((a,b)=>{const x=a[sortField],y=b[sortField];return sortDir*(typeof x==='number'&&typeof y==='number'?x-y:display(x).localeCompare(display(y),'pl',{numeric:true}));});const pages=Math.max(1,Math.ceil(rows.length/50));page=Math.min(page,pages-1);const shown=rows.slice(page*50,page*50+50);pane.innerHTML='<div class="r-barline"><h2>'+esc(viewRows?.title||'Dane źródłowe')+' <small>('+rows.length+')</small></h2>'+(viewRows?'<button data-action="back-report">← Wszystkie dane raportu</button>':'')+'</div>'+(m?.kind==='frequency'?'<p>'+m.rows.length+' wykonanych prań / '+E.distinctVehicles(m.rows).length+' pojazdów = '+fmt(m.value)+'</p>':'')+'<div class="r-scroll"><table><thead><tr><th>Szczegóły</th>'+cols.map(k=>'<th><button class="link" data-sort="'+esc(k)+'">'+esc(defs[k]?.label||k)+(sortField===k?(sortDir===1?' ↑':' ↓'):'')+'</button></th>').join('')+'</tr></thead><tbody>'+shown.map((r,i)=>'<tr><td><button class="link" data-row="'+i+'">Otwórz</button></td>'+cols.map(k=>'<td>'+esc(display(r[k]))+'</td>').join('')+'</tr>').join('')+'</tbody></table></div><div class="r-barline r-actions"><p class="r-muted">Strona '+(page+1)+' / '+pages+' · Eksport obejmuje wszystkie przefiltrowane rekordy raportu nadrzędnego.</p><div class="r-flex"><button data-action="prev" '+(page===0?'disabled':'')+'>←</button><button data-action="next" '+(page===pages-1?'disabled':'')+'>→</button></div></div>';
@@ -220,7 +221,7 @@ function buildReportPdfStage(r){
  if(!source)throw Error('Brak podglądu raportu do eksportu.');
  const stage=document.createElement('div');
  stage.className='cf-report-pdf-stage';
- stage.style.cssText='position:fixed;left:-100000px;top:0;width:1360px;padding:18px;background:#f3f5ef;box-sizing:border-box;pointer-events:none;z-index:-1;';
+ stage.style.cssText='position:fixed;left:-100000px;top:0;width:1360px;padding:18px;background:#ffffff;box-sizing:border-box;pointer-events:none;z-index:-1;';
  stage.innerHTML=source.innerHTML;
 
  const rowsBox=stage.querySelector('#rRows');
@@ -233,6 +234,7 @@ function buildReportPdfStage(r){
 
  const css=document.createElement('style');
  css.textContent=
+   '.cf-report-pdf-stage{background:#fff!important;}'+
    '.cf-report-pdf-stage .r-scroll{overflow:visible!important;max-height:none!important;}'+
    '.cf-report-pdf-stage .r-chart{overflow:visible!important;max-height:none!important;}'+
    '.cf-report-pdf-stage th{position:static!important;}'+
@@ -274,6 +276,9 @@ async function exportPDF(r){
  if(!root.jspdf?.jsPDF||!root.html2canvas)return exportPDFVectorFallback(r);
  const stage=buildReportPdfStage(r);
  try{
+   const reportLogo=stage.querySelector('.r-report-logo');
+   const lightLogo=await lightLogoSrc();
+   if(reportLogo&&lightLogo){reportLogo.src=lightLogo;reportLogo.hidden=false;try{if(reportLogo.decode)await reportLogo.decode();}catch(_){}}
    if(document.fonts?.ready)await document.fonts.ready;
    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
 
@@ -288,7 +293,7 @@ async function exportPDF(r){
      scale:1,
      useCORS:true,
      allowTaint:false,
-     backgroundColor:'#f3f5ef',
+     backgroundColor:'#ffffff',
      logging:false,
      windowWidth:Math.ceil(rect.width),
      windowHeight:Math.ceil(stage.scrollHeight)
@@ -303,7 +308,7 @@ async function exportPDF(r){
      slice.width=canvas.width;
      slice.height=sh;
      const ctx=slice.getContext('2d');
-     ctx.fillStyle='#f3f5ef';
+     ctx.fillStyle='#ffffff';
      ctx.fillRect(0,0,slice.width,slice.height);
      ctx.drawImage(canvas,0,sy,canvas.width,sh,0,0,canvas.width,sh);
      if(i)doc.addPage('a4','landscape');

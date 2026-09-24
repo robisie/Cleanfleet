@@ -202,8 +202,7 @@ self.addEventListener('fetch', event => {
       '<script src="/app/reminder-form-v1251.js?v=20260917-3"></script>\n' +
       '<script src="/app/calendar-today-tile-v1262.js?v=20260917-5"></script>\n' +
       '<script src="/app/taxes-v1310.js?v=20260918-6"></script>\n' +
-      '<script src="/app/admin-dashboard-v1270.js?v=20260923-13068"></script>\n' +
-      '<script src="/app/website-analytics-admin.js?v=20260924-13104"></script>';
+      '<script src="/app/admin-dashboard-v1270.js?v=20260923-13068"></script>';
     if (html.includes('</body>')) html = html.replace('</body>', `${injectedScripts}\n</body>`);
     else html += injectedScripts;
 

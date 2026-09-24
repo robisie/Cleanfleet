@@ -1,4 +1,4 @@
-// CleanFleet v1.30.102 — photo ZIP folders start from date; ZIP filename unchanged.
+// CleanFleet v1.30.103 — website analytics admin module + SEO rollout.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -11,7 +11,7 @@ self.addEventListener('fetch', event => {
   const req = event.request;
   const url = new URL(req.url);
 
-  if (url.origin === self.location.origin && (url.pathname === '/app/reports-ui.js' || url.pathname === '/app/reports.css')) {
+  if (url.origin === self.location.origin && (url.pathname === '/app/reports-ui.js' || url.pathname === '/app/reports.css' || url.pathname === '/app/website-analytics-admin.js')) {
     event.respondWith(fetch(req, { cache: 'no-store' }));
     return;
   }
@@ -70,6 +70,7 @@ self.addEventListener('fetch', event => {
     if (!response.ok || !type.includes('text/html')) return response;
 
     let html = await response.text(); 
+    html = html.replace(/v1\\.30\\.102/g, 'v1.30.103');
     html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13095');
     html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13096');
 
@@ -201,7 +202,8 @@ self.addEventListener('fetch', event => {
       '<script src="/app/reminder-form-v1251.js?v=20260917-3"></script>\n' +
       '<script src="/app/calendar-today-tile-v1262.js?v=20260917-5"></script>\n' +
       '<script src="/app/taxes-v1310.js?v=20260918-6"></script>\n' +
-      '<script src="/app/admin-dashboard-v1270.js?v=20260923-13068"></script>';
+      '<script src="/app/admin-dashboard-v1270.js?v=20260923-13068"></script>\n' +
+      '<script src="/app/website-analytics-admin.js?v=20260924-13103"></script>';
     if (html.includes('</body>')) html = html.replace('</body>', `${injectedScripts}\n</body>`);
     else html += injectedScripts;
 

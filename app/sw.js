@@ -1,4 +1,4 @@
-// CleanFleet v1.30.100 — secure wash-time updates for CleanFleet employees.
+// CleanFleet v1.30.101 — immediate confirmed completion state in the active list.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

@@ -1,4 +1,4 @@
-// CleanFleet v1.30.112 — website analytics admin module + SEO rollout.
+// CleanFleet v1.30.113 — website analytics admin module + SEO rollout.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -70,7 +70,7 @@ self.addEventListener('fetch', event => {
     if (!response.ok || !type.includes('text/html')) return response;
 
     let html = await response.text(); 
-    html = html.replace(/v1\\.30\\.(?:102|103|104|105|106|107|108|109|110|111)/g, 'v1.30.112');
+    html = html.replace(/v1\\.30\\.(?:102|103|104|105|106|107|108|109|110|111|112)/g, 'v1.30.113');
     html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13095');
     html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13096');
 

@@ -1,4 +1,4 @@
-// CleanFleet v1.30.101 — immediate confirmed completion state in the active list.
+// CleanFleet v1.30.102 — photo ZIP folders start from date; ZIP filename unchanged.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

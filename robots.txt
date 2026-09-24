@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /app/
+Disallow: /panelwww.html
+Disallow: /migracja-supabase.html
+Disallow: /recover.html
+Sitemap: https://cleanfleet.pl/sitemap.xml

@@ -467,14 +467,50 @@
             p_completion_notes:notes||null
           });
           if(error)throw error;
+
+          // Dopiero po potwierdzonym zapisie w Supabase aktualizujemy stan na ekranie.
+          // Dzięki temu przy błędzie zapisu checkbox nie może pokazać fałszywego "Wykonane".
+          try{
+            window.cfApplyCompletedWashLocal?.({
+              id,
+              washDate,
+              start,
+              end,
+              performer,
+              cost:Math.round(cost*100)/100,
+              notes
+            });
+          }catch(localError){
+            console.warn('CleanFleet local completion refresh:',localError);
+          }
+
           close();
+
           try{
             if(typeof addOptionIfNew==='function')addOptionIfNew('kto_wykonal',performer);
           }catch(_){}
-          if(typeof loadAll==='function')await loadAll();
-          try{if(typeof renderAttentionPanel==='function')renderAttentionPanel();}catch(_){}
-          try{if(typeof renderRecords==='function')renderRecords();}catch(_){}
-          try{if(typeof cfLoadChangeNotifications==='function')await cfLoadChangeNotifications();}catch(_){}
+
+          // Pełna synchronizacja potwierdza dane z bazy, ale nie blokuje już reakcji UI.
+          try{
+            const refresh=window.cfReloadActiveCompanyData
+              ? window.cfReloadActiveCompanyData()
+              : (typeof loadAll==='function' ? loadAll() : null);
+            if(refresh && typeof refresh.catch==='function'){
+              refresh.catch(err=>console.warn('CleanFleet post-completion refresh:',err));
+            }
+          }catch(refreshError){
+            console.warn('CleanFleet post-completion refresh:',refreshError);
+          }
+
+          try{
+            const notesRefresh=typeof cfLoadChangeNotifications==='function'
+              ? cfLoadChangeNotifications()
+              : null;
+            if(notesRefresh && typeof notesRefresh.catch==='function'){
+              notesRefresh.catch(err=>console.warn('CleanFleet completion notifications refresh:',err));
+            }
+          }catch(_){}
+
           toast(`Pranie zakończone · ${durationLabel(start,end)} · ${money(cost)}`);
         }catch(err){
           console.error('CleanFleet complete wash:',err);

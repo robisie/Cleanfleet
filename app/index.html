@@ -6599,7 +6599,7 @@ async function cfShowGlobalEmployees(){
   if(cfEmployeeActivityRefreshTimer){ clearTimeout(cfEmployeeActivityRefreshTimer); cfEmployeeActivityRefreshTimer=null; }
   const root=document.getElementById('modalRoot');
   root.innerHTML=`<div class="overlay" id="cfGlobalEmployeesOverlay">
-    <div class="sheet" style="max-width:980px;">
+    <div class="sheet cf-global-employees-sheet">
       <button class="close" data-close type="button">&times;</button>
       <h2>Pracownicy</h2>
       <div class="confirm-text">Ustal typ konta i dostęp do firm. Pracownik floty ma dostęp do jednej firmy. Pracownik CleanFleet może mieć dostęp do jednej lub kilku zaznaczonych firm, bez uprawnień administratora. Statystyki wejść, logowań i aktywnych dni są naliczane od wersji v1.30.110; wcześniejsza data ostatniego logowania pochodzi z historii Supabase.</div>
@@ -15112,106 +15112,273 @@ function uid(){
 }
 .cf-company-users-card strong{font-size:22px;display:block;margin-bottom:6px;}
 .cf-company-users-card span{color:var(--ink-soft);font-size:13px;}
+.cf-global-employees-sheet{
+  max-width:1180px !important;
+  width:96%;
+  max-height:92vh;
+  overflow:auto;
+}
 .cf-employee-admin-toolbar{
-  display:flex;justify-content:space-between;align-items:center;gap:12px;
-  margin:12px 0 4px;color:var(--ink-soft);font-size:13px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin:12px 0 8px;
+  color:var(--ink-soft);
+  font-size:13px;
 }
-.cf-employee-admin-row{align-items:center;gap:18px;}
-.cf-employee-admin-controls{
-  display:grid;grid-template-columns:minmax(180px,1fr) auto auto auto;
-  gap:8px;align-items:end;flex:1;
+.cf-employee-admin-row{
+  display:grid;
+  grid-template-columns:minmax(240px,.9fr) minmax(360px,1.1fr);
+  grid-template-areas:
+    "main activity"
+    "controls controls";
+  gap:14px 18px;
+  align-items:start;
+  padding:15px;
 }
-.cf-employee-admin-controls label{
-  font-size:12px;color:var(--ink-soft);display:grid;gap:5px;
+.cf-employee-admin-row > .cf-employee-main{
+  grid-area:main;
+  min-width:240px;
+  align-self:center;
 }
-.cf-employee-company-select{
-  min-height:40px;border:1px solid var(--line);border-radius:8px;
-  background:var(--paper);color:var(--ink);padding:0 10px;
+.cf-employee-admin-row > .cf-employee-activity{
+  grid-area:activity;
+  min-width:0;
+  width:100%;
+  box-sizing:border-box;
 }
+.cf-employee-admin-row > .cf-employee-admin-controls{
+  grid-area:controls;
+  width:100%;
+  box-sizing:border-box;
+}
+.cf-employee-main{min-width:0;}
+.cf-employee-name{
+  font-weight:800;
+  color:var(--ink);
+  font-size:15px;
+  line-height:1.25;
+  overflow-wrap:normal;
+  word-break:normal;
+}
+.cf-employee-email{
+  font-size:12px;
+  color:var(--ink-soft);
+  overflow-wrap:anywhere;
+  margin-top:4px;
+  line-height:1.35;
+}
+.cf-employee-state{
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.06em;
+  border-radius:999px;
+  padding:5px 8px;
+  display:inline-block;
+  margin-top:8px;
+}
+.cf-employee-state.active{background:var(--green-bg);color:var(--green-ink);}
+.cf-employee-state.blocked{background:#f8d9d5;color:#8e2f25;}
 .cf-employee-state.waiting{background:#fff3cd;color:#7a5a00;}
+
 .cf-employee-activity{
-  min-width:250px;
-  flex:0 1 360px;
   border:1px solid var(--line);
-  border-radius:10px;
+  border-radius:11px;
   background:#f8f8f5;
-  padding:10px 11px;
+  padding:12px 13px;
 }
 .cf-employee-presence{
   display:flex;
   align-items:center;
   gap:7px;
-  margin-bottom:8px;
+  margin-bottom:10px;
   font-size:11px;
+  min-width:0;
 }
 .cf-employee-presence-dot{
-  width:9px;height:9px;border-radius:50%;background:#aaa;flex:0 0 9px;
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background:#aaa;
+  flex:0 0 9px;
 }
-.cf-employee-presence.online .cf-employee-presence-dot{background:#4f8a10;box-shadow:0 0 0 3px rgba(79,138,16,.12);}
+.cf-employee-presence.online .cf-employee-presence-dot{
+  background:#4f8a10;
+  box-shadow:0 0 0 3px rgba(79,138,16,.12);
+}
 .cf-employee-presence.offline .cf-employee-presence-dot{background:#9da39f;}
-.cf-employee-presence strong{font-size:11px;color:var(--ink);}
-.cf-employee-presence span:last-child{color:var(--ink-soft);font-size:10px;}
+.cf-employee-presence strong{
+  font-size:11px;
+  color:var(--ink);
+  white-space:nowrap;
+}
+.cf-employee-presence span:last-child{
+  color:var(--ink-soft);
+  font-size:10px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
 .cf-employee-activity-grid{
   display:grid;
   grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:6px;
+  gap:8px;
 }
 .cf-employee-activity-grid>div{
   border-left:1px solid var(--line);
-  padding-left:8px;
+  padding-left:10px;
   min-width:0;
 }
-.cf-employee-activity-grid>div:first-child{border-left:0;padding-left:0;}
-.cf-employee-activity-grid span{display:block;font-size:8px;text-transform:uppercase;letter-spacing:.045em;color:var(--ink-soft);line-height:1.25;}
-.cf-employee-activity-grid strong{display:block;font-size:16px;color:var(--ink);margin-top:2px;}
-.cf-employee-activity-meta{margin-top:7px;color:var(--ink-soft);font-size:9.5px;line-height:1.35;}
-@media(max-width:1100px){
-  .cf-employee-admin-row{align-items:flex-start;flex-wrap:wrap;}
-  .cf-employee-activity{order:3;flex:1 1 100%;min-width:0;}
+.cf-employee-activity-grid>div:first-child{
+  border-left:0;
+  padding-left:0;
 }
-@media(max-width:620px){
-  .cf-employee-activity{margin-top:10px;}
-  .cf-employee-activity-grid strong{font-size:15px;}
+.cf-employee-activity-grid span{
+  display:block;
+  font-size:8px;
+  text-transform:uppercase;
+  letter-spacing:.045em;
+  color:var(--ink-soft);
+  line-height:1.25;
 }
-.cf-employee-company-field{font-size:12px;color:var(--ink-soft);display:grid;gap:5px;min-width:0;}
+.cf-employee-activity-grid strong{
+  display:block;
+  font-size:19px;
+  color:var(--ink);
+  margin-top:3px;
+}
+.cf-employee-activity-meta{
+  margin-top:9px;
+  padding-top:8px;
+  border-top:1px solid var(--line);
+  color:var(--ink-soft);
+  font-size:10px;
+  line-height:1.45;
+}
+
+.cf-employee-admin-controls{
+  display:grid;
+  gap:9px;
+  align-items:end;
+  flex:1;
+}
+.cf-employee-admin-controls-role{
+  grid-template-columns:minmax(190px,1fr) minmax(230px,1.2fr) auto auto auto;
+}
+.cf-employee-admin-controls label{
+  font-size:12px;
+  color:var(--ink-soft);
+  display:grid;
+  gap:5px;
+}
+.cf-employee-company-select{
+  min-height:40px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--paper);
+  color:var(--ink);
+  padding:0 10px;
+}
+.cf-employee-company-field{
+  font-size:12px;
+  color:var(--ink-soft);
+  display:grid;
+  gap:5px;
+  min-width:0;
+}
 .cf-employee-company-picker{position:relative;min-width:0;}
 .cf-employee-company-picker>summary{
-  min-height:40px;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;
-  background:var(--paper);color:var(--ink);padding:10px 34px 10px 10px;cursor:pointer;
-  list-style:none;position:relative;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  min-height:40px;
+  box-sizing:border-box;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--paper);
+  color:var(--ink);
+  padding:10px 34px 10px 10px;
+  cursor:pointer;
+  list-style:none;
+  position:relative;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 .cf-employee-company-picker>summary::-webkit-details-marker{display:none;}
-.cf-employee-company-picker>summary:after{content:'▾';position:absolute;right:11px;top:50%;transform:translateY(-50%);color:var(--ink-soft);}
+.cf-employee-company-picker>summary:after{
+  content:'▾';
+  position:absolute;
+  right:11px;
+  top:50%;
+  transform:translateY(-50%);
+  color:var(--ink-soft);
+}
 .cf-employee-company-picker[open]>summary:after{content:'▴';}
 .cf-employee-company-menu{
-  position:absolute;z-index:16050;left:0;right:0;top:calc(100% + 5px);
-  max-height:230px;overflow:auto;padding:7px;background:#fff;border:1px solid var(--line);
-  border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.16);
+  position:absolute;
+  z-index:16050;
+  left:0;
+  right:0;
+  top:calc(100% + 5px);
+  max-height:230px;
+  overflow:auto;
+  padding:7px;
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:10px;
+  box-shadow:0 10px 28px rgba(0,0,0,.16);
 }
 .cf-employee-company-menu label{
-  display:flex!important;grid-column:auto!important;align-items:center;gap:9px;
-  min-height:38px;padding:6px 7px;border-radius:7px;color:var(--ink);font-size:13px;cursor:pointer;
+  display:flex!important;
+  grid-column:auto!important;
+  align-items:center;
+  gap:9px;
+  min-height:38px;
+  padding:6px 7px;
+  border-radius:7px;
+  color:var(--ink);
+  font-size:13px;
+  cursor:pointer;
 }
 .cf-employee-company-menu label:hover{background:var(--green-bg);}
 .cf-employee-company-menu input{width:18px;height:18px;flex:0 0 auto;}
 
-@media(max-width:760px){
-  .cf-employee-admin-row{display:block;}
-  .cf-employee-admin-controls{grid-template-columns:1fr 1fr;margin-top:12px;}
-  .cf-employee-admin-controls label{grid-column:1/-1;}
-}
-
-.cf-employee-admin-controls-role{
-  grid-template-columns:minmax(160px,1fr) minmax(170px,1fr) auto auto auto;
-}
 @media(max-width:900px){
-  .cf-employee-admin-controls-role{grid-template-columns:1fr 1fr auto;}
-  .cf-employee-admin-controls-role > label,.cf-employee-admin-controls-role > .cf-employee-company-field{grid-column:auto;}
+  .cf-employee-admin-row{
+    grid-template-columns:1fr;
+    grid-template-areas:
+      "main"
+      "activity"
+      "controls";
+    gap:11px;
+  }
+  .cf-employee-admin-row > .cf-employee-main{min-width:0;}
+  .cf-employee-admin-controls-role{
+    grid-template-columns:1fr 1fr auto;
+  }
+  .cf-employee-admin-controls-role > label,
+  .cf-employee-admin-controls-role > .cf-employee-company-field{
+    grid-column:auto;
+  }
 }
 @media(max-width:620px){
-  .cf-employee-admin-controls-role{grid-template-columns:1fr 1fr;}
-  .cf-employee-admin-controls-role > label,.cf-employee-admin-controls-role > .cf-employee-company-field{grid-column:1/-1;}
-  .cf-employee-company-menu{position:static;margin-top:5px;box-shadow:none;}
+  .cf-global-employees-sheet{
+    width:100vw !important;
+    max-height:calc(100dvh - 70px - env(safe-area-inset-bottom)) !important;
+  }
+  .cf-employee-admin-row{padding:12px;}
+  .cf-employee-admin-controls-role{
+    grid-template-columns:1fr 1fr;
+  }
+  .cf-employee-admin-controls-role > label,
+  .cf-employee-admin-controls-role > .cf-employee-company-field{
+    grid-column:1/-1;
+  }
+  .cf-employee-company-menu{
+    position:static;
+    margin-top:5px;
+    box-shadow:none;
+  }
+  .cf-employee-activity-grid strong{font-size:17px;}
 }
 
 

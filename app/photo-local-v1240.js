@@ -108,7 +108,7 @@
     const items=await byRecord(recordId);
     const before=items.filter(x=>x.kind==='przed'),after=items.filter(x=>x.kind==='po');
     const meta=await metadata(recordId);
-    const root=`${meta.type.toLowerCase()}/${meta.date}/${meta.plate}`;
+    const root=`${meta.date}/${meta.plate}`;
     const ordered=[{path:`${root}/przed/`},{path:`${root}/po/`},...before.map((x,i)=>({x,path:`${root}/przed/${String(i+1).padStart(3,'0')}.${extFor(x.name,x.mime)}`})),...after.map((x,i)=>({x,path:`${root}/po/${String(i+1).padStart(3,'0')}.${extFor(x.name,x.mime)}`}))];
     const locals=[],centrals=[];let offset=0;const dt=dosDateTime();
     for(let i=0;i<ordered.length;i++){

@@ -1,4 +1,4 @@
-// CleanFleet v1.30.104 — website analytics admin module + SEO rollout.
+// CleanFleet v1.30.105 — website analytics admin module + SEO rollout.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -11,7 +11,7 @@ self.addEventListener('fetch', event => {
   const req = event.request;
   const url = new URL(req.url);
 
-  if (url.origin === self.location.origin && (url.pathname === '/app/reports-ui.js' || url.pathname === '/app/reports.css' || url.pathname === '/app/website-analytics-admin.js')) {
+  if (url.origin === self.location.origin && (url.pathname === '/app/reports-ui.js' || url.pathname === '/app/reports.css')) {
     event.respondWith(fetch(req, { cache: 'no-store' }));
     return;
   }
@@ -70,7 +70,7 @@ self.addEventListener('fetch', event => {
     if (!response.ok || !type.includes('text/html')) return response;
 
     let html = await response.text(); 
-    html = html.replace(/v1\\.30\\.(?:102|103)/g, 'v1.30.104');
+    html = html.replace(/v1\\.30\\.(?:102|103|104)/g, 'v1.30.105');
     html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13095');
     html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13096');
 

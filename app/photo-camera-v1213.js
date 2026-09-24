@@ -4,10 +4,93 @@
   let overlay=null,sourceSheet=null,stream=null,facing='environment',shots=[],busy=false;
   let torchOn=false;
   let rearDevices=[],ultraDevice=null,mainDevice=null,teleDevice=null,currentLens='1';
+  let cameraOrientationBound=false;
 
   const toast=m=>{try{typeof showToast==='function'?showToast(m):console.info(m)}catch(_){console.info(m)}};
   const cameraSize={width:{ideal:2560},height:{ideal:1920},aspectRatio:{ideal:4/3},resizeMode:{ideal:'none'}};
   const inputEl=()=>document.querySelector('#cfPhotoOverlay [data-photo-input]');
+
+  function cameraViewport(){
+    const vv=window.visualViewport;
+    return {
+      width:Math.max(1,Math.round(vv?.width||window.innerWidth||document.documentElement.clientWidth||1)),
+      height:Math.max(1,Math.round(vv?.height||window.innerHeight||document.documentElement.clientHeight||1))
+    };
+  }
+
+  function cameraOrientationAngle(){
+    const modern=Number(window.screen?.orientation?.angle);
+    if(Number.isFinite(modern) && modern!==0) return modern;
+    const legacy=Number(window.orientation);
+    return Number.isFinite(legacy)?legacy:0;
+  }
+
+  function resetCameraPortraitFallback(){
+    if(!overlay)return;
+    overlay.style.width='';
+    overlay.style.height='';
+    overlay.style.top='';
+    overlay.style.left='';
+    overlay.style.right='';
+    overlay.style.bottom='';
+    overlay.style.transform='';
+    overlay.style.transformOrigin='';
+  }
+
+  function applyCameraPortraitFallback(){
+    if(!overlay?.classList.contains('open'))return;
+    const {width,height}=cameraViewport();
+    if(height>=width){
+      resetCameraPortraitFallback();
+      return;
+    }
+
+    const angle=cameraOrientationAngle();
+    const rotation=(angle===90)?-90:((angle===-90||angle===270)?90:-90);
+
+    overlay.style.width=`${height}px`;
+    overlay.style.height=`${width}px`;
+    overlay.style.top='50%';
+    overlay.style.left='50%';
+    overlay.style.right='auto';
+    overlay.style.bottom='auto';
+    overlay.style.transformOrigin='50% 50%';
+    overlay.style.transform=`translate(-50%,-50%) rotate(${rotation}deg)`;
+  }
+
+  function bindCameraOrientationFallback(){
+    if(cameraOrientationBound)return;
+    cameraOrientationBound=true;
+    window.addEventListener('resize',applyCameraPortraitFallback,{passive:true});
+    window.addEventListener('orientationchange',applyCameraPortraitFallback,{passive:true});
+    window.visualViewport?.addEventListener?.('resize',applyCameraPortraitFallback,{passive:true});
+  }
+
+  function unbindCameraOrientationFallback(){
+    if(!cameraOrientationBound)return;
+    cameraOrientationBound=false;
+    window.removeEventListener('resize',applyCameraPortraitFallback);
+    window.removeEventListener('orientationchange',applyCameraPortraitFallback);
+    window.visualViewport?.removeEventListener?.('resize',applyCameraPortraitFallback);
+  }
+
+  async function lockCameraPortrait(){
+    bindCameraOrientationFallback();
+    try{
+      if(window.screen?.orientation?.lock){
+        await window.screen.orientation.lock('portrait');
+      }
+    }catch(error){
+      console.info('CleanFleet camera orientation lock fallback',error?.name||error);
+    }
+    applyCameraPortraitFallback();
+  }
+
+  function unlockCameraPortrait(){
+    unbindCameraOrientationFallback();
+    resetCameraPortraitFallback();
+    try{window.screen?.orientation?.unlock?.();}catch(_){}
+  }
 
   function ensureStyle(){
     if(document.getElementById('cfPhotoCamera1216Style'))return;
@@ -194,7 +277,15 @@ const box=overlay.querySelector('.cf-cam-zoom');box.style.display=facing==='envi
 
   async function openCamera(){
     if(busy)return;busy=true;
-    try{shots=[];facing='environment';currentLens='1';updateCount();const o=ensureOverlay();o.classList.add('open');document.documentElement.style.overflow='hidden';busy=false;await startStream();}
+    try{
+      shots=[];facing='environment';currentLens='1';updateCount();
+      const o=ensureOverlay();
+      o.classList.add('open');
+      document.documentElement.style.overflow='hidden';
+      await lockCameraPortrait();
+      busy=false;
+      await startStream();
+    }
     catch(e){console.error('CleanFleet camera',e);closeCamera(false);toast(e?.message||'Nie udało się uruchomić aparatu.');}
     finally{busy=false}
   }
@@ -206,10 +297,13 @@ const box=overlay.querySelector('.cf-cam-zoom');box.style.display=facing==='envi
   }
 
   function deliverShots(){if(shots.length)deliverFiles(shots);}
-  function closeCamera(save){if(save&&busy)return;stopStream();overlay?.classList.remove('open');document.documentElement.style.overflow='';if(save)deliverShots();shots=[];updateCount();busy=false;}
+  function closeCamera(save){if(save&&busy)return;stopStream();unlockCameraPortrait();overlay?.classList.remove('open');document.documentElement.style.overflow='';if(save)deliverShots();shots=[];updateCount();busy=false;}
 
   document.addEventListener('click',e=>{const b=e.target.closest?.('[data-photo-add]');if(!b)return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();showSourceSheet();},true);
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&overlay?.classList.contains('open'))stopStream()});
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='hidden'&&overlay?.classList.contains('open'))stopStream();
+    if(document.visibilityState==='visible'&&overlay?.classList.contains('open'))applyCameraPortraitFallback();
+  });
 })();
 
 // CleanFleet v1.30.68 — bootstrap selektywnej warstwy ikon i odświeżenie Service Workera.

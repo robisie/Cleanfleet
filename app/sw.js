@@ -1,4 +1,4 @@
-// CleanFleet v1.30.103 — website analytics admin module + SEO rollout.
+// CleanFleet v1.30.104 — website analytics admin module + SEO rollout.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -70,7 +70,7 @@ self.addEventListener('fetch', event => {
     if (!response.ok || !type.includes('text/html')) return response;
 
     let html = await response.text(); 
-    html = html.replace(/v1\\.30\\.102/g, 'v1.30.103');
+    html = html.replace(/v1\\.30\\.(?:102|103)/g, 'v1.30.104');
     html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13095');
     html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13096');
 
@@ -203,7 +203,7 @@ self.addEventListener('fetch', event => {
       '<script src="/app/calendar-today-tile-v1262.js?v=20260917-5"></script>\n' +
       '<script src="/app/taxes-v1310.js?v=20260918-6"></script>\n' +
       '<script src="/app/admin-dashboard-v1270.js?v=20260923-13068"></script>\n' +
-      '<script src="/app/website-analytics-admin.js?v=20260924-13103"></script>';
+      '<script src="/app/website-analytics-admin.js?v=20260924-13104"></script>';
     if (html.includes('</body>')) html = html.replace('</body>', `${injectedScripts}\n</body>`);
     else html += injectedScripts;
 

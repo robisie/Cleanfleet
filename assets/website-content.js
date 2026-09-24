@@ -126,7 +126,7 @@
     addEventListener('keydown',e=>{if(e.key==='Escape'&&overlay.classList.contains('open'))close()});
 
     document.addEventListener('click',e=>{
-      const a=e.target.closest('.contact .actions a[href^="mailto:"]');
+      const a=e.target.closest('.contact .actions a[href^="mailto:"], .quote-cta');
       if(!a)return;e.preventDefault();open();
     });
 

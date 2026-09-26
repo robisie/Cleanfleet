@@ -1,4 +1,4 @@
-// CleanFleet v1.30.121 — frozen invoice currency snapshots and open-wash currency propagation.
+// CleanFleet v1.30.122 — safe mutable invoice rows plus frozen PDF snapshots.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -70,7 +70,7 @@ self.addEventListener('fetch', event => {
     if (!response.ok || !type.includes('text/html')) return response;
 
     let html = await response.text(); 
-    html = html.replace(/v1\\.30\\.(?:102|103|104|105|106|107|108|109|110|111|112|113|114|115|116|117|118|119|120)/g, 'v1.30.121');
+    html = html.replace(/v1\\.30\\.(?:102|103|104|105|106|107|108|109|110|111|112|113|114|115|116|117|118|119|120|121)/g, 'v1.30.122');
     html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13095');
     html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13096');
 

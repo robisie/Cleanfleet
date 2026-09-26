@@ -1,4 +1,4 @@
-// CleanFleet v1.30.123 — save invoice rows before PDF preview to avoid iOS partial saves.
+// CleanFleet v1.30.124 — expired active entries are exclusive to their status.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -70,7 +70,7 @@ self.addEventListener('fetch', event => {
     if (!response.ok || !type.includes('text/html')) return response;
 
     let html = await response.text(); 
-    html = html.replace(/v1\\.30\\.(?:102|103|104|105|106|107|108|109|110|111|112|113|114|115|116|117|118|119|120|121|122)/g, 'v1.30.123');
+    html = html.replace(/v1\\.30\\.(?:102|103|104|105|106|107|108|109|110|111|112|113|114|115|116|117|118|119|120|121|122|123)/g, 'v1.30.124');
     html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13095');
     html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13096');
 

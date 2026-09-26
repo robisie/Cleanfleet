@@ -10458,7 +10458,7 @@ function uid(){
             <div class="record-meta record-description">${escapeHtml((r.zatwierdzone?r.opis_wykonania:r.uwagi)||'—')}</div>
           </div>
           <div style="text-align:right;">
-            <div class="record-cost">${fmtMoney(r.koszt)}</div>
+            <div class="record-cost">${fmtMoney(r.koszt,cfRecordCurrency(r))}</div>
             <div class="record-badges">
               <div class="record-type-badge">${escapeHtml(r.typ||'—')}</div>
               <div class="record-badge">${escapeHtml(r.marka||'----')}</div>
@@ -11729,7 +11729,7 @@ function uid(){
 
   function cfShowSearchWash(id,onBack){
     const r=records.find(x=>String(x.id)===String(id));if(!r)return;
-    const fields=[['Data prania',r.data_prania?fmtDate(r.data_prania):''],['Wykonał',r.kto_wykonal],['Zlecił',r.kto_zlecil],['Kwota',fmtMoney(r.koszt)],['Zatwierdzenie',r.zatwierdzone?'Zatwierdzone':'Oczekuje na zatwierdzenie'],['Płatność',r.zaplacone?'Zapłacone':'Niezapłacone'],['Opis zlecenia',r.uwagi],['Opis wykonania',r.opis_wykonania]].filter(x=>String(x[1]??'').trim());
+    const fields=[['Data prania',r.data_prania?fmtDate(r.data_prania):''],['Wykonał',r.kto_wykonal],['Zlecił',r.kto_zlecil],['Kwota',fmtMoney(r.koszt,cfRecordCurrency(r))],['Zatwierdzenie',r.zatwierdzone?'Zatwierdzone':'Oczekuje na zatwierdzenie'],['Płatność',r.zaplacone?'Zapłacone':'Niezapłacone'],['Opis zlecenia',r.uwagi],['Opis wykonania',r.opis_wykonania]].filter(x=>String(x[1]??'').trim());
     reportShell('Szczegóły prania','',`<div class="cf-vehicle-heading"><strong class="record-plate">${escapeHtml(r.tablica)}</strong></div><dl class="cf-vehicle-data">${fields.map(([k,v])=>`<div><dt>${k}</dt><dd>${escapeHtml(v)}</dd></div>`).join('')}</dl>`);
     cfVehicleBack(onBack);
   }
@@ -11759,7 +11759,7 @@ function uid(){
     const pending = rows
       .filter(r=>r.zlecone && !r.data_prania)
       .sort((a,b)=>String(a.data_zlecenia_do||'9999-12-31').localeCompare(String(b.data_zlecenia_do||'9999-12-31')))[0] || null;
-    const total = washed.reduce((s,r)=>s+Number(r.koszt||0),0);
+    const totalText = cfFormatCurrencyTotals(washed);
     const last = washed[0] || null;
     const days = last ? Math.max(0,Math.floor((Date.now()-new Date(last.data_prania+'T00:00:00').getTime())/86400000)) : null;
 
@@ -11782,7 +11782,7 @@ function uid(){
       <td>${escapeHtml(r.kto_zlecil||'—')}</td>
       <td>${r.data_zlecenia_do?fmtDate(r.data_zlecenia_do):'—'}</td>
       <td>${escapeHtml(r.kto_wykonal||'—')}</td>
-      <td>${fmtMoney(r.koszt)}</td>
+      <td>${fmtMoney(r.koszt,cfRecordCurrency(r))}</td>
       <td><span class="history-status-pill${scheduleIsExpired(r)?' expired':(scheduleNeedsDate(r)?' undated':'')}">${escapeHtml(cfHistoryStatus(r))}</span></td>
       <td style="text-align:right;vertical-align:middle;"><div class="history-row-actions"><button type="button" class="history-detail-btn" data-history-detail-id="${escapeHtml(r.id)}" title="Szczegóły prania" aria-label="Szczegóły prania">i</button><button type="button" class="history-edit-btn" data-edit-history-id="${escapeHtml(r.id)}" title="Edytuj wpis prania" aria-label="Edytuj wpis prania">✎</button><button type="button" class="history-delete-btn" data-delete-history-id="${escapeHtml(r.id)}" title="Usuń wpis prania" aria-label="Usuń wpis prania">🗑️</button></div></td>
     </tr>`).join('') : '<tr><td colspan="8">Brak historii.</td></tr>';
@@ -11800,7 +11800,7 @@ function uid(){
     const body=`<div class="confirm-text">${(cfIsAdmin()||cfIsFleetEmployee()) ? `<button type="button" class="cf-history-plate-edit" data-history-edit-vehicle="${escapeHtml(plate)}">${escapeHtml(plate)}</button>` : `<strong>${escapeHtml(plate)}</strong>`} · ${escapeHtml(info.typ||'—')} · ${escapeHtml(info.marka||'—')}</div>
       <div class="history-summary">
         <div class="history-stat"><div class="history-stat-label">Prań</div><div class="history-stat-value">${washed.length}</div></div>
-        <div class="history-stat"><div class="history-stat-label">Przychód</div><div class="history-stat-value">${fmtMoney(total)}</div></div>
+        <div class="history-stat"><div class="history-stat-label">Przychód</div><div class="history-stat-value">${escapeHtml(totalText)}</div></div>
         <div class="history-stat"><div class="history-stat-label">Ostatnie pranie</div><div class="history-stat-value">${days===null?'—':days+' dni'}</div></div>
         <div class="history-stat"><div class="history-stat-label">Średnio co</div><div class="history-stat-value">${avgInterval===null?'—':avgInterval+' dni'}</div></div>
       </div>
@@ -12010,7 +12010,7 @@ function uid(){
         <td>${escapeHtml(r.typ||'—')}</td>
         <td class="mono">${escapeHtml(r.tablica)}</td>
         <td>${fmtDate(r.data_prania)}</td>
-        <td>${fmtMoney(r.koszt)}</td>
+        <td>${fmtMoney(r.koszt,cfRecordCurrency(r))}</td>
         <td><span class="pill ${r.zaplacone?'pill-yes':'pill-no'}">${r.zaplacone?'TAK':'NIE'}</span></td>
       </tr>`).join('');
     return `
@@ -12033,7 +12033,7 @@ function uid(){
       if(!session) return;
       const {data: inv, error: ie} = await cfSupabase
         .from('invoices')
-        .select('id,company_id,invoice_number,invoice_date,period,amount,status,paid_at,created_at')
+        .select('id,company_id,invoice_number,invoice_date,period,amount,currency,status,paid_at,created_at')
         .eq('company_id',cfActiveCompanyId)
         .order('created_at',{ascending:false});
       if(ie){
@@ -12076,6 +12076,7 @@ function uid(){
     // dokładnie tym samym mechanizmem co załącznik tworzony przez administratora.
     const invoiceNumber = String(invoice.invoice_number || '');
     const period = String(invoice.period || invoice.invoice_date || '').slice(0,7);
+    const invoiceCurrency = cfNormalizeCurrency(invoice.currency || rows[0]?.currency || 'PLN');
     const activeCols = PDF_COLUMNS.slice();
     const headerCells = activeCols.map(c=>`<th style="text-align:left;padding:8px 10px;background:#16150F;color:#F5F4EE;font-size:13px;">${escapeHtml(colDefs[c.key].header)}</th>`).join('');
     const bodyRows = rows.map((r,i)=>`
@@ -12086,7 +12087,7 @@ function uid(){
     const summaryLabels={personal:'Osobowe',heavy:'Ciężarowe',bus:'Busy'};
     const summaryLines=['personal','heavy','bus'].map(type=>{
       const total=rows.filter(r=>pdfBillingCategoryKey(r)===type).reduce((sum,r)=>sum+(Number(r.koszt)||0),0);
-      return `<div style="display:flex;justify-content:space-between;gap:20px;margin-top:5px;"><span>${summaryLabels[type]}</span><span>${fmtMoney(total)}</span></div>`;
+      return `<div style="display:flex;justify-content:space-between;gap:20px;margin-top:5px;"><span>${summaryLabels[type]}</span><span>${fmtMoney(total,invoiceCurrency)}</span></div>`;
     }).join('');
     const sumHtml=`<div style="margin-top:18px;font-size:14px;font-weight:700;border-top:1px solid #D9D6C9;padding-top:10px;">${summaryLines}</div>`;
 
@@ -12178,6 +12179,9 @@ function uid(){
   async function cfCreateInvoiceFromRows(invoiceNumber, period, rows){
     const {data:{session}} = await cfSupabase.auth.getSession();
     if(!session?.user?.id) throw new Error('Brak zalogowanego użytkownika.');
+    const currencies=[...new Set(rows.map(r=>cfRecordCurrency(r)))];
+    if(currencies.length!==1) throw new Error('Jedna faktura może zawierać pojazdy tylko w jednej walucie.');
+    const currency=currencies[0];
     const amount = rows.reduce((sum,r)=>sum+(Number(r.koszt)||0),0);
     const existing = invoices.find(i => i.invoice_number === invoiceNumber);
     if(existing){
@@ -12213,13 +12217,13 @@ function uid(){
 
       const {data: updatedInvoice, error: updateInvoiceError} = await cfSupabase
         .from('invoices')
-        .update({period,amount})
+        .update({period,amount,currency})
         .eq('id',existing.id)
-        .select('id,company_id,invoice_number,invoice_date,period,amount,status,paid_at,created_at')
+        .select('id,company_id,invoice_number,invoice_date,period,amount,currency,status,paid_at,created_at')
         .single();
       if(updateInvoiceError) throw new Error('Nie udało się zaktualizować danych faktury: '+updateInvoiceError.message);
 
-      Object.assign(existing, updatedInvoice || {period,amount});
+      Object.assign(existing, updatedInvoice || {period,amount,currency});
       invoiceItems = invoiceItems.filter(x=>x.invoice_id!==existing.id);
       invoiceItems.push(...replacementItems.map((x,i)=>({...x,id: existing.id+'-updated-'+i})));
       return {existing:true, invoice:existing};
@@ -12231,8 +12235,9 @@ function uid(){
       invoice_date: todayISO(),
       period,
       amount,
+      currency,
       status:'pending'
-    }).select('id,company_id,invoice_number,invoice_date,period,amount,status,paid_at,created_at').single();
+    }).select('id,company_id,invoice_number,invoice_date,period,amount,currency,status,paid_at,created_at').single();
     if(ie) throw new Error('Nie udało się zapisać faktury: '+ie.message);
 
     const itemRows = rows.map(r=>({
@@ -12290,7 +12295,7 @@ function uid(){
           <div class="invoice-row-top">
             <div>
               <div class="invoice-number">${escapeHtml(inv.invoice_number || '—')}</div>
-              <div class="invoice-meta">${inv.invoice_date ? fmtDate(inv.invoice_date) : '—'} · ${count} pojazdów · ${fmtMoney(inv.amount)}</div>
+              <div class="invoice-meta">${inv.invoice_date ? fmtDate(inv.invoice_date) : '—'} · ${count} pojazdów · ${fmtMoney(inv.amount,inv.currency)}</div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
               <button type="button" class="btn btn-outline" data-invoice-attachment="${escapeHtml(inv.id)}" title="Pobierz załącznik PDF do tej faktury" aria-label="Pobierz załącznik PDF" style="padding:7px 10px;">📄 PDF</button>
@@ -12352,12 +12357,12 @@ function uid(){
       <td class="mono">${escapeHtml(r.tablica)}</td>
       <td>${escapeHtml(r.typ||'—')}</td>
       <td>${fmtDate(r.data_prania)}</td>
-      <td>${fmtMoney(r.koszt)}</td>
+      <td>${fmtMoney(r.koszt,cfRecordCurrency(r))}</td>
       <td><span class="pill ${r.zaplacone?'pill-yes':'pill-no'}">${r.zaplacone?'TAK':'NIE'}</span></td>
     </tr>`).join('') : '<tr><td colspan="5">Brak przypisanych wpisów.</td></tr>';
     const paid = inv.status==='paid';
     const employeeReadOnly = cfIsFleetEmployee();
-    const bodyHtml = `<div class="confirm-text">Faktura <strong>${escapeHtml(inv.invoice_number)}</strong> · ${fmtMoney(inv.amount)} · ${rows.length} pojazdów</div>
+    const bodyHtml = `<div class="confirm-text">Faktura <strong>${escapeHtml(inv.invoice_number)}</strong> · ${fmtMoney(inv.amount,inv.currency)} · ${rows.length} pojazdów</div>
       <table class="report"><thead><tr><th>Tablica</th><th>Typ</th><th>Data prania</th><th>Kwota</th><th>Zapł.</th></tr></thead><tbody>${body}</tbody></table>
       <div class="sheet-actions">
         <button class="btn btn-solid" id="downloadInvoiceAttachmentBtn">📄 Pobierz załącznik PDF</button>
@@ -12439,16 +12444,13 @@ function uid(){
 
       // Zafakturowane i Oczekuje liczymy z faktur wystawionych w wybranym miesiącu.
       const monthInvoices = invoices.filter(i => (i.invoice_date||'').slice(0,7) === month);
-      const invoicedAmount = monthInvoices.reduce((sum,i)=>sum+Number(i.amount||0),0);
-      const pendingAmount = monthInvoices
-        .filter(i=>i.status!=='paid')
-        .reduce((sum,i)=>sum+Number(i.amount||0),0);
+      const invoicedAmountText = cfFormatInvoiceTotals(monthInvoices);
+      const pendingAmountText = cfFormatInvoiceTotals(monthInvoices.filter(i=>i.status!=='paid'));
 
       // Zapłacone = wszystkie wpisy oznaczone przez użytkownika jako Zapłacone
       // w wybranym miesiącu, niezależnie od tego, czy były przypisane do faktury.
-      const paidAmount = records
-        .filter(r => r.data_prania && r.data_prania.slice(0,7) === month && r.zaplacone)
-        .reduce((sum,r)=>sum+Number(r.koszt||0),0);
+      const paidRows = records.filter(r => r.data_prania && r.data_prania.slice(0,7) === month && r.zaplacone);
+      const paidAmountText = cfFormatCurrencyTotals(paidRows);
 
       const paidCount = records
         .filter(r => r.data_prania && r.data_prania.slice(0,7) === month && r.zaplacone).length;
@@ -12458,9 +12460,9 @@ function uid(){
       if(!content) return;
       content.innerHTML = `
         <div class="finance-summary">
-          <div class="finance-card"><div class="finance-card-label">Zafakturowane</div><div class="finance-card-value">${fmtMoney(invoicedAmount)}</div></div>
-          <div class="finance-card"><div class="finance-card-label">Oczekuje</div><div class="finance-card-value">${fmtMoney(pendingAmount)}</div></div>
-          <div class="finance-card"><div class="finance-card-label">Zapłacone</div><div class="finance-card-value">${fmtMoney(paidAmount)}</div></div>
+          <div class="finance-card"><div class="finance-card-label">Zafakturowane</div><div class="finance-card-value">${escapeHtml(invoicedAmountText)}</div></div>
+          <div class="finance-card"><div class="finance-card-label">Oczekuje</div><div class="finance-card-value">${escapeHtml(pendingAmountText)}</div></div>
+          <div class="finance-card"><div class="finance-card-label">Zapłacone</div><div class="finance-card-value">${escapeHtml(paidAmountText)}</div></div>
         </div>
         <div class="confirm-text" style="margin-top:14px;">
           ${invoiceCount ? `Faktur w miesiącu: <strong>${invoiceCount}</strong>` : 'Brak faktur w wybranym miesiącu.'}
@@ -12585,7 +12587,7 @@ function uid(){
     {key:'completion_notes', label:'Opis wykonania', value:r=>r.opis_wykonania||'—'},
     {key:'wash_date', label:'Data prania', value:r=>fmtDate(r.data_prania)},
     {key:'performed_by', label:'Wykonał', value:r=>r.kto_wykonal||'—'},
-    {key:'cost', label:'Koszt', value:r=>fmtMoney(r.koszt)},
+    {key:'cost', label:'Koszt', value:r=>fmtMoney(r.koszt,cfRecordCurrency(r))},
     {key:'approved', label:'Zatwierdzone', value:r=>r.zatwierdzone?'TAK':'NIE'},
     {key:'paid', label:'Zapłacone', value:r=>r.zaplacone?'TAK':'NIE'},
     {key:'created_at', label:'Utworzono', value:r=>r.created_at?new Date(r.created_at).toLocaleString('pl-PL'):'—'},
@@ -13151,7 +13153,7 @@ function uid(){
     typ: {header:'Typ', cell:r => r.typ || '—'},
     tablica: {header:'Tablica', cell:r => r.tablica},
     data: {header:'Data prania', cell:r => fmtDate(r.data_prania)},
-    kwota: {header:'Kwota', cell:r => fmtMoney(r.koszt)},
+    kwota: {header:'Kwota', cell:r => fmtMoney(r.koszt,cfRecordCurrency(r))},
     rozliczone: {header:'Rozliczone', cell:r => r.zaplacone ? 'TAK' : 'NIE'}
   };
 
@@ -13190,7 +13192,7 @@ function uid(){
         <span style="display:block;min-width:0;line-height:1.35;">
           <strong>${escapeHtml(r.tablica || '—')}</strong>
           <span style="display:block;font-size:12px;color:var(--ink-soft);margin-top:2px;">
-            ${escapeHtml(r.typ || '—')} · ${escapeHtml(fmtDate(r.data_prania))} · ${escapeHtml(fmtMoney(r.koszt))}
+            ${escapeHtml(r.typ || '—')} · ${escapeHtml(fmtDate(r.data_prania))} · ${escapeHtml(fmtMoney(r.koszt,cfRecordCurrency(r)))}
           </span>
         </span>
       </label>`).join('');
@@ -13224,11 +13226,8 @@ function uid(){
 
     const updateSummary = () => {
       const selected = checks.filter(cb=>cb.checked);
-      const total = selected.reduce((sum,cb)=>{
-        const row = candidateRows[Number(cb.dataset.rowIndex)];
-        return sum + (Number(row?.koszt)||0);
-      },0);
-      summary.innerHTML = `Wybrano <strong>${selected.length} z ${candidateRows.length}</strong> pojazdów · suma <strong>${escapeHtml(fmtMoney(total))}</strong>`;
+      const selectedRows=selected.map(cb=>candidateRows[Number(cb.dataset.rowIndex)]).filter(Boolean);
+      summary.innerHTML = `Wybrano <strong>${selected.length} z ${candidateRows.length}</strong> pojazdów · suma <strong>${escapeHtml(cfFormatCurrencyTotals(selectedRows))}</strong>`;
     };
 
     const restoreConfig = () => {
@@ -13255,10 +13254,13 @@ function uid(){
         showToast('Wybierz co najmniej jeden pojazd do załącznika');
         return;
       }
-      cfPdfSelectedRowIds = new Set(selected.map(cb=>{
-        const row = candidateRows[Number(cb.dataset.rowIndex)];
-        return String(row?.id || '');
-      }));
+      const selectedRows=selected.map(cb=>candidateRows[Number(cb.dataset.rowIndex)]).filter(Boolean);
+      const currencies=[...new Set(selectedRows.map(r=>cfRecordCurrency(r)))];
+      if(currencies.length!==1){
+        showToast('W jednym załączniku wybierz pojazdy rozliczane w jednej walucie: PLN albo EUR.');
+        return;
+      }
+      cfPdfSelectedRowIds = new Set(selectedRows.map(row=>String(row?.id || '')));
       cfPdfSelectionConfirmed = true;
       overlay.style.display = 'none';
       generateMonthPdf();
@@ -13326,6 +13328,17 @@ function uid(){
       return;
     }
 
+    const currencies=[...new Set(rows.map(r=>cfRecordCurrency(r)))];
+    if(currencies.length!==1){
+      cfPdfSelectionConfirmed=false;
+      cfPdfSelectedRowIds=null;
+      const selectionOverlay=document.getElementById('pdfVehicleSelectionOverlay');
+      if(selectionOverlay) selectionOverlay.style.display='';
+      showToast('W jednym załączniku wybierz pojazdy rozliczane w jednej walucie: PLN albo EUR.');
+      return;
+    }
+    const invoiceCurrency=currencies[0];
+
     const activeCols = PDF_COLUMNS.filter(c=>selectedCols.includes(c.key));
     showToast('Generuję raport PDF…');
 
@@ -13342,7 +13355,7 @@ function uid(){
       const summaryLabels={personal:'Osobowe',heavy:'Ciężarowe',bus:'Busy'};
       const summaryLines=selectedSummaryTypes.map(type=>{
         const total=rows.filter(r=>pdfBillingCategoryKey(r)===type).reduce((sum,r)=>sum+(Number(r.koszt)||0),0);
-        return `<div style="display:flex;justify-content:space-between;gap:20px;margin-top:5px;"><span>${summaryLabels[type]}</span><span>${fmtMoney(total)}</span></div>`;
+        return `<div style="display:flex;justify-content:space-between;gap:20px;margin-top:5px;"><span>${summaryLabels[type]}</span><span>${fmtMoney(total,invoiceCurrency)}</span></div>`;
       }).join('');
       sumHtml=`<div style="margin-top:18px;font-size:14px;font-weight:700;border-top:1px solid #D9D6C9;padding-top:10px;">${summaryLines}</div>`;
     }
@@ -13398,7 +13411,7 @@ function uid(){
     const blob=doc.output('blob');
     cfPdfSelectionConfirmed = false;
     cfPdfSelectedRowIds = null;
-    showPdfPreview(blob,filename,{invoiceNumber,period:val,rows,invoiceFile:cfInvoiceAttachment});
+    showPdfPreview(blob,filename,{invoiceNumber,period:val,rows,currency:invoiceCurrency,invoiceFile:cfInvoiceAttachment});
   }
 
   function showPdfPreview(reportBlob,filename,invoiceContext){
@@ -13676,7 +13689,7 @@ function uid(){
     const tableRows=(view.rows||[]).map(r=>[
       r.typ||'—',r.tablica||'—',r.marka||'—',r.kto_zlecil||'—',
       fmtDate(r.data_zlecenia),r.uwagi||'—',r.opis_wykonania||'—',fmtDate(r.data_prania),
-      r.kto_wykonal||'—',fmtMoney(r.koszt),r.zaplacone?'TAK':'NIE'
+      r.kto_wykonal||'—',fmtMoney(r.koszt,cfRecordCurrency(r)),r.zaplacone?'TAK':'NIE'
     ]);
     doc.autoTable({
       head:[['Typ','Rejestracja','Marka','Zlecił','Data zlecenia','Opis zlecenia','Opis wykonania','Data prania','Wykonał','Kwota','Rozliczone']],
@@ -14572,9 +14585,9 @@ function uid(){
     return out;
   }
   const CF_BACKUP_COLUMNS={
-    vehicles:['plate','type','brand'],
-    wash_records:['id','plate','type','brand','billing_category','ordered','ordered_by','order_date','order_due_date','notes','wash_date','performed_by','cost','approved','paid','created_at'],
-    invoices:['id','user_id','invoice_number','invoice_date','period','amount','status','paid_at','created_at'],
+    vehicles:['plate','type','brand','currency'],
+    wash_records:['id','plate','type','brand','billing_category','currency','ordered','ordered_by','order_date','order_due_date','notes','wash_date','performed_by','cost','approved','paid','created_at'],
+    invoices:['id','user_id','invoice_number','invoice_date','period','amount','currency','status','paid_at','created_at'],
     invoice_items:['id','invoice_id','wash_record_id','plate','cost']
   };
   function cfPickColumns(row,cols){

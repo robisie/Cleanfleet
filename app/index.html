@@ -9193,7 +9193,7 @@ async function cfOpenChangeNotifications(){
   let scheduleRecordsById = {};
   if(scheduleRecordIds.length){
     const {data:schedRows,error:schedError}=await cfSupabase.from('wash_records')
-      .select('id,plate,type,brand,billing_category,ordered,ordered_by,order_date,order_due_date,notes,wash_date,performed_by,cost,approved,paid,created_at,created_by,schedule_status,schedule_proposed_date,schedule_proposed_by,schedule_proposed_at,schedule_confirmed_by,schedule_confirmed_at,schedule_note')
+      .select('id,plate,type,brand,billing_category,ordered,ordered_by,order_date,order_due_date,notes,wash_date,performed_by,cost,currency,approved,paid,created_at,created_by,schedule_status,schedule_proposed_date,schedule_proposed_by,schedule_proposed_at,schedule_confirmed_by,schedule_confirmed_at,schedule_note')
       .in('id',scheduleRecordIds);
     if(schedError){ console.error('CleanFleet schedule records:',schedError); showToast('Nie udało się pobrać zleceń terminów.'); return; }
     scheduleRecordsById=Object.fromEntries((schedRows||[]).map(r=>[r.id,r]));
@@ -9272,7 +9272,7 @@ async function cfOpenChangeNotifications(){
     if(req.wash_record_id){
       const { data, error:rowError } = await cfSupabase
         .from('wash_records')
-        .select('id,plate,type,brand,billing_category,ordered,ordered_by,order_date,order_due_date,notes,wash_date,performed_by,cost,approved,paid,created_at,created_by,schedule_status,schedule_proposed_date,schedule_proposed_by,schedule_proposed_at,schedule_confirmed_by,schedule_confirmed_at,schedule_note')
+        .select('id,plate,type,brand,billing_category,ordered,ordered_by,order_date,order_due_date,notes,wash_date,performed_by,cost,currency,approved,paid,created_at,created_by,schedule_status,schedule_proposed_date,schedule_proposed_by,schedule_proposed_at,schedule_confirmed_by,schedule_confirmed_at,schedule_note')
         .eq('id',req.wash_record_id)
         .maybeSingle();
       if(rowError){
@@ -9453,7 +9453,7 @@ async function cfOpenChangeNotifications(){
       } else if(note.type === 'wash_completed'){
         const { data:doneRow, error:doneError } = await cfSupabase
           .from('wash_records')
-          .select('id,plate,type,brand,billing_category,ordered,ordered_by,order_date,order_due_date,notes,wash_date,performed_by,cost,approved,paid,created_at,created_by,schedule_status,schedule_proposed_date,schedule_proposed_by,schedule_proposed_at,schedule_confirmed_by,schedule_confirmed_at,schedule_note')
+          .select('id,plate,type,brand,billing_category,ordered,ordered_by,order_date,order_due_date,notes,wash_date,performed_by,cost,currency,approved,paid,created_at,created_by,schedule_status,schedule_proposed_date,schedule_proposed_by,schedule_proposed_at,schedule_confirmed_by,schedule_confirmed_at,schedule_note')
           .eq('id',note.entity_id)
           .maybeSingle();
         if(doneError){ console.error(doneError); showToast('Nie udało się pobrać wykonanego wpisu.'); return; }
@@ -9583,9 +9583,9 @@ function uid(){
     setTimeout(()=> t.classList.remove('show'), 1800);
   }
 
-  function cfMapVehicle(row){ return { plate: row.plate, type: row.type || '', brand: row.brand || '', company_id: row.company_id || null }; }
-  function cfMapRecord(row){ return { id: row.id, company_id: row.company_id || null, created_by: row.created_by || null, tablica: row.plate, typ: row.type || '', marka: row.brand || '', billing_category: row.billing_category || '', zlecone: !!row.ordered, kto_zlecil: row.ordered_by || '', data_zlecenia: row.order_date || '', data_zlecenia_do: row.order_due_date || '', priority: row.priority == null ? null : Number(row.priority), schedule_status: row.schedule_status || '', schedule_proposed_date: row.schedule_proposed_date || '', schedule_proposed_by: row.schedule_proposed_by || null, schedule_proposed_at: row.schedule_proposed_at || null, schedule_confirmed_by: row.schedule_confirmed_by || null, schedule_confirmed_at: row.schedule_confirmed_at || null, schedule_note: row.schedule_note || '', uwagi: row.notes || '', opis_wykonania: row.completion_notes || '', data_prania: row.wash_date || '', wash_start_time: row.wash_start_time ? String(row.wash_start_time).slice(0,5) : '', wash_end_time: row.wash_end_time ? String(row.wash_end_time).slice(0,5) : '', kto_wykonal: row.performed_by || '', koszt: Number(row.cost)||0, zatwierdzone: !!row.approved, zaplacone: !!row.paid, created_at: new Date(row.created_at).getTime() || Date.now() }; }
-  function cfRecordToDb(r){ return { id:r.id, company_id:r.company_id || cfActiveCompanyId, plate:r.tablica, type:r.typ||'', brand:r.marka||'', billing_category:r.billing_category||null, ordered:!!r.zlecone, ordered_by:r.kto_zlecil||'', order_date:r.data_zlecenia||null, order_due_date:r.data_zlecenia_do||null, priority:(r.priority==null||r.priority==='')?null:Number(r.priority), schedule_status:r.schedule_status||null, schedule_proposed_date:r.schedule_proposed_date||null, schedule_proposed_by:r.schedule_proposed_by||null, schedule_proposed_at:r.schedule_proposed_at||null, schedule_confirmed_by:r.schedule_confirmed_by||null, schedule_confirmed_at:r.schedule_confirmed_at||null, schedule_note:r.schedule_note||null, notes:r.uwagi||'', completion_notes:r.opis_wykonania||'', wash_date:r.data_prania||null, wash_start_time:r.wash_start_time||null, wash_end_time:r.wash_end_time||null, performed_by:r.kto_wykonal||'', cost:Number(r.koszt)||0, approved:!!r.zatwierdzone, paid:!!r.zaplacone, created_at:new Date(r.created_at||Date.now()).toISOString(), created_by:r.created_by || cfCurrentUserId }; }
+  function cfMapVehicle(row){ return { plate: row.plate, type: row.type || '', brand: row.brand || '', currency: cfNormalizeCurrency(row.currency), company_id: row.company_id || null }; }
+  function cfMapRecord(row){ return { id: row.id, company_id: row.company_id || null, created_by: row.created_by || null, tablica: row.plate, typ: row.type || '', marka: row.brand || '', billing_category: row.billing_category || '', zlecone: !!row.ordered, kto_zlecil: row.ordered_by || '', data_zlecenia: row.order_date || '', data_zlecenia_do: row.order_due_date || '', priority: row.priority == null ? null : Number(row.priority), schedule_status: row.schedule_status || '', schedule_proposed_date: row.schedule_proposed_date || '', schedule_proposed_by: row.schedule_proposed_by || null, schedule_proposed_at: row.schedule_proposed_at || null, schedule_confirmed_by: row.schedule_confirmed_by || null, schedule_confirmed_at: row.schedule_confirmed_at || null, schedule_note: row.schedule_note || '', uwagi: row.notes || '', opis_wykonania: row.completion_notes || '', data_prania: row.wash_date || '', wash_start_time: row.wash_start_time ? String(row.wash_start_time).slice(0,5) : '', wash_end_time: row.wash_end_time ? String(row.wash_end_time).slice(0,5) : '', kto_wykonal: row.performed_by || '', koszt: Number(row.cost)||0, currency: cfNormalizeCurrency(row.currency), zatwierdzone: !!row.approved, zaplacone: !!row.paid, created_at: new Date(row.created_at).getTime() || Date.now() }; }
+  function cfRecordToDb(r){ return { id:r.id, company_id:r.company_id || cfActiveCompanyId, plate:r.tablica, type:r.typ||'', brand:r.marka||'', billing_category:r.billing_category||null, ordered:!!r.zlecone, ordered_by:r.kto_zlecil||'', order_date:r.data_zlecenia||null, order_due_date:r.data_zlecenia_do||null, priority:(r.priority==null||r.priority==='')?null:Number(r.priority), schedule_status:r.schedule_status||null, schedule_proposed_date:r.schedule_proposed_date||null, schedule_proposed_by:r.schedule_proposed_by||null, schedule_proposed_at:r.schedule_proposed_at||null, schedule_confirmed_by:r.schedule_confirmed_by||null, schedule_confirmed_at:r.schedule_confirmed_at||null, schedule_note:r.schedule_note||null, notes:r.uwagi||'', completion_notes:r.opis_wykonania||'', wash_date:r.data_prania||null, wash_start_time:r.wash_start_time||null, wash_end_time:r.wash_end_time||null, performed_by:r.kto_wykonal||'', cost:Number(r.koszt)||0, currency:cfRecordCurrency(r), approved:!!r.zatwierdzone, paid:!!r.zaplacone, created_at:new Date(r.created_at||Date.now()).toISOString(), created_by:r.created_by || cfCurrentUserId }; }
 
   window.cfApplyCompletedWashLocal = function(payload){
     const id=String(payload?.id||'');
@@ -9616,9 +9616,9 @@ function uid(){
       if(!cfActiveCompanyId) throw new Error('Najpierw wybierz firmę.');
       cfSetSync('Pobieranie aktualnych danych…');
       try{
-        const { data: vehicleRows, error: ve } = await cfRetrySupabase(() => cfSupabase.from('vehicles').select('plate,type,brand,model,production_year,fleet_number,assigned_driver,driver_name,vehicle_notes,company_id').eq('company_id',cfActiveCompanyId).order('plate'));
+        const { data: vehicleRows, error: ve } = await cfRetrySupabase(() => cfSupabase.from('vehicles').select('plate,type,brand,model,production_year,fleet_number,assigned_driver,driver_name,vehicle_notes,currency,company_id').eq('company_id',cfActiveCompanyId).order('plate'));
         if(ve) throw ve;
-        const { data: recordRows, error: re } = await cfRetrySupabase(() => cfSupabase.from('wash_records').select('id,company_id,plate,type,brand,billing_category,ordered,ordered_by,order_date,order_due_date,priority,notes,completion_notes,wash_date,wash_start_time,wash_end_time,performed_by,cost,approved,paid,created_at,created_by,schedule_status,schedule_proposed_date,schedule_proposed_by,schedule_proposed_at,schedule_confirmed_by,schedule_confirmed_at,schedule_note').eq('company_id',cfActiveCompanyId).order('created_at',{ascending:false}));
+        const { data: recordRows, error: re } = await cfRetrySupabase(() => cfSupabase.from('wash_records').select('id,company_id,plate,type,brand,billing_category,ordered,ordered_by,order_date,order_due_date,priority,notes,completion_notes,wash_date,wash_start_time,wash_end_time,performed_by,cost,currency,approved,paid,created_at,created_by,schedule_status,schedule_proposed_date,schedule_proposed_by,schedule_proposed_at,schedule_confirmed_by,schedule_confirmed_at,schedule_note').eq('company_id',cfActiveCompanyId).order('created_at',{ascending:false}));
         if(re) throw re;
 
         registry = {};
@@ -9630,7 +9630,8 @@ function uid(){
           numer_taborowy:v.fleet_number||'',
           przypisany:!!v.assigned_driver,
           kierowca:v.driver_name||'',
-          uwagi_pojazdu:v.vehicle_notes||''
+          uwagi_pojazdu:v.vehicle_notes||'',
+          waluta:cfNormalizeCurrency(v.currency)
         }; });
         records = (recordRows||[]).map(cfMapRecord);
         cfRemoteVehiclePlates = new Set((vehicleRows||[]).map(v=>v.plate));
@@ -9733,7 +9734,7 @@ function uid(){
             type:v.typ||'',brand:v.marka||'',model:v.model||null,
             production_year:v.rocznik===''||v.rocznik==null?null:Number(v.rocznik),
             fleet_number:v.numer_taborowy||null,assigned_driver:!!v.przypisany,
-            driver_name:v.przypisany?(v.kierowca||null):null,vehicle_notes:v.uwagi_pojazdu||null
+            driver_name:v.przypisany?(v.kierowca||null):null,vehicle_notes:v.uwagi_pojazdu||null,currency:cfNormalizeCurrency(v.waluta)
           }).eq('plate',plate).eq('company_id',cfActiveCompanyId);
         }else{
           result = await cfSupabase.from('vehicles').insert({
@@ -9741,7 +9742,7 @@ function uid(){
             model:v.model||null,
             production_year:v.rocznik===''||v.rocznik==null?null:Number(v.rocznik),
             fleet_number:v.numer_taborowy||null,assigned_driver:!!v.przypisany,
-            driver_name:v.przypisany?(v.kierowca||null):null,vehicle_notes:v.uwagi_pojazdu||null
+            driver_name:v.przypisany?(v.kierowca||null):null,vehicle_notes:v.uwagi_pojazdu||null,currency:cfNormalizeCurrency(v.waluta)
           });
         }
         if(result?.error) throw result.error;
@@ -9764,7 +9765,7 @@ function uid(){
           model:v.model||null,
           production_year:v.rocznik===''||v.rocznik==null?null:Number(v.rocznik),
           fleet_number:v.numer_taborowy||null,assigned_driver:!!v.przypisany,
-          driver_name:v.przypisany?(v.kierowca||null):null,vehicle_notes:v.uwagi_pojazdu||null
+          driver_name:v.przypisany?(v.kierowca||null):null,vehicle_notes:v.uwagi_pojazdu||null,currency:cfNormalizeCurrency(v.waluta)
         };
         const existsRemotely = cfRemoteVehiclePlates.has(changedPlate);
 
@@ -9776,7 +9777,7 @@ function uid(){
               type:payload.type,brand:payload.brand,model:payload.model,
               production_year:payload.production_year,fleet_number:payload.fleet_number,
               assigned_driver:payload.assigned_driver,driver_name:payload.driver_name,
-              vehicle_notes:payload.vehicle_notes
+              vehicle_notes:payload.vehicle_notes,currency:payload.currency
             })
             .eq('plate', changedPlate)
             .eq('company_id', cfActiveCompanyId));
@@ -9795,7 +9796,7 @@ function uid(){
         cfRemoteVehiclePlates.add(changedPlate);
       } else {
         // Import / pełna synchronizacja nadal zapisuje całą listę.
-        const rows = Object.entries(registry).map(([plate,v])=>({plate,type:v.typ||'',brand:v.marka||'',company_id:cfActiveCompanyId}));
+        const rows = Object.entries(registry).map(([plate,v])=>({plate,type:v.typ||'',brand:v.marka||'',currency:cfNormalizeCurrency(v.waluta),company_id:cfActiveCompanyId}));
         if(rows.length){
           await cfRetrySupabase(() => cfSupabase.from('vehicles').upsert(rows, {onConflict:'plate'}));
         }
@@ -9932,9 +9933,44 @@ function uid(){
     return `${d}.${m}.${y}`;
   }
 
-  function fmtMoney(n){
+  function cfNormalizeCurrency(value){
+    return String(value||'PLN').trim().toUpperCase()==='EUR' ? 'EUR' : 'PLN';
+  }
+
+  function fmtMoney(n,currency='PLN'){
     const num = Number(n)||0;
-    return num.toLocaleString('pl-PL') + ' zł';
+    const cur = cfNormalizeCurrency(currency);
+    try{
+      return new Intl.NumberFormat('pl-PL',{style:'currency',currency:cur,minimumFractionDigits:2,maximumFractionDigits:2}).format(num);
+    }catch(_){
+      return num.toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2}) + ' ' + cur;
+    }
+  }
+
+  function cfRecordCurrency(r){
+    if(r?.currency) return cfNormalizeCurrency(r.currency);
+    const plate=normalizePlate(r?.tablica||r?.plate||'');
+    return cfNormalizeCurrency(registry[plate]?.waluta||'PLN');
+  }
+
+  function cfFormatCurrencyTotals(rows,amountGetter=(r)=>r?.koszt){
+    const totals=new Map();
+    (rows||[]).forEach(r=>{
+      const cur=cfRecordCurrency(r);
+      totals.set(cur,(totals.get(cur)||0)+(Number(amountGetter(r))||0));
+    });
+    if(!totals.size) return fmtMoney(0,'PLN');
+    return [...totals.entries()].map(([cur,total])=>fmtMoney(total,cur)).join(' + ');
+  }
+
+  function cfFormatInvoiceTotals(list){
+    const totals=new Map();
+    (list||[]).forEach(inv=>{
+      const cur=cfNormalizeCurrency(inv?.currency||'PLN');
+      totals.set(cur,(totals.get(cur)||0)+(Number(inv?.amount)||0));
+    });
+    if(!totals.size) return fmtMoney(0,'PLN');
+    return [...totals.entries()].map(([cur,total])=>fmtMoney(total,cur)).join(' + ');
   }
 
   function cfWashDurationMinutes(start,end){
@@ -10517,6 +10553,7 @@ function uid(){
     const typ = rec ? (rec.typ || '') : cfCanonicalWashType(reg.typ || '');
     const marka = rec ? rec.marka : (reg.marka || '');
     const billing_category = rec ? (rec.billing_category || '') : '';
+    const washCurrency = rec ? cfRecordCurrency(rec) : cfNormalizeCurrency(reg.waluta||'PLN');
 
     const html = `
       <div class="overlay" id="formOverlay">
@@ -10648,8 +10685,9 @@ function uid(){
               <datalist id="opt_kw">${options.kto_wykonal.map(o=>`<option value="${escapeHtml(o)}">`).join('')}</datalist>
             </div>
             <div class="field grid-c2">
-              <label>Koszt (zł)</label>
+              <label id="f_koszt_label">Koszt (${escapeHtml(washCurrency)})</label>
               <input type="number" id="f_koszt" min="0" step="10" value="${rec?rec.koszt:''}">
+              <input type="hidden" id="f_currency" value="${escapeHtml(washCurrency)}">
             </div>
 
           </div>
@@ -10678,6 +10716,11 @@ function uid(){
       const normalizedType=cfCanonicalWashType(vehicle.typ||'');
       if(washTypeSelect && CF_WASH_TYPE_OPTIONS.includes(normalizedType)) washTypeSelect.value=normalizedType;
       if(washBrandInput && vehicle.marka) washBrandInput.value=vehicle.marka;
+      const currencyField=document.getElementById('f_currency');
+      const currencyLabel=document.getElementById('f_koszt_label');
+      const cur=cfNormalizeCurrency(vehicle.waluta||'PLN');
+      if(currencyField) currencyField.value=cur;
+      if(currencyLabel) currencyLabel.textContent='Koszt ('+cur+')';
     };
     washPlateInput?.addEventListener('change',cfFillVehicleDataFromPlate);
     washPlateInput?.addEventListener('blur',cfFillVehicleDataFromPlate);
@@ -10892,6 +10935,7 @@ function uid(){
     const wash_end_time = document.getElementById('f_wash_end_time')?.value || '';
     const kto_wykonal = document.getElementById('f_kto_wykonal').value.trim();
     const koszt = parseFloat(document.getElementById('f_koszt').value) || 0;
+    const currency = cfNormalizeCurrency(document.getElementById('f_currency')?.value || registry[plate]?.waluta || 'PLN');
     const billing_category = document.getElementById('f_grupa_rozliczeniowa')?.value || null;
 
     if(!editingId && !CF_WASH_TYPE_OPTIONS.includes(cfCanonicalWashType(typ))){
@@ -11003,7 +11047,7 @@ function uid(){
       const rec = records.find(x=>x.id===editingId);
       if(rec && (!cfEmployeeOwn(rec) || rec.data_prania || rec.zatwierdzone || rec.zaplacone)){
         try{
-          await cfSubmitChangeRequest(rec.id,'edit',{tablica:plate,typ,marka,billing_category,zlecone,kto_zlecil,data_zlecenia,data_zlecenia_do,priority,uwagi,opis_wykonania,data_prania,wash_start_time,wash_end_time,kto_wykonal,koszt},'Prośba pracownika floty o zmianę wykonanego wpisu.');
+          await cfSubmitChangeRequest(rec.id,'edit',{tablica:plate,typ,marka,billing_category,currency,zlecone,kto_zlecil,data_zlecenia,data_zlecenia_do,priority,uwagi,opis_wykonania,data_prania,wash_start_time,wash_end_time,kto_wykonal,koszt},'Prośba pracownika floty o zmianę wykonanego wpisu.');
           closeModal();
           showToast('Wysłano wniosek do administratora');
         }catch(e){ showToast('Nie udało się wysłać wniosku: '+(e?.message||'błąd')); }
@@ -11024,13 +11068,13 @@ function uid(){
 
     if(editingId){
       const rec = records.find(x => x.id === editingId);
-      Object.assign(rec, { tablica: plate, typ, marka, billing_category, zlecone, kto_zlecil, data_zlecenia, data_zlecenia_do, priority, uwagi, opis_wykonania, data_prania, wash_start_time, wash_end_time, kto_wykonal, koszt });
+      Object.assign(rec, { tablica: plate, typ, marka, billing_category, currency, zlecone, kto_zlecil, data_zlecenia, data_zlecenia_do, priority, uwagi, opis_wykonania, data_prania, wash_start_time, wash_end_time, kto_wykonal, koszt });
     } else {
       records.push({
         id: uid(),
         created_by: cfCurrentUserId,
         tablica: plate,
-        typ, marka, billing_category, zlecone, kto_zlecil, data_zlecenia, priority,
+        typ, marka, billing_category, currency, zlecone, kto_zlecil, data_zlecenia, priority,
         data_zlecenia_do: (cfIsFleetEmployee() && zlecone) ? '' : data_zlecenia_do,
         schedule_status: (zlecone && data_zlecenia_do) ? (cfIsFleetEmployee() ? 'pending_admin' : 'accepted') : '',
         schedule_proposed_date: (zlecone && data_zlecenia_do) ? data_zlecenia_do : '',
@@ -11560,7 +11604,7 @@ function uid(){
             const canonical=freshMap.get(key);
             if(!canonical){skipped.push(plate);return;}
             const info=registry[canonical]||{};
-            inserts.push({id:uid(),company_id:cfActiveCompanyId,plate:canonical,type:typeof cfCanonicalWashType==='function'?cfCanonicalWashType(info.typ||''):(info.typ||''),brand:info.marka||'',billing_category:null,ordered:true,ordered_by:orderedBy,order_date:orderDate,order_due_date:dueDate,priority:null,schedule_status:null,schedule_proposed_date:null,schedule_proposed_by:null,schedule_proposed_at:null,schedule_confirmed_by:null,schedule_confirmed_at:null,schedule_note:null,notes:'',wash_date:null,wash_start_time:null,wash_end_time:null,performed_by:'',cost:cost,approved:false,paid:false,created_at:new Date(Date.now()+index).toISOString(),created_by:cfCurrentUserId||null});
+            inserts.push({id:uid(),company_id:cfActiveCompanyId,plate:canonical,type:typeof cfCanonicalWashType==='function'?cfCanonicalWashType(info.typ||''):(info.typ||''),brand:info.marka||'',billing_category:null,currency:cfNormalizeCurrency(info.waluta||'PLN'),ordered:true,ordered_by:orderedBy,order_date:orderDate,order_due_date:dueDate,priority:null,schedule_status:null,schedule_proposed_date:null,schedule_proposed_by:null,schedule_proposed_at:null,schedule_confirmed_by:null,schedule_confirmed_at:null,schedule_note:null,notes:'',wash_date:null,wash_start_time:null,wash_end_time:null,performed_by:'',cost:cost,approved:false,paid:false,created_at:new Date(Date.now()+index).toISOString(),created_by:cfCurrentUserId||null});
             pending.add(key);
           });
           if(inserts.length){const {error}=await cfSupabase.from('wash_records').insert(inserts);if(error)throw error;}
@@ -11659,7 +11703,7 @@ function uid(){
     const companyName=company?cfCompanyDisplayName(company):'';
     const body=`<section class="cf-vehicle-profile">
       <div class="cf-profile-identity"><div class="cf-profile-plate" aria-label="Tablica rejestracyjna: ${escapeHtml(plate)}"><span class="cf-profile-eu" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><text x="12.00" y="5.00">★</text><text x="15.50" y="5.94">★</text><text x="18.06" y="8.50">★</text><text x="19.00" y="12.00">★</text><text x="18.06" y="15.50">★</text><text x="15.50" y="18.06">★</text><text x="12.00" y="19.00">★</text><text x="8.50" y="18.06">★</text><text x="5.94" y="15.50">★</text><text x="5.00" y="12.00">★</text><text x="5.94" y="8.50">★</text><text x="8.50" y="5.94">★</text></svg><span>PL</span></span><strong>${escapeHtml(plate)}</strong></div>${recordFleetBadge(plate)}${companyName?`<div class="cf-profile-company"><span>Firma</span><strong>${escapeHtml(companyName)}</strong></div>`:''}</div>
-      <dl class="cf-vehicle-data cf-profile-specs"><div><dt>Typ</dt><dd>${escapeHtml(v.typ||'—')}</dd></div><div><dt>Marka</dt><dd>${escapeHtml(v.marka||'—')}</dd></div><div><dt>Model</dt><dd>${escapeHtml(v.model||'—')}</dd></div><div><dt>Rok</dt><dd>${escapeHtml(v.rocznik||'—')}</dd></div></dl>
+      <dl class="cf-vehicle-data cf-profile-specs"><div><dt>Typ</dt><dd>${escapeHtml(v.typ||'—')}</dd></div><div><dt>Marka</dt><dd>${escapeHtml(v.marka||'—')}</dd></div><div><dt>Model</dt><dd>${escapeHtml(v.model||'—')}</dd></div><div><dt>Rok</dt><dd>${escapeHtml(v.rocznik||'—')}</dd></div><div><dt>Waluta</dt><dd>${escapeHtml(cfNormalizeCurrency(v.waluta||'PLN'))}</dd></div></dl>
       <div class="cf-vehicle-summary"><div><span>Ostatnie pranie</span><strong>${last?fmtDate(last.data_prania):'Brak zapisanych prań'}</strong>${Number.isFinite(days)?`<small>${days===0?'Dzisiaj':days===1?'1 dzień temu':days+' dni temu'}</small>`:''}</div>${next?`<div><span>Najbliższe pranie</span><strong>${fmtDate(next.data_zlecenia_do)}</strong></div>`:''}</div>
       ${active?`<div class="cf-vehicle-current"><span>Aktualny wpis${pending.length>1?' · oczekujących: '+pending.length:''}</span><strong class="${scheduleStatusClass(active)}">${escapeHtml(!active.data_prania&&!active.zlecone?'OCZEKUJE NA PRANIE':cfHistoryStatus(active))}</strong><button type="button" class="btn btn-outline" data-current-wash="${escapeHtml(active.id)}">Otwórz aktualny wpis</button></div>`:''}
       <h3 class="cf-vehicle-history-title">Historia prań <span>(${washed.length})</span></h3>
@@ -14155,6 +14199,14 @@ function uid(){
             <label>Numer taborowy</label>
             <input id="cfVehicleFleetNumber" type="text" value="${escapeHtml(v.numer_taborowy||'')}" placeholder="opcjonalnie">
           </div>
+          <div class="field">
+            <label>Waluta rozliczeń</label>
+            <select id="cfVehicleCurrency">
+              <option value="PLN" ${cfNormalizeCurrency(v.waluta)==='PLN'?'selected':''}>PLN — zł</option>
+              <option value="EUR" ${cfNormalizeCurrency(v.waluta)==='EUR'?'selected':''}>EUR — €</option>
+            </select>
+            <small style="display:block;margin-top:5px;color:var(--ink-soft);">Waluta nowych prań i załączników do faktur dla tego pojazdu.</small>
+          </div>
   
           <label class="field-check cf-vehicle-assigned-check">
             <input id="cfVehicleAssigned" type="checkbox" ${v.przypisany?'checked':''}>
@@ -14200,6 +14252,7 @@ function uid(){
       const model=(document.getElementById('cfVehicleModel')?.value||'').trim();
       const yearRaw=(document.getElementById('cfVehicleYear')?.value||'').trim();
       const fleetNumber=(document.getElementById('cfVehicleFleetNumber')?.value||'').trim();
+      const currency=cfNormalizeCurrency(document.getElementById('cfVehicleCurrency')?.value||'PLN');
       const isAssigned=!!document.getElementById('cfVehicleAssigned')?.checked;
       const driver=(document.getElementById('cfVehicleDriver')?.value||'').trim();
       const notes=(document.getElementById('cfVehicleNotes')?.value||'').trim();
@@ -14214,10 +14267,10 @@ function uid(){
         }
       }
       return {
-        newPlate,type,brand,model,year,fleetNumber,isAssigned,driver,notes,
+        newPlate,type,brand,model,year,fleetNumber,currency,isAssigned,driver,notes,
         payload:{
           plate:newPlate,type:type||'',brand:brand||'',model:model||null,
-          production_year:year,fleet_number:fleetNumber||null,
+          production_year:year,fleet_number:fleetNumber||null,currency,
           assigned_driver:isAssigned,driver_name:isAssigned?(driver||null):null,
           vehicle_notes:notes||null
         }
@@ -14227,7 +14280,7 @@ function uid(){
     const applyVehicleLocally=data=>{
       registry[data.newPlate]={
         typ:data.type,marka:data.brand,model:data.model,rocznik:data.year??'',
-        numer_taborowy:data.fleetNumber,przypisany:data.isAssigned,
+        numer_taborowy:data.fleetNumber,waluta:data.currency,przypisany:data.isAssigned,
         kierowca:data.isAssigned?data.driver:'',uwagi_pojazdu:data.notes
       };
       cfRemoteVehiclePlates.add(data.newPlate);

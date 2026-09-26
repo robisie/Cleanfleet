@@ -13289,6 +13289,10 @@ function uid(){
       canvas=await html2canvas(container,{scale:2,backgroundColor:'#ffffff',useCORS:true});
     }catch(e){
       document.body.removeChild(container);
+      cfPdfSelectionConfirmed = false;
+      cfPdfSelectedRowIds = null;
+      const selectionOverlay = document.getElementById('pdfVehicleSelectionOverlay');
+      if(selectionOverlay) selectionOverlay.style.display = '';
       showToast('Nie udało się wygenerować PDF');
       return;
     }

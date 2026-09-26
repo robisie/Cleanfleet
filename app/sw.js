@@ -1,4 +1,4 @@
-// CleanFleet v1.30.118 — PLN/EUR vehicle and invoice currency support.
+// CleanFleet v1.30.119 — complete invoice item currency snapshots.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -70,7 +70,7 @@ self.addEventListener('fetch', event => {
     if (!response.ok || !type.includes('text/html')) return response;
 
     let html = await response.text(); 
-    html = html.replace(/v1\\.30\\.(?:102|103|104|105|106|107|108|109|110|111|112|113|114|115|116|117)/g, 'v1.30.118');
+    html = html.replace(/v1\\.30\\.(?:102|103|104|105|106|107|108|109|110|111|112|113|114|115|116|117|118)/g, 'v1.30.119');
     html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13095');
     html = html.replace(/\/app\/reports-ui\.js\?v=[^"']+/g, '/app/reports-ui.js?v=13096');
 

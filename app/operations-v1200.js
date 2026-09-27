@@ -242,15 +242,19 @@
   // Decode only one original at a time; keep full quality files for the ZIP.
   window.cfPhotoThumbnail=async file=>{
     let image=null,url=null,canvas=null;
+    const previewMax=960;
     try{
       if(typeof createImageBitmap==='function'){
-        try{image=await createImageBitmap(file,{resizeWidth:320,resizeQuality:'low'})}catch(_){}
+        try{image=await createImageBitmap(file,{resizeWidth:previewMax,resizeQuality:'high'})}catch(_){}
       }
       if(!image){url=URL.createObjectURL(file);image=new Image();image.src=url;await image.decode()}
-      const w=image.naturalWidth||image.width,h=image.naturalHeight||image.height,scale=Math.min(1,320/Math.max(w,h));
+      const w=image.naturalWidth||image.width,h=image.naturalHeight||image.height,scale=Math.min(1,previewMax/Math.max(w,h));
       canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(w*scale));canvas.height=Math.max(1,Math.round(h*scale));
-      canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);
-      return await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.7));
+      const ctx=canvas.getContext('2d',{alpha:false});
+      ctx.imageSmoothingEnabled=true;
+      ctx.imageSmoothingQuality='high';
+      ctx.drawImage(image,0,0,canvas.width,canvas.height);
+      return await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.92));
     }catch(e){console.warn('Photo thumbnail unavailable',e);return null}
     finally{image?.close?.();if(url){image.src='';URL.revokeObjectURL(url)}if(canvas){canvas.width=0;canvas.height=0}}
   };

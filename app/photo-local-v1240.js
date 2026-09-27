@@ -94,6 +94,78 @@
   function u32(v){const a=new Uint8Array(4),d=new DataView(a.buffer);d.setUint32(0,v>>>0,true);return a}
   function dosDateTime(date=new Date()){const time=((date.getHours()&31)<<11)|((date.getMinutes()&63)<<5)|((Math.floor(date.getSeconds()/2))&31);const year=Math.max(1980,date.getFullYear());const dd=((year-1980)<<9)|((date.getMonth()+1)<<5)|date.getDate();return{time,date:dd}}
 
+  function stripMpoFromJpeg(bytes){
+    if(!(bytes instanceof Uint8Array)||bytes.length<4||bytes[0]!==0xff||bytes[1]!==0xd8)return null;
+    let pos=2,scanStart=-1;const mpf=[];
+    while(pos+1<bytes.length){
+      if(bytes[pos]!==0xff)return null;
+      const start=pos;
+      while(pos<bytes.length&&bytes[pos]===0xff)pos++;
+      if(pos>=bytes.length)return null;
+      const marker=bytes[pos++];
+      if(marker===0xda){
+        if(pos+1>=bytes.length)return null;
+        const len=(bytes[pos]<<8)|bytes[pos+1];
+        if(len<2||pos+len>bytes.length)return null;
+        scanStart=pos+len;
+        break;
+      }
+      if(marker===0xd8||marker===0xd9||marker===0x01||(marker>=0xd0&&marker<=0xd7))continue;
+      if(pos+1>=bytes.length)return null;
+      const len=(bytes[pos]<<8)|bytes[pos+1];
+      if(len<2||pos+len>bytes.length)return null;
+      const payload=pos+2;
+      if(marker===0xe2&&payload+3<bytes.length&&bytes[payload]===0x4d&&bytes[payload+1]===0x50&&bytes[payload+2]===0x46&&bytes[payload+3]===0x00){
+        mpf.push([start,pos+len]);
+      }
+      pos+=len;
+    }
+    if(!mpf.length||scanStart<0)return null;
+
+    let eoi=-1;
+    for(let i=scanStart;i+1<bytes.length;i++){
+      if(bytes[i]!==0xff)continue;
+      let j=i+1;
+      while(j<bytes.length&&bytes[j]===0xff)j++;
+      if(j>=bytes.length)break;
+      const marker=bytes[j];
+      if(marker===0x00){i=j;continue;}
+      if(marker===0xd9){eoi=j+1;break;}
+      i=j;
+    }
+    if(eoi<0)return null;
+
+    let removed=0;
+    for(const [a,b] of mpf)if(a<eoi)removed+=Math.max(0,Math.min(b,eoi)-a);
+    if(!removed)return null;
+
+    const out=new Uint8Array(eoi-removed);
+    let from=0,to=0;
+    for(const [a,b] of mpf){
+      if(a>=eoi)break;
+      if(a>from){out.set(bytes.subarray(from,a),to);to+=a-from;}
+      from=Math.min(b,eoi);
+    }
+    if(from<eoi)out.set(bytes.subarray(from,eoi),to);
+    return out;
+  }
+
+  async function preparePhotoForExport(row){
+    const original=row.blob||new Blob([row.bytes],{type:row.mime||'image/jpeg'});
+    const mime=row.mime||original.type||'image/jpeg';
+    const bytes=new Uint8Array(await original.arrayBuffer());
+    const jpeg=/jpe?g/i.test(mime)||((bytes[0]===0xff)&&(bytes[1]===0xd8));
+    if(jpeg){
+      const primary=stripMpoFromJpeg(bytes);
+      if(primary){
+        // Lossless MPO cleanup: JPEG scan data are copied byte-for-byte.
+        // EXIF stays intact; only MPF metadata and the auxiliary JPEG are removed.
+        return{blob:new Blob([primary],{type:'image/jpeg'}),bytes:primary,mime:'image/jpeg',ext:'jpg',normalized:true};
+      }
+    }
+    return{blob:original,bytes,mime,ext:extFor(row.name,mime),normalized:false};
+  }
+
   function showBuildProgress(done,total,msg){
     const box=ensureLocalBox();if(!box)return;
     const el=box.querySelector('[data-local-progress]');
@@ -114,11 +186,16 @@
     for(let i=0;i<ordered.length;i++){
       const {x,path}=ordered[i];showBuildProgress(i,ordered.length,`Przygotowanie ${path}`);
       const row=x?await getPhoto(x.id):null;if(x&&!row)throw new Error('Zdjęcie nie jest już dostępne.');
-      const source=row?(row.blob||new Blob([row.bytes],{type:row.mime})):new Blob([]);
-      const bytes=new Uint8Array(await source.arrayBuffer()),nameBytes=enc.encode(path),crc=crc32(bytes),size=bytes.byteLength;
+      let source=new Blob([]),bytes=new Uint8Array(),finalPath=path;
+      if(row){
+        const prepared=await preparePhotoForExport(row);
+        source=prepared.blob;bytes=prepared.bytes;
+        if(prepared.normalized)finalPath=path.replace(/\.[^.\/]+$/,'.jpg');
+      }
+      const nameBytes=enc.encode(finalPath),crc=crc32(bytes),size=bytes.byteLength;
       const local=new Blob([u32(0x04034b50),u16(20),u16(0x0800),u16(0),u16(dt.time),u16(dt.date),u32(crc),u32(size),u32(size),u16(nameBytes.length),u16(0),nameBytes,source]);
       locals.push(local);
-      const central=new Blob([u32(0x02014b50),u16(20),u16(20),u16(0x0800),u16(0),u16(dt.time),u16(dt.date),u32(crc),u32(size),u32(size),u16(nameBytes.length),u16(0),u16(0),u16(0),u16(0),u32(path.endsWith('/')?0x10:0),u32(offset),nameBytes]);
+      const central=new Blob([u32(0x02014b50),u16(20),u16(20),u16(0x0800),u16(0),u16(dt.time),u16(dt.date),u32(crc),u32(size),u32(size),u16(nameBytes.length),u16(0),u16(0),u16(0),u16(0),u32(finalPath.endsWith('/')?0x10:0),u32(offset),nameBytes]);
       centrals.push(central);offset+=local.size;showBuildProgress(i+1,ordered.length,`Gotowe ${i+1} z ${ordered.length}`);await new Promise(r=>setTimeout(r,0));
     }
     const centralOffset=offset,centralSize=centrals.reduce((s,b)=>s+b.size,0),end=new Blob([u32(0x06054b50),u16(0),u16(0),u16(ordered.length),u16(ordered.length),u32(centralSize),u32(centralOffset),u16(0)]);
@@ -189,9 +266,9 @@
         while(batchEnd<rows.length&&batch.length<8&&size<20*1024*1024){
           const meta=rows[batchEnd],row=await getPhoto(meta.id);if(closed)return;
           if(!row)throw new Error('Zdjęcie nie jest już dostępne. Otwórz zapis ponownie.');
-          const blob=row.blob||new Blob([row.bytes],{type:row.mime||'image/jpeg'});
-          batch.push(new File([blob],`${row.kind}-${String(batchEnd+1).padStart(3,'0')}.${extFor(row.name,row.mime)}`,{type:row.mime||blob.type||'image/jpeg'}));
-          size+=blob.size;batchEnd++;
+          const prepared=await preparePhotoForExport(row);
+          batch.push(new File([prepared.blob],`${row.kind}-${String(batchEnd+1).padStart(3,'0')}.${prepared.ext}`,{type:prepared.mime}));
+          size+=prepared.blob.size;batchEnd++;
         }
         if(closed)return;
         if(!batch.length){status.textContent='Brak zapisanych zdjęć. Najpierw kliknij „Zapisz zdjęcia” przy wpisie.';return;}

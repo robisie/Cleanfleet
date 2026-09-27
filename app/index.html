@@ -5573,27 +5573,49 @@ function cfInvoiceBuyerFromText(text){
   const normalized=String(text||'').replace(/\u00a0/g,' ').replace(/\r/g,'\n');
   const lines=normalized.split(/\n+/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
   const buyerRx=/^(?:nabywca|kupuj[aą]cy|odbiorca|buyer|bill\s*to|rechnungsempf[aä]nger|rechnungsempfaenger|kunde|customer)\b/i;
-  const stopRx=/^(?:sprzedawca|seller|vendor|wystawca|bank|płatność|platnosc|payment|razem|suma|total)\b/i;
-  const idx=lines.findIndex(x=>buyerRx.test(x)),block=[];
+  const buyerAnyRx=/(?:nabywca|kupuj[aą]cy|odbiorca|buyer|bill\s*to|rechnungsempf[aä]nger|rechnungsempfaenger|kunde|customer)\b/i;
+  const stopRx=/^(?:sprzedawca|seller|vendor|wystawca|bank|płatność|platnosc|payment|razem|suma|total|pozycje|lp\.?|opis\s+usługi)\b/i;
+  const stopAnyRx=/\b(?:sprzedawca|seller|vendor|wystawca|bank|płatność|platnosc|payment|razem|suma|total|pozycje|opis\s+usługi)\b/i;
+  const idx=lines.findIndex(x=>buyerRx.test(x));
+  let block=[];
   if(idx>=0){
     const first=lines[idx].replace(buyerRx,'').replace(/^\s*[:\-–]\s*/,'').trim();
-    if(first)block.push(first);
-    for(let i=idx+1;i<Math.min(lines.length,idx+8);i++){if(stopRx.test(lines[i]))break;block.push(lines[i]);}
+    if(first) block.push(first);
+    for(let i=idx+1;i<Math.min(lines.length,idx+8);i++){
+      if(stopRx.test(lines[i])) break;
+      block.push(lines[i]);
+    }
   }
-  const rawBlock=block.join(' · '),searchArea=rawBlock||normalized;
-  const taxMatch=searchArea.match(/(?:NIP|VAT(?:\s*(?:ID|UE))?|UST[.\s-]*ID(?:NR)?)[\s:#-]*([A-Z]{0,2}[A-Z0-9\s.\/-]{7,20})/i);
+  if(!block.length){
+    const m=buyerAnyRx.exec(normalized);
+    if(m){
+      let tail=normalized.slice(m.index+m[0].length).replace(/^\s*[:\-–]\s*/,'').slice(0,500);
+      const stop=tail.search(stopAnyRx);
+      if(stop>=0) tail=tail.slice(0,stop);
+      tail=tail.replace(/\s+/g,' ').trim();
+      if(tail) block=[tail];
+    }
+  }
+  const rawBlock=block.join(' · ');
+  const searchArea=rawBlock||normalized;
+  const taxMatch=searchArea.match(/(?:NIP|VAT(?:\s*(?:ID|UE))?|UST[.\s-]*ID(?:NR)?)[\s:#-]*([A-Z]{0,2}[A-Z0-9.\/-]{7,20})/i);
   const taxId=taxMatch?cfNormalizeTaxId(taxMatch[1]):'';
-  const name=(block.find(line=>{
-    if(/(?:NIP|VAT|UST[.\s-]*ID)/i.test(line))return false;
-    if(/^\d{2}[- ]?\d{3}\b/.test(line))return false;
-    if(/\b(?:ul\.|ulica|str\.|strasse|straße|street)\b/i.test(line))return false;
-    return /[A-Za-zĄĆĘŁŃÓŚŹŻÄÖÜäöüß]{3}/.test(line);
-  })||'').trim();
-  const address=block.filter(line=>line!==name&&!/(?:NIP|VAT|UST[.\s-]*ID)/i.test(line)).slice(0,3).join(', ');
+  let name='';
+  for(const line of block){
+    const candidate=line
+      .replace(/(?:NIP|VAT(?:\s*(?:ID|UE))?|UST[.\s-]*ID(?:NR)?)[\s:#-]*[A-Z]{0,2}[A-Z0-9.\/-]{7,20}.*/i,'')
+      .split(/\b(?:ul\.|ulica|str\.|strasse|straße|street)\b|\b\d{2}[- ]?\d{3}\b/i)[0]
+      .replace(/\s+/g,' ').trim();
+    if(candidate.length>=3 && /[A-Za-zĄĆĘŁŃÓŚŹŻÄÖÜäöüß]{3}/.test(candidate)){name=candidate;break;}
+  }
+  const address=rawBlock
+    .replace(name,'')
+    .replace(/(?:NIP|VAT(?:\s*(?:ID|UE))?|UST[.\s-]*ID(?:NR)?)[\s:#-]*[A-Z]{0,2}[A-Z0-9.\/-]{7,20}/ig,'')
+    .replace(/^[\s,;·-]+|[\s,;·-]+$/g,'').trim();
   return {name,taxId,address,rawBlock};
 }
 function cfResolveInvoiceBillingCompany(text){
-  const buyer=cfInvoiceBuyerFromText(text),compact=cfNormalizeTaxId(text),normText=cfNormalizeCompanyText(text);
+  const buyer=cfInvoiceBuyerFromText(text),matchSource=buyer.rawBlock||String(text||''),compact=cfNormalizeTaxId(matchSource),normText=cfNormalizeCompanyText(matchSource);
   const scored=(cfBillingCompanies||[]).filter(x=>x.active!==false).map(row=>{
     const tax=cfNormalizeTaxId(row.tax_id),name=cfNormalizeCompanyText(row.name),shortName=cfNormalizeCompanyText(row.short_name);
     const taxExact=!!(tax&&tax.length>=6&&compact.includes(tax));

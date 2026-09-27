@@ -7,7 +7,7 @@
   let cameraOrientationBound=false;
 
   const toast=m=>{try{typeof showToast==='function'?showToast(m):console.info(m)}catch(_){console.info(m)}};
-  const cameraSize={width:{ideal:2560},height:{ideal:1920},aspectRatio:{ideal:4/3},resizeMode:{ideal:'none'}};
+  const cameraSize={width:{ideal:4096},height:{ideal:3072},aspectRatio:{ideal:4/3},resizeMode:{ideal:'none'}};
   const inputEl=()=>document.querySelector('#cfPhotoOverlay [data-photo-input]');
 
   function cameraViewport(){
@@ -290,10 +290,75 @@ const box=overlay.querySelector('.cf-cam-zoom');box.style.display=facing==='envi
     finally{busy=false}
   }
 
+  function photoExtension(mime){
+    const type=String(mime||'').toLowerCase();
+    if(type.includes('heic'))return'heic';
+    if(type.includes('heif'))return'heif';
+    if(type.includes('png'))return'png';
+    if(type.includes('webp'))return'webp';
+    return'jpg';
+  }
+
+  async function captureNativeStill(){
+    const t=track();
+    if(!t||typeof ImageCapture!=='function')return null;
+    try{
+      const imageCapture=new ImageCapture(t);
+      let settings={};
+      try{
+        const pc=await imageCapture.getPhotoCapabilities?.();
+        const maxW=Number(pc?.imageWidth?.max);
+        const maxH=Number(pc?.imageHeight?.max);
+        if(Number.isFinite(maxW)&&maxW>0)settings.imageWidth=Math.round(maxW);
+        if(Number.isFinite(maxH)&&maxH>0)settings.imageHeight=Math.round(maxH);
+      }catch(_){}
+      const blob=await imageCapture.takePhoto(settings);
+      return blob?.size?blob:null;
+    }catch(error){
+      console.info('CleanFleet native still fallback',error?.name||error);
+      return null;
+    }
+  }
+
+  async function captureVideoFrameFallback(){
+    const v=overlay.querySelector('.cf-cam-video');
+    if(!v.videoWidth||!v.videoHeight)throw new Error('Brak gotowego obrazu z aparatu');
+    const w=Math.max(1,Math.round(v.videoWidth)),h=Math.max(1,Math.round(v.videoHeight));
+    const c=document.createElement('canvas');c.width=w;c.height=h;
+    const ctx=c.getContext('2d',{alpha:false});
+    if(facing==='user'){ctx.translate(w,0);ctx.scale(-1,1)}
+    ctx.drawImage(v,0,0,w,h);
+    return await new Promise((resolve,reject)=>c.toBlob(
+      b=>b?resolve(b):reject(new Error('Nie udało się zrobić zdjęcia')),
+      'image/jpeg',
+      1
+    ));
+  }
+
   async function capture(){
     if(busy||!stream)return;busy=true;
-    try{const v=overlay.querySelector('.cf-cam-video');if(!v.videoWidth||!v.videoHeight)return;const max=2200,scale=Math.min(1,max/Math.max(v.videoWidth,v.videoHeight)),w=Math.max(1,Math.round(v.videoWidth*scale)),h=Math.max(1,Math.round(v.videoHeight*scale));const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d');if(facing==='user'){ctx.translate(w,0);ctx.scale(-1,1)}ctx.drawImage(v,0,0,w,h);const blob=await new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(new Error('Nie udało się zrobić zdjęcia')),'image/jpeg',.9));shots.push(new File([blob],`CF-${Date.now()}-${String(shots.length+1).padStart(2,'0')}.jpg`,{type:'image/jpeg',lastModified:Date.now()}));updateCount();const flash=overlay.querySelector('.cf-cam-flash');flash.classList.add('on');setTimeout(()=>flash.classList.remove('on'),90);if(navigator.vibrate)navigator.vibrate(20);}
-    catch(e){console.error('CleanFleet capture',e);toast('Nie udało się zapisać tego ujęcia.');}finally{busy=false}
+    try{
+      // First choice: a true still exposure from the active physical lens (including 0.5×).
+      // This preserves the camera-provided resolution/encoding and allows repeated shots
+      // during the same open CleanFleet camera session.
+      let blob=await captureNativeStill();
+      if(!blob)blob=await captureVideoFrameFallback();
+
+      const ext=photoExtension(blob.type);
+      const mime=blob.type||'image/jpeg';
+      shots.push(new File(
+        [blob],
+        `CF-${Date.now()}-${String(shots.length+1).padStart(2,'0')}.${ext}`,
+        {type:mime,lastModified:Date.now()}
+      ));
+
+      updateCount();
+      const flash=overlay.querySelector('.cf-cam-flash');
+      flash.classList.add('on');setTimeout(()=>flash.classList.remove('on'),90);
+      if(navigator.vibrate)navigator.vibrate(20);
+    }
+    catch(e){console.error('CleanFleet capture',e);toast('Nie udało się zapisać tego ujęcia.');}
+    finally{busy=false}
   }
 
   function deliverShots(){if(shots.length)deliverFiles(shots);}

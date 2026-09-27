@@ -371,10 +371,10 @@ const box=overlay.querySelector('.cf-cam-zoom');box.style.display=facing==='envi
   });
 })();
 
-// CleanFleet v1.30.128 — bootstrap aplikacji i wymuszenie aktualnego Service Workera.
+// CleanFleet v1.30.129 — bootstrap aplikacji i wymuszenie aktualnego Service Workera.
 (()=>{
   'use strict';
-  const VERSION='1.30.128';
+  const VERSION='1.30.129';
   const start=()=>{
     const version=document.getElementById('cfAppVersion');
     if(version)version.textContent=`Wersja aplikacji: v${VERSION}`;
@@ -390,7 +390,7 @@ const box=overlay.querySelector('.cf-cam-zoom');box.style.display=facing==='envi
       document.body.appendChild(script);
     }
     if('serviceWorker' in navigator){
-      navigator.serviceWorker.register('/app/sw.js?v=20260927-130128',{updateViaCache:'none'})
+      navigator.serviceWorker.register('/app/sw.js?v=20260927-130129',{updateViaCache:'none'})
         .then(registration=>registration.update()).catch(error=>console.warn('CleanFleet icon SW update:',error));
     }
   };

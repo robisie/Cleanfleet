@@ -2799,6 +2799,43 @@ body[data-cf-role="cleanfleet_employee"] #plateCameraBtn{
 }
 </style>
 <link rel="stylesheet" href="/app/reports.css?v=13095">
+
+<style id="cf-mobile-modal-safe-top-v130134">
+/* v1.30.134 — mobile modal top safe zone.
+   Long, scrollable sheets must never reach the iPhone status/notch area,
+   and the sticky close button keeps a small clickable gap from the top. */
+@media (max-width:639px){
+  .overlay{
+    --cf-modal-safe-top:max(12px, env(safe-area-inset-top));
+    padding-top:var(--cf-modal-safe-top) !important;
+    box-sizing:border-box !important;
+  }
+
+  .overlay .sheet,
+  #formOverlay .sheet{
+    max-height:calc(100vh - 70px - env(safe-area-inset-bottom) - var(--cf-modal-safe-top)) !important;
+  }
+
+  .sheet > .close,
+  .sheet .close[data-close],
+  .sheet .close[id^="cfClose"],
+  .sheet .close#closeInvoicePdfPreview,
+  .sheet .close#cfReportPreviewClose{
+    top:8px !important;
+    z-index:200 !important;
+  }
+}
+
+@supports(height:100svh){
+  @media (max-width:639px){
+    .overlay .sheet,
+    #formOverlay .sheet{
+      max-height:calc(100svh - 70px - env(safe-area-inset-bottom) - var(--cf-modal-safe-top)) !important;
+    }
+  }
+}
+</style>
+
 </head>
 <body>
 

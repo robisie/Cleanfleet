@@ -12101,11 +12101,11 @@ function uid(){
       if(!latest) return false;
       return daysSinceLastWashForRecord(latest)>=(365/2);
     }).length;
-    const unapproved=records.filter(r=>r.data_prania && !r.zatwierdzone).length;
+    const expiredSchedules=records.filter(r=>scheduleIsExpired(r)).length;
     const items=[
       {label:'Do wykonania',value:pendingOrders,filter:'todo',alert:pendingOrders>0},
       {label:'Dawno nie prane',value:oldVehicles,action:'old',alert:oldVehicles>0},
-      {label:'Niezatwierdzone',value:unapproved,filter:'unapproved',alert:unapproved>0},
+      {label:'Termin upłynął',value:expiredSchedules,filter:'expired',alert:expiredSchedules>0},
       {label:'Faktury do zapłaty',value:unpaidInvoices,action:'finance',alert:unpaidInvoices>0}
     ];
     if(!items.some(x=>x.value>0)){ panel.classList.remove('show'); panel.innerHTML=''; return; }

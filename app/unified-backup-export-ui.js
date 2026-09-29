@@ -4,25 +4,26 @@
   if(!button)return;
   button.addEventListener('click',async()=>{
     document.getElementById('menuOverlay')?.classList.remove('open');
-    if(!cfIsAdmin()){showToast('Backup może utworzyć tylko administrator.');return;}
     button.disabled=true;
     try{
-      cfSetSync('Pobieranie danych do backupu…');
-      showToast('Przygotowuję backup całej aplikacji…');
-      const {archive,manifest}=await CFUnifiedBackup.makeArchive(cfSupabase);
+      const bridge=window.cfBackupBridge;
+      if(!bridge?.isAdmin())throw new Error('Backup może utworzyć tylko administrator.');
+      bridge.setSync('Pobieranie danych do backupu…');
+      bridge.toast('Przygotowuję backup całej aplikacji…');
+      const {archive,manifest}=await window.CFUnifiedBackup.makeArchive(bridge.getClient());
       // Verify the finished archive before offering it for download.
-      await CFUnifiedBackup.inspectArchive(archive);
+      await window.CFUnifiedBackup.inspectArchive(archive);
       const url=URL.createObjectURL(archive),link=document.createElement('a');
       link.href=url;
       link.download='CleanFleet-backup-'+manifest.createdAt.slice(0,19).replace(/[T:]/g,'-')+'.zip';
       document.body.appendChild(link);link.click();link.remove();
       setTimeout(()=>URL.revokeObjectURL(url),60000);
-      cfSetSync('Backup pobrany','ok');showToast('Pobrano backup CleanFleet.');
+      bridge.setSync('Backup pobrany','ok');bridge.toast('Pobrano backup CleanFleet.');
     }catch(error){
       console.error('Backup export:',error);
-      cfSetSync('Błąd tworzenia backupu','err');
+      window.cfBackupBridge?.setSync('Błąd tworzenia backupu','err');
       const message='Backup: '+(error?.message||String(error));
-      showToast(message);
+      window.cfBackupBridge?.toast(message);
       const root=document.getElementById('modalRoot');
       if(root){
         const overlay=document.createElement('div');overlay.className='overlay';

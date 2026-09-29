@@ -1,4 +1,4 @@
-// CleanFleet v1.48.6 — backup fix.
+// CleanFleet v1.49.0 — admin full backup export.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

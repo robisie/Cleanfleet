@@ -1,4 +1,4 @@
-// CleanFleet v1.50.0 — selective restoration of the unified backup.
+// CleanFleet v1.50.1 — backup actions in the administrator dashboard.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

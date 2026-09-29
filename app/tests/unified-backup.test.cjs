@@ -2,6 +2,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const {webcrypto}=require('node:crypto');
+const JSZip=require('../vendor/jszip-3.10.1.min.js');
 const code=fs.readFileSync(require('node:path').join(__dirname,'..','unified-backup.js'),'utf8');
 class Zip{
   constructor(){this.files={};}
@@ -20,6 +21,10 @@ vm.createContext(ctx);vm.runInContext(code,ctx);
   assert.equal(manifest.localPhotos,0);
   const read=await ctx.CFUnifiedBackup.inspectArchive(archive,Zip);
   assert.equal(read.data.tables.companies[0].id,'firm');
+  const real=await ctx.CFUnifiedBackup.makeArchive(client,JSZip);
+  const checked=await ctx.CFUnifiedBackup.inspectArchive(real.archive,JSZip);
+  assert.equal(checked.data.tables.companies[0].id,'firm');
+  assert.equal((await real.archive.arrayBuffer()).byteLength>0,true);
   archive.files['database.json']=Buffer.from('{}');
   await assert.rejects(ctx.CFUnifiedBackup.inspectArchive(archive,Zip),/Uszkodzony plik/);
   console.log('PASS: pojedyncza paczka sprawdza liczby i sumy kontrolne.');

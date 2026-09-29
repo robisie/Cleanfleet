@@ -30,7 +30,7 @@
     return {archive,manifest};
   }
   async function inspectArchive(file,Zip=JSZip){
-    const zip=await Zip.loadAsync(file);
+    const zip=await Zip.loadAsync(file?.arrayBuffer?await file.arrayBuffer():file);
     const manifestFile=zip.file('manifest.json');
     if(!manifestFile)throw new Error('Nie ma manifestu backupu.');
     const manifest=JSON.parse(await manifestFile.async('string'));

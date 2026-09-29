@@ -1,4 +1,4 @@
-// CleanFleet v1.49.2 — connect export button to admin module.
+// CleanFleet v1.49.3 — connect export button to admin module.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

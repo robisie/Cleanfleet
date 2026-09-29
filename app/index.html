@@ -2954,6 +2954,15 @@ body[data-cf-role="cleanfleet_employee"] #plateCameraBtn{
         <span class="menu-item-title">💾 Backup floty i rozliczeń</span>
         <span class="menu-item-sub">Pojazdy, prania, faktury i spółki wybranej firmy (Excel)</span>
       </button>
+      <button class="menu-item" id="cfUnifiedBackupExport">
+        <span class="menu-item-title">💾 Jeden backup CleanFleet</span>
+        <span class="menu-item-sub">Panel administratora, wszystkie firmy i dostępne zdjęcia (ZIP)</span>
+      </button>
+      <button class="menu-item" id="cfUnifiedBackupImport">
+        <span class="menu-item-title">Przywróć wybrany zakres z ZIP</span>
+        <span class="menu-item-sub">Sprawdź kopię i wybierz panel lub firmy</span>
+      </button>
+      <input type="file" id="cfUnifiedBackupFile" accept=".zip" hidden>
       <button class="menu-item" id="importBtn">
         <span class="menu-item-title">Importuj / przywróć dane</span>
         <span class="menu-item-sub">Przywróć dane floty i rozliczeń z Excela</span>
@@ -3039,6 +3048,7 @@ body[data-cf-role="cleanfleet_employee"] #plateCameraBtn{
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script type="module">
 import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
@@ -9768,6 +9778,8 @@ function cfApplyRoleMenu(){
   // Tylko administrator.
   setVisible('statsBtn', admin);
   setVisible('exportExcelBtn', admin);
+  setVisible('cfUnifiedBackupExport', admin);
+  setVisible('cfUnifiedBackupImport', admin);
   setVisible('importBtn', admin);
   setVisible('cfNotificationsBtn', admin || employee);
   setVisible('cfChangeNotificationsBtn', admin || employee);
@@ -17620,6 +17632,9 @@ document.addEventListener('focusin',e=>{
 });
 
 </script>
+<script src="/app/backup-sections.js?v=20260929-1"></script>
+<script src="/app/unified-backup.js?v=20260929-1"></script>
+<script src="/app/unified-backup-ui.js?v=20260929-1"></script>
 <script src="/app/weather-v6.js?v=20260923-13068"></script>
 <script src="/app/weather-refresh-v12311.js?v=20260923-13068"></script>
 <script src="/app/layout-v11913.js?v=20260923-13068"></script>

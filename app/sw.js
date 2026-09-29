@@ -1,4 +1,4 @@
-// CleanFleet v1.49.3 — connect export button to admin module.
+// CleanFleet v1.50.0 — selective restoration of the unified backup.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

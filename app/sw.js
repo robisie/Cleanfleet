@@ -1,4 +1,4 @@
-// CleanFleet v1.50.1 — backup actions in the administrator dashboard.
+// CleanFleet v1.50.2 — more reliable ANPR matching and image preparation.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

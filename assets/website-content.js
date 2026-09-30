@@ -43,8 +43,8 @@
     /* Contact form: desktop/tablet landscape — opens inside the free right side of slide 07. */
     .cf-mail-overlay{position:fixed;inset:0;z-index:1000;background:transparent;opacity:0;pointer-events:none;transition:opacity .22s ease}
     .cf-mail-overlay.open{opacity:1;pointer-events:none}
-    .cf-mail-panel{position:absolute;right:clamp(28px,6vw,96px);top:50%;width:min(560px,42vw);max-height:74svh;background:rgba(6,12,9,.9);border:1px solid rgba(255,255,255,.18);border-radius:22px;box-shadow:0 24px 70px rgba(0,0,0,.5);backdrop-filter:blur(16px);transform:translate(34px,-50%) scale(.985);opacity:0;transition:transform .28s ease,opacity .22s ease;display:flex;flex-direction:column;padding:26px 28px;pointer-events:auto}
-    .cf-mail-overlay.open .cf-mail-panel{transform:translate(0,-50%) scale(1);opacity:1}
+    .cf-mail-panel{position:absolute;right:clamp(28px,6vw,96px);top:50%;width:min(560px,42vw);max-height:74svh;background:rgba(6,12,9,.9);border:1px solid rgba(255,255,255,.18);border-radius:22px;box-shadow:0 24px 70px rgba(0,0,0,.5);backdrop-filter:blur(16px);transform:translate(34px,-50%) scale(.985);opacity:0;transition:transform .28s ease,opacity .22s ease;display:flex;flex-direction:column;padding:26px 28px;pointer-events:none}
+    .cf-mail-overlay.open .cf-mail-panel{transform:translate(0,-50%) scale(1);opacity:1;pointer-events:auto}
     .cf-mail-top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
     .cf-mail-top h3{margin:0;font:700 28px/1 Space Grotesk,sans-serif}
     .cf-mail-close{width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.03);color:#fff;font-size:24px;cursor:pointer;flex:0 0 auto}

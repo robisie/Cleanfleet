@@ -19,3 +19,5 @@ Etap 2 modułu Dokumenty księgowe — eksport faktur zakupowych i sprzedażowyc
 Zapamiętanie tokenu KSeF: przycisk Zapisz, maskowanie pola i zaszyfrowany zapis dla administratora — `v1.52.1`.
 
 Etap 3 Dokumentów księgowych — konwersja pełnych eksportów CSV mBanku do MT940, kontrola sald i pobieranie plików STA — `v1.53.0`.
+
+Rozszerzenie eksportu MT940 zmienione na TXT zgodnie z wymaganiem księgowej — `v1.53.1`.

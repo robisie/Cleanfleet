@@ -41,7 +41,7 @@
         try{const decoded=bank.decode(bytes);statement=bank.parse(decoded.text,month);output=bank.encode(bank.build(statement,number),encoding);}
         catch(error){throw new Error(file.name+': '+error.message);}
         if(accounts.has(statement.account))throw new Error('Wybrano więcej niż jeden CSV dla tego samego rachunku. Zostaw jeden pełny eksport miesiąca.');
-        accounts.add(statement.account);converted.push({statement,bytes:output,filename:'mbank-'+month+'-'+statement.account.slice(-8)+'.sta'});
+        accounts.add(statement.account);converted.push({statement,bytes:output,filename:'mbank-'+month+'-'+statement.account.slice(-8)+'.txt'});
       }
       if(run!==bankRun || !isAdmin())return;
       bankResults=converted;const list=bankElement('Results');
@@ -49,7 +49,7 @@
         const s=result.statement,bank=window.CFMBankMT940,entry=document.createElement('div');entry.className='cf-bank-result';
         const name=document.createElement('strong');name.textContent='Rachunek …'+s.account.slice(-8)+' · '+s.currency;
         const summary=document.createElement('p');summary.textContent=s.operations.length+' operacji · Wpływy: '+bank.money(s.credits)+' · Wydatki: '+bank.money(s.debits)+'. Saldo początkowe: '+(s.opening<0n?'-':'')+bank.money(s.opening)+' · Saldo końcowe: '+(s.closing<0n?'-':'')+bank.money(s.closing)+'.';
-        const button=document.createElement('button');button.type='button';button.className='cf-ksef-download';button.dataset.bankDownload=String(index);button.textContent='Pobierz MT940 (.sta)';
+        const button=document.createElement('button');button.type='button';button.className='cf-ksef-download';button.dataset.bankDownload=String(index);button.textContent='Pobierz MT940 (.txt)';
         entry.append(name,summary,button);list.appendChild(entry);
       }
       bankStatus('Gotowe: '+converted.length+' '+(converted.length===1?'plik MT940':'pliki MT940')+'. Salda wszystkich operacji są zgodne.');

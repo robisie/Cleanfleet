@@ -22,6 +22,27 @@ test('encrypted tickets reject tampering, another user and expiration',async()=>
   await assert.rejects(codec.open(ticket.slice(0,30)+'A'+ticket.slice(31),'admin','export'));
   await assert.rejects(codec.open(await codec.seal({userId:'admin',scope:'export',expires:1}),'admin','export'));
 });
+test('saved credentials persist encrypted, replace atomically and stay isolated by owner/environment',async()=>{
+  const rows=new Map();
+  const credentialStore={get:async(uid,env)=>rows.get(uid+env)||null,set:async(uid,env,value)=>{rows.set(uid+env,value);}};
+  const handler=createHandler({secret:'test-server-key',credentialStore,authorize:async req=>req.headers.get('test-owner'),fetchImpl:async()=>{throw new Error('No KSeF requests expected');}});
+  const call=(body,owner='alice')=>handler(new Request('https://edge.example',{method:'POST',headers:{'test-owner':owner},body:JSON.stringify(body)}));
+  const save={action:'save-credentials',environment:'production',nip:'5260250995',token:'first-secret',userId:'bob'};
+  const response=await(await call(save)).json();
+  assert.deepEqual(response,{configured:true,nip:'5260250995',environment:'production'});
+  const first=rows.get('aliceproduction').ciphertext;assert.ok(!first.includes('first-secret'));
+  const cipher=createStateCodec('test-server-key','saved-credentials-v1');
+  assert.equal((await cipher.open(first,'alice','credential')).token,'first-secret');
+  assert.equal((await(await call({action:'credentials',environment:'production'},'bob')).json()).configured,false);
+  assert.equal((await(await call({action:'credentials',environment:'test'})).json()).configured,false);
+  await assert.rejects(cipher.open(first,'bob','credential'));
+  await assert.rejects(createStateCodec('test-server-key').open(first,'alice','credential'));
+  await call({...save,token:'replacement-secret'});
+  const second=rows.get('aliceproduction').ciphertext;
+  assert.notEqual(second,first);assert.equal((await cipher.open(second,'alice','credential')).token,'replacement-secret');
+  assert.equal((await call({...save,token:''})).status,400);
+  assert.equal(rows.get('aliceproduction').ciphertext,second);
+});
 test('X509 certificate extracts RSA public key',async()=>{
   const dir=mkdtempSync(tmpdir()+'/cf-ksef-');
   try {
@@ -67,9 +88,16 @@ test('full export: correct auth encryption, filters, encrypted transfer and reje
     if(url.startsWith('https://storage.example/')){assert.equal(options.headers,undefined);return new Response(corrupt ? Buffer.alloc(jobs[0].length):jobs[0]);}
     throw new Error('Unexpected URL: '+url);
   };
-  const handler=createHandler({authorize:async()=> 'admin',secret:'server-secret',fetchImpl,pause:async()=>{}});
+  const store=new Map();
+  const credentialStore={get:async(uid,env)=>store.get(uid+env)||null,set:async(uid,env,value)=>{store.set(uid+env,value);}};
+  const handler=createHandler({authorize:async()=> 'admin',secret:'server-secret',credentialStore,fetchImpl,pause:async()=>{}});
   const call=body=>handler(new Request('https://edge.example',{method:'POST',headers:{Origin:'https://cleanfleet.pl'},body:JSON.stringify(body)}));
-  const started=await (await call({action:'start',nip:'5260250995',token:'raw-token',month:'2024-02',environment:'production'})).json();
+  assert.equal((await call({action:'save-credentials',nip:'5260250995',token:'raw-token',environment:'production'})).status,200);
+  const saved=store.get('adminproduction');assert.ok(!saved.ciphertext.includes('raw-token'));
+  const meta=await(await call({action:'credentials',environment:'production'})).json();
+  assert.deepEqual(meta,{configured:true,nip:'5260250995',environment:'production'});
+  assert.equal((await call({action:'start',nip:'5260250995',useSaved:true,month:'2024-02',environment:'test'})).status,400);
+  const started=await (await call({action:'start',nip:'5260250995',useSaved:true,month:'2024-02',environment:'production'})).json();
   assert.equal(started.jobs.length,2); assert.ok(!JSON.stringify(started).includes('access-secret'));
   const statusBody={action:'status',ticket:started.jobs[0].ticket};
   const ready=await(await call(statusBody)).json();assert.equal(ready.status,'ready');

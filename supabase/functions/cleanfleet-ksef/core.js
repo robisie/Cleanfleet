@@ -30,8 +30,8 @@ export async function certificateKey(certificate) {
   const spki = der(bytes, offset);
   return crypto.subtle.importKey('spki', bytes.slice(spki.start, spki.end), algorithm, false, ['encrypt']);
 }
-export function createStateCodec(secret) {
-  const keyPromise = crypto.subtle.importKey('raw', encoder.encode(secret), 'HKDF', false, ['deriveKey']).then(key => crypto.subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: encoder.encode('CleanFleet/KSeF/v1'), info: encoder.encode('export-state') }, key, { name: 'AES-GCM', length: 256 }, false, ['encrypt','decrypt']));
+export function createStateCodec(secret, purpose = 'export-state') {
+  const keyPromise = crypto.subtle.importKey('raw', encoder.encode(secret), 'HKDF', false, ['deriveKey']).then(key => crypto.subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: encoder.encode('CleanFleet/KSeF/v1'), info: encoder.encode(purpose) }, key, { name: 'AES-GCM', length: 256 }, false, ['encrypt','decrypt']));
   return {
     async seal(state) {
       const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -53,8 +53,17 @@ export function createStateCodec(secret) {
 }
 const MAX = 200 * 1024 * 1024;
 const origins = ['https://cleanfleet.pl','https://www.cleanfleet.pl'];
-export function createHandler({authorize, secret, fetchImpl = fetch, pause = ms => new Promise(resolve => setTimeout(resolve, ms))}) {
+export function createHandler({authorize, secret, credentialStore, fetchImpl = fetch, pause = ms => new Promise(resolve => setTimeout(resolve, ms))}) {
   const codec = createStateCodec(secret);
+  const credentials = createStateCodec(secret, 'saved-credentials-v1');
+  function environmentFor(value) {
+    if (!['production','test'].includes(value)) throw new HttpError('Niepoprawne środowisko KSeF.');
+    return value;
+  }
+  async function savedFor(userId, environment) {
+    if (!credentialStore) throw new HttpError('Zapisywanie tokenu jest chwilowo niedostępne.',503);
+    return credentialStore.get(userId, environment);
+  }
   async function api(environment, path, token, body) {
     const base = environment === 'test' ? 'https://api-test.ksef.mf.gov.pl/v2' : 'https://api.ksef.mf.gov.pl/v2';
     let response;
@@ -76,12 +85,38 @@ export function createHandler({authorize, secret, fetchImpl = fetch, pause = ms 
       const raw = await request.text(); if (raw.length > 20000) throw new HttpError('Żądanie jest za duże.',413);
       let body; try { body = JSON.parse(raw); } catch (_) { throw new HttpError('Niepoprawne żądanie.'); }
       if (!body || typeof body !== 'object') throw new HttpError('Niepoprawne żądanie.');
+      if (body.action === 'credentials') {
+        const environment = environmentFor(body.environment);
+        const saved = await savedFor(userId, environment);
+        return json({configured:Boolean(saved),nip:saved?.nip || '',environment});
+      }
+      if (body.action === 'save-credentials') {
+        const environment = environmentFor(body.environment);
+        const nip = String(body.nip || '').replace(/[\s-]/g,'');
+        const token = typeof body.token === 'string' ? body.token.trim() : '';
+        if (!validNip(nip)) throw new HttpError('Podaj poprawny NIP przed zapisaniem tokenu.');
+        if (!token || token.length > 8000) throw new HttpError('Wklej nowy token KSeF, który chcesz zapisać.');
+        if (!credentialStore) throw new HttpError('Zapisywanie tokenu jest chwilowo niedostępne.',503);
+        const ciphertext = await credentials.seal({scope:'credential',userId,environment,nip,token,expires:Number.MAX_SAFE_INTEGER});
+        await credentialStore.set(userId,environment,{nip,ciphertext});
+        return json({configured:true,nip,environment});
+      }
       if (body.action === 'start') {
-        const nip = String(body.nip || '').replace(/[\s-]/g,''); const token = typeof body.token === 'string' ? body.token.trim() : '';
+        const nip = String(body.nip || '').replace(/[\s-]/g,'');
+        const environment = environmentFor(body.environment);
+        let token = typeof body.token === 'string' ? body.token.trim() : '';
         if (!validNip(nip)) throw new HttpError('Podaj poprawny NIP.');
+        if (body.useSaved === true) {
+          const saved = await savedFor(userId, environment);
+          if (!saved || saved.nip !== nip) throw new HttpError('Brak zapisanego tokenu dla tego NIP-u. Wklej token i kliknij Zapisz.');
+          let state;
+          try { state = await credentials.open(saved.ciphertext,userId,'credential'); }
+          catch (_) { throw new HttpError('Zapisany token wymaga ponownego zapisania. Wklej go i kliknij Zapisz.',409); }
+          if (state.environment !== environment || state.nip !== nip) throw new HttpError('Zapisany token nie pasuje do wybranej firmy.',409);
+          token = state.token;
+        }
         if (!token || token.length > 8000) throw new HttpError('Podaj token KSeF z uprawnieniem do odczytu faktur.');
-        const dateRange = monthRange(body.month); const environment = body.environment;
-        if (!['production','test'].includes(environment)) throw new HttpError('Niepoprawne środowisko KSeF.');
+        const dateRange = monthRange(body.month);
         const certificates = await api(environment,'/security/public-key-certificates');
         async function keyFor(usage) {
           const cert = certificates.filter(c => c.usage?.includes(usage) && Date.parse(c.validFrom) <= Date.now() && Date.parse(c.validTo) > Date.now()).sort((a,b) => Date.parse(b.validFrom)-Date.parse(a.validFrom))[0];

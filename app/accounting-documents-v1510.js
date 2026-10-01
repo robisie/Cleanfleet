@@ -10,17 +10,63 @@
 
   let ksefRun = null;
   let ksefResults = {};
+  let ksefConfigRun = null;
+  let ksefSaved = null;
+  const KSEF_MASK = '************';
   const ksefElement = id => document.getElementById('cfKsef' + id);
   function ksefStatus(message) { const el=ksefElement('Status'); if(el)el.textContent=message; }
   function resetKsef() {
     ksefRun?.abort(); ksefRun=null; ksefResults={}; busyKsef(false);
-    const token=ksefElement('Token');if(token)token.value='';
     for(const kind of ['purchases','sales']) {const el=ksefElement(kind);if(el){el.hidden=true;el.disabled=true;}}
   }
   function busyKsef(busy) {
-    for(const id of ['Nip','Environment','Start']){const el=ksefElement(id);if(el)el.disabled=busy;}
+    for(const id of ['Nip','Token','Environment','Start','Save']){const el=ksefElement(id);if(el)el.disabled=busy || Boolean(ksefConfigRun);}
     const month=document.getElementById('cfAccountingMonth');if(month)month.disabled=busy;
     const cancel=ksefElement('Cancel');if(cancel)cancel.hidden=!busy;
+  }
+  function savedMatches() {
+    return ksefSaved && ksefSaved.environment===ksefElement('Environment')?.value && ksefSaved.nip===ksefElement('Nip')?.value.replace(/[\s-]/g,'');
+  }
+  function showSavedToken() {
+    const token=ksefElement('Token');
+    if(token){token.value=KSEF_MASK;token.dataset.saved='true';}
+  }
+  function forgetKsefView() {
+    ksefConfigRun?.abort();ksefConfigRun=null;ksefSaved=null;
+    const token=ksefElement('Token');if(token){token.value='';token.dataset.saved='false';}
+    resetKsef();
+  }
+  async function loadKsefCredential() {
+    if(ksefRun || !isAdmin())return;
+    ksefConfigRun?.abort();const controller=new AbortController();ksefConfigRun=controller;
+    const environment=ksefElement('Environment').value;
+    ksefSaved=null;ksefElement('Token').value='';ksefElement('Token').dataset.saved='false';busyKsef(false);
+    ksefStatus('Sprawdzanie zapisanego tokenu…');
+    try {
+      const result=await ksefRequest({action:'credentials',environment},controller.signal);
+      if(controller.signal.aborted || !isAdmin())return;
+      if(result.configured){
+        ksefSaved=result;ksefElement('Nip').value=result.nip;showSavedToken();
+        ksefStatus('Token zapisany. Możesz pobrać faktury lub wkleić nowy token i kliknąć Zapisz.');
+      }else{ksefStatus('Wpisz NIP i token z uprawnieniem do przeglądania faktur. Kliknij Zapisz, aby go zapamiętać.');}
+    }catch(error){if(error.name!=='AbortError')ksefStatus(error.message);}
+    finally{if(ksefConfigRun===controller){ksefConfigRun=null;busyKsef(Boolean(ksefRun));}}
+  }
+  async function saveKsefCredential() {
+    if(ksefRun || ksefConfigRun || !isAdmin())return;
+    const field=ksefElement('Token');
+    if(field.dataset.saved==='true' && savedMatches()){ksefStatus('Ten token jest już zapisany. Aby go zmienić, wklej nowy i kliknij Zapisz.');return;}
+    const token=field.value.trim();
+    if(!token || token===KSEF_MASK){ksefStatus('Wklej nowy token, który chcesz zapisać.');return;}
+    const nip=ksefElement('Nip').value,environment=ksefElement('Environment').value;
+    const controller=new AbortController();ksefConfigRun=controller;busyKsef(false);ksefStatus('Zapisywanie tokenu…');
+    try{
+      const result=await ksefRequest({action:'save-credentials',nip,token,environment},controller.signal);
+      if(controller.signal.aborted || !isAdmin())return;
+      ksefSaved=result;ksefElement('Nip').value=result.nip;showSavedToken();resetKsef();
+      ksefStatus('Token zapisany. Będzie dostępny przy kolejnym otwarciu modułu.');
+    }catch(error){if(error.name!=='AbortError')ksefStatus(error.message);}
+    finally{if(ksefConfigRun===controller){ksefConfigRun=null;busyKsef(Boolean(ksefRun));}}
   }
   function waitKsef(ms, signal) {
     return new Promise((resolve,reject)=>{
@@ -73,15 +119,18 @@
     return {count:ready.invoiceCount,blob:new Blob([combined],{type:'application/zip'})};
   }
   async function startKsef(event) {
-    event.preventDefault();if(ksefRun || !isAdmin())return;
+    event.preventDefault();if(ksefRun || ksefConfigRun || !isAdmin())return;
     const month=document.getElementById('cfAccountingMonth').value;
-    const nip=ksefElement('Nip').value, token=ksefElement('Token').value.trim(), environment=ksefElement('Environment').value;
-    if(!token){ksefStatus('Wpisz token KSeF z uprawnieniem do odczytu faktur.');return;}
+    const field=ksefElement('Token');
+    const useSaved=field.dataset.saved==='true' && Boolean(savedMatches());
+    const nip=ksefElement('Nip').value, token=useSaved ? '' : field.value.trim(), environment=ksefElement('Environment').value;
+    if(!useSaved && (!token || token===KSEF_MASK)){ksefStatus('Wpisz token KSeF z uprawnieniem do odczytu faktur.');return;}
+    if(!useSaved)field.value='';
     resetKsef();const controller=new AbortController();ksefRun=controller;busyKsef(true);
     const signal=controller.signal;
     try{
       ksefStatus('Łączenie z KSeF i zlecanie eksportu faktur…');
-      const started=await ksefRequest({action:'start',nip,token,month,environment},signal);
+      const started=await ksefRequest({action:'start',nip,...(useSaved ? {useSaved:true} : {token}),month,environment},signal);
       if(started.month!==month || started.jobs?.length!==2)throw new Error('Niepoprawna odpowiedź eksportu.');
       const remaining=[...started.jobs], readyJobs=[];const deadline=Date.now()+15*60*1000;
       while(remaining.length){
@@ -163,7 +212,7 @@
       '.cf-accounting-file.is-visible{display:block}',
       '.cf-accounting-note{margin:16px 0 0;padding:12px 14px;border-left:3px solid #a6c61b;border-radius:0 8px 8px 0;background:#f1f4e9;color:#59614b;font-size:11px;line-height:1.5}',
       '.cf-accounting-next{margin:18px 0 0;padding-top:16px;border-top:1px solid #e2e6dc;color:#687064;font-size:12px;line-height:1.55}',
-      '.cf-ksef-form{display:grid;gap:10px;margin-top:12px}.cf-ksef-form label{display:grid;gap:4px;font-size:12px;font-weight:700}.cf-ksef-form input,.cf-ksef-form select{width:100%;min-height:40px;padding:8px 10px;border:1px solid #cfd5c4;border-radius:8px;font:inherit;background:#fff;color:#222820}.cf-ksef-form button,.cf-ksef-download{min-height:40px;border:1px solid #a6c61b;border-radius:8px;padding:10px;background:#faffeb;color:#4c5c0d;font:inherit;font-size:12px;font-weight:800;cursor:pointer}.cf-ksef-form button:disabled,.cf-ksef-download:disabled{opacity:.6;cursor:default}.cf-ksef-download{width:100%;margin-top:8px}.cf-ksef-download[hidden],#cfKsefCancel[hidden]{display:none}#cfKsefStatus{margin-top:12px;overflow-wrap:anywhere}',
+      '.cf-ksef-token-row{display:flex;align-items:stretch;gap:8px}.cf-ksef-token-row input{flex:1;min-width:0}.cf-ksef-token-row button{flex:0 0 auto}.cf-ksef-form{display:grid;gap:10px;margin-top:12px}.cf-ksef-form label{display:grid;gap:4px;font-size:12px;font-weight:700}.cf-ksef-form input,.cf-ksef-form select{width:100%;min-height:40px;padding:8px 10px;border:1px solid #cfd5c4;border-radius:8px;font:inherit;background:#fff;color:#222820}.cf-ksef-form button,.cf-ksef-download{min-height:40px;border:1px solid #a6c61b;border-radius:8px;padding:10px;background:#faffeb;color:#4c5c0d;font:inherit;font-size:12px;font-weight:800;cursor:pointer}.cf-ksef-form button:disabled,.cf-ksef-download:disabled{opacity:.6;cursor:default}.cf-ksef-download{width:100%;margin-top:8px}.cf-ksef-download[hidden],#cfKsefCancel[hidden]{display:none}#cfKsefStatus{margin-top:12px;overflow-wrap:anywhere}',
       '@media(max-width:620px){#cfAccountingDocsOverlay{padding:0}.cf-accounting-docs-sheet{min-height:100dvh;border:0;border-radius:0}.cf-accounting-docs-head{padding:18px 16px 14px}.cf-accounting-docs-body{padding:16px}.cf-accounting-source-grid{grid-template-columns:1fr;gap:10px}.cf-accounting-period{align-items:flex-start;flex-direction:column}.cf-accounting-period input{width:100%}.cf-accounting-source{padding:14px}}'
     ].join('\n');
     document.head.appendChild(style);
@@ -231,7 +280,7 @@
           '<div class="cf-accounting-docs-body">',
             '<div class="cf-accounting-period"><label for="cfAccountingMonth">Miesiąc rozliczeniowy</label><input id="cfAccountingMonth" type="month"></div>',
             '<div class="cf-accounting-source-grid">',
-              '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>KSeF</h2><p>Faktury według daty wystawienia w wybranym miesiącu.</p></div><span class="cf-accounting-status">Połączenie KSeF</span></div><form id="cfKsefForm" class="cf-ksef-form"><label for="cfKsefNip">NIP firmy<input id="cfKsefNip" type="text" inputmode="numeric" maxlength="15" autocomplete="off" required></label><label for="cfKsefToken">Token KSeF<input id="cfKsefToken" type="password" autocomplete="new-password" spellcheck="false" required></label><label for="cfKsefEnvironment">Środowisko<select id="cfKsefEnvironment"><option value="production">Produkcyjne — rzeczywiste faktury</option><option value="test">Testowe — dane testowe</option></select></label><button id="cfKsefStart" type="submit">Pobierz faktury z KSeF</button><button id="cfKsefCancel" type="button" hidden>Anuluj pobieranie</button></form><p id="cfKsefStatus" role="status" aria-live="polite">Token musi mieć uprawnienie do odczytu faktur. Nie zapisujemy go; wpisujesz go przy każdym pobraniu.</p><button id="cfKsefpurchases" type="button" class="cf-ksef-download" hidden>Pobierz faktury zakupowe</button><button id="cfKsefsales" type="button" class="cf-ksef-download" hidden>Pobierz faktury sprzedażowe</button></article>',
+              '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>KSeF</h2><p>Faktury według daty wystawienia w wybranym miesiącu.</p></div><span class="cf-accounting-status">Połączenie KSeF</span></div><form id="cfKsefForm" class="cf-ksef-form"><label for="cfKsefNip">NIP firmy<input id="cfKsefNip" type="text" inputmode="numeric" maxlength="15" autocomplete="off" required></label><label for="cfKsefToken">Token KSeF<span class="cf-ksef-token-row"><input id="cfKsefToken" type="password" autocomplete="new-password" spellcheck="false" required data-saved="false"><button id="cfKsefSave" type="button">Zapisz</button></span></label><label for="cfKsefEnvironment">Środowisko<select id="cfKsefEnvironment"><option value="production">Produkcyjne — rzeczywiste faktury</option><option value="test">Testowe — dane testowe</option></select></label><button id="cfKsefStart" type="submit">Pobierz faktury z KSeF</button><button id="cfKsefCancel" type="button" hidden>Anuluj pobieranie</button></form><p id="cfKsefStatus" role="status" aria-live="polite">Token musi mieć uprawnienie do przeglądania faktur. Kliknij Zapisz, aby go zapamiętać.</p><button id="cfKsefpurchases" type="button" class="cf-ksef-download" hidden>Pobierz faktury zakupowe</button><button id="cfKsefsales" type="button" class="cf-ksef-download" hidden>Pobierz faktury sprzedażowe</button></article>',
               '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>mBank</h2><p>Eksport CSV z historią rachunku.</p></div><span class="cf-accounting-status">Plik z komputera</span></div><label class="cf-accounting-upload">Wybierz plik CSV<input id="cfAccountingBankInput" type="file" accept=".csv,text/csv"></label><div class="cf-accounting-file" id="cfAccountingBankFile"></div></article>',
               '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>mOrganizer</h2><p>Eksportowana paczka faktur w jednym pliku PDF.</p></div><span class="cf-accounting-status">Plik z komputera</span></div><label class="cf-accounting-upload">Wybierz plik PDF<input id="cfAccountingOrganizerInput" type="file" accept=".pdf,application/pdf"></label><div class="cf-accounting-file" id="cfAccountingOrganizerFile"></div></article>',
               '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>Poczta o2</h2><p>Załączniki otrzymywane od banku.</p></div><span class="cf-accounting-status is-next">Późniejszy etap</span></div><p>Połączenie skrzynki i pobieranie załączników dodamy po integracji KSeF.</p></article>',
@@ -241,8 +290,11 @@
           '</div>',
         '</section>'
       ].join('');
+      overlay.addEventListener('focusin', event => { if(event.target.id==='cfKsefToken' && event.target.dataset.saved==='true')event.target.select(); });
+      overlay.addEventListener('input', event => { if(event.target.id==='cfKsefToken')event.target.dataset.saved='false'; });
       overlay.addEventListener('submit', event => { if(event.target.id==='cfKsefForm')startKsef(event); });
       overlay.addEventListener('click', event => {
+        if(event.target.id==='cfKsefSave')saveKsefCredential();
         if(event.target.id==='cfKsefCancel')ksefRun?.abort();
         if(event.target.id==='cfKsefpurchases')saveKsef('purchases');
         if(event.target.id==='cfKsefsales')saveKsef('sales');
@@ -250,7 +302,9 @@
       });
       overlay.addEventListener('change', event => {
         const input = event.target;
-        if (['cfAccountingMonth','cfKsefNip','cfKsefEnvironment'].includes(input?.id)) { resetKsef();ksefStatus('Wpisz token i pobierz faktury dla wybranego miesiąca.'); }
+        if (['cfAccountingMonth','cfKsefNip','cfKsefEnvironment'].includes(input?.id)) { resetKsef(); }
+        if(input?.id==='cfKsefEnvironment')loadKsefCredential();
+        if(input?.id==='cfKsefNip' && ksefElement('Token').dataset.saved==='true' && !savedMatches()){ksefElement('Token').value='';ksefElement('Token').dataset.saved='false';ksefStatus('Wklej token dla tego NIP-u i kliknij Zapisz.');}
         if (input?.id === 'cfAccountingMonth') updateMonth();
         if (input?.id === 'cfAccountingBankInput') {
           const file = input.files?.[0] || null;
@@ -274,6 +328,7 @@
     priorBodyOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     overlay.classList.add('cf-open');
+    loadKsefCredential();
     overlay.querySelector('[data-cf-accounting-close]')?.focus({ preventScroll: true });
   }
 
@@ -281,7 +336,9 @@
     const overlay = document.getElementById(OVERLAY_ID);
     if (!overlay) return;
     ksefRun?.abort();
-    const token=ksefElement('Token');if(token)token.value='';
+    ksefConfigRun?.abort();ksefConfigRun=null;
+    const token=ksefElement('Token');if(token && token.dataset.saved!=='true')token.value='';
+    busyKsef(Boolean(ksefRun));
     overlay.classList.remove('cf-open');
     document.body.style.overflow = priorBodyOverflow;
   }
@@ -293,7 +350,7 @@
     else {
       grid.querySelector('#' + TILE_ID)?.remove();
       closeModule();
-      resetKsef();
+      forgetKsefView();
     }
   }
 
@@ -312,7 +369,7 @@
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape' && document.getElementById(OVERLAY_ID)?.classList.contains('cf-open')) closeModule();
     });
-    window.addEventListener('pagehide', () => { observer?.disconnect();resetKsef(); });
+    window.addEventListener('pagehide', () => { observer?.disconnect();forgetKsefView(); });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });

@@ -14,4 +14,18 @@ async function authorize(request: Request) {
   if (role.error || role.data?.role !== "admin") throw new HttpError("Moduł jest dostępny dla administratora.", 403);
   return data.user.id;
 }
-Deno.serve(createHandler({ authorize, secret }));
+const credentialStore = {
+  async get(userId: string, environment: string) {
+    const result = await admin.from('cf_ksef_credentials').select('nip,ciphertext')
+      .eq('user_id', userId).eq('environment', environment).maybeSingle();
+    if (result.error) throw new HttpError('Nie udało się odczytać zapisanego tokenu.', 503);
+    return result.data;
+  },
+  async set(userId: string, environment: string, value: { nip: string; ciphertext: string }) {
+    const result = await admin.from('cf_ksef_credentials').upsert({
+      user_id: userId, environment, ...value, updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,environment' });
+    if (result.error) throw new HttpError('Nie udało się zapisać tokenu. Spróbuj ponownie.', 503);
+  },
+};
+Deno.serve(createHandler({ authorize, secret, credentialStore }));

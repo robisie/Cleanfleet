@@ -9,7 +9,10 @@
   let priorBodyOverflow = '';
 
   function isAdmin() {
-    try { return typeof window.cfIsAdmin === 'function' && window.cfIsAdmin(); }
+    try {
+      const bridge = window.cfBackupBridge;
+      return Boolean(bridge && typeof bridge.isAdmin === 'function' && bridge.isAdmin());
+    }
     catch (_) { return false; }
   }
 

@@ -1,4 +1,4 @@
-// CleanFleet v1.50.2 — more reliable ANPR matching and image preparation.
+// CleanFleet v1.51.0 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });

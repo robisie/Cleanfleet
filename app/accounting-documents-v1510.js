@@ -7,6 +7,60 @@
   let observer = null;
   let selectedFiles = { bank: null, organizer: null };
   let priorBodyOverflow = '';
+  let bankFiles = [];
+  let bankResults = [];
+  let bankRun = 0;
+  let bankBusy = false;
+  const bankElement = id => document.getElementById('cfAccountingBank' + id);
+  function bankStatus(message) {const el=bankElement('Status');if(el)el.textContent=message;}
+  function resetBank() {
+    bankRun++;bankBusy=false;bankResults=[];
+    bankElement('Results')?.replaceChildren();
+    for(const id of ['Convert','Input','Number','Encoding']){const el=bankElement(id);if(el)el.disabled=false;}
+  }
+  function bankFileLabels() {
+    const el=bankElement('File');if(!el)return;
+    el.textContent=bankFiles.map(file=>file.name+' · '+fileSize(file.size)).join('\n');
+    el.classList.toggle('is-visible',bankFiles.length>0);
+  }
+  async function convertBank() {
+    if(!isAdmin() || bankBusy)return;
+    resetBank();const run=bankRun,month=document.getElementById('cfAccountingMonth').value;
+    if(!bankFiles.length){bankStatus('Wybierz pełny eksport CSV z mBanku.');return;}
+    if(!window.CFMBankMT940){bankStatus('Konwerter nie został załadowany. Odśwież aplikację.');return;}
+    const number=bankElement('Number').value,encoding=bankElement('Encoding').value;
+    bankBusy=true;for(const id of ['Convert','Input','Number','Encoding'])bankElement(id).disabled=true;
+    bankStatus('Sprawdzanie CSV i konwersja na MT940…');
+    try {
+      const converted=[],accounts=new Set();
+      for(const file of bankFiles) {
+        if(file.size>10*1024*1024)throw new Error(file.name+': plik przekracza limit 10 MB.');
+        const bytes=await file.arrayBuffer();
+        if(run!==bankRun || !isAdmin())return;
+        const bank=window.CFMBankMT940;let statement,output;
+        try{const decoded=bank.decode(bytes);statement=bank.parse(decoded.text,month);output=bank.encode(bank.build(statement,number),encoding);}
+        catch(error){throw new Error(file.name+': '+error.message);}
+        if(accounts.has(statement.account))throw new Error('Wybrano więcej niż jeden CSV dla tego samego rachunku. Zostaw jeden pełny eksport miesiąca.');
+        accounts.add(statement.account);converted.push({statement,bytes:output,filename:'mbank-'+month+'-'+statement.account.slice(-8)+'.sta'});
+      }
+      if(run!==bankRun || !isAdmin())return;
+      bankResults=converted;const list=bankElement('Results');
+      for(const [index,result] of converted.entries()) {
+        const s=result.statement,bank=window.CFMBankMT940,entry=document.createElement('div');entry.className='cf-bank-result';
+        const name=document.createElement('strong');name.textContent='Rachunek …'+s.account.slice(-8)+' · '+s.currency;
+        const summary=document.createElement('p');summary.textContent=s.operations.length+' operacji · Wpływy: '+bank.money(s.credits)+' · Wydatki: '+bank.money(s.debits)+'. Saldo początkowe: '+(s.opening<0n?'-':'')+bank.money(s.opening)+' · Saldo końcowe: '+(s.closing<0n?'-':'')+bank.money(s.closing)+'.';
+        const button=document.createElement('button');button.type='button';button.className='cf-ksef-download';button.dataset.bankDownload=String(index);button.textContent='Pobierz MT940 (.sta)';
+        entry.append(name,summary,button);list.appendChild(entry);
+      }
+      bankStatus('Gotowe: '+converted.length+' '+(converted.length===1?'plik MT940':'pliki MT940')+'. Salda wszystkich operacji są zgodne.');
+    }catch(error){bankResults=[];bankStatus(error.message || 'Nie udało się przekonwertować CSV.');}
+    finally{if(run===bankRun){bankBusy=false;for(const id of ['Convert','Input','Number','Encoding'])bankElement(id).disabled=false;}}
+  }
+  function downloadBank(index) {
+    const result=bankResults[index];if(!result || !isAdmin())return;
+    const url=URL.createObjectURL(new Blob([result.bytes],{type:'application/octet-stream'})),link=document.createElement('a');
+    link.href=url;link.download=result.filename;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
+  }
 
   let ksefRun = null;
   let ksefResults = {};
@@ -212,7 +266,7 @@
       '.cf-accounting-file.is-visible{display:block}',
       '.cf-accounting-note{margin:16px 0 0;padding:12px 14px;border-left:3px solid #a6c61b;border-radius:0 8px 8px 0;background:#f1f4e9;color:#59614b;font-size:11px;line-height:1.5}',
       '.cf-accounting-next{margin:18px 0 0;padding-top:16px;border-top:1px solid #e2e6dc;color:#687064;font-size:12px;line-height:1.55}',
-      '.cf-ksef-token-row{display:flex;align-items:stretch;gap:8px}.cf-ksef-token-row input{flex:1;min-width:0}.cf-ksef-token-row button{flex:0 0 auto}.cf-ksef-form{display:grid;gap:10px;margin-top:12px}.cf-ksef-form label{display:grid;gap:4px;font-size:12px;font-weight:700}.cf-ksef-form input,.cf-ksef-form select{width:100%;min-height:40px;padding:8px 10px;border:1px solid #cfd5c4;border-radius:8px;font:inherit;background:#fff;color:#222820}.cf-ksef-form button,.cf-ksef-download{min-height:40px;border:1px solid #a6c61b;border-radius:8px;padding:10px;background:#faffeb;color:#4c5c0d;font:inherit;font-size:12px;font-weight:800;cursor:pointer}.cf-ksef-form button:disabled,.cf-ksef-download:disabled{opacity:.6;cursor:default}.cf-ksef-download{width:100%;margin-top:8px}.cf-ksef-download[hidden],#cfKsefCancel[hidden]{display:none}#cfKsefStatus{margin-top:12px;overflow-wrap:anywhere}',
+      '.cf-bank-result{margin-top:14px;padding:12px;background:#f4f6f0;border-radius:8px}.cf-bank-result strong{font-size:12px}.cf-bank-result p,.cf-bank-status{margin-top:8px!important}.cf-accounting-file{white-space:pre-line}.cf-ksef-token-row{display:flex;align-items:stretch;gap:8px}.cf-ksef-token-row input{flex:1;min-width:0}.cf-ksef-token-row button{flex:0 0 auto}.cf-ksef-form{display:grid;gap:10px;margin-top:12px}.cf-ksef-form label{display:grid;gap:4px;font-size:12px;font-weight:700}.cf-ksef-form input,.cf-ksef-form select{width:100%;min-height:40px;padding:8px 10px;border:1px solid #cfd5c4;border-radius:8px;font:inherit;background:#fff;color:#222820}.cf-ksef-form button,.cf-ksef-download{min-height:40px;border:1px solid #a6c61b;border-radius:8px;padding:10px;background:#faffeb;color:#4c5c0d;font:inherit;font-size:12px;font-weight:800;cursor:pointer}.cf-ksef-form button:disabled,.cf-ksef-download:disabled{opacity:.6;cursor:default}.cf-ksef-download{width:100%;margin-top:8px}.cf-ksef-download[hidden],#cfKsefCancel[hidden]{display:none}#cfKsefStatus{margin-top:12px;overflow-wrap:anywhere}',
       '@media(max-width:620px){#cfAccountingDocsOverlay{padding:0}.cf-accounting-docs-sheet{min-height:100dvh;border:0;border-radius:0}.cf-accounting-docs-head{padding:18px 16px 14px}.cf-accounting-docs-body{padding:16px}.cf-accounting-source-grid{grid-template-columns:1fr;gap:10px}.cf-accounting-period{align-items:flex-start;flex-direction:column}.cf-accounting-period input{width:100%}.cf-accounting-source{padding:14px}}'
     ].join('\n');
     document.head.appendChild(style);
@@ -247,6 +301,7 @@
     const input = document.getElementById('cfAccountingMonth');
     const label = document.getElementById('cfAccountingMonthLabel');
     if (label) label.textContent = monthLabel(input?.value || '');
+    const number=bankElement('Number');if(number && !number.dataset.custom)number.value=String(Number(input?.value?.split('-')[1]) || 1);
   }
 
   function fileCard(type, file) {
@@ -281,11 +336,11 @@
             '<div class="cf-accounting-period"><label for="cfAccountingMonth">Miesiąc rozliczeniowy</label><input id="cfAccountingMonth" type="month"></div>',
             '<div class="cf-accounting-source-grid">',
               '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>KSeF</h2><p>Faktury według daty wystawienia w wybranym miesiącu.</p></div><span class="cf-accounting-status">Połączenie KSeF</span></div><form id="cfKsefForm" class="cf-ksef-form"><label for="cfKsefNip">NIP firmy<input id="cfKsefNip" type="text" inputmode="numeric" maxlength="15" autocomplete="off" required></label><label for="cfKsefToken">Token KSeF<span class="cf-ksef-token-row"><input id="cfKsefToken" type="password" autocomplete="new-password" spellcheck="false" required data-saved="false"><button id="cfKsefSave" type="button">Zapisz</button></span></label><label for="cfKsefEnvironment">Środowisko<select id="cfKsefEnvironment"><option value="production">Produkcyjne — rzeczywiste faktury</option><option value="test">Testowe — dane testowe</option></select></label><button id="cfKsefStart" type="submit">Pobierz faktury z KSeF</button><button id="cfKsefCancel" type="button" hidden>Anuluj pobieranie</button></form><p id="cfKsefStatus" role="status" aria-live="polite">Token musi mieć uprawnienie do przeglądania faktur. Kliknij Zapisz, aby go zapamiętać.</p><button id="cfKsefpurchases" type="button" class="cf-ksef-download" hidden>Pobierz faktury zakupowe</button><button id="cfKsefsales" type="button" class="cf-ksef-download" hidden>Pobierz faktury sprzedażowe</button></article>',
-              '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>mBank</h2><p>Eksport CSV z historią rachunku.</p></div><span class="cf-accounting-status">Plik z komputera</span></div><label class="cf-accounting-upload">Wybierz plik CSV<input id="cfAccountingBankInput" type="file" accept=".csv,text/csv"></label><div class="cf-accounting-file" id="cfAccountingBankFile"></div></article>',
+              '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>mBank</h2><p>Pełny eksport CSV historii rachunku za wybrany miesiąc.</p></div><span class="cf-accounting-status">CSV → MT940</span></div><label class="cf-accounting-upload">Wybierz pliki CSV<input id="cfAccountingBankInput" type="file" accept=".csv,text/csv" multiple></label><div class="cf-accounting-file" id="cfAccountingBankFile"></div><div class="cf-ksef-form"><label for="cfAccountingBankNumber">Numer wyciągu<input id="cfAccountingBankNumber" type="number" min="1" max="99999" step="1"></label><label for="cfAccountingBankEncoding">Kodowanie MT940<select id="cfAccountingBankEncoding"><option value="utf-8">UTF-8</option><option value="windows-1250">Windows-1250</option></select></label><button id="cfAccountingBankConvert" type="button">Konwertuj CSV na MT940</button></div><p id="cfAccountingBankStatus" class="cf-bank-status" role="status" aria-live="polite">Jeden pełny CSV na rachunek. Konwersja odbywa się w przeglądarce. Do importu wybierz w programie księgowym format MT940 standard i zgodne kodowanie.</p><div id="cfAccountingBankResults"></div></article>',
               '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>mOrganizer</h2><p>Eksportowana paczka faktur w jednym pliku PDF.</p></div><span class="cf-accounting-status">Plik z komputera</span></div><label class="cf-accounting-upload">Wybierz plik PDF<input id="cfAccountingOrganizerInput" type="file" accept=".pdf,application/pdf"></label><div class="cf-accounting-file" id="cfAccountingOrganizerFile"></div></article>',
               '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>Poczta o2</h2><p>Załączniki otrzymywane od banku.</p></div><span class="cf-accounting-status is-next">Późniejszy etap</span></div><p>Połączenie skrzynki i pobieranie załączników dodamy po integracji KSeF.</p></article>',
             '</div>',
-            '<div class="cf-accounting-note">KSeF: osobne archiwa ZIP z fakturami XML zakupowymi i sprzedażowymi. Archiwa pozostają w pamięci przeglądarki do zmiany miesiąca lub wylogowania. Pliki mBank i mOrganizer wybierasz lokalnie — ich wysyłanie i wspólna paczka miesięczna pojawią się w kolejnych etapach. Limit pobrania KSeF: 200 MB łącznie.</div>',
+            '<div class="cf-accounting-note">KSeF: osobne archiwa ZIP z fakturami XML zakupowymi i sprzedażowymi. Archiwa pozostają w pamięci przeglądarki do zmiany miesiąca lub wylogowania. CSV z mBanku konwertujemy na MT940 lokalnie w przeglądarce. Eksport PDF z mOrganizera wybierasz samodzielnie. Wspólna paczka miesięczna pojawi się w kolejnym etapie. Limit pobrania KSeF: 200 MB łącznie.</div>',
             '<div class="cf-accounting-next">Następnie podłączymy pocztę o2. Strukturę folderów i końcowy ZIP ustalimy po tych integracjach. Wybrany miesiąc: <strong id="cfAccountingMonthLabel">wybranego miesiąca</strong>.</div>',
           '</div>',
         '</section>'
@@ -294,6 +349,8 @@
       overlay.addEventListener('input', event => { if(event.target.id==='cfKsefToken')event.target.dataset.saved='false'; });
       overlay.addEventListener('submit', event => { if(event.target.id==='cfKsefForm')startKsef(event); });
       overlay.addEventListener('click', event => {
+        if(event.target.id==='cfAccountingBankConvert')convertBank();
+        if(event.target.dataset.bankDownload!==undefined)downloadBank(Number(event.target.dataset.bankDownload));
         if(event.target.id==='cfKsefSave')saveKsefCredential();
         if(event.target.id==='cfKsefCancel')ksefRun?.abort();
         if(event.target.id==='cfKsefpurchases')saveKsef('purchases');
@@ -305,11 +362,14 @@
         if (['cfAccountingMonth','cfKsefNip','cfKsefEnvironment'].includes(input?.id)) { resetKsef(); }
         if(input?.id==='cfKsefEnvironment')loadKsefCredential();
         if(input?.id==='cfKsefNip' && ksefElement('Token').dataset.saved==='true' && !savedMatches()){ksefElement('Token').value='';ksefElement('Token').dataset.saved='false';ksefStatus('Wklej token dla tego NIP-u i kliknij Zapisz.');}
-        if (input?.id === 'cfAccountingMonth') updateMonth();
+        if (input?.id === 'cfAccountingMonth') {updateMonth();resetBank();bankStatus('Miesiąc zmieniony. Ponownie przekonwertuj CSV.');}
+        if(input?.id==='cfAccountingBankNumber'){input.dataset.custom='true';resetBank();bankStatus('Numer wyciągu zmieniony. Ponownie przekonwertuj CSV.');}
+        if(input?.id==='cfAccountingBankEncoding'){resetBank();bankStatus('Kodowanie zmienione. Ponownie przekonwertuj CSV.');}
         if (input?.id === 'cfAccountingBankInput') {
-          const file = input.files?.[0] || null;
-          selectedFiles.bank = file && /\.csv$/i.test(file.name) ? file : null;
-          fileCard('bank', selectedFiles.bank);
+          resetBank();bankFiles=Array.from(input.files || []);
+          if(bankFiles.length>10 || bankFiles.some(file=>!/\.csv$/i.test(file.name))){bankFiles=[];input.value='';bankStatus('Wybierz maksymalnie 10 plików CSV.');}
+          else bankStatus('Wybrane pliki: '+bankFiles.length+'. Kliknij Konwertuj CSV na MT940.');
+          bankFileLabels();
         }
         if (input?.id === 'cfAccountingOrganizerInput') {
           const file = input.files?.[0] || null;
@@ -322,7 +382,7 @@
     const now = new Date();
     const monthInput = document.getElementById('cfAccountingMonth');
     if (monthInput && !monthInput.value) monthInput.value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-    fileCard('bank', selectedFiles.bank);
+    bankFileLabels();
     fileCard('organizer', selectedFiles.organizer);
     updateMonth();
     priorBodyOverflow = document.body.style.overflow;
@@ -351,6 +411,7 @@
       grid.querySelector('#' + TILE_ID)?.remove();
       closeModule();
       forgetKsefView();
+      resetBank();bankFiles=[];bankFileLabels();
     }
   }
 
@@ -369,7 +430,7 @@
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape' && document.getElementById(OVERLAY_ID)?.classList.contains('cf-open')) closeModule();
     });
-    window.addEventListener('pagehide', () => { observer?.disconnect();forgetKsefView(); });
+    window.addEventListener('pagehide', () => { observer?.disconnect();forgetKsefView();resetBank();bankFiles=[]; });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });

@@ -8,6 +8,121 @@
   let selectedFiles = { bank: null, organizer: null };
   let priorBodyOverflow = '';
 
+  let ksefRun = null;
+  let ksefResults = {};
+  const ksefElement = id => document.getElementById('cfKsef' + id);
+  function ksefStatus(message) { const el=ksefElement('Status'); if(el)el.textContent=message; }
+  function resetKsef() {
+    ksefRun?.abort(); ksefRun=null; ksefResults={}; busyKsef(false);
+    const token=ksefElement('Token');if(token)token.value='';
+    for(const kind of ['purchases','sales']) {const el=ksefElement(kind);if(el){el.hidden=true;el.disabled=true;}}
+  }
+  function busyKsef(busy) {
+    for(const id of ['Nip','Environment','Start']){const el=ksefElement(id);if(el)el.disabled=busy;}
+    const month=document.getElementById('cfAccountingMonth');if(month)month.disabled=busy;
+    const cancel=ksefElement('Cancel');if(cancel)cancel.hidden=!busy;
+  }
+  function waitKsef(ms, signal) {
+    return new Promise((resolve,reject)=>{
+      if(signal.aborted){reject(new DOMException('Anulowano','AbortError'));return;}
+      const abort=()=>{clearTimeout(timer);reject(new DOMException('Anulowano','AbortError'));};
+      const timer=setTimeout(()=>{signal.removeEventListener('abort',abort);resolve();},ms);
+      signal.addEventListener('abort',abort,{once:true});
+    });
+  }
+  async function ksefRequest(body, signal, binary=false) {
+    const client=window.cfBackupBridge?.getClient?.();
+    const session=await client?.auth.getSession();
+    const access=session?.data?.session?.access_token;
+    if(!access || !isAdmin())throw new Error('Zaloguj się ponownie do CleanFleet jako administrator.');
+    const response=await fetch(CF_SUPABASE_URL+'/functions/v1/cleanfleet-ksef',{
+      method:'POST',headers:{Authorization:'Bearer '+access,apikey:CF_SUPABASE_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify(body),signal,cache:'no-store'
+    });
+    if(!response.ok){
+      const data=await response.json().catch(()=>({}));
+      const error=new Error(data.error || 'Nie udało się pobrać faktur (HTTP '+response.status+').');
+      error.retryAfter=response.status===429 ? data.retryAfter || 30 : 0;
+      throw error;
+    }
+    return binary ? response.arrayBuffer() : response.json();
+  }
+  const ksefBytes=value=>Uint8Array.from(atob(value),c=>c.charCodeAt(0));
+  async function downloadKsefJob(job, ready, signal, label) {
+    if(ready.invoiceCount===0)return {count:0};
+    if(!window.JSZip)throw new Error('Biblioteka ZIP nie została załadowana. Odśwież aplikację.');
+    const aes=await crypto.subtle.importKey('raw',ksefBytes(job.key),'AES-CBC',false,['decrypt']);
+    const chunks=[];let size=0;
+    for(const [index,part] of ready.parts.entries()){
+      ksefStatus('Pobieranie: '+label+' · część '+(index+1)+' z '+ready.parts.length+'.');
+      const encrypted=await ksefRequest({action:'part',ticket:part.ticket},signal,true);
+      const plain=await crypto.subtle.decrypt({name:'AES-CBC',iv:ksefBytes(job.iv)},aes,encrypted);
+      const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',plain));
+      const encoded=btoa(Array.from(digest,byte=>String.fromCharCode(byte)).join(''));
+      if(plain.byteLength!==part.partSize || encoded!==part.partHash)throw new Error('Nie udało się zweryfikować części archiwum. Uruchom pobieranie ponownie.');
+      size+=plain.byteLength;if(size>200*1024*1024)throw new Error('Archiwum przekracza limit 200 MB.');
+      chunks.push(new Uint8Array(plain));
+    }
+    if(signal.aborted)throw new DOMException('Anulowano','AbortError');
+    if(size!==ready.size)throw new Error('Archiwum jest niepełne. Uruchom pobieranie ponownie.');
+    const combined=new Uint8Array(size);let offset=0;for(const chunk of chunks){combined.set(chunk,offset);offset+=chunk.length;}
+    const zip=await window.JSZip.loadAsync(combined);
+    const xml=Object.values(zip.files).filter(file=>!file.dir && /\.xml$/i.test(file.name));
+    if(xml.length!==ready.invoiceCount)throw new Error('Liczba faktur w archiwum jest niezgodna. Uruchom pobieranie ponownie.');
+    if(signal.aborted)throw new DOMException('Anulowano','AbortError');
+    return {count:ready.invoiceCount,blob:new Blob([combined],{type:'application/zip'})};
+  }
+  async function startKsef(event) {
+    event.preventDefault();if(ksefRun || !isAdmin())return;
+    const month=document.getElementById('cfAccountingMonth').value;
+    const nip=ksefElement('Nip').value, token=ksefElement('Token').value.trim(), environment=ksefElement('Environment').value;
+    if(!token){ksefStatus('Wpisz token KSeF z uprawnieniem do odczytu faktur.');return;}
+    resetKsef();const controller=new AbortController();ksefRun=controller;busyKsef(true);
+    const signal=controller.signal;
+    try{
+      ksefStatus('Łączenie z KSeF i zlecanie eksportu faktur…');
+      const started=await ksefRequest({action:'start',nip,token,month,environment},signal);
+      if(started.month!==month || started.jobs?.length!==2)throw new Error('Niepoprawna odpowiedź eksportu.');
+      const remaining=[...started.jobs], readyJobs=[];const deadline=Date.now()+15*60*1000;
+      while(remaining.length){
+        if(Date.now()>deadline)throw new Error('KSeF nadal przygotowuje eksport. Spróbuj ponownie później.');
+        let retry=4;
+        for(let i=remaining.length-1;i>=0;i--){
+          try{
+            const ready=await ksefRequest({action:'status',ticket:remaining[i].ticket},signal);
+            if(ready.status==='ready'){readyJobs.push({job:remaining[i],ready});remaining.splice(i,1);}
+          }catch(error){if(error.retryAfter)retry=Math.max(retry,error.retryAfter);else throw error;}
+        }
+        if(remaining.length){ksefStatus('KSeF przygotowuje archiwa. Gotowe: '+readyJobs.length+' z 2.');await waitKsef(retry*1000,signal);}
+      }
+      if(readyJobs.reduce((sum,item)=>sum+item.ready.size,0)>200*1024*1024)throw new Error('Łączny rozmiar archiwów przekracza 200 MB. Pobierz je bezpośrednio w KSeF.');
+      const results={};
+      for(const {job,ready} of readyJobs){
+        if(!['purchases','sales'].includes(job.kind))throw new Error('Niepoprawny rodzaj eksportu.');
+        results[job.kind]=await downloadKsefJob(job,ready,signal,job.kind==='purchases'?'faktury zakupowe':'faktury sprzedażowe');
+      }
+      if(signal.aborted)throw new DOMException('Anulowano','AbortError');
+      ksefResults=results;
+      for(const kind of ['purchases','sales']){
+        const button=ksefElement(kind),result=results[kind];
+        if(!result)throw new Error('Brak jednej kategorii faktur.');
+        result.month=month;button.hidden=false;button.disabled=!result.blob;
+        button.textContent=(kind==='purchases'?'Faktury zakupowe':'Faktury sprzedażowe')+': '+result.count+(result.blob?' · Pobierz ZIP':' · Brak faktur');
+      }
+      ksefStatus('Gotowe. Miesiąc: '+month+'. Archiwa zawierają oryginalne faktury XML z KSeF.');
+    }catch(error){
+      ksefResults={};ksefStatus(error.name==='AbortError'?'Pobieranie anulowane.':error.message || 'Nie udało się pobrać faktur.');
+    }finally{
+      if(ksefRun===controller){ksefRun=null;busyKsef(false);}
+    }
+  }
+  function saveKsef(kind){
+    const result=ksefResults[kind];if(!result?.blob || !isAdmin())return;
+    const url=URL.createObjectURL(result.blob),link=document.createElement('a');
+    link.href=url;link.download='KSeF-'+result.month+'-'+(kind==='purchases'?'zakupowe':'sprzedazowe')+'.zip';
+    document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
+  }
+
   function isAdmin() {
     try {
       const bridge = window.cfBackupBridge;
@@ -48,6 +163,7 @@
       '.cf-accounting-file.is-visible{display:block}',
       '.cf-accounting-note{margin:16px 0 0;padding:12px 14px;border-left:3px solid #a6c61b;border-radius:0 8px 8px 0;background:#f1f4e9;color:#59614b;font-size:11px;line-height:1.5}',
       '.cf-accounting-next{margin:18px 0 0;padding-top:16px;border-top:1px solid #e2e6dc;color:#687064;font-size:12px;line-height:1.55}',
+      '.cf-ksef-form{display:grid;gap:10px;margin-top:12px}.cf-ksef-form label{display:grid;gap:4px;font-size:12px;font-weight:700}.cf-ksef-form input,.cf-ksef-form select{width:100%;min-height:40px;padding:8px 10px;border:1px solid #cfd5c4;border-radius:8px;font:inherit;background:#fff;color:#222820}.cf-ksef-form button,.cf-ksef-download{min-height:40px;border:1px solid #a6c61b;border-radius:8px;padding:10px;background:#faffeb;color:#4c5c0d;font:inherit;font-size:12px;font-weight:800;cursor:pointer}.cf-ksef-form button:disabled,.cf-ksef-download:disabled{opacity:.6;cursor:default}.cf-ksef-download{width:100%;margin-top:8px}.cf-ksef-download[hidden],#cfKsefCancel[hidden]{display:none}#cfKsefStatus{margin-top:12px;overflow-wrap:anywhere}',
       '@media(max-width:620px){#cfAccountingDocsOverlay{padding:0}.cf-accounting-docs-sheet{min-height:100dvh;border:0;border-radius:0}.cf-accounting-docs-head{padding:18px 16px 14px}.cf-accounting-docs-body{padding:16px}.cf-accounting-source-grid{grid-template-columns:1fr;gap:10px}.cf-accounting-period{align-items:flex-start;flex-direction:column}.cf-accounting-period input{width:100%}.cf-accounting-source{padding:14px}}'
     ].join('\n');
     document.head.appendChild(style);
@@ -115,21 +231,26 @@
           '<div class="cf-accounting-docs-body">',
             '<div class="cf-accounting-period"><label for="cfAccountingMonth">Miesiąc rozliczeniowy</label><input id="cfAccountingMonth" type="month"></div>',
             '<div class="cf-accounting-source-grid">',
-              '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>KSeF</h2><p>Faktury sprzedażowe i zakupowe pobierane bezpośrednio z KSeF.</p></div><span class="cf-accounting-status is-next">Kolejny etap</span></div><p>Połączenie zostanie dodane po przygotowaniu widoku modułu.</p></article>',
+              '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>KSeF</h2><p>Faktury według daty wystawienia w wybranym miesiącu.</p></div><span class="cf-accounting-status">Połączenie KSeF</span></div><form id="cfKsefForm" class="cf-ksef-form"><label for="cfKsefNip">NIP firmy<input id="cfKsefNip" type="text" inputmode="numeric" maxlength="15" autocomplete="off" required></label><label for="cfKsefToken">Token KSeF<input id="cfKsefToken" type="password" autocomplete="new-password" spellcheck="false" required></label><label for="cfKsefEnvironment">Środowisko<select id="cfKsefEnvironment"><option value="production">Produkcyjne — rzeczywiste faktury</option><option value="test">Testowe — dane testowe</option></select></label><button id="cfKsefStart" type="submit">Pobierz faktury z KSeF</button><button id="cfKsefCancel" type="button" hidden>Anuluj pobieranie</button></form><p id="cfKsefStatus" role="status" aria-live="polite">Token musi mieć uprawnienie do odczytu faktur. Nie zapisujemy go; wpisujesz go przy każdym pobraniu.</p><button id="cfKsefpurchases" type="button" class="cf-ksef-download" hidden>Pobierz faktury zakupowe</button><button id="cfKsefsales" type="button" class="cf-ksef-download" hidden>Pobierz faktury sprzedażowe</button></article>',
               '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>mBank</h2><p>Eksport CSV z historią rachunku.</p></div><span class="cf-accounting-status">Plik z komputera</span></div><label class="cf-accounting-upload">Wybierz plik CSV<input id="cfAccountingBankInput" type="file" accept=".csv,text/csv"></label><div class="cf-accounting-file" id="cfAccountingBankFile"></div></article>',
               '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>mOrganizer</h2><p>Eksportowana paczka faktur w jednym pliku PDF.</p></div><span class="cf-accounting-status">Plik z komputera</span></div><label class="cf-accounting-upload">Wybierz plik PDF<input id="cfAccountingOrganizerInput" type="file" accept=".pdf,application/pdf"></label><div class="cf-accounting-file" id="cfAccountingOrganizerFile"></div></article>',
               '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>Poczta o2</h2><p>Załączniki otrzymywane od banku.</p></div><span class="cf-accounting-status is-next">Późniejszy etap</span></div><p>Połączenie skrzynki i pobieranie załączników dodamy po integracji KSeF.</p></article>',
             '</div>',
-            '<div class="cf-accounting-note">Na tym etapie aplikacja zapisuje wyłącznie nazwy wybranych plików w bieżącym widoku. Nie wysyła ich do serwera ani nie tworzy jeszcze paczki ZIP.</div>',
-            '<div class="cf-accounting-next">Następnie podłączymy KSeF, potem pocztę o2. Strukturę folderów i końcowy ZIP ustalimy po tych integracjach. Wybrany miesiąc: <strong id="cfAccountingMonthLabel">wybranego miesiąca</strong>.</div>',
+            '<div class="cf-accounting-note">KSeF: osobne archiwa ZIP z fakturami XML zakupowymi i sprzedażowymi. Archiwa pozostają w pamięci przeglądarki do zmiany miesiąca lub wylogowania. Pliki mBank i mOrganizer wybierasz lokalnie — ich wysyłanie i wspólna paczka miesięczna pojawią się w kolejnych etapach. Limit pobrania KSeF: 200 MB łącznie.</div>',
+            '<div class="cf-accounting-next">Następnie podłączymy pocztę o2. Strukturę folderów i końcowy ZIP ustalimy po tych integracjach. Wybrany miesiąc: <strong id="cfAccountingMonthLabel">wybranego miesiąca</strong>.</div>',
           '</div>',
         '</section>'
       ].join('');
+      overlay.addEventListener('submit', event => { if(event.target.id==='cfKsefForm')startKsef(event); });
       overlay.addEventListener('click', event => {
+        if(event.target.id==='cfKsefCancel')ksefRun?.abort();
+        if(event.target.id==='cfKsefpurchases')saveKsef('purchases');
+        if(event.target.id==='cfKsefsales')saveKsef('sales');
         if (event.target === overlay || event.target.closest('[data-cf-accounting-close]')) closeModule();
       });
       overlay.addEventListener('change', event => {
         const input = event.target;
+        if (['cfAccountingMonth','cfKsefNip','cfKsefEnvironment'].includes(input?.id)) { resetKsef();ksefStatus('Wpisz token i pobierz faktury dla wybranego miesiąca.'); }
         if (input?.id === 'cfAccountingMonth') updateMonth();
         if (input?.id === 'cfAccountingBankInput') {
           const file = input.files?.[0] || null;
@@ -159,6 +280,8 @@
   function closeModule() {
     const overlay = document.getElementById(OVERLAY_ID);
     if (!overlay) return;
+    ksefRun?.abort();
+    const token=ksefElement('Token');if(token)token.value='';
     overlay.classList.remove('cf-open');
     document.body.style.overflow = priorBodyOverflow;
   }
@@ -170,6 +293,7 @@
     else {
       grid.querySelector('#' + TILE_ID)?.remove();
       closeModule();
+      resetKsef();
     }
   }
 
@@ -188,7 +312,7 @@
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape' && document.getElementById(OVERLAY_ID)?.classList.contains('cf-open')) closeModule();
     });
-    window.addEventListener('pagehide', () => { observer?.disconnect(); });
+    window.addEventListener('pagehide', () => { observer?.disconnect();resetKsef(); });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });

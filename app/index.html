@@ -3169,8 +3169,8 @@ async function cfRegisterServiceWorker(){
       // Nie przeładowujemy aktywnego formularza ani aparatu, ale od razu
       // synchronizujemy widoczny numer wersji z nowym Service Workerem.
       const versionEl=document.getElementById('cfAppVersion');
-      if(versionEl) versionEl.textContent='Wersja aplikacji: v1.50.2';
-      console.info('CleanFleet: aktywowano Service Worker v1.50.2.');
+      if(versionEl) versionEl.textContent='Wersja aplikacji: v1.51.0';
+      console.info('CleanFleet: aktywowano Service Worker v1.51.0.');
     });
   }
   cfPushRegistration = await navigator.serviceWorker.register('./sw.js?v=20261002-1510',{updateViaCache:'none'});

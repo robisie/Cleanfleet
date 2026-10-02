@@ -42,3 +42,5 @@ Zaszyfrowany trwały zapis danych poczty, przycisk Zapisz, maskowanie i wymiana 
 Kafelek Dokumenty księgowe bezpośrednio w rendererze administratora (także iPhone); aktualne pliki modułu przez Service Worker — `v1.51.8`.
 
 Czytnik kartek z praniami — odczyt zdjęcia, tabela zatwierdzenia, czas 1:30 / 1,5, wykonane i nieopłacone, zapis transakcyjny — `v1.52.0`.
+
+Naprawa otwierania Dokumentów księgowych — zamknięcie modułu poczty przed zamontowaniem formularza nie przerywa inicjalizacji obsługi kafelka — `v1.51.9`.

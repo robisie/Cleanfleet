@@ -34,7 +34,7 @@ function mount(overlay){
  dates();
 }
 function open(){if(!root)return;if(!el('From').value)dates();if(connected)return;run(async current=>{status('Odczytywanie zapisanych danych poczty…');const value=await request({action:'config'});if(current!==generation)return;if(!value.configured){status('Wpisz dane i kliknij Zapisz.');return;}connected=value;el('Email').value=value.email;el('Senders').value=value.senders.join(', ');el('Folder').value=value.folder;el('Password').value='************';el('Password').dataset.saved='true';status('Dane poczty są zapisane. Wyszukaj załączniki.');});}
-function close(){stop();if(el('Password')?.dataset.saved!=='true')el('Password').value='';}
+function close(){stop();const password=el('Password');if(password && password.dataset.saved!=='true')password.value='';}
 function reset(){stop();session='';connected=null;clear();if(root){el('Form').reset();el('Password').dataset.saved='false';status('Wpisz dane i kliknij Zapisz.');}}
 window.CFAccountingMail={mount,open,close,reset,monthChanged};
 })();

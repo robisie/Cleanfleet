@@ -2,7 +2,7 @@
 'use strict';
 let root=null,session='',connected=null,items=[],controller=null,generation=0;
 const el=id=>root?.querySelector('#cfMail'+id);
-function status(text){if(el('Status'))el('Status').textContent=text;}
+function status(text){if(el('Status') && el('Status').textContent!==text)el('Status').textContent=text;}
 function stop(){generation++;controller?.abort();controller=null;busy(false);}
 function clear(){items=[];el('Results')?.replaceChildren();if(el('Download'))el('Download').hidden=true;}
 function busy(value){if(!root)return;root.querySelectorAll('input,textarea,button').forEach(node=>{if(node.id!=='cfMailCancel')node.disabled=value;});el('Cancel').hidden=!value;}

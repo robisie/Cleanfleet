@@ -1,0 +1,15 @@
+(function(root){
+'use strict';
+const TABLE='cf_accounting_invoice_history';
+function months(month){if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw new Error('Niepoprawny miesiąc historii.');const [y,m]=month.split('-').map(Number);return Array.from({length:4},(_,i)=>new Date(Date.UTC(y,m-1-i,1)).toISOString().slice(0,7));}
+function scope({month,nip,environment='production'}){months(month);nip=String(nip||'').replace(/\D/g,'');if(!/^\d{10}$/.test(nip)||!['production','test'].includes(environment))throw new Error('Podaj NIP i środowisko KSeF, aby odczytać historię.');return {month,nip,environment};}
+function cleanInvoices(invoices,month){
+ if(!Array.isArray(invoices)||invoices.length>20000)throw new Error('Niepoprawne dane historii faktur.');const unique=new Map();
+ for(const i of invoices){if(!/^\d{4}-\d{2}-\d{2}$/.test(i.date||'')||i.date.slice(0,7)!==month||!/^\d{10}$/.test(i.nip||'')||!i.number||!/^-?\d+(\.\d{1,2})?$/.test(i.gross||'')||! /^[A-Z]{3}$/.test(i.currency||''))throw new Error('Faktura ma niepełne dane historii.');const row={};for(const key of ['date','nip','nrKSeF','number','seller','gross','currency','type'])row[key]=String(i[key]||'').slice(0,1000);row.accounts=(i.accounts||[]).map(a=>String(a).slice(0,100)).slice(0,20);unique.set(row.nrKSeF||JSON.stringify([row.nip,row.number,row.date,row.gross,row.currency]),row);}
+ const result=[...unique.values()];if(JSON.stringify(result).length>8*1024*1024)throw new Error('Historia miesiąca przekracza limit rozmiaru.');return result;
+}
+async function owner(client){if(!client)throw new Error('Brak połączenia z historią. Odśwież aplikację.');const {data,error}=await client.auth.getUser();if(error||!data?.user?.id)throw new Error('Zaloguj się ponownie, aby zapisać lub odczytać historię.');return data.user.id;}
+async function save(client,context,invoices,signal){const s=scope(context),clean=cleanInvoices(invoices,s.month),user_id=await owner(client);const query=client.from(TABLE).upsert({...s,user_id,invoices:clean,invoice_count:clean.length,updated_at:new Date().toISOString()},{onConflict:'user_id,environment,nip,month'});const {error}=await (signal?query.abortSignal(signal):query);if(error)throw new Error('Nie udało się zapisać historii KSeF. '+error.message);return clean.length;}
+async function load(client,context,signal){const s=scope(context),user_id=await owner(client),expected=months(s.month);const query=client.from(TABLE).select('month,invoices,invoice_count').eq('user_id',user_id).eq('environment',s.environment).eq('nip',s.nip).in('month',expected);const {data,error}=await (signal?query.abortSignal(signal):query);if(error)throw new Error('Nie udało się odczytać historii KSeF. '+error.message);const snapshots=(data||[]).map(row=>{const invoices=cleanInvoices(row.invoices,row.month);if(invoices.length!==row.invoice_count)throw new Error('Niekompletna historia KSeF. Pobierz ten miesiąc ponownie.');return {...row,invoices};});return {snapshots,expected};}
+const api={months,scope,cleanInvoices,save,load};if(typeof module==='object'&&module.exports)module.exports=api;else root.CFAccountingHistory=api;
+})(typeof window==='object'?window:globalThis);

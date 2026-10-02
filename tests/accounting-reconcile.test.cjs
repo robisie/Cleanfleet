@@ -9,7 +9,7 @@ test('unique amount/currency and identifying details match; incoming transfers e
 });
 test('amount alone, several candidates, repeated payment, operators and installments remain uncertain',()=>{
  assert.equal(result([invoice({accounts:[]})],[op({party:'Someone',title:'Purchase',counterAccount:''})]).counts.uncertain,1);
- assert.equal(result([invoice(),invoice({number:'FV/2026/082'})],[op({title:'Purchase'})]).counts.uncertain,1);
+ assert.equal(result([invoice(),invoice({number:'FV/2026/082',nrKSeF:'5265877635-20260802-223456789ABC-AB'})],[op({title:'Purchase'})]).counts.uncertain,1);
  const duplicate=result([invoice()],[op(),op()]);assert.equal(duplicate.counts.matched,0);assert.equal(duplicate.counts.uncertain,2);assert.equal(duplicate.unmatchedInvoices.length,1);
  assert.equal(result([invoice()],[op({party:'PAYU Allegro'})]).counts.uncertain,1);
  assert.equal(result([invoice()],[op({amount:-5000n})]).counts.uncertain,1);

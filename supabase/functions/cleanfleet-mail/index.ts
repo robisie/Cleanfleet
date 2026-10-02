@@ -17,4 +17,15 @@ function makeClient(config:{email:string;password:string}){
   const client=new ImapFlow({host:'poczta.o2.pl',port:993,secure:true,auth:{user:config.email,pass:config.password},logger:false,logRaw:false,disableAutoIdle:true,disableCompression:true,disableBinary:true,connectionTimeout:10000,greetingTimeout:10000,socketTimeout:25000,tls:{rejectUnauthorized:true}});
   client.on('error',()=>{});return client;
 }
-Deno.serve(createMailHandler({authorize,makeClient,secret}));
+const credentialStore={
+  async get(userId:string){
+    const result=await admin.from('cf_mail_credentials').select('ciphertext').eq('user_id',userId).maybeSingle();
+    if(result.error)throw new HttpError('Nie udało się odczytać zapisanych danych poczty.',503);
+    return result.data;
+  },
+  async set(userId:string,value:{ciphertext:string}){
+    const result=await admin.from('cf_mail_credentials').upsert({user_id:userId,...value,updated_at:new Date().toISOString()},{onConflict:'user_id'});
+    if(result.error)throw new HttpError('Nie udało się zapisać danych poczty.',503);
+  }
+};
+Deno.serve(createMailHandler({authorize,makeClient,secret,credentialStore}));

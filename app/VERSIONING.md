@@ -33,6 +33,8 @@ Moduł ma stały numer `1.51`. Każda kolejna zmiana zwiększa ostatnią liczbę
 - `v1.51.4`: rozszerzenie MT940 `.txt`.
 - `v1.51.5`: wybór wielu PDF-ów z mOrganizera.
 
-Starsze oznaczenia `1.52.*` i `1.53.*` powyżej oraz w historii Git są historycznymi etykietami sprzed uzgodnienia. Bieżące oznaczenie aplikacji: `v1.51.6`. Kolejna zmiana tego modułu: `v1.51.7`.
+Starsze oznaczenia `1.52.*` i `1.53.*` powyżej oraz w historii Git są historycznymi etykietami sprzed uzgodnienia. Bieżące oznaczenie aplikacji: `v1.51.7`. Kolejna zmiana tego modułu: `v1.51.8`.
 
 Poczta o2 — połączenie IMAP na bieżącą sesję, wybór załączników banku i ZIP — `v1.51.6`.
+
+Zaszyfrowany trwały zapis danych poczty, przycisk Zapisz, maskowanie i wymiana hasła — `v1.51.7`.

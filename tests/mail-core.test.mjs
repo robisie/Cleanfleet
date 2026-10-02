@@ -10,9 +10,10 @@ test('mail filters validate exact sender addresses, valid dates and safe attachm
   assert.throws(()=>period('2026-01-01','2026-08-01'));
   assert.equal(attachments(message.bodyStructure).length,1);assert.equal(attachments(message.bodyStructure)[0].filename,'faktura.pdf');
 });
-test('session-only connection, read-only mailbox, authorized part download and failure gates',async()=>{
+test('persistent encrypted connection, read-only mailbox, authorized part download and failure gates',async()=>{
+  const rows=new Map();const credentialStore={get:async uid=>rows.get(uid),set:async(uid,value)=>rows.set(uid,value)};
   let closes=0,clientCalls=0,huge=false,wrongSender=false,uidValidity=10n;
-  const handler=createMailHandler({secret:'test-secret',authorize:async request=>request.headers.get('test-owner')||'admin',makeClient:config=>{
+  const handler=createMailHandler({secret:'test-secret',credentialStore,authorize:async request=>request.headers.get('test-owner')||'admin',makeClient:config=>{
     clientCalls++;assert.equal(config.password,'app-password');
     return {mailbox:{uidValidity},connect:async()=>{},mailboxOpen:async(folder,options)=>{assert.equal(folder,'INBOX');assert.deepEqual(options,{readOnly:true});},close:()=>{closes++;},
       search:async(query,options)=>{assert.equal(query.or[0].from,'bank@example.pl');assert.equal(options.uid,true);return [15];},
@@ -25,6 +26,9 @@ test('session-only connection, read-only mailbox, authorized part download and f
   assert.equal(saved.configured,true);assert.ok(saved.session);assert.ok(!JSON.stringify(saved).includes('app-password'));
   const config=await(await call({action:'config',session:saved.session})).json();assert.equal(config.email,'test@o2.pl');assert.equal(config.password,undefined);
   assert.equal((await call({action:'config',session:saved.session},'another-user')).status,401);
+  assert.ok(!JSON.stringify([...rows]).includes('app-password'));
+  assert.equal((await(await call({action:'config'})).json()).configured,true);
+  assert.equal((await(await call({action:'config'},'another-user')).json()).configured,false);
   const body={action:'list',session:saved.session,from:'2026-08-01',to:'2026-08-31'};
   const listed=await(await call(body)).json();assert.equal(listed.attachments.length,1);assert.equal(listed.messageCount,1);
   const downloaded=await call({action:'attachment',session:saved.session,ticket:listed.attachments[0].ticket});assert.equal(downloaded.status,200);assert.equal((await downloaded.arrayBuffer()).byteLength,4);
@@ -33,4 +37,8 @@ test('session-only connection, read-only mailbox, authorized part download and f
   huge=false;wrongSender=true;assert.equal((await(await call(body)).json()).attachments.length,0);
   assert.equal(closes,clientCalls);
   assert.equal((await call({action:'attachment',session:saved.session,ticket:'tampered'})).status,401);
+  const resaved=await call({action:'save',email:'test@o2.pl',useSavedPassword:true,senders:'bank@example.pl',folder:'INBOX'});assert.equal(resaved.status,200);
+  assert.equal((await call({action:'attachment',ticket:listed.attachments[0].ticket})).status,409);
+  assert.equal((await call({action:'save',email:'other@o2.pl',useSavedPassword:true,senders:'bank@example.pl'})).status,400);
+  assert.equal((await(await call({action:'config'})).json()).email,'test@o2.pl');
 });

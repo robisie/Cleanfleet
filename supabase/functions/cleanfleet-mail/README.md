@@ -1,8 +1,8 @@
-# CleanFleet o2 mail — v1.51.6
+# CleanFleet o2 mail — v1.51.7
 
-Session-only, admin-authorized read-only IMAP integration. Fixed TLS endpoint poczta.o2.pl:993. Activate IMAP in o2; use an application password when two-step login is enabled.
+Admin-authorized read-only IMAP integration. Fixed TLS endpoint poczta.o2.pl:993. Activate IMAP in o2; use an application password when two-step login is enabled.
 
-The frontend holds an encrypted, owner-bound one-hour connection ticket in memory. No mailbox password or ticket is stored in a database or browser storage. Refresh/logout discards the connection. Do not add persistent credential storage without explicit user approval.
+Connection data are persisted in cf_mail_credentials as owner-bound AES-GCM ciphertext with a separate HKDF purpose. User explicitly approved database persistence on 2026-10-02. RLS enabled, no frontend role grants; only admin-authorized Edge Function uses service_role to read/write. Configuration response includes mailbox and sender metadata but never password/ciphertext. Password input is masked after save and reload; paste new password then save to replace. Logout clears the browser view, not the encrypted database record. Existing session tickets are accepted as fallback until the user saves their connection.
 
 POST actions: save (validate and connect), config, list (received dates in Europe/Warsaw and exact configured senders), attachment (signed 30-minute part ticket). JWT and user_roles admin are required. Mailbox opens with EXAMINE and attachment reads use BODY.PEEK; no mail changes or sends.
 

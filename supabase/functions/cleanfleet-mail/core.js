@@ -31,9 +31,11 @@ export function attachments(node,result=[]) {
   else if(name && (String(node.disposition).toLowerCase()==='attachment' || /\.(pdf|csv|xml|zip|txt|sta|mt940|xls|xlsx)$/i.test(name)) && /^[1-9]\d*(\.[1-9]\d*)*$/.test(node.part || '1') && Number.isInteger(node.size) && node.size>=0){result.push({part:node.part || '1',filename:filename(name),size:node.size});}
   return result;
 }
-export function createMailHandler({authorize,makeClient,secret}) {
+export function createMailHandler({authorize,makeClient,secret,credentialStore}) {
   const credentialCodec=createStateCodec(secret,'mail-credentials-v1'),ticketCodec=createStateCodec(secret,'mail-attachments-v1');
   async function savedCredential(uid,session) {
+    const stored=await credentialStore.get(uid);
+    if(stored){const config=await credentialCodec.open(stored.ciphertext,uid,'mail-stored');return {row:{revision:config.revision},config};}
     if(!session)throw new HttpError('Połącz najpierw pocztę na bieżącą sesję.');
     let config;try{config=await credentialCodec.open(session,uid,'mail-session');}catch(_){throw new HttpError('Sesja poczty wygasła. Wpisz hasło i połącz pocztę ponownie.',401);}
     return {row:{revision:config.revision},config};
@@ -56,7 +58,7 @@ export function createMailHandler({authorize,makeClient,secret}) {
       let body;try{body=JSON.parse(raw);}catch(_){throw new HttpError('Niepoprawne żądanie.');}
       if(!body || typeof body!=='object' || Array.isArray(body))throw new HttpError('Niepoprawne żądanie.');
       if(body.action==='config'){
-        if(!body.session)return json({configured:false});
+        if(!body.session && !await credentialStore.get(uid))return json({configured:false});
         const {config}=await savedCredential(uid,body.session);return json({configured:true,email:config.email,senders:config.senders,folder:config.folder});
       }
       if(body.action==='save'){
@@ -64,7 +66,10 @@ export function createMailHandler({authorize,makeClient,secret}) {
         if(body.useSavedPassword===true){const saved=await savedCredential(uid,body.session);if(saved.config.email!==config.email)throw new HttpError('Dla nowego adresu wpisz nowe hasło.');password=saved.config.password;}
         if(!password || password.length>1024 || /[\x00\r\n]/.test(password))throw new HttpError('Wpisz hasło do programu pocztowego.');
         config.password=password;await mailbox(config,async()=>{});
-        const revision=crypto.randomUUID();const session=await credentialCodec.seal({...config,revision,userId:uid,scope:'mail-session',expires:Date.now()+60*60000});
+        const revision=crypto.randomUUID();
+        const ciphertext=await credentialCodec.seal({...config,revision,userId:uid,scope:'mail-stored',expires:9999999999999});
+        await credentialStore.set(uid,{ciphertext});
+        const session=await credentialCodec.seal({...config,revision,userId:uid,scope:'mail-session',expires:Date.now()+60*60000});
         return json({configured:true,email:config.email,senders:config.senders,folder:config.folder,session});
       }
       if(body.action==='list'){

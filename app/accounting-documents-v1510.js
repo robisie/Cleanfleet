@@ -5,7 +5,7 @@
   const OVERLAY_ID = 'cfAccountingDocsOverlay';
   const STYLE_ID = 'cfAccountingDocsStyle1510';
   let observer = null;
-  let selectedFiles = { bank: null, organizer: null };
+  let selectedFiles = { organizer: [] };
   let priorBodyOverflow = '';
   let bankFiles = [];
   let bankResults = [];
@@ -304,15 +304,16 @@
     const number=bankElement('Number');if(number && !number.dataset.custom)number.value=String(Number(input?.value?.split('-')[1]) || 1);
   }
 
-  function fileCard(type, file) {
+  function fileCard(type, files) {
     const target = document.getElementById(type === 'bank' ? 'cfAccountingBankFile' : 'cfAccountingOrganizerFile');
     if (!target) return;
-    if (!file) {
+    const list = Array.isArray(files) ? files : files ? [files] : [];
+    if (!list.length) {
       target.textContent = '';
       target.classList.remove('is-visible');
       return;
     }
-    target.textContent = file.name + ' · ' + fileSize(file.size);
+    target.textContent = 'Wybrane pliki PDF: ' + list.length + '\n' + list.map(file => file.name + ' · ' + fileSize(file.size)).join('\n');
     target.classList.add('is-visible');
   }
 
@@ -337,7 +338,7 @@
             '<div class="cf-accounting-source-grid">',
               '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>KSeF</h2><p>Faktury według daty wystawienia w wybranym miesiącu.</p></div><span class="cf-accounting-status">Połączenie KSeF</span></div><form id="cfKsefForm" class="cf-ksef-form"><label for="cfKsefNip">NIP firmy<input id="cfKsefNip" type="text" inputmode="numeric" maxlength="15" autocomplete="off" required></label><label for="cfKsefToken">Token KSeF<span class="cf-ksef-token-row"><input id="cfKsefToken" type="password" autocomplete="new-password" spellcheck="false" required data-saved="false"><button id="cfKsefSave" type="button">Zapisz</button></span></label><label for="cfKsefEnvironment">Środowisko<select id="cfKsefEnvironment"><option value="production">Produkcyjne — rzeczywiste faktury</option><option value="test">Testowe — dane testowe</option></select></label><button id="cfKsefStart" type="submit">Pobierz faktury z KSeF</button><button id="cfKsefCancel" type="button" hidden>Anuluj pobieranie</button></form><p id="cfKsefStatus" role="status" aria-live="polite">Token musi mieć uprawnienie do przeglądania faktur. Kliknij Zapisz, aby go zapamiętać.</p><button id="cfKsefpurchases" type="button" class="cf-ksef-download" hidden>Pobierz faktury zakupowe</button><button id="cfKsefsales" type="button" class="cf-ksef-download" hidden>Pobierz faktury sprzedażowe</button></article>',
               '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>mBank</h2><p>Pełny eksport CSV historii rachunku za wybrany miesiąc.</p></div><span class="cf-accounting-status">CSV → MT940</span></div><label class="cf-accounting-upload">Wybierz pliki CSV<input id="cfAccountingBankInput" type="file" accept=".csv,text/csv" multiple></label><div class="cf-accounting-file" id="cfAccountingBankFile"></div><div class="cf-ksef-form"><label for="cfAccountingBankNumber">Numer wyciągu<input id="cfAccountingBankNumber" type="number" min="1" max="99999" step="1"></label><label for="cfAccountingBankEncoding">Kodowanie MT940<select id="cfAccountingBankEncoding"><option value="utf-8">UTF-8</option><option value="windows-1250">Windows-1250</option></select></label><button id="cfAccountingBankConvert" type="button">Konwertuj CSV na MT940</button></div><p id="cfAccountingBankStatus" class="cf-bank-status" role="status" aria-live="polite">Jeden pełny CSV na rachunek. Konwersja odbywa się w przeglądarce. Do importu wybierz w programie księgowym format MT940 standard i zgodne kodowanie.</p><div id="cfAccountingBankResults"></div></article>',
-              '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>mOrganizer</h2><p>Eksportowana paczka faktur w jednym pliku PDF.</p></div><span class="cf-accounting-status">Plik z komputera</span></div><label class="cf-accounting-upload">Wybierz plik PDF<input id="cfAccountingOrganizerInput" type="file" accept=".pdf,application/pdf"></label><div class="cf-accounting-file" id="cfAccountingOrganizerFile"></div></article>',
+              '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>mOrganizer</h2><p>Eksportowane paczki faktur w plikach PDF. Możesz zaznaczyć kilka plików jednocześnie.</p></div><span class="cf-accounting-status">Plik z komputera</span></div><label class="cf-accounting-upload">Wybierz pliki PDF<input id="cfAccountingOrganizerInput" type="file" accept=".pdf,application/pdf" multiple></label><div class="cf-accounting-file" id="cfAccountingOrganizerFile"></div></article>',
               '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>Poczta o2</h2><p>Załączniki otrzymywane od banku.</p></div><span class="cf-accounting-status is-next">Późniejszy etap</span></div><p>Połączenie skrzynki i pobieranie załączników dodamy po integracji KSeF.</p></article>',
             '</div>',
             '<div class="cf-accounting-note">KSeF: osobne archiwa ZIP z fakturami XML zakupowymi i sprzedażowymi. Archiwa pozostają w pamięci przeglądarki do zmiany miesiąca lub wylogowania. CSV z mBanku konwertujemy na MT940 lokalnie w przeglądarce. Eksport PDF z mOrganizera wybierasz samodzielnie. Wspólna paczka miesięczna pojawi się w kolejnym etapie. Limit pobrania KSeF: 200 MB łącznie.</div>',
@@ -372,8 +373,8 @@
           bankFileLabels();
         }
         if (input?.id === 'cfAccountingOrganizerInput') {
-          const file = input.files?.[0] || null;
-          selectedFiles.organizer = file && (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') ? file : null;
+          const files = Array.from(input.files || []);
+          selectedFiles.organizer = files.filter(file => /\.pdf$/i.test(file.name) || file.type === 'application/pdf');
           fileCard('organizer', selectedFiles.organizer);
         }
       });
@@ -412,6 +413,7 @@
       closeModule();
       forgetKsefView();
       resetBank();bankFiles=[];bankFileLabels();
+      selectedFiles.organizer=[];fileCard('organizer',selectedFiles.organizer);
     }
   }
 

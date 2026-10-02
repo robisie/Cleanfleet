@@ -8,7 +8,15 @@ export const hash = async bytes => b64(await crypto.subtle.digest('SHA-256', byt
 export function monthRange(month) {
   if (!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month || '')) throw new HttpError('Wybierz poprawny miesiąc.');
   const [year, number] = month.split('-').map(Number);
-  return { dateType: 'Issue', from: new Date(Date.UTC(year, number - 1, 1)).toISOString(), to: new Date(Date.UTC(year, number, 1) - 1).toISOString() };
+  // KSeF compares timestamps; invoice dates belong to the Polish calendar month.
+  // Compute both boundaries separately because March/October cross a DST change.
+  const formatter=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Warsaw',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+  const midnight=monthIndex=>{
+    const utc=Date.UTC(year,monthIndex,1),parts=Object.fromEntries(formatter.formatToParts(new Date(utc)).filter(p=>p.type!=='literal').map(p=>[p.type,Number(p.value)]));
+    const offset=Date.UTC(parts.year,parts.month-1,parts.day,parts.hour,parts.minute,parts.second)-utc;
+    return utc-offset;
+  };
+  return { dateType: 'Issue', from: new Date(midnight(number-1)).toISOString(), to: new Date(midnight(number)-1).toISOString() };
 }
 export function validNip(nip) {
   return /^\d{10}$/.test(nip) && [6,5,7,2,3,4,5,6,7].reduce((sum, weight, i) => sum + weight * Number(nip[i]), 0) % 11 === Number(nip[9]);

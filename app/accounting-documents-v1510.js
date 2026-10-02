@@ -284,7 +284,7 @@
       const months=history.yearMonths(month),client=window.cfBackupBridge?.getClient?.();total=months.length;
       ksefStatus('Sprawdzanie zapisanej historii roku '+month.slice(0,4)+'…');
       const saved=await history.loadMonths(client,{...credentials,month},months,signal);
-      const known=new Set(saved.snapshots.map(row=>row.month));
+      const known=new Set(saved.snapshots.filter(row=>history.isCurrentRange?.(row)).map(row=>row.month));
       const now=new Date(),current=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
       for(const item of months){
         activeMonth=item;

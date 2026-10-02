@@ -7,8 +7,8 @@ import { tmpdir } from 'node:os';
 import { createHandler, createStateCodec, monthRange, validNip, b64, unb64, hash, certificateKey, HttpError } from '../supabase/functions/cleanfleet-ksef/core.js';
 
 test('calendar boundaries and NIP validation', () => {
-  assert.equal(monthRange('2024-02').to, '2024-02-29T23:59:59.999Z');
-  assert.equal(monthRange('2026-12').from, '2026-12-01T00:00:00.000Z');
+  assert.equal(monthRange('2024-02').to, '2024-02-29T22:59:59.999Z');
+  assert.equal(monthRange('2026-12').from, '2026-11-30T23:00:00.000Z');
   assert.throws(()=>monthRange('2026-13'));
   assert.equal(validNip('5260250995'),true);
   assert.equal(validNip('5260250996'),false);
@@ -74,7 +74,7 @@ test('full export: correct auth encryption, filters, encrypted transfer and reje
       assert.equal(options.headers.Authorization,'Bearer access-secret');
       assert.equal(body.onlyMetadata,false); assert.equal(body.compressionType,'Zip');
       assert.equal(body.filters.subjectType,jobs.length ? 'Subject2':'Subject1');
-      assert.equal(body.filters.dateRange.to,'2024-02-29T23:59:59.999Z');
+      assert.equal(body.filters.dateRange.to,'2024-02-29T22:59:59.999Z');
       const key=decrypt(body.encryption.encryptedSymmetricKey); assert.equal(key.length,32);
       const cipher=createCipheriv('aes-256-cbc',key,Buffer.from(body.encryption.initializationVector,'base64'));
       const encrypted=Buffer.concat([cipher.update(plain),cipher.final()]); jobs.push(encrypted);
@@ -113,4 +113,14 @@ test('full export: correct auth encryption, filters, encrypted transfer and reje
   assert.equal((await blocked(new Request('https://edge.example',{method:'POST',body:'{}'}))).status,403);
   assert.equal(calls,before);
   assert.equal((await handler(new Request('https://edge.example',{method:'POST',headers:{Origin:'https://attacker.example'},body:'{}'}))).status,403);
+});
+
+test('Polish month boundaries exclude April 1 from March and include the first day through DST changes',()=>{
+ const march=monthRange('2026-03'),april=monthRange('2026-04'),october=monthRange('2026-10'),november=monthRange('2026-11');
+ assert.equal(march.from,'2026-02-28T23:00:00.000Z');assert.equal(march.to,'2026-03-31T21:59:59.999Z');
+ assert.equal(april.from,'2026-03-31T22:00:00.000Z');assert.equal(october.from,'2026-09-30T22:00:00.000Z');assert.equal(october.to,'2026-10-31T22:59:59.999Z');
+ assert.equal(Date.parse(march.to)+1,Date.parse(april.from));assert.equal(Date.parse(october.to)+1,Date.parse(november.from));
+ const firstApril=Date.parse('2026-04-01T00:00:00+02:00');assert.ok(firstApril>Date.parse(march.to));assert.ok(firstApril>=Date.parse(april.from));
+ const polish=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw',year:'numeric',month:'2-digit',day:'2-digit'});
+ for(let m=1;m<=12;m++){const month='2026-'+String(m).padStart(2,'0'),range=monthRange(month);assert.equal(polish.format(new Date(range.from)),month+'-01');assert.equal(polish.format(new Date(range.to)).slice(0,7),month);}
 });

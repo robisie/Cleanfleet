@@ -40,3 +40,5 @@ test('metadata never saves a truncated or mismatched invoice list and honors can
  z.file('_metadata.json','bad json');await assert.rejects(h.archiveMetadata(z,1),/Niepoprawne/);
  const controller=new AbortController();controller.abort();await assert.rejects(h.archiveMetadata(z,1,controller.signal),{name:'AbortError'});
 });
+
+test('year import refreshes old UTC snapshots once and resumes corrected snapshots',()=>{assert.equal(h.isCurrentRange({updated_at:'2026-10-02T18:13:59Z'}),false);assert.equal(h.isCurrentRange({updated_at:'2026-10-02T18:43:12.475Z'}),true);assert.equal(h.isCurrentRange({}),false);});

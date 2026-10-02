@@ -33,7 +33,7 @@ Moduł ma stały numer `1.51`. Każda kolejna zmiana zwiększa ostatnią liczbę
 - `v1.51.4`: rozszerzenie MT940 `.txt`.
 - `v1.51.5`: wybór wielu PDF-ów z mOrganizera.
 
-Starsze oznaczenia `1.52.*` i `1.53.*` powyżej oraz w historii Git są historycznymi etykietami sprzed uzgodnienia. Bieżące oznaczenie modułu Dokumenty księgowe: `v1.51.11`. Kolejna zmiana tego modułu: `v1.51.12`. Bieżące oznaczenie całej aplikacji: `v1.52.3`.
+Starsze oznaczenia `1.52.*` i `1.53.*` powyżej oraz w historii Git są historycznymi etykietami sprzed uzgodnienia. Bieżące oznaczenie modułu Dokumenty księgowe: `v1.51.12`. Kolejna zmiana tego modułu: `v1.51.13`. Bieżące oznaczenie całej aplikacji: `v1.52.5`.
 
 Poczta o2 — połączenie IMAP na bieżącą sesję, wybór załączników banku i ZIP — `v1.51.6`.
 
@@ -54,3 +54,5 @@ Dokumenty księgowe v1.51.11 (aplikacja v1.52.3): filtr maili kontakt@mbank.pl i
 
 
 Czytnik kartek — analiza asynchroniczna, krótkie sprawdzanie statusu i wznowienie tego samego wyniku po przerwaniu połączenia — `v1.52.4`.
+
+Dokumenty księgowe v1.51.12 (aplikacja v1.52.5): wybór folderu z listy IMAP o2; rozwiązywanie pełnej ścieżki folderu i Unicode, pomijanie kontenerów bez możliwości wyboru. Lista folderów pobierana po logowaniu bez otwierania folderu i bez zapisu hasła.

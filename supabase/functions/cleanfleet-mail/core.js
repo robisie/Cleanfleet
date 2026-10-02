@@ -32,6 +32,17 @@ export function attachments(node,result=[]) {
   else if(name && (String(node.disposition).toLowerCase()==='attachment' || /\.(pdf|csv|xml|zip|txt|sta|mt940|xls|xlsx)$/i.test(name)) && /^[1-9]\d*(\.[1-9]\d*)*$/.test(node.part || '1') && Number.isInteger(node.size) && node.size>=0){result.push({part:node.part || '1',filename:filename(name),size:node.size});}
   return result;
 }
+export function selectableFolders(list) {
+ return list.filter(folder=>![...(folder.flags || [])].some(flag=>['noselect','nonexistent'].includes(String(flag).replaceAll(String.fromCharCode(92),'').toLowerCase()))).map(folder=>({path:String(folder.path),name:String(folder.name || folder.path)})).filter(folder=>folder.path && folder.path.length<=128).slice(0,300);
+}
+export function resolveFolder(folders,value) {
+ const name=String(value).normalize('NFC');
+ const exact=folders.find(folder=>folder.path.normalize('NFC')===name || (name.toUpperCase()==='INBOX' && folder.path.toUpperCase()==='INBOX'));
+ if(exact)return exact.path;
+ const matched=folders.filter(folder=>folder.name.normalize('NFC')===name);
+ if(matched.length===1)return matched[0].path;
+ throw new HttpError('Folder nie jest dostępny pod podaną nazwą. Kliknij Pobierz listę folderów i wybierz folder z o2.');
+}
 export function createMailHandler({authorize,makeClient,secret,credentialStore}) {
   const credentialCodec=createStateCodec(secret,'mail-credentials-v1'),ticketCodec=createStateCodec(secret,'mail-attachments-v1');
   async function savedCredential(uid,session) {
@@ -41,9 +52,9 @@ export function createMailHandler({authorize,makeClient,secret,credentialStore})
     let config;try{config=await credentialCodec.open(session,uid,'mail-session');}catch(_){throw new HttpError('Sesja poczty wygasła. Wpisz hasło i połącz pocztę ponownie.',401);}
     config.senders=[BANK_SENDER];return {row:{revision:config.revision},config};
   }
-  async function mailbox(config,operation) {
+  async function mailbox(config,operation,openFolder=true) {
     let phase='connect';const client=makeClient(config);const timer=setTimeout(()=>client.close(),70000);
-    try{await client.connect();phase='folder';await client.mailboxOpen(config.folder,{readOnly:true});phase='operation';return await operation(client);}
+    try{await client.connect();if(openFolder){phase='folder';const folders=selectableFolders(await client.list());config.folder=resolveFolder(folders,config.folder);await client.mailboxOpen(config.folder,{readOnly:true});}phase='operation';return await operation(client);}
     catch(error){
       if(error instanceof HttpError)throw error;
       const codes=['AUTHENTICATIONFAILED','AUTHORIZATIONFAILED','UNAVAILABLE','PRIVACYREQUIRED','CONTACTADMIN','NONEXISTENT','ENOTFOUND','EAI_AGAIN','ECONNREFUSED','ECONNRESET','ETIMEDOUT','ETIMEOUT','CONNECT_TIMEOUT','GREETING_TIMEOUT','CERT_HAS_EXPIRED','ERR_TLS_CERT_ALTNAME_INVALID','UNABLE_TO_VERIFY_LEAF_SIGNATURE','NO','BAD'];
@@ -51,7 +62,7 @@ export function createMailHandler({authorize,makeClient,secret,credentialStore})
       const server=codes.includes(error.serverResponseCode)?error.serverResponseCode:'';
       console.warn('CF_MAIL_FAILURE '+JSON.stringify({phase,code,server,authenticationFailed:Boolean(error.authenticationFailed)}));
       if(error.authenticationFailed)throw new HttpError('Serwer o2 odrzucił logowanie'+(server?' ('+server+')':'')+'. Połączenie działa, ale serwer nie zaakceptował dostępu do skrzynki. Sprawdź pełny adres konta; jeśli te same dane działają w programie pocztowym, przekaż ten komunikat do sprawdzenia blokady po stronie o2.',502);
-      if(phase==='folder')throw new HttpError('Zalogowano do o2, ale nie udało się otworzyć folderu poczty. Dla skrzynki odbiorczej wpisz INBOX.',502);
+      if(phase==='folder')throw new HttpError('Zalogowano do o2, ale nie udało się otworzyć folderu poczty. Kliknij Pobierz listę folderów i wybierz dokładną ścieżkę folderu z o2.',502);
       if(phase==='operation')throw new HttpError('Zalogowano do o2, ale nie udało się odczytać wiadomości. Spróbuj ponownie.',502);
       if(['ENOTFOUND','EAI_AGAIN'].includes(code))throw new HttpError('Serwer aplikacji nie może odnaleźć serwera o2 (DNS: '+code+'). To nie jest błąd hasła.',502);
       throw new HttpError('Nie udało się zestawić połączenia z serwerem o2 ('+code+'). To nie potwierdza błędnego hasła.',502);
@@ -73,11 +84,13 @@ export function createMailHandler({authorize,makeClient,secret,credentialStore})
         if(!body.session && !await credentialStore.get(uid))return json({configured:false});
         const {config}=await savedCredential(uid,body.session);return json({configured:true,email:config.email,senders:config.senders,folder:config.folder});
       }
-      if(body.action==='save'){
+      if(body.action==='save' || body.action==='folders'){
         const config=cleanConfig(body);let password=typeof body.password==='string'?body.password:'';
         if(body.useSavedPassword===true){const saved=await savedCredential(uid,body.session);if(saved.config.email!==config.email)throw new HttpError('Dla nowego adresu wpisz nowe hasło.');password=saved.config.password;}
         if(!password || password.length>1024 || /[\x00\r\n]/.test(password))throw new HttpError('Wpisz hasło do programu pocztowego.');
-        config.password=password;await mailbox(config,async()=>{});
+        config.password=password;
+        if(body.action==='folders')return await mailbox(config,async client=>json({folders:selectableFolders(await client.list())}),false);
+        await mailbox(config,async()=>{});
         const revision=crypto.randomUUID();
         const ciphertext=await credentialCodec.seal({...config,revision,userId:uid,scope:'mail-stored',expires:9999999999999});
         await credentialStore.set(uid,{ciphertext});

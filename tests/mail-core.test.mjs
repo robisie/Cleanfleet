@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createMailHandler,cleanConfig,attachments,period,MAX_PART,matchesBankMessage} from '../supabase/functions/cleanfleet-mail/core.js';
+import {createMailHandler,cleanConfig,attachments,period,MAX_PART,matchesBankMessage,selectableFolders,resolveFolder} from '../supabase/functions/cleanfleet-mail/core.js';
 const part={part:'2',size:4,disposition:'attachment',dispositionParameters:{filename:'../faktura.pdf'}};
 const message={uid:15,internalDate:new Date('2026-08-15T10:00:00Z'),envelope:{subject:'mBank - elektroniczne zestawienie operacji za sierpień 2026',from:[{address:'kontakt@mbank.pl'}]},bodyStructure:{childNodes:[part,{part:'1',size:100,disposition:'inline',parameters:{name:'logo.png'}}]}};
 test('mail filters validate exact sender addresses, valid dates and safe attachment names',()=>{
@@ -15,7 +15,7 @@ test('persistent encrypted connection, read-only mailbox, authorized part downlo
   let closes=0,clientCalls=0,huge=false,wrongSender=false,uidValidity=10n;
   const handler=createMailHandler({secret:'test-secret',credentialStore,authorize:async request=>request.headers.get('test-owner')||'admin',makeClient:config=>{
     clientCalls++;assert.equal(config.password,'app-password');
-    return {mailbox:{uidValidity},connect:async()=>{},mailboxOpen:async(folder,options)=>{assert.equal(folder,'INBOX');assert.deepEqual(options,{readOnly:true});},close:()=>{closes++;},
+    return {list:async()=>[{path:'INBOX',name:'INBOX',flags:new Set()}],mailbox:{uidValidity},connect:async()=>{},mailboxOpen:async(folder,options)=>{assert.equal(folder,'INBOX');assert.deepEqual(options,{readOnly:true});},close:()=>{closes++;},
       search:async(query,options)=>{assert.equal(query.from,'kontakt@mbank.pl');assert.equal(query.subject,'mBank - elektroniczne zestawienie operacji za');assert.equal(options.uid,true);return [15];},
       fetchAll:async()=>[{...message,envelope:{...message.envelope,from:[{address:wrongSender?'other@example.pl':'kontakt@mbank.pl'}]},bodyStructure:huge?{...part,size:MAX_PART+1}:message.bodyStructure}],
       fetchOne:async()=>message,download:async(uid,path,options)=>{assert.equal(uid,15);assert.equal(path,'2');assert.equal(options.uid,true);return {content:(async function*(){yield new Uint8Array([1,2,3,4]);})()};}
@@ -49,7 +49,7 @@ test('mail errors distinguish server login rejection, folder and DNS without lea
   ['folder',new Error('private folder details'),/Zalogowano do o2.*folderu/],
   ['connect',Object.assign(new Error('secret-password'),{code:'ENOTFOUND'}),/DNS: ENOTFOUND/]
  ]){
-  const handler=createMailHandler({secret:'test-secret',authorize:async()=> 'owner',credentialStore:{get:async()=>null,set:async()=>assert.fail('failed login must not save')},makeClient:()=>({connect:async()=>{if(phase==='connect')throw error;},mailboxOpen:async()=>{throw error;},close(){}})});
+  const handler=createMailHandler({secret:'test-secret',authorize:async()=> 'owner',credentialStore:{get:async()=>null,set:async()=>assert.fail('failed login must not save')},makeClient:()=>({list:async()=>[{path:'INBOX',name:'INBOX',flags:new Set()}],connect:async()=>{if(phase==='connect')throw error;},mailboxOpen:async()=>{throw error;},close(){}})});
   const response=await handler(new Request('https://edge.example',{method:'POST',body:JSON.stringify({action:'save',email:'me@o2.pl',password:'secret-password',senders:'bank@example.com'})}));
   assert.equal(response.status,502);const text=await response.text();assert.match(text,expected);assert.ok(!text.includes('secret-password'));assert.ok(!text.includes('private folder details'));
  }
@@ -62,3 +62,16 @@ test('bank subject wildcard allows changing period and rejects forwards, another
  assert.equal(matchesBankMessage({...message,envelope:{...message.envelope,from:[{address:'kontakt@mbank.pl.evil.example'}]}}),false);
  assert.deepEqual(cleanConfig({email:'test@o2.pl',senders:'wrong@example.com'}).senders,['kontakt@mbank.pl']);
 });
+
+test('IMAP folder selection resolves server hierarchy, Unicode and skips containers',()=>{
+ const folders=selectableFolders([{path:'INBOX.mBank - zestawienia',name:'mBank - zestawienia',flags:new Set()},{path:'Archiwum',flags:new Set([String.fromCharCode(92)+'Noselect'])}]);
+ assert.equal(folders.length,1);assert.equal(resolveFolder(folders,'mBank - zestawienia'),'INBOX.mBank - zestawienia');
+ assert.throws(()=>resolveFolder([...folders,{path:'other.mBank - zestawienia',name:'mBank - zestawienia'}],'mBank - zestawienia'));
+ assert.equal(resolveFolder([{path:'INBOX',name:'INBOX'}],'inbox'),'INBOX');
+});
+test('listing folders uses current credentials without opening or saving any folder',async()=>{
+ let opened=0,written=0;const handler=createMailHandler({secret:'test-secret',authorize:async()=> 'owner',credentialStore:{get:async()=>null,set:async()=>written++},makeClient:()=>({connect:async()=>{},list:async()=>[{path:'INBOX/mBank - zestawienia',name:'mBank - zestawienia',flags:new Set()}],mailboxOpen:async()=>opened++,close(){}})});
+ const response=await handler(new Request('https://edge.example',{method:'POST',body:JSON.stringify({action:'folders',email:'me@o2.pl',password:'secret',folder:'nonexistent'})}));
+ assert.equal(response.status,200);assert.equal((await response.json()).folders[0].path,'INBOX/mBank - zestawienia');assert.equal(opened,0);assert.equal(written,0);
+});
+

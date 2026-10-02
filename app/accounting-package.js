@@ -11,7 +11,7 @@ async function build({month,ksef,organizerFiles=[],bankResults=[],mailFiles=[],s
  [base+'/faktury zakupowe',folders.purchases,folders.sales,folders.bank,base+'/raport kasowy'].forEach(path=>zip.folder(path));
  function add(folder,name,bytes){check(signal);size+=bytes.byteLength;if(size>300*1024*1024)throw new Error('Dokumenty przekraczają limit wspólnej paczki 300 MB.');const original=safeName(name),dot=original.lastIndexOf('.');let next=original,index=2;while(names.has((folder+'/'+next).normalize('NFC').toLowerCase())){next=(dot>0?original.slice(0,dot):original)+' ('+(index++)+')'+(dot>0?original.slice(dot):'');}names.add((folder+'/'+next).normalize('NFC').toLowerCase());zip.file(folder+'/'+next,bytes);}
  for(const kind of ['purchases','sales']){
-  check(signal);const result=ksef?.[kind];if(!result || result.month!==month || !Number.isInteger(result.count) || result.count<0)throw new Error('Brak poprawnego eksportu '+(kind==='purchases'?'zakupów':'sprzedaży')+' z KSeF za wybrany miesiąc.');
+  check(signal);const result=ksef?.[kind];if(!result)continue;if( result.month!==month || !Number.isInteger(result.count) || result.count<0)throw new Error('Brak poprawnego eksportu '+(kind==='purchases'?'zakupów':'sprzedaży')+' z KSeF za wybrany miesiąc.');
   if(!result.count){if(result.blob)throw new Error('Niezgodny pusty eksport KSeF.');continue;}
   if(!result.blob)throw new Error('Niepełny eksport KSeF.');onProgress('Układanie faktur z KSeF…');
   const archive=await Zip.loadAsync(await result.blob.arrayBuffer(),{checkCRC32:true});check(signal);

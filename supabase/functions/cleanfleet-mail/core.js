@@ -1,4 +1,6 @@
 import {createStateCodec,HttpError} from './crypto.js';
+export const BANK_SENDER='kontakt@mbank.pl';
+export const BANK_SUBJECT='mBank - elektroniczne zestawienie operacji za ';
 export const MAX_PART=20*1024*1024;
 const allowedOrigins=['https://cleanfleet.pl','https://www.cleanfleet.pl'];
 export function cleanEmail(value) {
@@ -8,8 +10,7 @@ export function cleanEmail(value) {
 }
 export function cleanConfig(body) {
   const email=cleanEmail(body.email);if(!/@(?:o2|tlen|go2)\.pl$/.test(email))throw new HttpError('Ten moduł obsługuje skrzynki o2.pl, tlen.pl i go2.pl.');
-  const senders=[...new Set(String(body.senders || '').split(/[\s,;]+/).filter(Boolean).map(cleanEmail))];
-  if(!senders.length || senders.length>10)throw new HttpError('Podaj od 1 do 10 pełnych adresów nadawców banku.');
+  const senders=[BANK_SENDER];
   const folder=String(body.folder || 'INBOX').trim();if(!folder || folder.length>128 || /[\x00-\x1f\x7f]/.test(folder))throw new HttpError('Niepoprawna nazwa folderu poczty.');
   return {email,senders,folder};
 }
@@ -22,7 +23,7 @@ export function period(from,to) {
   return {from,to,since:new Date(begin.getTime()-86400000),before:new Date(end.getTime()+2*86400000)};
 }
 function received(message) {const d=new Date(message.internalDate);if(!Number.isFinite(d.getTime()))throw new HttpError('Poczta zwróciła niepoprawną datę wiadomości.',502);return new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);}
-function senderMatches(message,senders) {return (message.envelope?.from || []).some(item=>senders.includes(String(item.address || '').toLowerCase()));}
+export function matchesBankMessage(message) {const subject=String(message.envelope?.subject || '');return (message.envelope?.from || []).some(item=>String(item.address || '').toLowerCase()===BANK_SENDER) && subject.startsWith(BANK_SUBJECT) && subject.slice(BANK_SUBJECT.length).trim().length>0;}
 export function filename(value) {return String(value || 'zalacznik').split(/[\\/]/).at(-1).replace(/[\x00-\x1f\x7f<>:"|?*]/g,'_').replace(/^\.+/,'').slice(0,180) || 'zalacznik';}
 export function attachments(node,result=[]) {
   if(!node)return result;
@@ -35,10 +36,10 @@ export function createMailHandler({authorize,makeClient,secret,credentialStore})
   const credentialCodec=createStateCodec(secret,'mail-credentials-v1'),ticketCodec=createStateCodec(secret,'mail-attachments-v1');
   async function savedCredential(uid,session) {
     const stored=await credentialStore.get(uid);
-    if(stored){const config=await credentialCodec.open(stored.ciphertext,uid,'mail-stored');return {row:{revision:config.revision},config};}
+    if(stored){const config=await credentialCodec.open(stored.ciphertext,uid,'mail-stored');config.senders=[BANK_SENDER];return {row:{revision:config.revision},config};}
     if(!session)throw new HttpError('Połącz najpierw pocztę na bieżącą sesję.');
     let config;try{config=await credentialCodec.open(session,uid,'mail-session');}catch(_){throw new HttpError('Sesja poczty wygasła. Wpisz hasło i połącz pocztę ponownie.',401);}
-    return {row:{revision:config.revision},config};
+    config.senders=[BANK_SENDER];return {row:{revision:config.revision},config};
   }
   async function mailbox(config,operation) {
     let phase='connect';const client=makeClient(config);const timer=setTimeout(()=>client.close(),70000);
@@ -86,13 +87,13 @@ export function createMailHandler({authorize,makeClient,secret,credentialStore})
       if(body.action==='list'){
         const dates=period(body.from,body.to);const {row,config}=await savedCredential(uid,body.session);
         return await mailbox(config,async client=>{
-          const uids=await client.search({since:dates.since,before:dates.before,or:config.senders.map(from=>({from}))},{uid:true});
+          const uids=await client.search({since:dates.since,before:dates.before,from:BANK_SENDER,subject:BANK_SUBJECT.trimEnd()},{uid:true});
           if(!uids || !uids.length)return json({attachments:[],messageCount:0});
           if(uids.length>200)throw new HttpError('Znaleziono ponad 200 wiadomości. Zawęź daty lub listę nadawców.',422);
           const messages=await client.fetchAll(uids,{uid:true,envelope:true,bodyStructure:true,internalDate:true},{uid:true});
           const result=[];let count=0;
           for(const message of messages){
-            if(!senderMatches(message,config.senders))continue;
+            if(!matchesBankMessage(message))continue;
             const day=received(message);if(day<dates.from || day>dates.to)continue;count++;
             for(const part of attachments(message.bodyStructure)){
               if(part.size>MAX_PART)throw new HttpError('Załącznik „'+part.filename+'” przekracza limit 20 MB. Pobierz go bezpośrednio z poczty.',422);
@@ -110,7 +111,7 @@ export function createMailHandler({authorize,makeClient,secret,credentialStore})
         return await mailbox(config,async client=>{
           if(String(client.mailbox.uidValidity)!==state.uidValidity)throw new HttpError('Folder poczty zmienił się. Ponownie wyszukaj załączniki.',409);
           const message=await client.fetchOne(state.uid,{envelope:true,bodyStructure:true,internalDate:true},{uid:true});
-          if(!message || !senderMatches(message,config.senders) || received(message)<state.from || received(message)>state.to)throw new HttpError('Wiadomość jest już niedostępna w wybranym zakresie.',410);
+          if(!message || !matchesBankMessage(message) || received(message)<state.from || received(message)>state.to)throw new HttpError('Wiadomość jest już niedostępna w wybranym zakresie.',410);
           const part=attachments(message.bodyStructure).find(part=>part.part===state.part && part.size===state.size && part.filename===state.filename);
           if(!part)throw new HttpError('Załącznik zmienił się. Ponownie wyszukaj pocztę.',409);
           const downloaded=await client.download(state.uid,state.part,{uid:true,maxBytes:MAX_PART+1});

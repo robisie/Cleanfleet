@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createMailHandler,cleanConfig,attachments,period,MAX_PART} from '../supabase/functions/cleanfleet-mail/core.js';
+import {createMailHandler,cleanConfig,attachments,period,MAX_PART,matchesBankMessage} from '../supabase/functions/cleanfleet-mail/core.js';
 const part={part:'2',size:4,disposition:'attachment',dispositionParameters:{filename:'../faktura.pdf'}};
-const message={uid:15,internalDate:new Date('2026-08-15T10:00:00Z'),envelope:{subject:'Wyciąg',from:[{address:'bank@example.pl'}]},bodyStructure:{childNodes:[part,{part:'1',size:100,disposition:'inline',parameters:{name:'logo.png'}}]}};
+const message={uid:15,internalDate:new Date('2026-08-15T10:00:00Z'),envelope:{subject:'mBank - elektroniczne zestawienie operacji za sierpień 2026',from:[{address:'kontakt@mbank.pl'}]},bodyStructure:{childNodes:[part,{part:'1',size:100,disposition:'inline',parameters:{name:'logo.png'}}]}};
 test('mail filters validate exact sender addresses, valid dates and safe attachment names',()=>{
-  assert.deepEqual(cleanConfig({email:'test@o2.pl',senders:'bank@example.pl; BANK@example.pl',folder:'INBOX'}).senders,['bank@example.pl']);
-  assert.throws(()=>cleanConfig({email:'test@gmail.com',senders:'bank@example.pl'}));
+  assert.deepEqual(cleanConfig({email:'test@o2.pl',senders:'kontakt@mbank.pl; KONTAKT@MBANK.PL',folder:'INBOX'}).senders,['kontakt@mbank.pl']);
+  assert.throws(()=>cleanConfig({email:'test@gmail.com',senders:'kontakt@mbank.pl'}));
   assert.throws(()=>period('2026-02-30','2026-03-01'));
   assert.throws(()=>period('2026-01-01','2026-08-01'));
   assert.equal(attachments(message.bodyStructure).length,1);assert.equal(attachments(message.bodyStructure)[0].filename,'faktura.pdf');
@@ -16,13 +16,13 @@ test('persistent encrypted connection, read-only mailbox, authorized part downlo
   const handler=createMailHandler({secret:'test-secret',credentialStore,authorize:async request=>request.headers.get('test-owner')||'admin',makeClient:config=>{
     clientCalls++;assert.equal(config.password,'app-password');
     return {mailbox:{uidValidity},connect:async()=>{},mailboxOpen:async(folder,options)=>{assert.equal(folder,'INBOX');assert.deepEqual(options,{readOnly:true});},close:()=>{closes++;},
-      search:async(query,options)=>{assert.equal(query.or[0].from,'bank@example.pl');assert.equal(options.uid,true);return [15];},
-      fetchAll:async()=>[{...message,envelope:{...message.envelope,from:[{address:wrongSender?'other@example.pl':'bank@example.pl'}]},bodyStructure:huge?{...part,size:MAX_PART+1}:message.bodyStructure}],
+      search:async(query,options)=>{assert.equal(query.from,'kontakt@mbank.pl');assert.equal(query.subject,'mBank - elektroniczne zestawienie operacji za');assert.equal(options.uid,true);return [15];},
+      fetchAll:async()=>[{...message,envelope:{...message.envelope,from:[{address:wrongSender?'other@example.pl':'kontakt@mbank.pl'}]},bodyStructure:huge?{...part,size:MAX_PART+1}:message.bodyStructure}],
       fetchOne:async()=>message,download:async(uid,path,options)=>{assert.equal(uid,15);assert.equal(path,'2');assert.equal(options.uid,true);return {content:(async function*(){yield new Uint8Array([1,2,3,4]);})()};}
     };
   }});
   const call=(body,owner='admin')=>handler(new Request('https://edge.example',{method:'POST',headers:{'test-owner':owner,Origin:'https://cleanfleet.pl'},body:JSON.stringify(body)}));
-  const saved=await(await call({action:'save',email:'test@o2.pl',password:'app-password',senders:'bank@example.pl',folder:'INBOX'})).json();
+  const saved=await(await call({action:'save',email:'test@o2.pl',password:'app-password',senders:'kontakt@mbank.pl',folder:'INBOX'})).json();
   assert.equal(saved.configured,true);assert.ok(saved.session);assert.ok(!JSON.stringify(saved).includes('app-password'));
   const config=await(await call({action:'config',session:saved.session})).json();assert.equal(config.email,'test@o2.pl');assert.equal(config.password,undefined);
   assert.equal((await call({action:'config',session:saved.session},'another-user')).status,401);
@@ -37,9 +37,9 @@ test('persistent encrypted connection, read-only mailbox, authorized part downlo
   huge=false;wrongSender=true;assert.equal((await(await call(body)).json()).attachments.length,0);
   assert.equal(closes,clientCalls);
   assert.equal((await call({action:'attachment',session:saved.session,ticket:'tampered'})).status,401);
-  const resaved=await call({action:'save',email:'test@o2.pl',useSavedPassword:true,senders:'bank@example.pl',folder:'INBOX'});assert.equal(resaved.status,200);
+  const resaved=await call({action:'save',email:'test@o2.pl',useSavedPassword:true,senders:'kontakt@mbank.pl',folder:'INBOX'});assert.equal(resaved.status,200);
   assert.equal((await call({action:'attachment',ticket:listed.attachments[0].ticket})).status,409);
-  assert.equal((await call({action:'save',email:'other@o2.pl',useSavedPassword:true,senders:'bank@example.pl'})).status,400);
+  assert.equal((await call({action:'save',email:'other@o2.pl',useSavedPassword:true,senders:'kontakt@mbank.pl'})).status,400);
   assert.equal((await(await call({action:'config'})).json()).email,'test@o2.pl');
 });
 test('mail errors distinguish server login rejection, folder and DNS without leaking credentials',async t=>{
@@ -54,4 +54,11 @@ test('mail errors distinguish server login rejection, folder and DNS without lea
   assert.equal(response.status,502);const text=await response.text();assert.match(text,expected);assert.ok(!text.includes('secret-password'));assert.ok(!text.includes('private folder details'));
  }
  assert.equal(logs.length,3);assert.ok(!JSON.stringify(logs).includes('secret-password'));assert.ok(!JSON.stringify(logs).includes('me@o2.pl'));
+});
+
+test('bank subject wildcard allows changing period and rejects forwards, another sender and other bank mail',()=>{
+ for(const subject of ['mBank - elektroniczne zestawienie operacji za sierpień 2026','mBank - elektroniczne zestawienie operacji za 01.09.2026 - 30.09.2026'])assert.equal(matchesBankMessage({...message,envelope:{subject,from:[{address:'kontakt@mbank.pl'}]}}),true);
+ for(const subject of ['Re: mBank - elektroniczne zestawienie operacji za sierpień','Oferta mBank','mBank - elektroniczne zestawienie operacji za '])assert.equal(matchesBankMessage({...message,envelope:{subject,from:[{address:'kontakt@mbank.pl'}]}}),false);
+ assert.equal(matchesBankMessage({...message,envelope:{...message.envelope,from:[{address:'kontakt@mbank.pl.evil.example'}]}}),false);
+ assert.deepEqual(cleanConfig({email:'test@o2.pl',senders:'wrong@example.com'}).senders,['kontakt@mbank.pl']);
 });

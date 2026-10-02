@@ -239,14 +239,14 @@
     try{
       if(bankFiles.length && bankResults.length!==bankFiles.length)throw new Error('mBank: najpierw przekonwertuj wybrane CSV na MT940.');
       const ksef={...ksefResults},bank=[...bankResults];
-      if(!confirmed){const result=window.CFAccountingReconcile.reconcile({month,bankResults:bank,purchases:ksef.purchases});window.CFAccountingReconcile.render(document.getElementById('cfAccountingReview'),result);reviewState={revision:reviewRevision,month};allElement('Confirm').hidden=false;allStatus('Sprawdź wynik kontroli. Uzupełnij dokumenty lub kliknij Pobierz ZIP z obecnymi dokumentami.');return;}
+      if(!confirmed){const result=reviewState?.revision===reviewRevision&&reviewState.month===month?reviewState.result:window.CFAccountingReconcile.reconcile({month,bankResults:bank,purchases:ksef.purchases});window.CFAccountingReconcile.render(document.getElementById('cfAccountingReview'),result);reviewState={revision:reviewRevision,month,result};allElement('Confirm').hidden=false;allStatus('Sprawdź wynik kontroli. Uzupełnij dokumenty lub kliknij Pobierz ZIP z obecnymi dokumentami.');return;}
       if(!reviewState || reviewState.revision!==reviewRevision || reviewState.month!==month)throw new Error('Dokumenty zmieniono. Ponownie uruchom kontrolę przed pobraniem ZIP.');
       allStatus('Dołączanie zaznaczonych załączników poczty…');
       const mail=await window.CFAccountingMail.exportFiles(controller.signal,allStatus);check();
       if(!organizer.length && !bank.length && !mail.length && !Object.values(ksef).some(result=>result?.count>0))throw new Error('Przygotuj dokumenty lub zaznacz załączniki, zanim pobierzesz paczkę.');
       const result=await window.CFAccountingPackage.build({month,ksef,organizerFiles:organizer,bankResults:bank,mailFiles:mail,signal:controller.signal,onProgress:allStatus});check();
       const url=URL.createObjectURL(new Blob([result.bytes],{type:'application/zip'})),link=document.createElement('a');link.href=url;link.download='Dokumenty-'+month+'.zip';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
-      reviewState=null;allElement('Confirm').hidden=true;const c=result.counts;allStatus('ZIP gotowy. KSeF: '+c.purchases+' zakupowych i '+c.sales+' sprzedażowych. mOrganizer: '+c.organizer+' PDF. MT940: '+c.bank+'. Poczta: '+c.mail+' załączników. Raport kasowy: pusty folder.');
+      allElement('Confirm').hidden=true;const c=result.counts;allStatus('ZIP gotowy. KSeF: '+c.purchases+' zakupowych i '+c.sales+' sprzedażowych. mOrganizer: '+c.organizer+' PDF. MT940: '+c.bank+'. Poczta: '+c.mail+' załączników. Raport kasowy: pusty folder.');
     }catch(error){allStatus(error.name==='AbortError'?'Anulowano przygotowanie paczki.':'Nie utworzono wspólnego ZIP: '+error.message);}
     finally{if(allRun===controller){allRun=null;allBusy(false);}}
   }
@@ -398,6 +398,7 @@
         if (event.target === overlay || event.target.closest('[data-cf-accounting-close]')) closeModule();
       });
       overlay.addEventListener('change', event => {
+        if(event.target.closest?.('#cfAccountingReview'))return;
         invalidateReview();
         const input = event.target;
         if (['cfAccountingMonth','cfKsefNip','cfKsefEnvironment'].includes(input?.id)) { resetKsef(); }

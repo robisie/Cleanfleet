@@ -33,7 +33,7 @@ Moduł ma stały numer `1.51`. Każda kolejna zmiana zwiększa ostatnią liczbę
 - `v1.51.4`: rozszerzenie MT940 `.txt`.
 - `v1.51.5`: wybór wielu PDF-ów z mOrganizera.
 
-Starsze oznaczenia `1.52.*` i `1.53.*` powyżej oraz w historii Git są historycznymi etykietami sprzed uzgodnienia. Bieżące oznaczenie modułu Dokumenty księgowe: `v1.51.16`. Kolejna zmiana tego modułu: `v1.51.17`. Bieżące oznaczenie całej aplikacji: `v1.52.10`.
+Starsze oznaczenia `1.52.*` i `1.53.*` powyżej oraz w historii Git są historycznymi etykietami sprzed uzgodnienia. Bieżące oznaczenie modułu Dokumenty księgowe: `v1.51.17`. Kolejna zmiana tego modułu: `v1.51.18`. Bieżące oznaczenie całej aplikacji: `v1.52.11`.
 
 Poczta o2 — połączenie IMAP na bieżącą sesję, wybór załączników banku i ZIP — `v1.51.6`.
 
@@ -68,3 +68,5 @@ Dokumenty księgowe v1.51.14 (aplikacja v1.52.8): zwijane dane logowania poczty;
 Dokumenty księgowe v1.51.15 (aplikacja v1.52.9): zakupy i sprzedaż KSeF w PDF, generowane lokalnie z XML przez przypięty renderer CIRFMF 1.1.40; QR z oryginalnego SHA-256, NIP-u i daty wystawienia. Osobne ZIP-y i wspólna paczka zawierają wyłącznie PDF-y KSeF. Sprawdzenie kompletności, formatu i anulowania; błąd konwersji blokuje eksport. Wizualna weryfikacja zwykłej faktury, korekty i faktury z 70 pozycjami; polskie znaki, sumy, wielostronicowe tabele.
 
 Dokumenty księgowe v1.51.16 (aplikacja v1.52.10): kontrola płatności przed ZIP. Metadane zakupów zachowane w pamięci z XML KSeF; porównanie ujemnych operacji CSV według dokładnej kwoty, waluty, numeru faktury, rachunku i nazwy sprzedawcy. Dopasowania, przypadki niepewne, wydatki do sprawdzenia i pozostałe operacje; platformy/operatorzy, korekty, raty, duplikaty i inne waluty wymagają oceny. Ograniczenie do bieżącego miesiąca i przygotowanych źródeł ujawnione w raporcie. Osobne zatwierdzenie ZIP, unieważnienie kontroli po zmianie źródeł.
+
+Dokumenty księgowe v1.51.17 (aplikacja v1.52.11): czytelna responsywna lista kontroli z datą, odbiorcą, kwotą i statusem; rozwijane szczegóły, filtry i wyszukiwanie. Zaznaczanie widocznych pozycji i akcje zbiorcze: do uzupełnienia, dokument poza KSeF, nie wymaga faktury, sprawdzone, cofnięcie oznaczenia. Decyzje zachowane w bieżącej kontroli, również po ponownym pokazaniu i pobraniu ZIP; zmiana źródeł lub miesiąca je unieważnia. Oznaczenia nie zmieniają dokumentów w paczce. Przelewy własne bez dopasowania trafiają do pozostałych operacji.

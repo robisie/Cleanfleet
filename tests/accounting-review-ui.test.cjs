@@ -1,0 +1,14 @@
+const test=require('node:test'),assert=require('node:assert/strict');const dom=require('./accounting-dom.cjs');const {render,applyAction}=require('../app/accounting-reconcile.js');
+const row=(id,kind='review')=>({id,kind,currency:'PLN',account:'12345678901234567890123456',operation:{amount:-2999n,booked:'2026-08-04',title:'LIDL 2167/Bielsko-Biała DATA TRANSAKCJI: 2026-08-03',party:'',description:'ZAKUP PRZY UŻYCIU KARTY'},reason:'Nie znaleziono faktury.',candidates:[]});
+test('bulk decisions apply only to selected IDs and can be undone without altering bank data',()=>{
+ const result={rows:[row('a'),row('b')]};const before=result.rows[0].operation.amount;assert.equal(applyAction(result,['a','unknown'],'no_invoice'),1);assert.equal(result.rows[0].reviewStatus,'no_invoice');assert.equal(result.rows[1].reviewStatus,undefined);assert.equal(result.rows[0].operation.amount,before);applyAction(result,['a'],'reset');assert.equal(result.rows[0].reviewStatus,undefined);assert.throws(()=>applyAction(result,['a'],'delete'),/Nieznana/);
+});
+test('review filters and checkboxes support bulk actions, reset, search, and responsive compact rows',()=>{
+ global.document=dom.document;const root=new dom.Node('div');const result={month:'2026-08',warnings:[],rows:[row('a'),row('b','uncertain'),row('c','matched'),row('d','other')],unmatchedInvoices:[]};render(root,result);
+ const all=()=>dom.walk(root),find=predicate=>all().find(predicate),cards=()=>all().filter(n=>n.className==='cr-row');
+ assert.equal(cards().length,2);assert.ok(all().some(n=>n.className==='cr-name'&&n.textContent==='LIDL 2167/Bielsko-Biała'));assert.ok(all().filter(n=>n.className==='cr-details').every(n=>!n.open));
+ const filter=find(n=>n.attributes['aria-label']==='Filtr operacji'),action=find(n=>n.attributes['aria-label']==='Akcja dla zaznaczonych operacji');const apply=find(n=>n.tag==='button'&&n.textContent==='Zastosuj');
+ assert.equal(apply.disabled,true);find(n=>n.tag==='button'&&n.textContent==='Zaznacz widoczne').emit('click');action.value='no_invoice';action.emit('change');assert.equal(apply.disabled,false);apply.emit('click');assert.equal(result.rows[0].reviewStatus,'no_invoice');assert.equal(result.rows[1].reviewStatus,'no_invoice');assert.equal(result.rows[2].reviewStatus,undefined);assert.equal(cards().length,0);
+ filter.value='marked';filter.emit('change');assert.equal(cards().length,2);const checkbox=find(n=>n.type==='checkbox'&&n.dataset.reviewId==='a');checkbox.checked=true;checkbox.emit('change');action.value='reset';action.emit('change');apply.emit('click');assert.equal(result.rows[0].reviewStatus,undefined);assert.equal(cards().length,1);
+ filter.value='all';filter.emit('change');assert.equal(cards().length,4);const search=find(n=>n.type==='search');search.value='nonexistent';search.emit('input');assert.equal(cards().length,0);assert.equal(apply.disabled,true);assert.ok(find(n=>n.tag==='style').textContent.includes('@media(max-width:700px)'));
+});

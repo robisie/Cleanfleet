@@ -18,7 +18,7 @@ test('amount alone, several candidates, repeated payment, operators and installm
  assert.equal(result([invoice({type:'KOR',gross:'-123.45'})],[op()]).counts.uncertain,1);
 });
 test('unknown expense stays for review; tax and fees shown separately, not treated as missing invoices',()=>{
- const r=result([],[op({title:'Purchase'}),op({party:'ZUS',title:'Składki'}),op({description:'OPŁATA ZA PROWADZENIE RACHUNKU',title:'Fee'})]);assert.equal(r.counts.review,1);assert.equal(r.counts.other,2);
+ const r=result([],[op({title:'Purchase'}),op({party:'ZUS',title:'Składki'}),op({description:'OPŁATA ZA PROWADZENIE RACHUNKU',title:'Fee'})]);assert.equal(r.counts.review,1);assert.equal(r.counts.other,2);assert.equal(result([],[op({description:'PRZELEW WŁASNY'})]).counts.other,1);
 });
 test('missing, stale and incomplete inputs never yield a misleading all-clear',()=>{
  assert.match(reconcile({month}).warnings.join(' '),/Brak przekonwertowanego.*Nie pobrano/);
@@ -31,6 +31,6 @@ test('cents use exact arithmetic and invoice numbers require full boundaries',()
  assert.equal(numberIn('Zapłata FV/2026/081','FV/2026/081'),true);assert.equal(numberIn('FV/2026/0810','FV/2026/081'),false);assert.equal(numberIn('FV/2026/081/extra','FV/2026/081'),false);assert.equal(numberIn('payment 1','1'),false);
 });
 test('render treats invoice and bank text as text, including HTML-looking descriptions',()=>{
- const nodes=[];global.document={createElement:tag=>{const node={tag,style:{},children:[],appendChild(child){this.children.push(child);}};nodes.push(node);return node;}};
+ const nodes=[];const dom=require('./accounting-dom.cjs');global.document={createElement:tag=>{const node=new dom.Node(tag);nodes.push(node);return node;}};
  const root={replaceChildren(){},appendChild(){}};render(root,result([invoice()],[op({title:'<img onerror=alert(1)>',party:'Unknown',counterAccount:''})]));assert.ok(nodes.some(n=>String(n.textContent).includes('<img onerror')));assert.ok(nodes.every(n=>n.innerHTML===undefined));
 });

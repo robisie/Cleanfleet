@@ -11,7 +11,7 @@
   let bankResults = [];
   let bankRun = 0;
   let bankBusy = false;
-  let reviewRevision=0,reviewState=null;
+  let reviewRevision=0,reviewState=null;const purchaseAttachments=new Map();
   function invalidateReview(){reviewRevision++;reviewState=null;document.getElementById('cfAccountingReview')?.replaceChildren();const button=document.getElementById('cfAccountingAllConfirm');if(button)button.hidden=true;}
   const bankElement = id => document.getElementById('cfAccountingBank' + id);
   function bankStatus(message) {const el=bankElement('Status');if(el)el.textContent=message;}
@@ -229,24 +229,25 @@
   let allRun=null;
   const allElement=id=>document.getElementById('cfAccountingAll'+id);
   function allStatus(text){const el=allElement('Status');if(el)el.textContent=text;}
-  function allBusy(busy){const inputs=document.getElementById('cfAccountingInputs');if(inputs)inputs.disabled=busy;if(allElement('Start'))allElement('Start').disabled=busy;if(allElement('Confirm'))allElement('Confirm').disabled=busy;if(allElement('Cancel'))allElement('Cancel').hidden=!busy;}
+  function allBusy(busy){const review=document.getElementById('cfAccountingReview');if(review){review.inert=busy;}const inputs=document.getElementById('cfAccountingInputs');if(inputs)inputs.disabled=busy;if(allElement('Start'))allElement('Start').disabled=busy;if(allElement('Confirm'))allElement('Confirm').disabled=busy;if(allElement('Cancel'))allElement('Cancel').hidden=!busy;}
   async function downloadAll(confirmed=false){
     if(!isAdmin() || allRun)return;
-    if(ksefRun || ksefConfigRun || bankBusy || window.CFAccountingMail?.isBusy?.()){allStatus('Poczekaj na zakończenie bieżącej operacji.');return;}
+    if(ksefRun || ksefConfigRun || bankBusy || window.CFAccountingMail?.isBusy?.() || window.CFAccountingReconcile?.isBusy?.()){allStatus('Poczekaj na zakończenie bieżącej operacji.');return;}
     if(!window.CFAccountingPackage || !window.CFAccountingMail || !window.CFAccountingReconcile){allStatus('Odśwież aplikację — brakuje modułu paczki.');return;}
     const month=document.getElementById('cfAccountingMonth').value,organizer=[...selectedFiles.organizer];
     const controller=new AbortController();allRun=controller;allBusy(true);const check=()=>{if(controller.signal.aborted || !isAdmin() || document.getElementById('cfAccountingMonth').value!==month)throw new DOMException('Anulowano','AbortError');};
     try{
       if(bankFiles.length && bankResults.length!==bankFiles.length)throw new Error('mBank: najpierw przekonwertuj wybrane CSV na MT940.');
       const ksef={...ksefResults},bank=[...bankResults];
-      if(!confirmed){const result=reviewState?.revision===reviewRevision&&reviewState.month===month?reviewState.result:window.CFAccountingReconcile.reconcile({month,bankResults:bank,purchases:ksef.purchases});window.CFAccountingReconcile.render(document.getElementById('cfAccountingReview'),result);reviewState={revision:reviewRevision,month,result};allElement('Confirm').hidden=false;allStatus('Sprawdź wynik kontroli. Uzupełnij dokumenty lub kliknij Pobierz ZIP z obecnymi dokumentami.');return;}
+      if(!confirmed){const result=reviewState?.revision===reviewRevision&&reviewState.month===month?reviewState.result:window.CFAccountingReconcile.reconcile({month,bankResults:bank,purchases:ksef.purchases});window.CFAccountingReconcile.render(document.getElementById('cfAccountingReview'),result,{attachments:purchaseAttachments,isCurrent:()=>isAdmin()&&reviewState?.result===result&&reviewState.month===month});reviewState={revision:reviewRevision,month,result};allElement('Confirm').hidden=false;allStatus('Sprawdź wynik kontroli. Uzupełnij dokumenty lub kliknij Pobierz ZIP z obecnymi dokumentami.');return;}
       if(!reviewState || reviewState.revision!==reviewRevision || reviewState.month!==month)throw new Error('Dokumenty zmieniono. Ponownie uruchom kontrolę przed pobraniem ZIP.');
+      const purchaseFiles=window.CFAccountingReconcile.attachmentFiles(purchaseAttachments);
       allStatus('Dołączanie zaznaczonych załączników poczty…');
       const mail=await window.CFAccountingMail.exportFiles(controller.signal,allStatus);check();
-      if(!organizer.length && !bank.length && !mail.length && !Object.values(ksef).some(result=>result?.count>0))throw new Error('Przygotuj dokumenty lub zaznacz załączniki, zanim pobierzesz paczkę.');
-      const result=await window.CFAccountingPackage.build({month,ksef,organizerFiles:organizer,bankResults:bank,mailFiles:mail,signal:controller.signal,onProgress:allStatus});check();
+      if(!organizer.length && !purchaseFiles.length && !bank.length && !mail.length && !Object.values(ksef).some(result=>result?.count>0))throw new Error('Przygotuj dokumenty lub zaznacz załączniki, zanim pobierzesz paczkę.');
+      const result=await window.CFAccountingPackage.build({month,ksef,organizerFiles:organizer,purchaseFiles,bankResults:bank,mailFiles:mail,signal:controller.signal,onProgress:allStatus});check();
       const url=URL.createObjectURL(new Blob([result.bytes],{type:'application/zip'})),link=document.createElement('a');link.href=url;link.download='Dokumenty-'+month+'.zip';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
-      allElement('Confirm').hidden=true;const c=result.counts;allStatus('ZIP gotowy. KSeF: '+c.purchases+' zakupowych i '+c.sales+' sprzedażowych. mOrganizer: '+c.organizer+' PDF. MT940: '+c.bank+'. Poczta: '+c.mail+' załączników. Raport kasowy: pusty folder.');
+      allElement('Confirm').hidden=true;const c=result.counts;allStatus('ZIP gotowy. KSeF: '+c.purchases+' zakupowych i '+c.sales+' sprzedażowych. Zakupowe spoza KSeF: '+c.externalPurchases+' PDF. mOrganizer: '+c.organizer+' PDF. MT940: '+c.bank+'. Poczta: '+c.mail+' załączników. Raport kasowy: pusty folder.');
     }catch(error){allStatus(error.name==='AbortError'?'Anulowano przygotowanie paczki.':'Nie utworzono wspólnego ZIP: '+error.message);}
     finally{if(allRun===controller){allRun=null;allBusy(false);}}
   }
@@ -404,7 +405,7 @@
         if (['cfAccountingMonth','cfKsefNip','cfKsefEnvironment'].includes(input?.id)) { resetKsef(); }
         if(input?.id==='cfKsefEnvironment')loadKsefCredential();
         if(input?.id==='cfKsefNip' && ksefElement('Token').dataset.saved==='true' && !savedMatches()){ksefElement('Token').value='';ksefElement('Token').dataset.saved='false';ksefStatus('Wklej token dla tego NIP-u i kliknij Zapisz.');}
-        if (input?.id === 'cfAccountingMonth') {updateMonth();window.CFAccountingMail?.monthChanged();resetBank();bankStatus('Miesiąc zmieniony. Ponownie przekonwertuj CSV.');}
+        if (input?.id === 'cfAccountingMonth') {purchaseAttachments.clear();updateMonth();window.CFAccountingMail?.monthChanged();resetBank();bankStatus('Miesiąc zmieniony. Ponownie przekonwertuj CSV.');}
         if(input?.id==='cfAccountingBankNumber'){input.dataset.custom='true';resetBank();bankStatus('Numer wyciągu zmieniony. Ponownie przekonwertuj CSV.');}
         if(input?.id==='cfAccountingBankEncoding'){resetBank();bankStatus('Kodowanie zmienione. Ponownie przekonwertuj CSV.');}
         if (input?.id === 'cfAccountingBankInput') {
@@ -459,7 +460,7 @@
       forgetKsefView();
       window.CFAccountingMail?.reset();
       resetBank();bankFiles=[];bankFileLabels();
-      selectedFiles.organizer=[];fileCard('organizer',selectedFiles.organizer);
+      purchaseAttachments.clear();selectedFiles.organizer=[];fileCard('organizer',selectedFiles.organizer);
     }
   }
 
@@ -478,7 +479,7 @@
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape' && document.getElementById(OVERLAY_ID)?.classList.contains('cf-open')) closeModule();
     });
-    window.addEventListener('pagehide', () => { allRun?.abort();observer?.disconnect();window.CFAccountingMail?.reset();forgetKsefView();resetBank();bankFiles=[]; });
+    window.addEventListener('pagehide', () => { allRun?.abort();observer?.disconnect();purchaseAttachments.clear();window.CFAccountingMail?.reset();forgetKsefView();resetBank();bankFiles=[]; });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });

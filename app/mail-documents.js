@@ -55,6 +55,6 @@ async function exportFiles(signal,report=()=>{}){
   status('Pobrano '+files.length+' załączników do paczki miesięcznej.');return files;
  }finally{signal.removeEventListener('abort',abort);if(current===generation){controller=null;busy(false);}}
 }
-window.CFAccountingMail={mount,open,close,reset,monthChanged,exportFiles};
+window.CFAccountingMail={mount,open,close,reset,monthChanged,exportFiles,isBusy:()=>Boolean(controller)};
 })();
 

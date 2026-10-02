@@ -1,0 +1,15 @@
+const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
+test('mail UI keeps credentials in memory, masks password, invalidates changed dates and clears logout',async()=>{
+ const nodes=new Map();const node=()=>({value:'',style:{},reset(){},dataset:{},handlers:{},children:[],addEventListener(name,fn){this.handlers[name]=fn;},replaceChildren(){this.children=[];},append(...values){this.children.push(...values);},select(){},querySelectorAll(){return [];}});
+ for(const name of ['Email','Password','Senders','Folder','Form','From','To','Search','Cancel','Results','Download','Status'])nodes.set('#cfMail'+name,node());
+ const root={...node(),querySelector:id=>nodes.get(id)};
+ const requests=[];let waitList,release;
+ const context={AbortController,Date,Blob,setTimeout,URL,CF_SUPABASE_URL:'https://example.com',CF_SUPABASE_KEY:'public',window:{cfBackupBridge:{isAdmin:()=>true,getClient:()=>({auth:{getSession:async()=>({data:{session:{access_token:'auth'}}})}})}},document:{getElementById:()=>({value:'2026-08'}),createElement:node,createTextNode:text=>text},fetch:async(url,options)=>{const body=JSON.parse(options.body);requests.push(body);if(body.action==='save')return {ok:true,json:async()=>({session:'encrypted',email:'me@o2.pl',senders:['bank@example.com'],folder:'INBOX'})};if(waitList)await new Promise(resolve=>release=resolve);return {ok:true,json:async()=>({attachments:[{filename:'statement.pdf',received:'2026-08-31',subject:'Bank',sender:'bank@example.com'}],messageCount:1})};}};
+ vm.createContext(context);const source=fs.readFileSync('app/mail-documents.js','utf8').replace('window.CFAccountingMail={','window.harness={run,request,getSession:()=>session};window.CFAccountingMail={');vm.runInContext(source,context);
+ context.window.CFAccountingMail.mount({querySelector:()=>root});assert.equal(nodes.get('#cfMailTo').value,'2026-09-07');
+ nodes.get('#cfMailEmail').value='me@o2.pl';nodes.get('#cfMailSenders').value='bank@example.com';nodes.get('#cfMailFolder').value='INBOX';nodes.get('#cfMailPassword').value='secret';
+ nodes.get('#cfMailForm').handlers.submit({preventDefault(){}});await new Promise(resolve=>setImmediate(resolve));assert.equal(context.window.harness.getSession(),'encrypted');assert.equal(nodes.get('#cfMailPassword').value,'************');assert.equal(nodes.get('#cfMailPassword').dataset.saved,'true');
+ nodes.get('#cfMailSearch').handlers.click();await new Promise(resolve=>setImmediate(resolve));assert.equal(nodes.get('#cfMailResults').children.length,1);assert.equal(requests.at(-1).session,'encrypted');assert.equal(requests.at(-1).password,undefined);
+ waitList=true;nodes.get('#cfMailSearch').handlers.click();await new Promise(resolve=>setImmediate(resolve));context.window.CFAccountingMail.monthChanged();release();await new Promise(resolve=>setImmediate(resolve));assert.equal(nodes.get('#cfMailResults').children.length,0);
+ context.window.CFAccountingMail.reset();assert.equal(context.window.harness.getSession(),'');
+});

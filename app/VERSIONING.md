@@ -44,3 +44,6 @@ Kafelek Dokumenty księgowe bezpośrednio w rendererze administratora (także iP
 Czytnik kartek z praniami — odczyt zdjęcia, tabela zatwierdzenia, czas 1:30 / 1,5, wykonane i nieopłacone, zapis transakcyjny — `v1.52.0`.
 
 Naprawa otwierania Dokumentów księgowych — zamknięcie modułu poczty przed zamontowaniem formularza nie przerywa inicjalizacji obsługi kafelka — `v1.51.9`.
+
+
+Czytnik kartek — GPT‑5.4, szczegółowy obraz, kontrola rejestracji i dat z całej kartki oraz przypisanie dat grup — `v1.52.1`.

@@ -56,3 +56,6 @@ Dokumenty księgowe v1.51.11 (aplikacja v1.52.3): filtr maili kontakt@mbank.pl i
 Czytnik kartek — analiza asynchroniczna, krótkie sprawdzanie statusu i wznowienie tego samego wyniku po przerwaniu połączenia — `v1.52.4`.
 
 Dokumenty księgowe v1.51.12 (aplikacja v1.52.5): wybór folderu z listy IMAP o2; rozwiązywanie pełnej ścieżki folderu i Unicode, pomijanie kontenerów bez możliwości wyboru. Lista folderów pobierana po logowaniu bez otwierania folderu i bez zapisu hasła.
+
+
+Czytnik kartek — przycisk OCR obok wyszukiwarki w panelu administratora, niewidoczny w widokach firm i dla pracowników — `v1.52.6`.

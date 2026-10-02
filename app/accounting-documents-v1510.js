@@ -366,7 +366,7 @@
             '</div>',
             '</fieldset>',
             '<div class="cf-accounting-note">KSeF: osobne archiwa ZIP z fakturami XML zakupowymi i sprzedażowymi. Archiwa pozostają w pamięci przeglądarki do zmiany miesiąca lub wylogowania. CSV z mBanku konwertujemy na MT940 lokalnie w przeglądarce. Eksport PDF z mOrganizera wybierasz samodzielnie. Wspólny ZIP przygotujesz przyciskiem Pobierz cały miesiąc (ZIP). Limit pobrania KSeF: 200 MB łącznie.</div>',
-            '<div class="cf-accounting-next">Strukturę folderów i końcowy ZIP ustalimy po tych integracjach. Wybrany miesiąc: <strong id="cfAccountingMonthLabel">wybranego miesiąca</strong>.</div>',
+            '<div class="cf-accounting-next">Paczka zawiera faktury zakupowe/KSEF, faktury sprzedażowe, wyciągi bankowe i pusty raport kasowy. Wybrany miesiąc: <strong id="cfAccountingMonthLabel">wybranego miesiąca</strong>.</div>',
           '</div>',
         '</section>'
       ].join('');

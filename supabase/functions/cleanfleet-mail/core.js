@@ -41,9 +41,20 @@ export function createMailHandler({authorize,makeClient,secret,credentialStore})
     return {row:{revision:config.revision},config};
   }
   async function mailbox(config,operation) {
-    const client=makeClient(config);const timer=setTimeout(()=>client.close(),70000);
-    try{await client.connect();await client.mailboxOpen(config.folder,{readOnly:true});return await operation(client);}
-    catch(error){if(error instanceof HttpError)throw error;throw new HttpError('Nie udało się połączyć z o2. Sprawdź adres, hasło do programu pocztowego, włączenie IMAP i nazwę folderu.',502);}
+    let phase='connect';const client=makeClient(config);const timer=setTimeout(()=>client.close(),70000);
+    try{await client.connect();phase='folder';await client.mailboxOpen(config.folder,{readOnly:true});phase='operation';return await operation(client);}
+    catch(error){
+      if(error instanceof HttpError)throw error;
+      const codes=['AUTHENTICATIONFAILED','AUTHORIZATIONFAILED','UNAVAILABLE','PRIVACYREQUIRED','CONTACTADMIN','NONEXISTENT','ENOTFOUND','EAI_AGAIN','ECONNREFUSED','ECONNRESET','ETIMEDOUT','ETIMEOUT','CONNECT_TIMEOUT','GREETING_TIMEOUT','CERT_HAS_EXPIRED','ERR_TLS_CERT_ALTNAME_INVALID','UNABLE_TO_VERIFY_LEAF_SIGNATURE','NO','BAD'];
+      const code=codes.includes(error.code)?error.code:'UNKNOWN';
+      const server=codes.includes(error.serverResponseCode)?error.serverResponseCode:'';
+      console.warn('CF_MAIL_FAILURE '+JSON.stringify({phase,code,server,authenticationFailed:Boolean(error.authenticationFailed)}));
+      if(error.authenticationFailed)throw new HttpError('Serwer o2 odrzucił logowanie'+(server?' ('+server+')':'')+'. Połączenie działa, ale serwer nie zaakceptował dostępu do skrzynki. Sprawdź pełny adres konta; jeśli te same dane działają w programie pocztowym, przekaż ten komunikat do sprawdzenia blokady po stronie o2.',502);
+      if(phase==='folder')throw new HttpError('Zalogowano do o2, ale nie udało się otworzyć folderu poczty. Dla skrzynki odbiorczej wpisz INBOX.',502);
+      if(phase==='operation')throw new HttpError('Zalogowano do o2, ale nie udało się odczytać wiadomości. Spróbuj ponownie.',502);
+      if(['ENOTFOUND','EAI_AGAIN'].includes(code))throw new HttpError('Serwer aplikacji nie może odnaleźć serwera o2 (DNS: '+code+'). To nie jest błąd hasła.',502);
+      throw new HttpError('Nie udało się zestawić połączenia z serwerem o2 ('+code+'). To nie potwierdza błędnego hasła.',502);
+    }
     finally{clearTimeout(timer);try{client.close();}catch(_){}}
   }
   return async request=>{
@@ -113,3 +124,4 @@ export function createMailHandler({authorize,makeClient,secret,credentialStore})
     }catch(error){return json({error:error instanceof HttpError?error.message:'Wystąpił błąd pobierania poczty. Spróbuj ponownie.'},error instanceof HttpError?error.status:500);}
   };
 }
+

@@ -42,3 +42,16 @@ test('persistent encrypted connection, read-only mailbox, authorized part downlo
   assert.equal((await call({action:'save',email:'other@o2.pl',useSavedPassword:true,senders:'bank@example.pl'})).status,400);
   assert.equal((await(await call({action:'config'})).json()).email,'test@o2.pl');
 });
+test('mail errors distinguish server login rejection, folder and DNS without leaking credentials',async t=>{
+ const logs=[];t.mock.method(console,'warn',value=>logs.push(value));
+ for(const [phase,error,expected] of [
+  ['connect',Object.assign(new Error('secret-password'),{authenticationFailed:true,serverResponseCode:'AUTHENTICATIONFAILED'}),/Serwer o2 odrzucił logowanie/],
+  ['folder',new Error('private folder details'),/Zalogowano do o2.*folderu/],
+  ['connect',Object.assign(new Error('secret-password'),{code:'ENOTFOUND'}),/DNS: ENOTFOUND/]
+ ]){
+  const handler=createMailHandler({secret:'test-secret',authorize:async()=> 'owner',credentialStore:{get:async()=>null,set:async()=>assert.fail('failed login must not save')},makeClient:()=>({connect:async()=>{if(phase==='connect')throw error;},mailboxOpen:async()=>{throw error;},close(){}})});
+  const response=await handler(new Request('https://edge.example',{method:'POST',body:JSON.stringify({action:'save',email:'me@o2.pl',password:'secret-password',senders:'bank@example.com'})}));
+  assert.equal(response.status,502);const text=await response.text();assert.match(text,expected);assert.ok(!text.includes('secret-password'));assert.ok(!text.includes('private folder details'));
+ }
+ assert.equal(logs.length,3);assert.ok(!JSON.stringify(logs).includes('secret-password'));assert.ok(!JSON.stringify(logs).includes('me@o2.pl'));
+});

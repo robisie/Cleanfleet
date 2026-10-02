@@ -14,7 +14,7 @@ async function authorize(request:Request){
   return data.user.id;
 }
 function makeClient(config:{email:string;password:string}){
-  const client=new ImapFlow({host:'poczta.o2.pl',port:993,secure:true,auth:{user:config.email,pass:config.password},logger:false,logRaw:false,disableAutoIdle:true,disableCompression:true,disableBinary:true,connectionTimeout:10000,greetingTimeout:10000,socketTimeout:25000,tls:{rejectUnauthorized:true}});
+  const client=new ImapFlow({host:'poczta.o2.pl',port:993,secure:true,auth:{user:config.email,pass:config.password,loginMethod:'LOGIN'},logger:false,logRaw:false,disableAutoIdle:true,disableCompression:true,disableBinary:true,connectionTimeout:10000,greetingTimeout:10000,socketTimeout:25000,tls:{rejectUnauthorized:true}});
   client.on('error',()=>{});return client;
 }
 const credentialStore={
@@ -29,3 +29,4 @@ const credentialStore={
   }
 };
 Deno.serve(createMailHandler({authorize,makeClient,secret,credentialStore}));
+

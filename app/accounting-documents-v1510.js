@@ -170,7 +170,9 @@
     const xml=Object.values(zip.files).filter(file=>!file.dir && /\.xml$/i.test(file.name));
     if(xml.length!==ready.invoiceCount)throw new Error('Liczba faktur w archiwum jest niezgodna. Uruchom pobieranie ponownie.');
     if(signal.aborted)throw new DOMException('Anulowano','AbortError');
-    return {count:ready.invoiceCount,blob:new Blob([combined],{type:'application/zip'})};
+    if(!window.CFKsefPDF)throw new Error('Generator faktur PDF nie został załadowany. Odśwież aplikację.');
+    const blob=await window.CFKsefPDF.convert({archive:zip,count:ready.invoiceCount,signal,environment:ksefElement('Environment').value,onProgress:text=>ksefStatus(label+' · '+text)});
+    return {count:ready.invoiceCount,blob,format:'pdf'};
   }
   async function startKsef(event,parentSignal) {
     event.preventDefault();if(ksefRun || ksefConfigRun || !isAdmin())return;
@@ -205,14 +207,15 @@
         results[job.kind]=await downloadKsefJob(job,ready,signal,job.kind==='purchases'?'faktury zakupowe':'faktury sprzedażowe');
       }
       if(signal.aborted)throw new DOMException('Anulowano','AbortError');
+      if(Object.values(results).reduce((sum,result)=>sum+(result.blob?.size || 0),0)>200*1024*1024)throw new Error('PDF-y KSeF przekraczają łącznie limit 200 MB.');
       ksefResults=results;
       for(const kind of ['purchases','sales']){
         const button=ksefElement(kind),result=results[kind];
         if(!result)throw new Error('Brak jednej kategorii faktur.');
         result.month=month;button.hidden=false;button.disabled=!result.blob;
-        button.textContent=(kind==='purchases'?'Faktury zakupowe':'Faktury sprzedażowe')+': '+result.count+(result.blob?' · Pobierz ZIP':' · Brak faktur');
+        button.textContent=(kind==='purchases'?'Faktury zakupowe':'Faktury sprzedażowe')+': '+result.count+(result.blob?' · Pobierz PDF-y (ZIP)':' · Brak faktur');
       }
-      ksefStatus('Gotowe. Miesiąc: '+month+'. Archiwa zawierają oryginalne faktury XML z KSeF.');
+      ksefStatus('Gotowe. Miesiąc: '+month+'. Archiwa zawierają faktury PDF wygenerowane z danych KSeF.');
     }catch(error){
       ksefResults={};ksefStatus(error.name==='AbortError'?'Pobieranie anulowane.':error.message || 'Nie udało się pobrać faktur.');
     }finally{
@@ -366,7 +369,7 @@
             '</div>',
             '</fieldset>',
           '<div class="cf-ksef-form" style="margin-top:24px"><button id="cfAccountingAllStart" type="button">Pobierz całą paczkę (ZIP)</button><button id="cfAccountingAllCancel" type="button" hidden>Anuluj przygotowanie ZIP</button><p id="cfAccountingAllStatus" role="status" aria-live="polite">Najpierw przygotuj dokumenty w wybranych sekcjach. ZIP połączy pobrane faktury KSeF, przekonwertowane MT940, wgrane PDF-y i tylko zaznaczone załączniki poczty. Możesz pominąć źródła, z których niczego nie potrzebujesz. Limit paczki: 300 MB.</p></div>',
-            '<div class="cf-accounting-note">KSeF: osobne archiwa ZIP z fakturami XML zakupowymi i sprzedażowymi. Archiwa pozostają w pamięci przeglądarki do zmiany miesiąca lub wylogowania. CSV z mBanku konwertujemy na MT940 lokalnie w przeglądarce. Eksport PDF z mOrganizera wybierasz samodzielnie. Wspólny ZIP przygotujesz przyciskiem Pobierz całą paczkę (ZIP) na dole. Limit pobrania KSeF: 200 MB łącznie.</div>',
+            '<div class="cf-accounting-note">KSeF: osobne archiwa ZIP z fakturami PDF zakupowymi i sprzedażowymi. Archiwa pozostają w pamięci przeglądarki do zmiany miesiąca lub wylogowania. CSV z mBanku konwertujemy na MT940 lokalnie w przeglądarce. Eksport PDF z mOrganizera wybierasz samodzielnie. Wspólny ZIP przygotujesz przyciskiem Pobierz całą paczkę (ZIP) na dole. Limit pobrania KSeF: 200 MB łącznie.</div>',
             '<div class="cf-accounting-next">Paczka zawiera faktury zakupowe/KSEF, faktury sprzedażowe, wyciągi bankowe i pusty raport kasowy. Wybrany miesiąc: <strong id="cfAccountingMonthLabel">wybranego miesiąca</strong>.</div>',
           '</div>',
         '</section>'

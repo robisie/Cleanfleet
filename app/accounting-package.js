@@ -13,9 +13,9 @@ async function build({month,ksef,organizerFiles=[],bankResults=[],mailFiles=[],s
  for(const kind of ['purchases','sales']){
   check(signal);const result=ksef?.[kind];if(!result)continue;if( result.month!==month || !Number.isInteger(result.count) || result.count<0)throw new Error('Brak poprawnego eksportu '+(kind==='purchases'?'zakupów':'sprzedaży')+' z KSeF za wybrany miesiąc.');
   if(!result.count){if(result.blob)throw new Error('Niezgodny pusty eksport KSeF.');continue;}
-  if(!result.blob)throw new Error('Niepełny eksport KSeF.');onProgress('Układanie faktur z KSeF…');
+  if(!result.blob)throw new Error('Niepełny eksport KSeF.');if(result.format!=='pdf')throw new Error('Pobierz faktury KSeF ponownie, aby przygotować PDF-y.');onProgress('Układanie faktur z KSeF…');
   const archive=await Zip.loadAsync(await result.blob.arrayBuffer(),{checkCRC32:true});check(signal);
-  const files=Object.values(archive.files).filter(file=>!file.dir);if(files.filter(file=>/\.xml$/i.test(file.name)).length!==result.count)throw new Error('Liczba faktur w archiwum KSeF jest niezgodna.');
+  const files=Object.values(archive.files).filter(file=>!file.dir);if(files.length!==result.count || files.some(file=>!/\.pdf$/i.test(file.name)))throw new Error('Liczba faktur w archiwum KSeF jest niezgodna.');
   for(const file of files){check(signal);add(folders[kind],file.name,await file.async('uint8array'));}counts[kind]=result.count;
  }
  for(const file of organizerFiles){check(signal);if(!/\.pdf$/i.test(file.name) && file.type!=='application/pdf')throw new Error('mOrganizer: wybierz pliki PDF.');onProgress('Dołączanie PDF: '+file.name);add(folders.sales,/\.pdf$/i.test(file.name)?file.name:file.name+'.pdf',new Uint8Array(await file.arrayBuffer()));counts.organizer++;}

@@ -14,7 +14,7 @@ test('browser flow clears token, verifies parts and enables separate downloads',
   let corrupt=false,tokenSeen=false,saved=null,savedStart=false;
   const context={crypto,Uint8Array,TextEncoder,AbortController,DOMException,Blob,atob,btoa,setTimeout,clearTimeout,URL,CF_SUPABASE_URL:'https://example.supabase.co',CF_SUPABASE_KEY:'publishable',
     document:{readyState:'loading',addEventListener(){},getElementById:id=>elements.get(id)},
-    window:{cfBackupBridge:{isAdmin:()=>true,getClient:()=>({auth:{getSession:async()=>({data:{session:{access_token:'jwt'}}})}})},JSZip:{loadAsync:async()=>({files:{'invoice.xml':{name:'invoice.xml',dir:false}}})}},
+    window:{cfBackupBridge:{isAdmin:()=>true,getClient:()=>({auth:{getSession:async()=>({data:{session:{access_token:'jwt'}}})}})},CFKsefPDF:{convert:async()=>new Blob(['mock pdf zip'])},JSZip:{loadAsync:async()=>({files:{'invoice.xml':{name:'invoice.xml',dir:false}}})}},
     fetch:async(url,options)=>{
       assert.equal(options.headers.Authorization,'Bearer jwt');assert.equal(options.headers.apikey,'publishable');
       const body=JSON.parse(options.body);

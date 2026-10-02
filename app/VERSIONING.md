@@ -33,7 +33,7 @@ Moduł ma stały numer `1.51`. Każda kolejna zmiana zwiększa ostatnią liczbę
 - `v1.51.4`: rozszerzenie MT940 `.txt`.
 - `v1.51.5`: wybór wielu PDF-ów z mOrganizera.
 
-Starsze oznaczenia `1.52.*` i `1.53.*` powyżej oraz w historii Git są historycznymi etykietami sprzed uzgodnienia. Bieżące oznaczenie modułu Dokumenty księgowe: `v1.51.14`. Kolejna zmiana tego modułu: `v1.51.15`. Bieżące oznaczenie całej aplikacji: `v1.52.8`.
+Starsze oznaczenia `1.52.*` i `1.53.*` powyżej oraz w historii Git są historycznymi etykietami sprzed uzgodnienia. Bieżące oznaczenie modułu Dokumenty księgowe: `v1.51.15`. Kolejna zmiana tego modułu: `v1.51.16`. Bieżące oznaczenie całej aplikacji: `v1.52.9`.
 
 Poczta o2 — połączenie IMAP na bieżącą sesję, wybór załączników banku i ZIP — `v1.51.6`.
 
@@ -64,3 +64,5 @@ Czytnik kartek — przycisk OCR obok wyszukiwarki w panelu administratora, niewi
 Dokumenty księgowe v1.51.13 (aplikacja v1.52.7): jeden przycisk pobiera świeże faktury KSeF i wszystkie bankowe załączniki z wybranego zakresu poczty, konwertuje wgrane CSV do MT940 TXT i dołącza wszystkie PDF-y mOrganizera. ZIP zawiera folder miesiąca, zakupy/KSEF, sprzedaż, wyciągi i pusty raport kasowy. Kontrola kompletności, kolizji nazw i anulowania; błąd któregokolwiek źródła blokuje niepełny ZIP.
 
 Dokumenty księgowe v1.51.14 (aplikacja v1.52.8): zwijane dane logowania poczty; przycisk Pobierz całą paczkę na dole pakuje przygotowane faktury KSeF, MT940, PDF-y i wyłącznie zaznaczone wyniki poczty. Bez ponownego eksportu, konwersji i wyszukiwania. Źródła można pominąć; wybrane CSV wymagają wcześniejszej konwersji. Pobieranie dokumentów oddzielnie pozostaje dostępne.
+
+Dokumenty księgowe v1.51.15 (aplikacja v1.52.9): zakupy i sprzedaż KSeF w PDF, generowane lokalnie z XML przez przypięty renderer CIRFMF 1.1.40; QR z oryginalnego SHA-256, NIP-u i daty wystawienia. Osobne ZIP-y i wspólna paczka zawierają wyłącznie PDF-y KSeF. Sprawdzenie kompletności, formatu i anulowania; błąd konwersji blokuje eksport. Wizualna weryfikacja zwykłej faktury, korekty i faktury z 70 pozycjami; polskie znaki, sumy, wielostronicowe tabele.

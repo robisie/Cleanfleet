@@ -41,5 +41,22 @@ function mount(overlay){
 function open(){if(!root)return;if(!el('From').value)dates();if(connected)return;run(async current=>{status('Odczytywanie zapisanych danych poczty…');const value=await request({action:'config'});if(current!==generation)return;if(!value.configured){status('Wpisz dane i kliknij Zapisz.');return;}connected=value;el('Email').value=value.email;el('Senders').value=value.senders.join(', ');el('Folder').value=value.folder;el('Password').value='************';el('Password').dataset.saved='true';status('Dane poczty są zapisane. Wyszukaj załączniki.');});}
 function close(){stop();const password=el('Password');if(password && password.dataset.saved!=='true')password.value='';}
 function reset(){stop();session='';connected=null;clear();if(root){el('Form').reset();el('FolderList').replaceChildren();el('FolderChoice').hidden=true;el('FolderChoice').style.display='none';el('Password').dataset.saved='false';status('Wpisz dane i kliknij Zapisz.');}}
-window.CFAccountingMail={mount,open,close,reset,monthChanged};
+async function exportFiles(signal,report=()=>{}){
+ if(controller)throw new Error('Poczta wykonuje inną operację. Poczekaj na jej zakończenie.');
+ const current=generation;controller=new AbortController();const abort=()=>controller?.abort();signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort();busy(true);
+ try{
+  const config=await request({action:'config'});if(!config.configured)throw new Error('Zapisz dane poczty przed pobraniem całego miesiąca.');
+  if(el('Email').value.trim().toLowerCase()!==config.email || el('Folder').value.trim()!==config.folder || el('Password').dataset.saved!=='true')throw new Error('Dane poczty zmieniono. Kliknij Zapisz przed wspólnym pobieraniem.');
+  report('Wyszukiwanie załączników banku…');const listed=await request({action:'list',from:el('From').value,to:el('To').value});
+  if(listed.attachments.reduce((sum,item)=>sum+item.size,0)>100*1024*1024)throw new Error('Załączniki poczty przekraczają limit 100 MB. Zawęź daty wiadomości.');
+  if(current!==generation || signal.aborted)throw new DOMException('Anulowano','AbortError');items=listed.attachments;render();const files=[];let size=0;
+  for(const [index,item] of items.entries()){
+   report('Poczta: '+(index+1)+' z '+items.length+' — '+item.filename);const blob=await request({action:'attachment',ticket:item.ticket},true);
+   if(current!==generation || signal.aborted)throw new DOMException('Anulowano','AbortError');size+=blob.size;if(size>100*1024*1024)throw new Error('Załączniki poczty przekraczają 100 MB.');files.push({name:item.received+'_'+String(index+1).padStart(3,'0')+'_'+item.filename,blob});
+  }
+  status('Pobrano '+files.length+' załączników do paczki miesięcznej.');return files;
+ }finally{signal.removeEventListener('abort',abort);if(current===generation){controller=null;busy(false);}}
+}
+window.CFAccountingMail={mount,open,close,reset,monthChanged,exportFiles};
 })();
+

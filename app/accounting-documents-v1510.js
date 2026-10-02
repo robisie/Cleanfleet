@@ -41,7 +41,7 @@
         try{const decoded=bank.decode(bytes);statement=bank.parse(decoded.text,month);output=bank.encode(bank.build(statement,number),encoding);}
         catch(error){throw new Error(file.name+': '+error.message);}
         if(accounts.has(statement.account))throw new Error('Wybrano więcej niż jeden CSV dla tego samego rachunku. Zostaw jeden pełny eksport miesiąca.');
-        accounts.add(statement.account);converted.push({statement,bytes:output,filename:'mbank-'+month+'-'+statement.account.slice(-8)+'.txt'});
+        accounts.add(statement.account);converted.push({month,statement,bytes:output,filename:'mbank-'+month+'-'+statement.account.slice(-8)+'.txt'});
       }
       if(run!==bankRun || !isAdmin())return;
       bankResults=converted;const list=bankElement('Results');
@@ -172,7 +172,7 @@
     if(signal.aborted)throw new DOMException('Anulowano','AbortError');
     return {count:ready.invoiceCount,blob:new Blob([combined],{type:'application/zip'})};
   }
-  async function startKsef(event) {
+  async function startKsef(event,parentSignal) {
     event.preventDefault();if(ksefRun || ksefConfigRun || !isAdmin())return;
     const month=document.getElementById('cfAccountingMonth').value;
     const field=ksefElement('Token');
@@ -181,7 +181,7 @@
     if(!useSaved && (!token || token===KSEF_MASK)){ksefStatus('Wpisz token KSeF z uprawnieniem do odczytu faktur.');return;}
     if(!useSaved)field.value='';
     resetKsef();const controller=new AbortController();ksefRun=controller;busyKsef(true);
-    const signal=controller.signal;
+    const signal=controller.signal;const cancel=()=>controller.abort();parentSignal?.addEventListener('abort',cancel,{once:true});if(parentSignal?.aborted)cancel();
     try{
       ksefStatus('Łączenie z KSeF i zlecanie eksportu faktur…');
       const started=await ksefRequest({action:'start',nip,...(useSaved ? {useSaved:true} : {token}),month,environment},signal);
@@ -216,8 +216,29 @@
     }catch(error){
       ksefResults={};ksefStatus(error.name==='AbortError'?'Pobieranie anulowane.':error.message || 'Nie udało się pobrać faktur.');
     }finally{
-      if(ksefRun===controller){ksefRun=null;busyKsef(false);}
+      parentSignal?.removeEventListener('abort',cancel);if(ksefRun===controller){ksefRun=null;busyKsef(false);}
     }
+  }
+  let allRun=null;
+  const allElement=id=>document.getElementById('cfAccountingAll'+id);
+  function allStatus(text){const el=allElement('Status');if(el)el.textContent=text;}
+  function allBusy(busy){const inputs=document.getElementById('cfAccountingInputs');if(inputs)inputs.disabled=busy;if(allElement('Start'))allElement('Start').disabled=busy;if(allElement('Cancel'))allElement('Cancel').hidden=!busy;}
+  async function downloadAll(){
+    if(!isAdmin() || allRun)return;
+    if(ksefRun || ksefConfigRun || bankBusy){allStatus('Poczekaj na zakończenie bieżącej operacji.');return;}
+    if(!window.CFAccountingPackage || !window.CFAccountingMail){allStatus('Odśwież aplikację — brakuje modułu paczki.');return;}
+    const month=document.getElementById('cfAccountingMonth').value,organizer=[...selectedFiles.organizer];
+    const controller=new AbortController();allRun=controller;allBusy(true);const check=()=>{if(controller.signal.aborted || !isAdmin() || document.getElementById('cfAccountingMonth').value!==month)throw new DOMException('Anulowano','AbortError');};
+    try{
+      allStatus('KSeF: pobieranie faktur zakupowych i sprzedażowych…');resetKsef();await startKsef({preventDefault(){}},controller.signal);check();
+      if(!ksefResults.purchases || !ksefResults.sales)throw new Error('KSeF: '+(ksefElement('Status').textContent || 'nie udało się pobrać faktur.'));
+      allStatus('mBank: konwersja wybranych CSV…');if(bankFiles.length){await convertBank();check();if(bankResults.length!==bankFiles.length)throw new Error('mBank: '+bankElement('Status').textContent);}else resetBank();
+      const bank=[...bankResults],mail=await window.CFAccountingMail.exportFiles(controller.signal,allStatus);check();
+      const result=await window.CFAccountingPackage.build({month,ksef:ksefResults,organizerFiles:organizer,bankResults:bank,mailFiles:mail,signal:controller.signal,onProgress:allStatus});check();
+      const url=URL.createObjectURL(new Blob([result.bytes],{type:'application/zip'})),link=document.createElement('a');link.href=url;link.download='Dokumenty-'+month+'.zip';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
+      const c=result.counts;allStatus('ZIP gotowy. KSeF: '+c.purchases+' zakupowych i '+c.sales+' sprzedażowych. mOrganizer: '+c.organizer+' PDF. MT940: '+c.bank+'. Poczta: '+c.mail+' załączników. Raport kasowy: pusty folder.');
+    }catch(error){allStatus(error.name==='AbortError'?'Anulowano przygotowanie paczki.':'Nie utworzono wspólnego ZIP: '+error.message);}
+    finally{if(allRun===controller){allRun=null;allBusy(false);}}
   }
   function saveKsef(kind){
     const result=ksefResults[kind];if(!result?.blob || !isAdmin())return;
@@ -334,6 +355,8 @@
             '<button class="cf-accounting-docs-close" type="button" data-cf-accounting-close>Wróć do panelu</button>',
           '</header>',
           '<div class="cf-accounting-docs-body">',
+          '<div class="cf-ksef-form"><button id="cfAccountingAllStart" type="button">Pobierz cały miesiąc (ZIP)</button><button id="cfAccountingAllCancel" type="button" hidden>Anuluj przygotowanie ZIP</button><p id="cfAccountingAllStatus" role="status" aria-live="polite">Wybierz miesiąc i wgraj CSV oraz PDF-y. Jeden przycisk pobierze KSeF i wszystkie pasujące załączniki banku z ustawionego folderu i zakresu dat poczty. Następnie ułoży dokumenty w folderach. Limit paczki: 300 MB.</p></div>',
+          '<fieldset id="cfAccountingInputs" style="border:0;padding:0;margin:18px 0 0;min-width:0">',
             '<div class="cf-accounting-period"><label for="cfAccountingMonth">Miesiąc rozliczeniowy</label><input id="cfAccountingMonth" type="month"></div>',
             '<div class="cf-accounting-source-grid">',
               '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>KSeF</h2><p>Faktury według daty wystawienia w wybranym miesiącu.</p></div><span class="cf-accounting-status">Połączenie KSeF</span></div><form id="cfKsefForm" class="cf-ksef-form"><label for="cfKsefNip">NIP firmy<input id="cfKsefNip" type="text" inputmode="numeric" maxlength="15" autocomplete="off" required></label><label for="cfKsefToken">Token KSeF<span class="cf-ksef-token-row"><input id="cfKsefToken" type="password" autocomplete="new-password" spellcheck="false" required data-saved="false"><button id="cfKsefSave" type="button">Zapisz</button></span></label><label for="cfKsefEnvironment">Środowisko<select id="cfKsefEnvironment"><option value="production">Produkcyjne — rzeczywiste faktury</option><option value="test">Testowe — dane testowe</option></select></label><button id="cfKsefStart" type="submit">Pobierz faktury z KSeF</button><button id="cfKsefCancel" type="button" hidden>Anuluj pobieranie</button></form><p id="cfKsefStatus" role="status" aria-live="polite">Token musi mieć uprawnienie do przeglądania faktur. Kliknij Zapisz, aby go zapamiętać.</p><button id="cfKsefpurchases" type="button" class="cf-ksef-download" hidden>Pobierz faktury zakupowe</button><button id="cfKsefsales" type="button" class="cf-ksef-download" hidden>Pobierz faktury sprzedażowe</button></article>',
@@ -341,7 +364,8 @@
               '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>mOrganizer</h2><p>Eksportowane paczki faktur w plikach PDF. Możesz zaznaczyć kilka plików jednocześnie.</p></div><span class="cf-accounting-status">Plik z komputera</span></div><label class="cf-accounting-upload">Wybierz pliki PDF<input id="cfAccountingOrganizerInput" type="file" accept=".pdf,application/pdf" multiple></label><div class="cf-accounting-file" id="cfAccountingOrganizerFile"></div></article>',
               '<article class="cf-accounting-source" id="cfMailMount"></article>',
             '</div>',
-            '<div class="cf-accounting-note">KSeF: osobne archiwa ZIP z fakturami XML zakupowymi i sprzedażowymi. Archiwa pozostają w pamięci przeglądarki do zmiany miesiąca lub wylogowania. CSV z mBanku konwertujemy na MT940 lokalnie w przeglądarce. Eksport PDF z mOrganizera wybierasz samodzielnie. Wspólna paczka miesięczna pojawi się w kolejnym etapie. Limit pobrania KSeF: 200 MB łącznie.</div>',
+            '</fieldset>',
+            '<div class="cf-accounting-note">KSeF: osobne archiwa ZIP z fakturami XML zakupowymi i sprzedażowymi. Archiwa pozostają w pamięci przeglądarki do zmiany miesiąca lub wylogowania. CSV z mBanku konwertujemy na MT940 lokalnie w przeglądarce. Eksport PDF z mOrganizera wybierasz samodzielnie. Wspólny ZIP przygotujesz przyciskiem Pobierz cały miesiąc (ZIP). Limit pobrania KSeF: 200 MB łącznie.</div>',
             '<div class="cf-accounting-next">Strukturę folderów i końcowy ZIP ustalimy po tych integracjach. Wybrany miesiąc: <strong id="cfAccountingMonthLabel">wybranego miesiąca</strong>.</div>',
           '</div>',
         '</section>'
@@ -350,6 +374,8 @@
       overlay.addEventListener('input', event => { if(event.target.id==='cfKsefToken')event.target.dataset.saved='false'; });
       overlay.addEventListener('submit', event => { if(event.target.id==='cfKsefForm')startKsef(event); });
       overlay.addEventListener('click', event => {
+        if(event.target.id==='cfAccountingAllStart')downloadAll();
+        if(event.target.id==='cfAccountingAllCancel')allRun?.abort();
         if(event.target.id==='cfAccountingBankConvert')convertBank();
         if(event.target.dataset.bankDownload!==undefined)downloadBank(Number(event.target.dataset.bankDownload));
         if(event.target.id==='cfKsefSave')saveKsefCredential();
@@ -396,6 +422,7 @@
   }
 
   function closeModule() {
+    allRun?.abort();
     window.CFAccountingMail?.close();
     const overlay = document.getElementById(OVERLAY_ID);
     if (!overlay) return;
@@ -436,7 +463,7 @@
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape' && document.getElementById(OVERLAY_ID)?.classList.contains('cf-open')) closeModule();
     });
-    window.addEventListener('pagehide', () => { observer?.disconnect();window.CFAccountingMail?.reset();forgetKsefView();resetBank();bankFiles=[]; });
+    window.addEventListener('pagehide', () => { allRun?.abort();observer?.disconnect();window.CFAccountingMail?.reset();forgetKsefView();resetBank();bankFiles=[]; });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });

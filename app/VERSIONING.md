@@ -33,7 +33,7 @@ Moduł ma stały numer `1.51`. Każda kolejna zmiana zwiększa ostatnią liczbę
 - `v1.51.4`: rozszerzenie MT940 `.txt`.
 - `v1.51.5`: wybór wielu PDF-ów z mOrganizera.
 
-Starsze oznaczenia `1.52.*` i `1.53.*` powyżej oraz w historii Git są historycznymi etykietami sprzed uzgodnienia. Bieżące oznaczenie modułu Dokumenty księgowe: `v1.51.12`. Kolejna zmiana tego modułu: `v1.51.13`. Bieżące oznaczenie całej aplikacji: `v1.52.5`.
+Starsze oznaczenia `1.52.*` i `1.53.*` powyżej oraz w historii Git są historycznymi etykietami sprzed uzgodnienia. Bieżące oznaczenie modułu Dokumenty księgowe: `v1.51.13`. Kolejna zmiana tego modułu: `v1.51.14`. Bieżące oznaczenie całej aplikacji: `v1.52.7`.
 
 Poczta o2 — połączenie IMAP na bieżącą sesję, wybór załączników banku i ZIP — `v1.51.6`.
 
@@ -59,3 +59,6 @@ Dokumenty księgowe v1.51.12 (aplikacja v1.52.5): wybór folderu z listy IMAP o2
 
 
 Czytnik kartek — przycisk OCR obok wyszukiwarki w panelu administratora, niewidoczny w widokach firm i dla pracowników — `v1.52.6`.
+
+
+Dokumenty księgowe v1.51.13 (aplikacja v1.52.7): jeden przycisk pobiera świeże faktury KSeF i wszystkie bankowe załączniki z wybranego zakresu poczty, konwertuje wgrane CSV do MT940 TXT i dołącza wszystkie PDF-y mOrganizera. ZIP zawiera folder miesiąca, zakupy/KSEF, sprzedaż, wyciągi i pusty raport kasowy. Kontrola kompletności, kolizji nazw i anulowania; błąd któregokolwiek źródła blokuje niepełny ZIP.

@@ -1,0 +1,9 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const vm=require('node:vm');const fs=require('node:fs');
+test('przerwane sprawdzanie wyniku można wznowić bez ponownego wysłania zdjęcia',async()=>{
+ const elements=new Map(),calls=[];const el=selector=>{if(!elements.has(selector))elements.set(selector,{hidden:true,textContent:''});return elements.get(selector);};
+ const context={Date,URL:{createObjectURL:()=> 'blob:test',revokeObjectURL(){}},setTimeout:fn=>fn(),createImageBitmap:async()=>({width:100,height:200,close(){}}),document:{readyState:'loading',addEventListener(){},createElement:()=>({getContext:()=>({drawImage(){}}),toDataURL:()=> 'data:image/jpeg;base64,AAAA'})},window:{cfWashSheetBridge:{isAdmin:()=>true,getClient:()=>({functions:{invoke:async(name,{body})=>{calls.push(body);if(body.action==='start')return {data:{ok:true,pending:true,job:'signed'}};if(calls.length===2)return {error:{message:'Failed to send a request to the Edge Function'}};return {data:{ok:true,rows:[{plate:'SB252FU',wash_date:'2026-10-02'}]}};}}})}}};
+ const source=fs.readFileSync('app/wash-sheet-import.js','utf8').replace('window.CFWashSheetImport={open};',"window.harness={scan,getRows:()=>rows,setup:value=>{overlay=value;companyId='company';render=()=>{};}};window.CFWashSheetImport={open};");
+ vm.runInNewContext(source,context);const h=context.window.harness;h.setup({querySelector:el,querySelectorAll:()=>[]});
+ await h.scan({size:100});assert.equal(el('[data-resume]').hidden,false);assert.match(el('[data-status]').textContent,/Wznów odczyt/);
+ await h.scan(null);assert.equal(h.getRows().length,1);assert.equal(el('[data-resume]').hidden,true);assert.equal(calls.filter(b=>b.action==='start').length,1);assert.equal(calls.filter(b=>b.action==='status').length,2);assert.equal(calls[2].job,'signed');
+});

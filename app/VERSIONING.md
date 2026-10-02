@@ -51,3 +51,6 @@ Czytnik kartek — GPT‑5.4, szczegółowy obraz, kontrola rejestracji i dat z 
 Dokumenty księgowe v1.51.10 (aplikacja v1.52.2): standardowy LOGIN przez TLS dla o2, rozróżnienie odrzucenia logowania, błędów DNS/połączenia i otwarcia folderu. Logowanie wyłącznie kodów błędów bez danych skrzynki i hasła. Sprawdzono TLS i powitanie IMAP bez logowania do rzeczywistej skrzynki.
 
 Dokumenty księgowe v1.51.11 (aplikacja v1.52.3): filtr maili kontakt@mbank.pl i tytułu „mBank - elektroniczne zestawienie operacji za *”, kontrolowany przy wyszukiwaniu i pobieraniu pojedynczego załącznika.
+
+
+Czytnik kartek — analiza asynchroniczna, krótkie sprawdzanie statusu i wznowienie tego samego wyniku po przerwaniu połączenia — `v1.52.4`.

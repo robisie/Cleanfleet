@@ -40,3 +40,5 @@ Poczta o2 — połączenie IMAP na bieżącą sesję, wybór załączników bank
 Zaszyfrowany trwały zapis danych poczty, przycisk Zapisz, maskowanie i wymiana hasła — `v1.51.7`.
 
 Kafelek Dokumenty księgowe bezpośrednio w rendererze administratora (także iPhone); aktualne pliki modułu przez Service Worker — `v1.51.8`.
+
+Czytnik kartek z praniami — odczyt zdjęcia, tabela zatwierdzenia, czas 1:30 / 1,5, wykonane i nieopłacone, zapis transakcyjny — `v1.52.0`.

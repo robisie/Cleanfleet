@@ -175,6 +175,18 @@
     if(xml.length!==ready.invoiceCount)throw new Error('Liczba faktur w archiwum jest niezgodna. Uruchom pobieranie ponownie.');
     if(signal.aborted)throw new DOMException('Anulowano','AbortError');
     if(!window.CFKsefPDF)throw new Error('Generator faktur PDF nie został załadowany. Odśwież aplikację.');
+    const metadata=window.CFAccountingHistory?.archiveMetadata ? await window.CFAccountingHistory.archiveMetadata(zip,ready.invoiceCount,signal) : null;
+    if(historyOnly && metadata){
+      const supplements=[];
+      for(const file of xml){
+        if(signal.aborted || !isAdmin())throw new DOMException('Anulowano','AbortError');
+        const bytes=await file.async('uint8array');
+        if(bytes.byteLength>10*1024*1024)throw new Error(file.name+': faktura przekracza limit 10 MB.');
+        // Metadata is the complete source; XML supplies optional bank accounts for supported schemas.
+        try{supplements.push(window.CFKsefPDF.invoiceData(bytes,file.name));}catch(_){/* Other KSeF schemas can still be recorded from their verified metadata. */}
+      }
+      return {count:ready.invoiceCount,invoices:window.CFAccountingHistory.mergeMetadata(supplements,metadata)};
+    }
     if(historyOnly){
       const invoices=[];
       for(const [index,file] of xml.entries()){
@@ -187,7 +199,7 @@
       return {count:ready.invoiceCount,invoices};
     }
     const invoices=[];const blob=await window.CFKsefPDF.convert({archive:zip,count:ready.invoiceCount,signal,environment:ksefElement('Environment').value,onProgress:text=>ksefStatus(label+' · '+text),onInvoice:data=>invoices.push(data)});
-    return {count:ready.invoiceCount,blob,format:'pdf',invoices};
+    return {count:ready.invoiceCount,blob,format:'pdf',invoices:window.CFAccountingHistory?.mergeMetadata ? window.CFAccountingHistory.mergeMetadata(invoices,metadata) : invoices};
   }
   async function fetchKsefMonth({month,nip,useSaved,token,environment},signal,historyOnly=false){
       ksefStatus('Łączenie z KSeF i zlecanie eksportu faktur…');

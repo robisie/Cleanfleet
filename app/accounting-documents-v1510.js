@@ -95,7 +95,7 @@
     resetKsef();
   }
   async function loadKsefCredential() {
-    if(ksefRun || !isAdmin())return;
+    if(ksefRun || window.CFAccountingReconcile?.isBusy?.() || !isAdmin())return;
     ksefConfigRun?.abort();const controller=new AbortController();ksefConfigRun=controller;
     const environment=ksefElement('Environment').value;
     ksefSaved=null;ksefElement('Token').value='';ksefElement('Token').dataset.saved='false';busyKsef(false);
@@ -326,7 +326,16 @@
       if(!confirmed){
         let result=reviewState?.revision===reviewRevision&&reviewState.month===month?reviewState.result:null;
         if(!result){let history={snapshots:[],expected:[]},historyError='';try{allStatus('Odczytywanie historii faktur KSeF…');history=await window.CFAccountingHistory.load(window.cfBackupBridge?.getClient?.(),{month,nip:ksefElement('Nip').value,environment:ksefElement('Environment').value},controller.signal);}catch(error){if(controller.signal.aborted)throw error;historyError=error.message;}check();result=window.CFAccountingReconcile.reconcile({month,bankResults:bank,purchases:ksef.purchases,history,historyError});}
-        window.CFAccountingReconcile.render(document.getElementById('cfAccountingReview'),result,{attachments:purchaseAttachments,isCurrent:()=>isAdmin()&&reviewState?.result===result&&reviewState.month===month});reviewState={revision:reviewRevision,month,result};allElement('Confirm').hidden=false;allStatus('Sprawdź wynik kontroli. Uzupełnij dokumenty lub kliknij Pobierz ZIP z obecnymi dokumentami.');return;
+        const decisionContext={month,nip:ksefElement('Nip').value,environment:ksefElement('Environment').value};
+        try{allStatus('Odczytywanie zapisanych decyzji…');if(!window.CFAccountingDecisions)throw new Error('Odśwież aplikację — brakuje modułu zapisu decyzji.');const saved=await window.CFAccountingDecisions.load(window.cfBackupBridge?.getClient?.(),decisionContext,result.rows,controller.signal);check();decisionContext.userId=saved.userId;window.CFAccountingDecisions.restore(result,saved.records);}catch(error){if(controller.signal.aborted)throw error;result.warnings=[...(result.warnings||[]),'Nie odtworzono wcześniejszych decyzji: '+error.message];}
+        check();reviewState={revision:reviewRevision,month,result};
+        const isCurrent=()=>isAdmin()&&reviewState?.result===result&&reviewState.month===month;
+        window.CFAccountingReconcile.render(document.getElementById('cfAccountingReview'),result,{attachments:purchaseAttachments,isCurrent,onDecision:async(ids,action,invoice)=>{
+          if(!isCurrent())throw new Error('Kontrola zmieniona. Wczytaj dane ponownie.');
+          if(!window.CFAccountingDecisions)throw new Error('Odśwież aplikację — brakuje modułu zapisu decyzji.');
+          const monthInput=document.getElementById('cfAccountingMonth');allBusy(true);allElement('Cancel').hidden=true;if(monthInput)monthInput.disabled=true;
+          try{return await window.CFAccountingDecisions.save(window.cfBackupBridge?.getClient?.(),decisionContext,result,ids,action,invoice);}finally{allBusy(false);if(monthInput)monthInput.disabled=false;}
+        }});allElement('Confirm').hidden=false;allStatus('Sprawdź wynik kontroli. Uzupełnij dokumenty lub kliknij Pobierz ZIP z obecnymi dokumentami.');return;
       }
       if(!reviewState || reviewState.revision!==reviewRevision || reviewState.month!==month)throw new Error('Dokumenty zmieniono. Ponownie uruchom kontrolę przed pobraniem ZIP.');
       const purchaseFiles=window.CFAccountingReconcile.attachmentFiles(purchaseAttachments);

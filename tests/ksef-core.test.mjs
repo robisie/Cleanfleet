@@ -19,7 +19,7 @@ test('encrypted tickets reject tampering, another user and expiration',async()=>
   assert.equal((await codec.open(ticket,'admin','export')).accessToken,'secret');
   await assert.rejects(codec.open(ticket,'other','export'));
   await assert.rejects(codec.open(ticket,'admin','part'));
-  await assert.rejects(codec.open(ticket.slice(0,30)+'A'+ticket.slice(31),'admin','export'));
+  await assert.rejects(codec.open(ticket.slice(0,30)+(ticket[30]==='A'?'B':'A')+ticket.slice(31),'admin','export'));
   await assert.rejects(codec.open(await codec.seal({userId:'admin',scope:'export',expires:1}),'admin','export'));
 });
 test('saved credentials persist encrypted, replace atomically and stay isolated by owner/environment',async()=>{

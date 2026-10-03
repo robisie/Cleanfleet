@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {parseRate,fetchRate,warsawDay} from '../supabase/functions/cleanfleet-exchange-rate/core.mjs';
+const day='2026-10-02',table={items:[{currency:'EUR',date:day,time:'08:00:00',purchaseRate:4.2,refNumber:1},{currency:'EUR',date:day,time:'16:30:00',purchaseRate:4.2454,refNumber:1}]};
+test('latest buy rate, no sell/average rate',()=>{assert.equal(parseRate(table,day).rate,4.2454);assert.throws(()=>parseRate(table,'2026-10-03'));assert.throws(()=>parseRate({items:[{...table.items[0],purchaseRate:0}]},day));});
+test('Saturday uses Friday official table and Warsaw date',async()=>{const calls=[];const rate=await fetchRate(async url=>{calls.push(url);return calls.length===1?{status:404}:{ok:true,json:async()=>table};},new Date('2026-10-03T08:00:00Z'));assert.equal(rate.rate_date,day);assert.equal(calls.length,2);assert.equal(warsawDay(new Date('2026-10-02T23:30:00Z')),'2026-10-03');});

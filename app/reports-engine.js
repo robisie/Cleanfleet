@@ -16,6 +16,8 @@ function fields(source){const f=JSON.parse(JSON.stringify(catalog[source].fields
  }
  if(['invoice_items','wash_change_requests','wash_record_photos'].includes(source))for(const k of ['company_id','plate','type','performed_by','wash_date'])f['wash_'+k]={...catalog.wash_records.fields[k],label:'Pranie: '+catalog.wash_records.fields[k].label};
  if(source==='invoice_items')f.invoice_number={label:'Numer faktury',type:'text'};
+ if(source==='wash_records'||source==='invoice_items')f.cost_pln={label:'Kwota PLN',type:'number'};
+ if(source==='invoices')f.amount_pln={label:'Kwota PLN',type:'number'};
  return f;
 }
 function enrich(source,data){const companies=new Map((data.companies||[]).map(c=>[c.id,c]));const vehicles=new Map((data.vehicles||[]).map(v=>[key(v),v]));const invoices=new Map((data.invoices||[]).map(i=>[i.id,i]));const items=new Map((data.invoice_items||[]).map(i=>[i.wash_record_id,i]));const washes=new Map((data.wash_records||[]).map(w=>[w.id,w]));
@@ -23,6 +25,12 @@ function enrich(source,data){const companies=new Map((data.companies||[]).map(c=
  if(source==='wash_records'){const v=vehicles.get(key(r));for(const k of Object.keys(catalog.vehicles.fields))if(!['company_id','plate'].includes(k))r['vehicle_'+k]=v?.[k]??null;const i=invoices.get(items.get(r.id)?.invoice_id);r.has_invoice=!!i;r.completed=!!r.wash_date;for(const k of ['invoice_number','invoice_date','status','paid_at'])r['invoice_'+k]=i?.[k]??null;}
  if(['invoice_items','wash_change_requests','wash_record_photos'].includes(source)){const w=washes.get(r.wash_record_id);for(const k of ['company_id','plate','type','performed_by','wash_date'])r['wash_'+k]=w?.[k]??null;}
  if(source==='invoice_items')r.invoice_number=invoices.get(r.invoice_id)?.invoice_number??null;
+ if(root.CFExchange){
+  if(source==='wash_records')r.cost_pln=root.CFExchange.amount(r);
+  if(source==='invoice_items')r.cost_pln=root.CFExchange.amount({...r,...(washes.get(r.wash_record_id)||{}),cost:r.cost,currency:r.currency});
+  if(source==='invoices'){const linked=(data.invoice_items||[]).filter(x=>x.invoice_id===r.id).map(x=>washes.get(x.wash_record_id)).filter(Boolean);r.amount_pln=r.currency==='EUR'?(linked.length?root.CFExchange.sum(linked):Math.round(Number(r.amount||0)*root.CFExchange.get().rate*100)/100):Number(r.amount||0);}
+  if(source==='cf_earnings')Object.assign(r,root.CFExchange.earnings(r,washes.get(r.source_wash_record_id)));
+ }else{if(source==='wash_records'||source==='invoice_items')r.cost_pln=r.cost;if(source==='invoices')r.amount_pln=r.amount;}
  return r;});
 }
 function matches(r,f,defs){if(!defs[f.field])throw Error('Nieznane pole filtra: '+f.field);let v=r[f.field];let type=defs[f.field].type;if(f.op==='empty')return v==null||v==='';if(f.op==='notempty')return v!=null&&v!=='';
@@ -36,7 +44,7 @@ function filter(rows,cfg,defs){if(cfg.from&&cfg.to&&cfg.from>cfg.to)throw Error(
 function bucket(value,mode,type){const d=day(value,type);if(!d)return null;if(mode==='year')return d.slice(0,4);if(mode==='month')return d.slice(0,7);if(mode==='week'){const t=new Date(d+'T00:00:00Z');t.setUTCDate(t.getUTCDate()-((t.getUTCDay()+6)%7));return t.toISOString().slice(0,10)+' (pon.)';}return d;}
 function groups(rows,cfg,defs){if(!(cfg.groups||[]).length)return [{label:'Wszystkie dane',rows}];const m=new Map();for(const r of rows){const values=cfg.groups.map(g=>{if(!defs[g.field])throw Error('Nieznane grupowanie');return ['date','datetime'].includes(defs[g.field].type)?bucket(r[g.field],g.bucket,defs[g.field].type):r[g.field]??null;});const k=JSON.stringify(cfg.groups.map((g,i)=>['company_name','plate','vehicle_plate'].includes(g.field)?[r.company_id,values[i]]:g.field==='wash_plate'?[r.wash_company_id,values[i]]:values[i]));if(!m.has(k))m.set(k,{label:values.map(v=>v==null||v===''?'Brak danych':v===true?'Tak':v===false?'Nie':text(v)).join(' · '),values,rows:[]});m.get(k).rows.push(r);}return [...m.values()].sort((a,b)=>a.label.localeCompare(b.label,'pl',{numeric:true}));}
 function distinctVehicles(rows){const map=new Map();for(const r of rows){const plate=r.plate||r.vehicle_plate||r.wash_plate;if(!plate)continue;const company=r.company_id??r.wash_company_id??null;const k=JSON.stringify([company,plate]);if(!map.has(k))map.set(k,{company_id:company,plate,company_name:r.company_name??company,rows:[]});map.get(k).rows.push(r);}return [...map.values()];}
-function metric(rows,m,cfg){let contributing=rows,value=null,pairs=null;const nums=()=>rows.filter(r=>number(r[m.field])!==null);const vals=rs=>rs.map(r=>number(r[m.field]));
+function metric(rows,m,cfg){let contributing=rows,value=null,pairs=null;const nums=()=>rows.filter(r=>number(r[m.field])!==null);const vals=rs=>rs.map(r=>number(m.money&&m.field==='cost'&&r.cost_pln!=null?r.cost_pln:m.money&&m.field==='amount'&&r.amount_pln!=null?r.amount_pln:r[m.field]));
  switch(m.kind){case'count':value=rows.length;break;
  case'completed':contributing=rows.filter(r=>!!r.wash_date);value=contributing.length;break;
  case'vehicles':contributing=rows.filter(r=>!!(r.plate||r.vehicle_plate||r.wash_plate));value=distinctVehicles(contributing).length;break;

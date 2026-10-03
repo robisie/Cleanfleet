@@ -1,4 +1,4 @@
-/* Private payments v1.0.3. Pure parser and reconciliation; no network or storage. */
+/* Private payments v1.0.4. Pure parser and reconciliation; no network or storage. */
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.Payments=api;})(typeof globalThis!=='undefined'?globalThis:this,()=>{
   'use strict';
   const normalize=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ł/g,'l').replace(/Ł/g,'L').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
@@ -17,6 +17,7 @@
     const dateX=dateItems.length?Math.min(...dateItems.map(i=>i.x)):null;
     const amountTokens=t=>[...String(t).replace(new RegExp(dateToken,'g'),'').matchAll(/(?:^|\s)([+−-]?\s*\d[\d \u00a0\u202f]*[,.]\d{2})(?=\s|$)/g)];
     const operation=/^(?:ZAKUP PRZY UŻYCIU KARTY|PRZELEW|PŁATNOŚĆ|OP[ŁL]ATA|PROWIZJA|WYPŁATA|WPŁYW|BLIK|KAPITALIZACJA|ZWROT|TRANSAKCJA KARTĄ)/i;
+    const heading=/^(?:ZAKUP PRZY UŻYCIU KARTY|TRANSAKCJA KARTĄ|BLIK (?:P2P|ZAKUP)|PRZELEW(?:$| (?:ZEWNĘTRZNY|WEWNĘTRZNY|PODATKOWY|WYCHODZĄCY|PRZYCHODZĄCY))|POS ZWROT|OP[ŁL]ATA ZA|PROWIZJA|WYPŁATA|WPŁYW|KAPITALIZACJA)/i;
     const clean=t=>String(t).replace(/(?:PLN|EUR|USD|GBP)?\d{4}\s+X{4}\s+X{4}\s+\d{4}/gi,'').replace(new RegExp(dateToken,'g'),'').replace(/(?:PL\s*)?(?:\d[\s-]*){26}/g,'').replace(/[+−-]?\s*\d[\d \u00a0\u202f]*[,.]\d{2}(?:\s*(?:PLN|EUR|USD|GBP))?/g,'').replace(/\s+/g,' ').trim();
     const flush=()=>{
       if(!block)return;const joined=block.lines.join(' '),description=block.description.map(clean).filter(Boolean);
@@ -59,7 +60,7 @@
         const afterDate=start?text.replace(new RegExp('^(?:'+dateToken+'\\s*)+'),'').trim():text;
         const detailDate=/^(?:DATA TRANSAKCJI|DATA WALUTY|DATA KSIĘGOWANIA|NUMER KARTY|NR KARTY)\s*:/i.test(afterDate);
         if(start&&!columns&&!detailDate&&rowValue==null){const token=amountTokens(text)[0];if(token){rowValue=cents(token[1]);rowCurrency=(text.slice(token.index+token[0].length).match(/^\s*(PLN|EUR|USD|GBP)\b/)||[])[1]||null;}}
-        const continuationDate=block&&start&&(detailDate||!primaryDate||rowValue==null&&(!afterDate||columns&&block.lines.length<=2&&(!operation.test(afterDate)||/^(?:PRZELEW NA TELEFON|OPŁATA - SMS)/i.test(afterDate))));
+        const continuationDate=block&&start&&(detailDate||!primaryDate||rowValue==null&&(!afterDate||columns&&block.lines.length<=2&&!heading.test(afterDate)));
         if(start&&!continuationDate&&primaryDate){flush();block={date:date(start[1]),page:page+1,lines:[],description:[],value:null};if(!block.date){block=null;continue;}
           if(rowValue==null&&!columns){const token=amountTokens(text)[0];if(token)rowValue=cents(token[1]);}
         }
@@ -89,7 +90,7 @@
   function contractorKey(name){return normalize(name).replace(/\bsp z o o\b|\bs k\b/g,'').replace(/^spotify\s+p[a-z0-9]+\s+/,'spotify ').replace(/^apple com bill .*$/,'apple com bill').replace(/\s+/g,' ').trim();}
   function candidates(transactions){
     const groups=new Map();
-    for(const t of transactions){const recipient=String(t.recipient||'').trim(),key=contractorKey(recipient);if(!key||/^(?:odbiorca nierozpoznany|blik zakup|zakup przy|przelew|op[łl]ata|prowizja|wpływ|wypłata|data |saldo)/i.test(recipient))continue;
+    for(const t of transactions){const recipient=String(t.recipient||'').trim(),key=contractorKey(recipient);if(!key||/^(?:odbiorca nierozpoznany|blik (?:zakup|p2p)|zakup przy|przelew|op[łl]ata|prowizja|wpływ|wypłata|data |saldo)/i.test(recipient))continue;
       if(!groups.has(key))groups.set(key,{...t,recipient,count:0,accounts:[],currencies:[]});
       const group=groups.get(key);group.count++;if(t.account&&!group.accounts.includes(t.account))group.accounts.push(t.account);if(t.currency&&!group.currencies.includes(t.currency))group.currencies.push(t.currency);if(group.amount==null&&t.amount!=null)group.amount=t.amount;
     }

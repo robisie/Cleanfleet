@@ -82,3 +82,5 @@ Moje płatności v1.0.1 (aplikacja v1.54.1): odczyt zabezpieczonych PDF-ów po p
 Moje płatności v1.0.2 (aplikacja v1.54.2): czytelna lista odczytu bez edytowania transakcji, wybór stałych pozycji ptaszkami, pola dat i miesięcy węższe o 32 px; parser łączy datę księgowania i opisy z operacją, rozdziela kwotę od salda, pokazuje nierozpoznane operacje i blokuje błędne potwierdzenie kompletności.
 
 Moje płatności v1.0.3 / CleanFleet v1.54.3: pierwszy odczyt pokazuje tylko unikalnych kontrahentów z aktywnymi checkboxami; zapis i kolejne importy dotyczą wyłącznie kontrolowanej listy. Naprawa odczytu kwot i dat księgowania potwierdzona na rzeczywistym wyciągu mBanku.
+
+Moje płatności v1.0.4 / CleanFleet v1.54.4: opis przelewu BLIK zaczynający się od „PRZELEW ŚRODKÓW” nie tworzy osobnej operacji bez kwoty. Rozpoznawanie dat księgowania oparte na nagłówkach typów operacji. Zweryfikowano marcowy i sierpniowy wyciąg mBanku.

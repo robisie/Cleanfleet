@@ -30,3 +30,8 @@ test('unique contractors include missing amounts and normalize variable card ref
 test('one contractor retains multiple accounts while untracked payments are excluded',()=>{
  const other='22345678901234567890123456',list=P.candidates([t,{...t,account:other}]);assert.equal(list.length,1);assert.deepEqual(list[0].accounts,[t.account,other]);assert.equal(P.tracked([t,{...t,account:other},{...t,recipient:'Other',account:'32345678901234567890123456'}],[{...r,accounts:list[0].accounts}]).length,2);
 });
+test('BLIK booking description starting with PRZELEW is not a new amountless operation',()=>{
+ const row=(text,x=118)=>({text,items:[{text,x}]});const header={text:'Data Opis Kwota Saldo',items:[{text:'Data',x:60},{text:'Opis',x:118},{text:'Kwota',x:407},{text:'Saldo',x:470}]};const dated=(label)=>({text:'19-03-2026 '+label,items:[{text:'19-03-2026',x:60},{text:label,x:118}]});
+ const v=P.parsePages([[header,dated('BLIK P2P-WYCHODZĄCY'),{text:'-35,00 1082,88',items:[{text:'-35,00',x:445},{text:'1082,88',x:516}]},dated('PRZELEW ŚRODKÓW - ZA KOREK'),dated('ZAKUP PRZY UŻYCIU KARTY'),{text:'-5,00 1077,88',items:[{text:'-5,00',x:445},{text:'1077,88',x:516}]},dated('DATA TRANSAKCJI: 2026-03-18'),row('Odbiorca testowy -5,00 PLN -5,00 PLN4056 XXXX XXXX 0503')]]);
+ assert.equal(v.transactions.length,2);assert.equal(v.unread.length,0);assert.equal(v.transactions[0].amount,3500);assert.ok(v.transactions[0].title.includes('ZA KOREK'));assert.equal(P.candidates(v.transactions).length,1);
+});

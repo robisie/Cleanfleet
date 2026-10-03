@@ -80,3 +80,5 @@ Dokumenty księgowe v1.51.19 (aplikacja v1.52.13): trwała historia metadanych z
 Moje płatności v1.0.1 (aplikacja v1.54.1): odczyt zabezpieczonych PDF-ów po podaniu hasła, ponowienie błędnego hasła i anulowanie; bez zapisu hasła.
 
 Moje płatności v1.0.2 (aplikacja v1.54.2): czytelna lista odczytu bez edytowania transakcji, wybór stałych pozycji ptaszkami, pola dat i miesięcy węższe o 32 px; parser łączy datę księgowania i opisy z operacją, rozdziela kwotę od salda, pokazuje nierozpoznane operacje i blokuje błędne potwierdzenie kompletności.
+
+Moje płatności v1.0.3 / CleanFleet v1.54.3: pierwszy odczyt pokazuje tylko unikalnych kontrahentów z aktywnymi checkboxami; zapis i kolejne importy dotyczą wyłącznie kontrolowanej listy. Naprawa odczytu kwot i dat księgowania potwierdzona na rzeczywistym wyciągu mBanku.

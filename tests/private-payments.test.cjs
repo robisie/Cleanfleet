@@ -17,3 +17,16 @@ test('bank booking-date column and card details stay in one transaction',()=>{
 test('positive operation with negative balance is not an outgoing payment',()=>{const v=P.parsePages([['2026-08-01 PRZELEW -26,99 100,00','ODBIORCA: Test','2026-08-02 WPŁYW +20,00 -50,00']]);assert.equal(v.transactions.length,1);});
 test('foreign card description does not change account debit currency',()=>{const v=P.parsePages([['Waluta rachunku PLN','2026-08-01 ZAKUP PRZY UŻYCIU KARTY -26,99 100,00','DATA TRANSAKCJI: Merchant 6,00 EUR']]);assert.equal(v.transactions[0].currency,'PLN');assert.equal(v.transactions[0].amount,2699);});
 test('unknown amounts are visible and source page continuation is retained',()=>{const v=P.parsePages([['2026-08-01 PRZELEW -26,99 100,00'],['ODBIORCA: Test continuation','2026-08-02 PRZELEW WYCHODZĄCY','ODBIORCA: Unknown amount']]);assert.equal(v.transactions[0].recipient,'Test continuation');assert.equal(v.unread.length,1);assert.equal(v.unread[0].recipient,'Unknown amount');assert.equal(v.unread[0].date,'2026-08-02');});
+test('mBank split amount rows and same-column booking dates keep contractor with its debit',()=>{
+ const row=(...items)=>({text:items.map(i=>i[0]).join(' '),items:items.map(([text,x])=>({text,x}))});
+ const v=P.parsePages([[row(['Data operacji',60],['Opis',118],['Kwota',407],['Saldo',470]),row(['/ księgowania',60]),row(['02-08-2026',60],['BLIK ZAKUP E-COMMERCE',118]),row(['-40,32',445],['63,77',516]),row(['02-08-2026',60],['PAYPRO S.A.',118]),row(['03-08-2026',60],['PRZELEW WEWNĘTRZNY PRZYCHODZĄCY',118]),row(['500,00',445],['563,77',516]),row(['03-08-2026',60],['Firma przychodząca',118]),row(['13-08-2026',60],['PRZELEW ZEWNĘTRZNY WYCHODZĄCY',118]),row(['-45,00',445],['147,32',516]),row(['13-08-2026',60],['Kontrahent testowy',118]),row(['12345678901234567890123456',118]),row(['1 / 4',560])]]);
+ assert.equal(v.transactions.length,2);assert.equal(v.transactions[0].recipient,'PAYPRO S.A.');assert.equal(v.transactions[0].amount,4032);assert.equal(v.transactions[1].recipient,'Kontrahent testowy');assert.equal(v.transactions[1].amount,4500);assert.equal(v.unread.length,0);
+});
+test('unique contractors include missing amounts and normalize variable card references',()=>{
+ const list=P.candidates([{...t,recipient:'Spotify Stockholm SE',account:'',amount:null},{...t,recipient:'Spotify P45TEST Stockholm SE',account:''},{...t,recipient:'AS VENDING Zory PL',account:''},{...t,recipient:'AS VENDING SP.Z.O.O S.K Zory PL',account:''},{...t,recipient:'APPLE.COM/BILL CORK IE',account:''},{...t,recipient:'APPLE.COM/BILL APPLE.COM/BIL IE',account:''}]);
+ assert.equal(list.length,3);assert.ok(list.every(c=>c.count===2));assert.equal(list.find(c=>c.recipient.includes('Spotify')).amount,5529);
+ assert.equal(P.tracked([{...t,recipient:'Spotify P45NEXT Stockholm SE',account:''},t],[{...r,recipient:'Spotify Stockholm SE',account:''}]).length,1);
+});
+test('one contractor retains multiple accounts while untracked payments are excluded',()=>{
+ const other='22345678901234567890123456',list=P.candidates([t,{...t,account:other}]);assert.equal(list.length,1);assert.deepEqual(list[0].accounts,[t.account,other]);assert.equal(P.tracked([t,{...t,account:other},{...t,recipient:'Other',account:'32345678901234567890123456'}],[{...r,accounts:list[0].accounts}]).length,2);
+});

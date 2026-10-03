@@ -1,5 +1,7 @@
 # Numeracja CleanFleet
 
+Osobne narzędzie Moje płatności `/app/priv/index.html` v1.0.0: kafelek administratora, osobny PIN, zaszyfrowana lista i historia, import tekstowych PDF-ów z podglądem, edycja i miesięczna kontrola. Wersja całej aplikacji: `v1.54.0`.
+
 Ustalony schemat: `vMAJOR.FEATURE.FIX`.
 
 - `MAJOR` oznacza główną generację aplikacji.

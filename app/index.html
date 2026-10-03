@@ -16267,8 +16267,8 @@ function uid(){
         if(event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') return;
         if(event === 'SIGNED_IN' && session){
           if(cfRegistrationInProgress) return;
-          cfBootLoaderShow?.('Logowanie…','Ładowanie danych użytkownika');
           if(cfCurrentUserId === session.user?.id && cfCurrentRole) return;
+          cfBootLoaderShow?.('Logowanie…','Ładowanie danych użytkownika');
           cfShowLogin(false);
           setTimeout(async ()=>{
             try{

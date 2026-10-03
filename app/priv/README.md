@@ -1,4 +1,4 @@
-# Moje płatności v1.0.0
+# Moje płatności v1.0.1
 
 Separate application at `/app/priv/index.html`. The administrator dashboard links to it; it does not read or change fleet data. Uses the existing administrator Auth session and a separate user-selected PIN (minimum six characters) or password. Database stores only AES-GCM ciphertext. PBKDF2-SHA256, 600,000 iterations, random 16-byte salt; fresh 12-byte IV per save. Key remains in memory. PIN loss is unrecoverable; copies remain encrypted with their original PIN. A longer password improves resistance to guessing. The HTML shell is public, but payment content is encrypted and owner/admin RLS protects ciphertext access.
 
@@ -11,3 +11,7 @@ Recognition uses exact destination account, or normalized exact recipient when a
 Limit: the parser must be verified against the user's actual mBank export layout. Missing parsed amounts are reported. Unsupported layouts must be corrected or supplied for parser adaptation; successful fixture tests alone do not establish compatibility with every bank PDF. Full-period confirmation is an explicit user assertion, not inferred from the filename.
 
 Checks: `node --test tests/private-payments.test.cjs`; database rollback integration: `supabase/tests/private_payment_vault.sql`. DOM integration checks with mocked Auth/database cover encrypted persistence, PIN creation, wrong PIN, editing, lock and PIN change. No real administrator session is used in those tests. Chromium download was unavailable, so visual browser verification remains pending.
+
+Password-protected PDFs use PDF.js onPassword with a local dialog, incorrect-password retry and cancellation. Password exists only during worker decryption, is cleared from the form and is not saved or sent to the database. Plain PDFs do not prompt.
+
+Password checks: `node --test tests/private-payments-password.test.cjs`. Additionally tested the actual PDF.js 4.4.168 reader against a generated encrypted text PDF: incorrect/correct passwords, extraction, cancellation and plaintext import. The user-supplied mBank PDF remains encrypted until its password is supplied; these fixture tests do not verify that bank layout.

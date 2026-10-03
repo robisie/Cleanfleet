@@ -1,6 +1,6 @@
 (function(root){'use strict';
 let current=null;
-const round=v=>Math.round((Number(v)+Number.EPSILON)*100)/100;
+const round=v=>{const n=Number(v);return Math.round((n+Number.EPSILON*Math.max(1,Math.abs(n)))*100)/100;};
 const currency=r=>String(r?.currency||'PLN').toUpperCase();
 const cost=r=>Number(r?.koszt??r?.cost??0);
 function frozen(r){return !!(r?.zaplacone??r?.paid)&&!!(r?.data_prania??r?.wash_date)&&Number(r?.pln_rate)>0&&r?.pln_amount!=null;}

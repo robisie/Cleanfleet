@@ -8,6 +8,7 @@ test('mixed sums use PLN, unpaid values follow quote and paid values stay fixed'
 });
 test('round individual amounts before summing and keep split of linked earnings',()=>{
  fx.set({rate:4.2454});assert.equal(fx.amount({currency:'EUR',cost:225}),955.22);
+ assert.equal(fx.amount({currency:'EUR',cost:125}),530.68);
  const e=fx.earnings({total_amount:100,employee_amount:30,my_amount:70},{currency:'EUR',cost:100});assert.equal(e.total_amount,424.54);assert.equal(e.employee_amount,127.36);assert.equal(e.my_amount,297.18);
 });
 test('report totals and saved old templates aggregate PLN but retain original EUR',()=>{

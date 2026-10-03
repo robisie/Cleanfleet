@@ -96,3 +96,5 @@ Moje płatności v1.0.8 / CleanFleet v1.54.8: ręczne „Scal pozycje”, lista 
 Moje płatności v1.0.9 / CleanFleet v1.54.9: nad obserwowaną listą bieżący miesiąc z nazwami pozycji i datami ich terminów, uporządkowany chronologicznie. Uwzględnia zakres kontroli, przesunięcie miesiąca i ostatni dzień krótszych miesięcy.
 
 Moje płatności v1.0.10 / CleanFleet v1.54.10: kliknięcie kafelka bieżącego miesiąca przewija do odpowiedniej obserwowanej pozycji, z widocznym obramowaniem, odstępem od górnego komunikatu i obsługą ograniczenia animacji.
+
+Moje płatności v1.0.11 / CleanFleet v1.54.11: pola formularzy mają 16 px, bez automatycznego powiększania przy fokusie na iOS; odstępy safe-area głównego ekranu, logowania, komunikatu i dialogów; po odblokowaniu zamknięcie klawiatury i powrót na początek strony. Bardziej zwarty pasek przycisków i statystyki telefonu.

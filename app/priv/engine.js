@@ -1,4 +1,4 @@
-/* Private payments v1.0.8. Pure parser and reconciliation; no network or storage. */
+/* Private payments v1.0.9. Pure parser and reconciliation; no network or storage. */
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.Payments=api;})(typeof globalThis!=='undefined'?globalThis:this,()=>{
   'use strict';
   const normalize=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ł/g,'l').replace(/Ł/g,'L').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
@@ -79,11 +79,13 @@
   function matches(rule,t){if(rule.currency!==t.currency)return false;const accounts=[rule.account,...(rule.accounts||[])].filter(Boolean);const identity=accounts.length&&t.account?accounts.includes(t.account):[rule.recipient,...(rule.aliases||[])].some(n=>contractorKey(n)&&contractorKey(n)===contractorKey(t.recipient));return !!identity&&(!rule.phrase||normalize(t.title).includes(normalize(rule.phrase)));}
   function allocation(state,t){if(t.assignment==='__ignore__')return null;if(t.assignment){const rule=state.rules.find(r=>r.id===t.assignment);return rule?{rule,month:t.month||monthShift(t.date.slice(0,7),rule.offset)}:null;}const rules=state.rules.filter(r=>matches(r,t));return rules.length===1?{rule:rules[0],month:t.month||monthShift(t.date.slice(0,7),rules[0].offset)}:null;}
   function covered(imports,from,to){const intervals=imports.filter(i=>i.complete&&i.from&&i.to).map(i=>({from:i.from,to:i.to})).sort((a,b)=>a.from.localeCompare(b.from));let next=from;for(const i of intervals){if(i.to<next)continue;if(i.from>next)return false;const d=new Date(i.to+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+1);next=d.toISOString().slice(0,10);if(next>to)return true;}return false;}
+  function dueDate(rule,paymentMonth){const [y,m]=paymentMonth.split('-').map(Number),last=new Date(Date.UTC(y,m,0)).getUTCDate();return paymentMonth+'-'+String(Math.min(rule.day,last)).padStart(2,'0');}
+  function schedule(rules,paymentMonth){return rules.filter(rule=>{const month=monthShift(paymentMonth,rule.offset);return month>=rule.start&&(!rule.end||month<=rule.end);}).map(rule=>({rule,due:dueDate(rule,paymentMonth)})).sort((a,b)=>a.due.localeCompare(b.due)||a.rule.name.localeCompare(b.rule.name,'pl'));}
   function status(state,rule,month,today){
     if(month<rule.start||(rule.end&&month>rule.end))return {kind:'inactive',label:'Poza kontrolą',total:0,transactions:[]};
     const transactions=state.transactions.filter(t=>{const a=allocation(state,t);return a?.rule.id===rule.id&&a.month===month;});const total=transactions.reduce((s,t)=>s+t.amount,0),expected=rule.expected;
     if(transactions.length)return {kind:expected!=null&&total!==expected?'difference':'paid',label:expected!=null&&total!==expected?'Różnica kwoty':'Zapłacono',total,transactions,difference:expected==null?null:total-expected};
-    const paymentMonth=monthShift(month,-rule.offset);const end=new Date(Date.UTC(Number(paymentMonth.slice(0,4)),Number(paymentMonth.slice(5,7)),0)).getUTCDate();const from=paymentMonth+'-01',to=paymentMonth+'-'+String(end).padStart(2,'0');const due=paymentMonth+'-'+String(Math.min(rule.day,end)).padStart(2,'0');
+    const paymentMonth=monthShift(month,-rule.offset);const end=new Date(Date.UTC(Number(paymentMonth.slice(0,4)),Number(paymentMonth.slice(5,7)),0)).getUTCDate();const from=paymentMonth+'-01',to=paymentMonth+'-'+String(end).padStart(2,'0');const due=dueDate(rule,paymentMonth);
     if(today<due)return {kind:'pending',label:'Przed terminem',total,transactions,due};
     return {kind:covered(state.imports,from,to)?'missing':'unknown',label:covered(state.imports,from,to)?'Brak płatności':'Brak potwierdzenia',total,transactions,due};
   }
@@ -113,5 +115,5 @@
   const signature=t=>[t.date,t.account,normalize(t.recipient),normalize(t.title),t.amount,t.currency].join('|');
   // Keep real repeated payments, while re-importing an overlapping statement adds no copies.
   function mergeTransactions(existing,incoming){const counts=new Map();for(const t of existing){const s=signature(t);counts.set(s,(counts.get(s)||0)+1);}const seen=new Map(),added=[];for(const t of incoming){const s=signature(t),n=(seen.get(s)||0)+1;seen.set(s,n);if(n>(counts.get(s)||0))added.push(t);}return [...existing,...added];}
-  return {normalize,contractorKey,similarRules,linkContractor,mergeRules,date,cents,monthShift,rowsFromItems,parsePages,matches,allocation,covered,status,candidates,tracked,signature,mergeTransactions};
+  return {normalize,contractorKey,similarRules,linkContractor,mergeRules,dueDate,schedule,date,cents,monthShift,rowsFromItems,parsePages,matches,allocation,covered,status,candidates,tracked,signature,mergeTransactions};
 });

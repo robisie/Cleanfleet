@@ -1,4 +1,4 @@
-/* Private payments v1.0.5. Pure parser and reconciliation; no network or storage. */
+/* Private payments v1.0.6. Pure parser and reconciliation; no network or storage. */
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.Payments=api;})(typeof globalThis!=='undefined'?globalThis:this,()=>{
   'use strict';
   const normalize=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ł/g,'l').replace(/Ł/g,'L').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
@@ -76,7 +76,7 @@
     if(!result.length&&!unread.length)throw new Error('Nie rozpoznano operacji. Użyj tekstowego PDF historii operacji z mBanku. Skan ani samo potwierdzenie przelewu nie są obsługiwane.');
     return {transactions:result,range,warnings,unread};
   }
-  function matches(rule,t){if(rule.currency!==t.currency)return false;const accounts=[rule.account,...(rule.accounts||[])].filter(Boolean);const identity=accounts.length?accounts.includes(t.account):contractorKey(rule.recipient)&&contractorKey(rule.recipient)===contractorKey(t.recipient);return !!identity&&(!rule.phrase||normalize(t.title).includes(normalize(rule.phrase)));}
+  function matches(rule,t){if(rule.currency!==t.currency)return false;const accounts=[rule.account,...(rule.accounts||[])].filter(Boolean);const identity=accounts.length?accounts.includes(t.account):[rule.recipient,...(rule.aliases||[])].some(n=>contractorKey(n)&&contractorKey(n)===contractorKey(t.recipient));return !!identity&&(!rule.phrase||normalize(t.title).includes(normalize(rule.phrase)));}
   function allocation(state,t){if(t.assignment==='__ignore__')return null;if(t.assignment){const rule=state.rules.find(r=>r.id===t.assignment);return rule?{rule,month:t.month||monthShift(t.date.slice(0,7),rule.offset)}:null;}const rules=state.rules.filter(r=>matches(r,t));return rules.length===1?{rule:rules[0],month:t.month||monthShift(t.date.slice(0,7),rules[0].offset)}:null;}
   function covered(imports,from,to){const intervals=imports.filter(i=>i.complete&&i.from&&i.to).map(i=>({from:i.from,to:i.to})).sort((a,b)=>a.from.localeCompare(b.from));let next=from;for(const i of intervals){if(i.to<next)continue;if(i.from>next)return false;const d=new Date(i.to+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+1);next=d.toISOString().slice(0,10);if(next>to)return true;}return false;}
   function status(state,rule,month,today){
@@ -96,9 +96,22 @@
     }
     return [...groups.values()].sort((a,b)=>a.recipient.localeCompare(b.recipient,'pl'));
   }
+  function similarRules(candidate,rules){
+    const key=contractorKey(candidate.recipient),words=key.split(' ').filter(w=>w.length>2&&!['com','spolka','limited','inc'].includes(w));
+    return rules.filter(r=>r.currency===candidate.currency).map(rule=>{let score=0;for(const name of [rule.recipient,rule.name,...(rule.aliases||[])]){const other=contractorKey(name),tokens=other.split(' ').filter(w=>w.length>2&&!['com','spolka','limited','inc'].includes(w)),common=words.filter(w=>tokens.includes(w)).length;const value=key===other?1:words[0]&&words[0]===tokens[0]?0.9:common/Math.max(words.length,tokens.length,1);score=Math.max(score,value);}return {rule,score};}).filter(x=>x.score>=0.55).sort((a,b)=>b.score-a.score).map(x=>x.rule);
+  }
+  function linkContractor(rule,candidate){
+    rule.aliases=[...new Set([...(rule.aliases||[]),candidate.recipient,...(candidate.aliases||[])].filter(n=>n&&n!==rule.recipient))];
+    rule.accounts=[...new Set([rule.account,...(rule.accounts||[]),candidate.account,...(candidate.accounts||[])].filter(Boolean))];return rule;
+  }
+  function mergeRules(state,targetId,sourceIds){
+    const target=state.rules.find(r=>r.id===targetId);if(!target)throw Error('Nie znaleziono pozycji docelowej.');const sources=sourceIds.filter(id=>id!==targetId).map(id=>{const rule=state.rules.find(r=>r.id===id);if(!rule||rule.currency!==target.currency||rule.offset!==target.offset)throw Error('Scalane pozycje muszą mieć tę samą walutę i sposób przypisania miesiąca.');return rule;});
+    for(const rule of sources){linkContractor(target,rule);target.start=target.start<rule.start?target.start:rule.start;target.end=!target.end||!rule.end?null:target.end>rule.end?target.end:rule.end;}
+    const removed=new Set(sources.map(r=>r.id));for(const t of state.transactions)if(removed.has(t.assignment))t.assignment=targetId;state.rules=state.rules.filter(r=>!removed.has(r.id));return state;
+  }
   function tracked(transactions,rules){return transactions.filter(t=>rules.some(r=>matches(r,t)));}
   const signature=t=>[t.date,t.account,normalize(t.recipient),normalize(t.title),t.amount,t.currency].join('|');
   // Keep real repeated payments, while re-importing an overlapping statement adds no copies.
   function mergeTransactions(existing,incoming){const counts=new Map();for(const t of existing){const s=signature(t);counts.set(s,(counts.get(s)||0)+1);}const seen=new Map(),added=[];for(const t of incoming){const s=signature(t),n=(seen.get(s)||0)+1;seen.set(s,n);if(n>(counts.get(s)||0))added.push(t);}return [...existing,...added];}
-  return {normalize,contractorKey,date,cents,monthShift,rowsFromItems,parsePages,matches,allocation,covered,status,candidates,tracked,signature,mergeTransactions};
+  return {normalize,contractorKey,similarRules,linkContractor,mergeRules,date,cents,monthShift,rowsFromItems,parsePages,matches,allocation,covered,status,candidates,tracked,signature,mergeTransactions};
 });

@@ -1,4 +1,4 @@
-# Moje płatności v1.0.9
+# Moje płatności v1.0.10
 
 Separate application at `/app/priv/index.html`. The administrator dashboard links to it; it does not read or change fleet data. Uses the existing administrator Auth session and a separate user-selected PIN (minimum six characters) or password. Database stores only AES-GCM ciphertext. PBKDF2-SHA256, 600,000 iterations, random 16-byte salt; fresh 12-byte IV per save. Key remains in memory. PIN loss is unrecoverable; copies remain encrypted with their original PIN. A longer password improves resistance to guessing. The HTML shell is public, but payment content is encrypted and owner/admin RLS protects ciphertext access.
 
@@ -16,7 +16,7 @@ Password-protected PDFs use PDF.js onPassword with a local dialog, incorrect-pas
 
 Password checks: `node --test tests/private-payments-password.test.cjs`. Additionally tested the actual PDF.js 4.4.168 reader against a generated encrypted text PDF: incorrect/correct passwords, extraction, cancellation and plaintext import. The supplied four-page mBank statement was locally decrypted and checked with the actual PDF.js reader: 56 outgoing operations, no unread amounts, and the debit total agrees with the bank summary. No bank contents or password were committed.
 
-Contractor preview v1.0.9: names only, no editable fields, transaction descriptions, amounts or dates. Card references and masked card numbers do not create duplicate contractors. The parser reads the debit column separately from balance, joins same-column booking-date details and keeps bank account currency for foreign card purchases. Actual-statement DOM tests covered 22 unique selectable contractors, tracked-only history, adding new contractors from the same file, and duplicate-free re-imports.
+Contractor preview v1.0.10: names only, no editable fields, transaction descriptions, amounts or dates. Card references and masked card numbers do not create duplicate contractors. The parser reads the debit column separately from balance, joins same-column booking-date details and keeps bank account currency for foreign card purchases. Actual-statement DOM tests covered 22 unique selectable contractors, tracked-only history, adding new contractors from the same file, and duplicate-free re-imports.
 
 Adding contractors after list editing uses an explicit visible file input in a separate upload step. The native picker is no longer invoked after awaiting encryption/database persistence, preserving compatibility with browsers that require a direct user gesture. Cancelling file selection keeps the upload step open.
 

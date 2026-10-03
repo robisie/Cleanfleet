@@ -94,3 +94,5 @@ Moje płatności v1.0.7 / CleanFleet v1.54.7: każda pozycja pokazuje wydatki za
 Moje płatności v1.0.8 / CleanFleet v1.54.8: ręczne „Scal pozycje”, lista z checkboxami i wybór zachowanej nazwy/ustawień. Zachowanie historii, wariantów odbiorcy, ręcznych przypisań i zakresu kontroli; waluta oraz sposób przypisania miesiąca i filtr tytułu muszą być zgodne.
 
 Moje płatności v1.0.9 / CleanFleet v1.54.9: nad obserwowaną listą bieżący miesiąc z nazwami pozycji i datami ich terminów, uporządkowany chronologicznie. Uwzględnia zakres kontroli, przesunięcie miesiąca i ostatni dzień krótszych miesięcy.
+
+Moje płatności v1.0.10 / CleanFleet v1.54.10: kliknięcie kafelka bieżącego miesiąca przewija do odpowiedniej obserwowanej pozycji, z widocznym obramowaniem, odstępem od górnego komunikatu i obsługą ograniczenia animacji.

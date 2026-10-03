@@ -98,3 +98,5 @@ Moje płatności v1.0.9 / CleanFleet v1.54.9: nad obserwowaną listą bieżący 
 Moje płatności v1.0.10 / CleanFleet v1.54.10: kliknięcie kafelka bieżącego miesiąca przewija do odpowiedniej obserwowanej pozycji, z widocznym obramowaniem, odstępem od górnego komunikatu i obsługą ograniczenia animacji.
 
 Moje płatności v1.0.11 / CleanFleet v1.54.11: pola formularzy mają 16 px, bez automatycznego powiększania przy fokusie na iOS; odstępy safe-area głównego ekranu, logowania, komunikatu i dialogów; po odblokowaniu zamknięcie klawiatury i powrót na początek strony. Bardziej zwarty pasek przycisków i statystyki telefonu.
+
+CleanFleet v1.54.12: pełnoekranowy loader startowy wykorzystujący aktualne logo aplikacji; animowany puls i refleks, komunikaty rzeczywistych etapów uruchamiania, obsługa safe-area na iPhone/iPad, informacja o dłuższym ładowaniu po 9 s i przycisk „Spróbuj ponownie”. Loader znika po załadowaniu danych albo przed ekranem logowania; przy błędzie pozostaje z czytelnym komunikatem i możliwością ponowienia.

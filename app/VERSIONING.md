@@ -88,3 +88,5 @@ Moje płatności v1.0.4 / CleanFleet v1.54.4: opis przelewu BLIK zaczynający si
 Moje płatności v1.0.5 / CleanFleet v1.54.5: po „Zapisz i zaczytaj z wyciągu” otwiera się jawny krok z polem wyboru PDF. Usunięto wywołanie systemowego wyboru pliku po asynchronicznym zapisie, które może blokować Safari na iPadzie.
 
 Moje płatności v1.0.6 / CleanFleet v1.54.6: podobni kontrahenci przy dodawaniu nowych pozycji, jawny wybór scalenia z istniejącą pozycją lub utworzenia osobnej; zapamiętywanie wariantów nazwy i zachowanie historii oraz ustawień.
+
+Moje płatności v1.0.7 / CleanFleet v1.54.7: każda pozycja pokazuje wydatki za wybrany rok oraz całą zapisaną historię, według dat płatności, w walucie pozycji.

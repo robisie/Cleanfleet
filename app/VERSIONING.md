@@ -90,3 +90,5 @@ Moje płatności v1.0.5 / CleanFleet v1.54.5: po „Zapisz i zaczytaj z wyciągu
 Moje płatności v1.0.6 / CleanFleet v1.54.6: podobni kontrahenci przy dodawaniu nowych pozycji, jawny wybór scalenia z istniejącą pozycją lub utworzenia osobnej; zapamiętywanie wariantów nazwy i zachowanie historii oraz ustawień.
 
 Moje płatności v1.0.7 / CleanFleet v1.54.7: każda pozycja pokazuje wydatki za wybrany rok oraz całą zapisaną historię, według dat płatności, w walucie pozycji.
+
+Moje płatności v1.0.8 / CleanFleet v1.54.8: ręczne „Scal pozycje”, lista z checkboxami i wybór zachowanej nazwy/ustawień. Zachowanie historii, wariantów odbiorcy, ręcznych przypisań i zakresu kontroli; waluta oraz sposób przypisania miesiąca i filtr tytułu muszą być zgodne.

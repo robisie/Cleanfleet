@@ -1,4 +1,4 @@
-/* Private payments v1.0.7. Pure parser and reconciliation; no network or storage. */
+/* Private payments v1.0.8. Pure parser and reconciliation; no network or storage. */
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.Payments=api;})(typeof globalThis!=='undefined'?globalThis:this,()=>{
   'use strict';
   const normalize=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ł/g,'l').replace(/Ł/g,'L').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
@@ -76,7 +76,7 @@
     if(!result.length&&!unread.length)throw new Error('Nie rozpoznano operacji. Użyj tekstowego PDF historii operacji z mBanku. Skan ani samo potwierdzenie przelewu nie są obsługiwane.');
     return {transactions:result,range,warnings,unread};
   }
-  function matches(rule,t){if(rule.currency!==t.currency)return false;const accounts=[rule.account,...(rule.accounts||[])].filter(Boolean);const identity=accounts.length?accounts.includes(t.account):[rule.recipient,...(rule.aliases||[])].some(n=>contractorKey(n)&&contractorKey(n)===contractorKey(t.recipient));return !!identity&&(!rule.phrase||normalize(t.title).includes(normalize(rule.phrase)));}
+  function matches(rule,t){if(rule.currency!==t.currency)return false;const accounts=[rule.account,...(rule.accounts||[])].filter(Boolean);const identity=accounts.length&&t.account?accounts.includes(t.account):[rule.recipient,...(rule.aliases||[])].some(n=>contractorKey(n)&&contractorKey(n)===contractorKey(t.recipient));return !!identity&&(!rule.phrase||normalize(t.title).includes(normalize(rule.phrase)));}
   function allocation(state,t){if(t.assignment==='__ignore__')return null;if(t.assignment){const rule=state.rules.find(r=>r.id===t.assignment);return rule?{rule,month:t.month||monthShift(t.date.slice(0,7),rule.offset)}:null;}const rules=state.rules.filter(r=>matches(r,t));return rules.length===1?{rule:rules[0],month:t.month||monthShift(t.date.slice(0,7),rules[0].offset)}:null;}
   function covered(imports,from,to){const intervals=imports.filter(i=>i.complete&&i.from&&i.to).map(i=>({from:i.from,to:i.to})).sort((a,b)=>a.from.localeCompare(b.from));let next=from;for(const i of intervals){if(i.to<next)continue;if(i.from>next)return false;const d=new Date(i.to+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+1);next=d.toISOString().slice(0,10);if(next>to)return true;}return false;}
   function status(state,rule,month,today){
@@ -105,7 +105,7 @@
     rule.accounts=[...new Set([rule.account,...(rule.accounts||[]),candidate.account,...(candidate.accounts||[])].filter(Boolean))];return rule;
   }
   function mergeRules(state,targetId,sourceIds){
-    const target=state.rules.find(r=>r.id===targetId);if(!target)throw Error('Nie znaleziono pozycji docelowej.');const sources=sourceIds.filter(id=>id!==targetId).map(id=>{const rule=state.rules.find(r=>r.id===id);if(!rule||rule.currency!==target.currency||rule.offset!==target.offset)throw Error('Scalane pozycje muszą mieć tę samą walutę i sposób przypisania miesiąca.');return rule;});
+    const target=state.rules.find(r=>r.id===targetId);if(!target)throw Error('Nie znaleziono pozycji docelowej.');const sources=sourceIds.filter(id=>id!==targetId).map(id=>{const rule=state.rules.find(r=>r.id===id);if(!rule||rule.currency!==target.currency||rule.offset!==target.offset||(rule.phrase||'')!==(target.phrase||''))throw Error('Scalane pozycje muszą mieć tę samą walutę, sposób przypisania miesiąca i filtr tytułu.');return rule;});
     for(const rule of sources){linkContractor(target,rule);target.start=target.start<rule.start?target.start:rule.start;target.end=!target.end||!rule.end?null:target.end>rule.end?target.end:rule.end;}
     const removed=new Set(sources.map(r=>r.id));for(const t of state.transactions)if(removed.has(t.assignment))t.assignment=targetId;state.rules=state.rules.filter(r=>!removed.has(r.id));return state;
   }

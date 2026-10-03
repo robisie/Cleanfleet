@@ -1,4 +1,4 @@
-/* Private payments v1.0.0. Pure parser and reconciliation; no network or storage. */
+/* Private payments v1.0.2. Pure parser and reconciliation; no network or storage. */
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.Payments=api;})(typeof globalThis!=='undefined'?globalThis:this,()=>{
   'use strict';
   const normalize=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ł/g,'l').replace(/Ł/g,'L').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
@@ -8,34 +8,61 @@
   function monthShift(month,offset){const [y,m]=month.split('-').map(Number);const d=new Date(Date.UTC(y,m-1+Number(offset),1));return d.toISOString().slice(0,7);}
   function rowsFromItems(items){const rows=[];for(const item of items.filter(x=>x.str?.trim()).sort((a,b)=>b.transform[5]-a.transform[5]||a.transform[4]-b.transform[4])){let row=rows.find(r=>Math.abs(r.y-item.transform[5])<2.5);if(!row){row={y:item.transform[5],items:[]};rows.push(row);}row.items.push({text:item.str,x:item.transform[4]});}return rows.sort((a,b)=>b.y-a.y).map(r=>({text:r.items.sort((a,b)=>a.x-b.x).map(i=>i.text).join(' '),items:r.items}));}
   function parsePages(pages){
-    const result=[],warnings=[];let range=null;const raw=pages.map(p=>p.map(r=>r.text??r).join('\n')).join('\n');
+    const result=[],warnings=[],unread=[];let range=null,block=null,columns=null;
+    const raw=pages.map(p=>p.map(r=>r.text??r).join('\n')).join('\n');
     const rangeMatch=raw.match(new RegExp('(?:okres|zakres|za okres|od)\\s*[:]?\\s*('+dateToken+')\\s*(?:do|[-–])\\s*('+dateToken+')','i'));
     if(rangeMatch&&date(rangeMatch[1])&&date(rangeMatch[2]))range={from:date(rangeMatch[1]),to:date(rangeMatch[2])};
     const currency=(raw.match(/(?:waluta(?: rachunku)?\s*:?\s*)(PLN|EUR|USD|GBP)/i)||[])[1]?.toUpperCase()||'PLN';
+    const dateItems=pages.flat().flatMap(r=>(r.items||[]).filter(i=>date(i.text.trim())));
+    const dateX=dateItems.length?Math.min(...dateItems.map(i=>i.x)):null;
+    const amountTokens=t=>[...String(t).replace(new RegExp(dateToken,'g'),'').matchAll(/(?:^|\s)([+−-]?\s*\d[\d \u00a0\u202f]*[,.]\d{2})(?=\s|$)/g)];
+    const operation=/^(?:ZAKUP PRZY UŻYCIU KARTY|PRZELEW|PŁATNOŚĆ|OPŁATA|PROWIZJA|WYPŁATA|WPŁYW|BLIK|KAPITALIZACJA|ZWROT|TRANSAKCJA KARTĄ)/i;
+    const clean=t=>String(t).replace(new RegExp(dateToken,'g'),'').replace(/(?:PL\s*)?(?:\d[\s-]*){26}/g,'').replace(/[+−-]?\s*\d[\d \u00a0\u202f]*[,.]\d{2}(?:\s*(?:PLN|EUR|USD|GBP))?/g,'').replace(/\s+/g,' ').trim();
+    const flush=()=>{
+      if(!block)return;const joined=block.lines.join(' '),description=block.description.map(clean).filter(Boolean);
+      // A card's transaction/booking date is part of the same operation, not a second payment.
+      const labelled=description.find(t=>/^(?:ODBIORCA|NAZWA ODBIORCY|DANE ODBIORCY|DATA TRANSAKCJI)\s*:/i.test(t));
+      let recipient=labelled?.replace(/^(?:ODBIORCA|NAZWA ODBIORCY|DANE ODBIORCY|DATA TRANSAKCJI)\s*:\s*/i,'').trim();
+      if(!recipient){const pos=description.findIndex(t=>/^(?:ODBIORCA|NAZWA ODBIORCY|DANE ODBIORCY)\s*:?$/i.test(t));if(pos>=0)recipient=description[pos+1];}
+      recipient ||= description.find(t=>!operation.test(t)&&! /^(?:SALDO|TYTUŁ|DATA|NR |NUMER |RACHUNEK|PLN$|EUR$)/i.test(t)) || description.join(' ') || 'Odbiorca nierozpoznany';
+      const titled=description.findIndex(t=>/^TYTUŁ\s*:/i.test(t));
+      const title=titled>=0?description.slice(titled).join(' ').replace(/^TYTUŁ\s*:\s*/i,''):description.join(' ').replace(/DATA TRANSAKCJI\s*:\s*/gi,'');
+      const value=block.value;
+      if(value!=null&&value<0){const account=(joined.match(/(?:PL\s*)?(?:\d[\s-]*){26}/)||[])[0]?.replace(/\D/g,'')||'';result.push({date:block.date,recipient,title,account,amount:Math.abs(value),currency:block.currency||currency,sourcePage:block.page,raw:joined});}
+      else if(value==null){const reason=`Nie rozpoznano kwoty operacji z ${block.date} (strona ${block.page}).`;warnings.push(reason);unread.push({date:block.date,recipient,title,sourcePage:block.page,raw:joined,reason});}
+      block=null;
+    };
     for(let page=0;page<pages.length;page++){
-      let block=null,amountX=null;
-      const flush=()=>{if(!block)return;const joined=block.lines.join(' ');let value=block.value;
-        if(value==null){const values=[...joined.matchAll(/(?:^|\s)([−-]?\s*\d[\d \u00a0\u202f]*[,.]\d{2})(?=\s|$)/g)];const negative=values.find(v=>/[−-]/.test(v[1]));if(negative)value=cents(negative[1]);}
-        if(value!=null&&value<0){const account=(joined.match(/(?:PL\s*)?(?:\d[\s-]*){26}/)||[])[0]?.replace(/\D/g,'')||'';
-          const body=joined.replace(new RegExp(dateToken,'g'),'').replace(/(?:PL\s*)?(?:\d[\s-]*){26}/g,'').replace(/[−-]?\s*\d[\d \u00a0\u202f]*[,.]\d{2}(?:\s*(?:PLN|EUR|USD|GBP))?/g,'').replace(/\s+/g,' ').trim();
-          const lines=block.lines.map(x=>x.replace(new RegExp(dateToken,'g'),'').replace(/[−-]?\s*\d[\d \u00a0\u202f]*[,.]\d{2}/g,'').trim()).filter(Boolean);
-          const clean=lines.filter(x=>!/(?:saldo|przelew|operacja|rachunek|tytuł|data|nr konta)/i.test(x)&&!/^\d[\d\s-]{20,}$/.test(x));
-          result.push({date:block.date,recipient:clean[0]||body.slice(0,140)||'Uzupełnij odbiorcę',title:body,account,amount:Math.abs(value),currency:(joined.match(/\b(PLN|EUR|USD|GBP)\b/)||[])[1]||currency,sourcePage:page+1,raw:joined});
-        }else if(value==null)warnings.push(`Strona ${page+1}: nie rozpoznano kwoty operacji z ${block.date}.`);block=null;
-      };
       for(const row of pages[page]){
-        const text=String(row.text??row).trim();
-        if(/kwota/i.test(text)&&row.items){amountX=row.items.find(i=>/kwota/i.test(i.text))?.x??amountX;}
-        if(/^(?:saldo początkowe|saldo końcowe|podsumowanie|suma obciążeń|suma uznań|strona\s+\d)/i.test(text)){flush();continue;}
+        const text=String(row.text??row).trim(),items=row.items||[];
+        const amountHeader=items.find(i=>/^kwota(?: operacji)?$/i.test(i.text.trim()));
+        const balanceHeader=items.find(i=>/^saldo/i.test(i.text.trim()));
+        if(amountHeader){const descriptionHeader=items.find(i=>/opis|tytuł/i.test(i.text));columns={left:descriptionHeader?(descriptionHeader.x+amountHeader.x)/2:amountHeader.x-90,right:balanceHeader?(amountHeader.x+balanceHeader.x)/2:Infinity};continue;}
+        if(/^(?:saldo początkowe|saldo końcowe|podsumowanie|suma obciążeń|suma uznań)/i.test(text)){flush();continue;}
+        if(/^(?:strona\s+\d|data operacji|data księgowania|mBank|wyciąg|elektroniczne zestawienie)/i.test(text))continue;
+        let rowValue=null,rowCurrency=null;
+        if(columns&&items.length){const tokens=items.filter(i=>i.x>=columns.left&&i.x<columns.right).map(i=>i.text).join(' ').trim();if(/[,.]\d{2}/.test(tokens)){rowValue=cents(tokens);rowCurrency=(tokens.match(/\b(PLN|EUR|USD|GBP)\b/)||[])[1]||null;}}
         const start=text.match(new RegExp('^('+dateToken+')(?:\\s|$)'));
-        if(start){flush();block={date:date(start[1]),lines:[],value:null};if(!block.date){block=null;continue;}}
+        const firstDate=items.find(i=>date(i.text.trim()));
+        const primaryDate=!firstDate||dateX==null||Math.abs(firstDate.x-dateX)<8;
+        const afterDate=start?text.replace(new RegExp('^(?:'+dateToken+'\\s*)+'),'').trim():text;
+        const detailDate=/^(?:DATA TRANSAKCJI|DATA WALUTY|DATA KSIĘGOWANIA|NUMER KARTY|NR KARTY)\s*:/i.test(afterDate);
+        if(start&&!columns&&!detailDate&&rowValue==null){const token=amountTokens(text)[0];if(token){rowValue=cents(token[1]);rowCurrency=(text.slice(token.index+token[0].length).match(/^\s*(PLN|EUR|USD|GBP)\b/)||[])[1]||null;}}
+        const continuationDate=block&&start&&(detailDate||!primaryDate||rowValue==null&&!afterDate&&block.lines.length<3);
+        if(start&&!continuationDate&&primaryDate){flush();block={date:date(start[1]),page:page+1,lines:[],description:[],value:null};if(!block.date){block=null;continue;}
+          if(rowValue==null&&!columns){const token=amountTokens(text)[0];if(token)rowValue=cents(token[1]);}
+        }
         if(!block)continue;
         block.lines.push(text);
-        if(row.items&&amountX!=null){const item=row.items.find(i=>Math.abs(i.x-amountX)<45&&cents(i.text)!=null&&/[,.]\d{2}/.test(i.text));if(item)block.value=cents(item.text);}
-      }flush();
+        if(items.length&&columns){block.description.push(items.filter(i=>i.x<columns.left&&!date(i.text.trim())).map(i=>i.text).join(' '));}
+        else block.description.push(text);
+        if(block.value==null&&rowValue!=null){block.value=rowValue;block.currency=rowCurrency;}
+      }
+      // Keep a transaction open across a page break; its continuation may hold the recipient/title.
     }
-    if(!result.length)throw new Error('Nie rozpoznano płatności wychodzących. Użyj tekstowego PDF historii operacji z mBanku. Skan ani samo potwierdzenie przelewu nie są obsługiwane.');
-    return {transactions:result,range,warnings};
+    flush();
+    if(!result.length&&!unread.length)throw new Error('Nie rozpoznano operacji. Użyj tekstowego PDF historii operacji z mBanku. Skan ani samo potwierdzenie przelewu nie są obsługiwane.');
+    return {transactions:result,range,warnings,unread};
   }
   function matches(rule,t){if(rule.currency!==t.currency)return false;const identity=rule.account?rule.account===t.account:normalize(rule.recipient)&&normalize(rule.recipient)===normalize(t.recipient);return !!identity&&(!rule.phrase||normalize(t.title).includes(normalize(rule.phrase)));}
   function allocation(state,t){if(t.assignment==='__ignore__')return null;if(t.assignment){const rule=state.rules.find(r=>r.id===t.assignment);return rule?{rule,month:t.month||monthShift(t.date.slice(0,7),rule.offset)}:null;}const rules=state.rules.filter(r=>matches(r,t));return rules.length===1?{rule:rules[0],month:t.month||monthShift(t.date.slice(0,7),rules[0].offset)}:null;}

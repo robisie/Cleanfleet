@@ -78,3 +78,5 @@ Dokumenty księgowe v1.51.18 (aplikacja v1.52.12): wiele faktur PDF dołączanyc
 Dokumenty księgowe v1.51.19 (aplikacja v1.52.13): trwała historia metadanych zakupów KSeF na koncie administratora, osobno dla NIP-u i środowiska. Kompletne miesięczne migawki, także puste, aktualizowane przy eksporcie; ponowienie błędnego zapisu. Kontrola płatności uwzględnia miesiąc bieżący i trzy poprzednie, ujawnia brak historii i miesiąc faktury, umożliwia ręczny wybór dopasowania. Starsze dokumenty nie trafiają ponownie do ZIP. RLS ogranicza zapis i odczyt do właściciela z rolą administratora.
 
 Moje płatności v1.0.1 (aplikacja v1.54.1): odczyt zabezpieczonych PDF-ów po podaniu hasła, ponowienie błędnego hasła i anulowanie; bez zapisu hasła.
+
+Moje płatności v1.0.2 (aplikacja v1.54.2): czytelna lista odczytu bez edytowania transakcji, wybór stałych pozycji ptaszkami, pola dat i miesięcy węższe o 32 px; parser łączy datę księgowania i opisy z operacją, rozdziela kwotę od salda, pokazuje nierozpoznane operacje i blokuje błędne potwierdzenie kompletności.

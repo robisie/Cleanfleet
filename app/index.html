@@ -15143,7 +15143,7 @@ function uid(){
 
     reportShell(
       'Lista wszystkich samochodów',
-      '<div class="confirm-text">Pełna lista pojazdów w bazie. Liczniki pokazują aktualny typ zapisany przy pojeździe. SOLO i SOLÓWKA są liczone jako jedna grupa.</div>',
+      '<div class="confirm-text">Aktywna flota. Wyszukiwarka poniżej może znaleźć również pojazdy wycofane z floty oraz wiele tablic jednocześnie. Liczniki pokazują tylko aktywne pojazdy.</div>',
       summary + vehicleTableHtml(rows)
     );
     document.querySelector('#reportOverlay .sheet')?.classList.add('cf-all-vehicles-sheet');
@@ -15290,10 +15290,13 @@ function uid(){
     };
   
     const applyVehicleLocally=data=>{
+      const prior=registry[data.newPlate]||registry[originalPlate]||{};
       registry[data.newPlate]={
         typ:data.type,marka:data.brand,model:data.model,rocznik:data.year??'',
         numer_taborowy:data.fleetNumber,billing_company_id:data.billingCompanyId||null,waluta:data.currency,przypisany:data.isAssigned,
-        kierowca:data.isAssigned?data.driver:'',uwagi_pojazdu:data.notes
+        kierowca:data.isAssigned?data.driver:'',uwagi_pojazdu:data.notes,
+        in_fleet:prior.in_fleet!==false,
+        fleet_removed_at:prior.fleet_removed_at||null
       };
       cfRemoteVehiclePlates.add(data.newPlate);
       addOptionIfNew('typ',data.type);

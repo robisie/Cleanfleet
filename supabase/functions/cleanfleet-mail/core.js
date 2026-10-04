@@ -84,6 +84,10 @@ export function createMailHandler({authorize,makeClient,secret,credentialStore})
         if(!body.session && !await credentialStore.get(uid))return json({configured:false});
         const {config}=await savedCredential(uid,body.session);return json({configured:true,email:config.email,senders:config.senders,folder:config.folder});
       }
+      if(body.action==='saved-folders'){
+        const {config}=await savedCredential(uid,body.session);
+        return await mailbox(config,async client=>json({folders:selectableFolders(await client.list()),current:config.folder,email:config.email}),false);
+      }
       if(body.action==='save' || body.action==='folders'){
         const config=cleanConfig(body);let password=typeof body.password==='string'?body.password:'';
         if(body.useSavedPassword===true){const saved=await savedCredential(uid,body.session);if(saved.config.email!==config.email)throw new HttpError('Dla nowego adresu wpisz nowe hasło.');password=saved.config.password;}

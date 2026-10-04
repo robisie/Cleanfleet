@@ -243,7 +243,58 @@
       cb.checked=state.selected.has(norm(plate));
       cb.addEventListener('change',()=>setSelected(itemForPlate(plate),cb.checked));
     });
+    requestAnimationFrame(sizeFleetColumns);
   }
+
+  function sizeFleetColumns(){
+    const table=document.getElementById('allVehiclesTable');
+    if(!table)return;
+
+    const hasSelect=!!table.querySelector('[data-cf-fleet-select-head]');
+    const typeIndex=hasSelect?2:1;
+    const plateIndex=hasSelect?3:2;
+    const actionIndex=hasSelect?4:3;
+
+    const px=n=>Math.ceil(n)+'px';
+    const cellPadding=cell=>{
+      const s=getComputedStyle(cell);
+      return (parseFloat(s.paddingLeft)||0)+(parseFloat(s.paddingRight)||0);
+    };
+    const textContentWidth=(cell)=>{
+      const text=String(cell?.textContent||'').trim();
+      if(!text)return 0;
+      const s=getComputedStyle(cell);
+      const canvas=sizeFleetColumns._canvas||(sizeFleetColumns._canvas=document.createElement('canvas'));
+      const ctx=canvas.getContext('2d');
+      ctx.font=s.font||[s.fontWeight,s.fontSize,s.fontFamily].filter(Boolean).join(' ');
+      return ctx.measureText(text).width;
+    };
+    const setWidth=(index,contentMeasure)=>{
+      const cells=[...table.querySelectorAll('tr')].map(row=>row.children[index-1]).filter(Boolean);
+      let contentMax=0,paddingMax=0;
+      cells.forEach(cell=>{
+        paddingMax=Math.max(paddingMax,cellPadding(cell));
+        contentMax=Math.max(contentMax,contentMeasure(cell));
+      });
+      const width=Math.ceil(contentMax*1.10+paddingMax);
+      cells.forEach(cell=>{
+        cell.style.width=px(width);
+        cell.style.minWidth=px(width);
+        cell.style.maxWidth=px(width);
+      });
+    };
+
+    setWidth(typeIndex,cell=>textContentWidth(cell));
+    setWidth(plateIndex,cell=>{
+      const el=cell.querySelector('[data-vehicle-profile]');
+      return el?el.getBoundingClientRect().width:textContentWidth(cell);
+    });
+    setWidth(actionIndex,cell=>{
+      const el=cell.querySelector('.cf-vehicle-row-actions-inner');
+      return el?el.getBoundingClientRect().width:textContentWidth(cell);
+    });
+  }
+
   function ensureStyles(){
     if(document.getElementById('cfFleetBulkStyles'))return;
     const style=document.createElement('style');style.id='cfFleetBulkStyles';
@@ -260,14 +311,12 @@
       .cf-fleet-bulk-result span{display:flex;flex-direction:column;min-width:0}.cf-fleet-bulk-result strong{font:800 12px/1.2 'JetBrains Mono',monospace}.cf-fleet-bulk-result small{margin-top:3px;color:var(--ink-soft,#747b76);font-size:10px;white-space:normal}
       .cf-fleet-bulk-edit-sheet{max-width:680px!important}.cf-fleet-bulk-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin-top:12px}.cf-fleet-bulk-edit-grid .cf-span-2{grid-column:span 2}
       .cf-fleet-inactive-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:10px 12px;border:1px solid #e2b866;border-radius:10px;background:#fff8e8;color:#674a10;font-size:12px}.cf-fleet-inactive-banner span{font-size:10px;opacity:.85}
-      #allVehiclesTable.cf-fleet-selectable-table{table-layout:fixed;width:100%;min-width:780px}
-      #allVehiclesTable.cf-fleet-selectable-table th:nth-child(1),#allVehiclesTable.cf-fleet-selectable-table td:nth-child(1){width:3.5%;text-align:center;padding-left:4px;padding-right:4px}
-      #allVehiclesTable.cf-fleet-selectable-table th:nth-child(2),#allVehiclesTable.cf-fleet-selectable-table td:nth-child(2){width:10%;white-space:nowrap;padding-left:8px;padding-right:8px}
-      #allVehiclesTable.cf-fleet-selectable-table th:nth-child(3),#allVehiclesTable.cf-fleet-selectable-table td:nth-child(3){width:34%}
-      #allVehiclesTable.cf-fleet-selectable-table th:nth-child(4),#allVehiclesTable.cf-fleet-selectable-table td:nth-child(4){width:13%}
-      #allVehiclesTable.cf-fleet-selectable-table th:nth-child(5),#allVehiclesTable.cf-fleet-selectable-table td:nth-child(5){width:24%}
-      #allVehiclesTable.cf-fleet-selectable-table th:nth-child(6),#allVehiclesTable.cf-fleet-selectable-table td:nth-child(6){width:7.75%;text-align:center}
-      #allVehiclesTable.cf-fleet-selectable-table th:nth-child(7),#allVehiclesTable.cf-fleet-selectable-table td:nth-child(7){width:7.75%;text-align:center}
+      #allVehiclesTable.cf-fleet-selectable-table{table-layout:auto;width:100%;min-width:780px}
+      #allVehiclesTable.cf-fleet-selectable-table th:nth-child(1),#allVehiclesTable.cf-fleet-selectable-table td:nth-child(1){width:34px;min-width:34px;max-width:34px;text-align:center;padding-left:4px;padding-right:4px}
+      #allVehiclesTable.cf-fleet-selectable-table th:nth-child(2),#allVehiclesTable.cf-fleet-selectable-table td:nth-child(2),
+      #allVehiclesTable.cf-fleet-selectable-table th:nth-child(3),#allVehiclesTable.cf-fleet-selectable-table td:nth-child(3),
+      #allVehiclesTable.cf-fleet-selectable-table th:nth-child(4),#allVehiclesTable.cf-fleet-selectable-table td:nth-child(4){white-space:nowrap}
+      #allVehiclesTable .cf-vehicle-row-actions-inner{display:inline-flex;align-items:center;gap:8px;flex-wrap:nowrap}
       @media(max-width:620px){
         .cf-fleet-search-row{grid-template-columns:1fr}.cf-fleet-search-row .btn{width:100%}
         .cf-fleet-bulk-result-list{grid-template-columns:1fr}
@@ -303,6 +352,7 @@
     mountTableCheckboxes();
     renderSearchResults();
     updateSelectionUi();
+    requestAnimationFrame(sizeFleetColumns);
   }
 
   ensureStyles();

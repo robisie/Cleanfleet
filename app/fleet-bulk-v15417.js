@@ -202,7 +202,35 @@
       cb.addEventListener('change',()=>setSelected(itemForPlate(plate),cb.checked));
     });
   }
+  function ensureStyles(){
+    if(document.getElementById('cfFleetBulkStyles'))return;
+    const style=document.createElement('style');style.id='cfFleetBulkStyles';
+    style.textContent=`
+      .cf-fleet-bulk-toolbar{margin:14px 0;padding:12px;border:1px solid var(--line,#dfe3df);border-radius:12px;background:#f8f8f5}
+      .cf-fleet-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:stretch}
+      .cf-fleet-search-row textarea{box-sizing:border-box;width:100%;min-height:46px;resize:vertical;border:1px solid var(--line-strong,#ccd2cd);border-radius:9px;background:#fff;padding:10px 12px;font:600 13px/1.35 'JetBrains Mono',monospace;text-transform:uppercase}
+      .cf-fleet-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+      .cf-fleet-actions strong{margin-right:auto;font-size:12px}
+      .cf-fleet-bulk-result-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}
+      .cf-fleet-bulk-result{display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--line,#dfe3df);border-radius:9px;background:#fff;min-width:0}
+      .cf-fleet-bulk-result.is-inactive{border-style:dashed}.cf-fleet-bulk-result.is-new{background:#fffdf2}
+      .cf-fleet-bulk-result input{width:18px;height:18px;flex:0 0 auto}
+      .cf-fleet-bulk-result span{display:flex;flex-direction:column;min-width:0}.cf-fleet-bulk-result strong{font:800 12px/1.2 'JetBrains Mono',monospace}.cf-fleet-bulk-result small{margin-top:3px;color:var(--ink-soft,#747b76);font-size:10px;white-space:normal}
+      .cf-fleet-bulk-edit-sheet{max-width:680px!important}.cf-fleet-bulk-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin-top:12px}.cf-fleet-bulk-edit-grid .cf-span-2{grid-column:span 2}
+      .cf-fleet-inactive-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:10px 12px;border:1px solid #e2b866;border-radius:10px;background:#fff8e8;color:#674a10;font-size:12px}.cf-fleet-inactive-banner span{font-size:10px;opacity:.85}
+      #allVehiclesTable th:first-child,#allVehiclesTable td:first-child{text-align:center;width:34px}
+      @media(max-width:620px){
+        .cf-fleet-search-row{grid-template-columns:1fr}.cf-fleet-search-row .btn{width:100%}
+        .cf-fleet-bulk-result-list{grid-template-columns:1fr}
+        .cf-fleet-actions{align-items:stretch}.cf-fleet-actions strong{width:100%;margin:0}.cf-fleet-actions .btn{flex:1 1 calc(50% - 8px);min-width:120px}
+        .cf-fleet-bulk-edit-grid{grid-template-columns:1fr}.cf-fleet-bulk-edit-grid .cf-span-2{grid-column:span 1}
+        .cf-fleet-inactive-banner{align-items:flex-start;flex-direction:column}
+      }
+    `;
+    document.head.appendChild(style);
+  }
   function bind(){
+    ensureStyles();
     const table=document.getElementById('allVehiclesTable');if(!table)return;
     if(!document.getElementById('cfFleetBulkToolbar')){
       const toolbar=document.createElement('section');

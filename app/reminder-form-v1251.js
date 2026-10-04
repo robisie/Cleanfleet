@@ -204,8 +204,55 @@
         mail_last_checked_at:preserveMail?(reminder?.mail_last_checked_at||null):null,mail_last_error:preserveMail?(reminder?.mail_last_error||null):null,
         mail_source_message_uid:preserveMail?(reminder?.mail_source_message_uid||null):null,mail_source_subject:preserveMail?(reminder?.mail_source_subject||null):null,mail_source_received_at:preserveMail?(reminder?.mail_source_received_at||null):null,mail_source_attachment:preserveMail?(reminder?.mail_source_attachment||null):null,mail_invoice_detected_at:preserveMail?(reminder?.mail_invoice_detected_at||null):null,mail_candidate:preserveMail?(reminder?.mail_candidate||null):null
       };
-      const saveBtn=host.querySelector('[data-save]');saveBtn.disabled=true;
-      try{const q=reminder?.id?client.from('cf_reminders').update(payload).eq('id',reminder.id):client.from('cf_reminders').insert(payload);const {error}=await q;if(error)throw error;close();toast(reminder?'Przypomnienie zaktualizowane.':'Przypomnienie dodane.');if(typeof onSaved==='function')await onSaved()}catch(err){console.error('CleanFleet reminder range:',err);toast('Nie udało się zapisać przypomnienia.');saveBtn.disabled=false}
+      const saveBtn=host.querySelector('[data-save]');
+      const saveLabel=saveBtn.textContent;
+      saveBtn.disabled=true;
+      try{
+        const q=reminder?.id
+          ? client.from('cf_reminders').update(payload).eq('id',reminder.id).select('id').single()
+          : client.from('cf_reminders').insert(payload).select('id').single();
+        const {data:saved,error}=await q;
+        if(error)throw error;
+
+        let scanResult=null;
+        if(useMail&&saved?.id){
+          saveBtn.textContent='Sprawdzam pocztę…';
+          toast('Przypomnienie zapisane. Sprawdzam pocztę…');
+          try{
+            const result=await client.functions.invoke('cleanfleet-reminder-mail-now',{body:{reminder_id:saved.id}});
+            if(result.error)throw result.error;
+            if(result.data?.error)throw new Error(result.data.error);
+            scanResult=result.data||null;
+          }catch(scanError){
+            console.error('CleanFleet reminder mail scan now:',scanError);
+            scanResult={error:scanError?.message||'Nie udało się sprawdzić poczty teraz.'};
+          }
+        }
+
+        close();
+        if(typeof onSaved==='function')await onSaved();
+
+        if(!useMail){
+          toast(reminder?'Przypomnienie zaktualizowane.':'Przypomnienie dodane.');
+        }else if(scanResult?.status==='applied'){
+          const amount=Number(scanResult.amount);
+          const amountText=Number.isFinite(amount)?new Intl.NumberFormat('pl-PL',{style:'currency',currency:'PLN'}).format(amount):'';
+          toast('Pobrano dane z faktury'+(amountText?' · '+amountText:'')+(scanResult.invoice_number?' · '+scanResult.invoice_number:'')+'.');
+        }else if(scanResult?.status==='needs_review'){
+          toast('Znaleziono fakturę, ale dane wymagają sprawdzenia.');
+        }else if(scanResult?.status==='waiting'||scanResult?.found===false){
+          toast('Nie znaleziono jeszcze pasującej faktury. Automat będzie sprawdzał ponownie.');
+        }else if(scanResult?.error){
+          toast('Przypomnienie zapisane. Sprawdzenie poczty teraz nie powiodło się — automat spróbuje ponownie.');
+        }else{
+          toast(reminder?'Przypomnienie zaktualizowane.':'Przypomnienie dodane.');
+        }
+      }catch(err){
+        console.error('CleanFleet reminder range:',err);
+        toast('Nie udało się zapisać przypomnienia.');
+        saveBtn.disabled=false;
+        saveBtn.textContent=saveLabel;
+      }
     };
   }
 

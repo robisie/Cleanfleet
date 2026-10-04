@@ -160,7 +160,7 @@
   window.CFCalendarEngine={loadSupabase,loadAll,moveWash,moveReminder,saveReminder,setReminderStatus,snoozeReminder,deleteReminder,isoDay};
 
   if(location.pathname.endsWith('/app/calendar.html')){
-    loadScript('/app/reminder-form-v1251.js?v=20261004-15413','cfReminderRange1251Script')
+    loadScript('/app/reminder-form-v1251.js?v=20261004-15413-2','cfReminderRange1251Script')
       .then(()=>loadScript('/app/calendar-touch-v1251.js?v=20260917-1','cfCalendarTouch1251Script'))
       .catch(err=>console.error('CleanFleet calendar enhancements:',err));
   }

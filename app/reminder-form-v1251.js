@@ -17,7 +17,11 @@
       .cf-rem-range-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}.cf-rem-range-span2{grid-column:span 2}.cf-rem-range-field{min-width:0}.cf-rem-range-field span{display:block;font-size:11px;color:#666f69;margin-bottom:5px;font-weight:700}.cf-rem-range-field input,.cf-rem-range-field select,.cf-rem-range-field textarea{width:100%;max-width:100%;box-sizing:border-box;border:1px solid #d3d9d5;border-radius:10px;background:#fff;color:#171914;padding:10px 11px;min-height:42px}.cf-rem-range-field input[type="date"],.cf-rem-range-field input[type="time"]{width:calc(100% - 32px)!important;max-width:calc(100% - 32px)!important}.cf-rem-range-field textarea{min-height:88px;resize:vertical}
       .cf-rem-range-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px}.cf-rem-range-box{background:#fff;border:1px solid #dde2de;border-radius:12px;padding:10px;min-width:0}.cf-rem-range-box b{display:block;font-size:11px;margin-bottom:8px}.cf-rem-range-box .row{display:grid;grid-template-columns:1.2fr .8fr;gap:8px;min-width:0}
       .cf-rem-range-payment{grid-column:span 2;display:flex;align-items:center;gap:8px;font-weight:800;font-size:12px;padding:5px 0}.cf-rem-range-payment input{width:17px;height:17px}.cf-rem-range-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px}.cf-rem-range-btn{border:1px solid #ccd4cf;border-radius:10px;background:#fff;color:#182019;padding:10px 14px;font-weight:800;cursor:pointer}.cf-rem-range-btn.primary{background:#294b34;border-color:#294b34;color:#fff}.cf-rem-range-note{font-size:10px;color:#707b74;margin-top:6px}
-      @media(max-width:620px){.cf-rem-range-sheet{padding:14px}.cf-rem-range-grid{grid-template-columns:1fr}.cf-rem-range-span2,.cf-rem-range-payment{grid-column:span 1}.cf-rem-range-dates{grid-template-columns:1fr}.cf-rem-range-box .row{grid-template-columns:1fr 1fr}}
+      @media(max-width:620px){
+        #cfrMailFields,#cfrPayFields{grid-template-columns:1fr!important}
+        #cfrMailFields > *{grid-column:1!important}
+        #cfrMailFolder{min-width:0}
+.cf-rem-range-sheet{padding:14px}.cf-rem-range-grid{grid-template-columns:1fr}.cf-rem-range-span2,.cf-rem-range-payment{grid-column:span 1}.cf-rem-range-dates{grid-template-columns:1fr}.cf-rem-range-box .row{grid-template-columns:1fr 1fr}}
     `;document.head.appendChild(s);
   }
 
@@ -152,9 +156,13 @@
       const dueIso=iso(dueDate,host.querySelector('#cfrStartTime').value||'09:00');
       const duration=oldStart&&oldEnd?Math.max(0,new Date(oldEnd).getTime()-new Date(oldStart).getTime()):0;
       const endIso=new Date(new Date(dueIso).getTime()+duration).toISOString();
-      const customAt=modeEl.value==='custom'?iso(host.querySelector('#cfrCustomDate').value,host.querySelector('#cfrCustomTime').value):null;
+      let customAt=modeEl.value==='custom'?iso(host.querySelector('#cfrCustomDate').value,host.querySelector('#cfrCustomTime').value):null;
+      if(modeEl.value==='custom'&&customAt&&oldStart){
+        const diff=new Date(oldStart).getTime()-new Date(customAt).getTime();
+        if(Number.isFinite(diff))customAt=new Date(new Date(dueIso).getTime()-diff).toISOString();
+      }
       const client=await db();
-      const patch={amount,invoice_number:invoice,start_at:dueIso,end_at:endIso,due_at:dueIso,remind_at:reminderAt(dueIso,modeEl.value,customAt),push_sent_at:null,mail_scan_status:'applied',mail_last_error:null};
+      const patch={amount,invoice_number:invoice,start_at:dueIso,end_at:endIso,due_at:dueIso,custom_remind_at:modeEl.value==='custom'?customAt:null,remind_at:reminderAt(dueIso,modeEl.value,customAt),push_sent_at:null,mail_scan_status:'applied',mail_last_error:null};
       const {error}=await client.from('cf_reminders').update(patch).eq('id',reminder.id);
       if(error){toast('Nie udało się zastosować danych z faktury.');return;}
       close();toast('Dane z faktury zostały zastosowane.');if(typeof onSaved==='function')await onSaved();

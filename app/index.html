@@ -15458,11 +15458,27 @@ function uid(){
       }
     });
   }
+  function cfBindFleetBulk(){
+    window.CFFleetBulk?.bind?.({
+      registry,
+      cfSupabase,
+      cfActiveCompanyId,
+      options,
+      escapeHtml,
+      cfBillingCompanyOptions,
+      cfBillingCompanyCurrency,
+      showToast,
+      loadAll,
+      showAllOutstanding,
+      showConfirm
+    });
+  }
+
   function bindAllVehiclesTable(){
     const table = document.getElementById('allVehiclesTable');
     const label = document.getElementById('vehicleTypeFilterLabel');
     const cards = document.querySelectorAll('.vehicle-filter-card');
-    if(!table){ window.CFFleetBulk?.bind?.(); return; }
+    if(!table){ cfBindFleetBulk(); return; }
     const plural = (n) => n === 1 ? 'pojazd' : (n >= 2 && n <= 4 ? 'pojazdy' : 'pojazdów');
     const update = (value, card) => {
       cfAllVehiclesFilter = value || 'ALL';
@@ -15494,7 +15510,7 @@ function uid(){
     const remembered = document.querySelector(`.vehicle-filter-card[data-vehicle-filter="${CSS.escape(cfAllVehiclesFilter||'ALL')}"]`);
     const active = remembered || document.querySelector('.vehicle-filter-card.active') || document.querySelector('.vehicle-filter-card');
     if(active) update(active.getAttribute('data-vehicle-filter') || 'ALL', active);
-    window.CFFleetBulk?.bind?.();
+    cfBindFleetBulk();
   }
 
   // --- Supabase: pobieranie całej tabeli stronicami ---

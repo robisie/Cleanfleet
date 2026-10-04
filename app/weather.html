@@ -244,7 +244,10 @@
     finally{$('loading').classList.add('hidden');loading=false;}
   }
 
-  $('backBtn').addEventListener('click',()=>{history.back();});
+  $('backBtn').addEventListener('click',()=>{
+    try{ sessionStorage.setItem('cf_return_from_weather','1'); }catch(_){}
+    window.location.replace('/app/');
+  });
   $('refreshBtn').addEventListener('click',()=>load(true));
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&Date.now()-lastLoad>=REFRESH_MS)load(true);});
   timer=setInterval(()=>load(true),REFRESH_MS);

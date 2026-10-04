@@ -160,6 +160,7 @@
     overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
     document.getElementById('cfFleetBulkSave')?.addEventListener('click',async e=>{
       const btn=e.currentTarget,patch=readCommon();if(!patch)return;
+      if(mode==='edit'&&!Object.keys(patch).length){window.CFFleetBulkBridge?.toast?.('Uzupełnij co najmniej jedno pole do zmiany.');return;}
       btn.disabled=true;btn.textContent='Zapisuję…';
       try{
         if(mode==='edit'){
@@ -207,7 +208,7 @@
     );
   }
   function mountTableCheckboxes(){
-    const table=document.getElementById('allVehiclesTable');if(!table)return;
+    const table=document.getElementById('allVehiclesTable');if(!table||!window.CFFleetBulkBridge?.canEdit?.())return;
     const head=table.querySelector('thead tr');
     if(head&&!head.querySelector('[data-cf-fleet-select-head]')){
       const th=document.createElement('th');th.dataset.cfFleetSelectHead='1';th.textContent='✓';head.prepend(th);
@@ -261,7 +262,7 @@
       toolbar.className='cf-fleet-bulk-toolbar';
       toolbar.innerHTML='<div class="cf-fleet-search-row"><textarea id="cfFleetBulkSearch" rows="2" placeholder="Wklej tablice, np. SB1234A, SB5678B, SB9012C"></textarea><button type="button" class="btn btn-solid" id="cfFleetBulkSearchBtn">Szukaj</button></div>'+
         '<div id="cfFleetBulkResults" hidden></div>'+
-        ((cfIsAdmin?.()||cfIsFleetEmployee?.())?'<div class="cf-fleet-actions"><strong id="cfFleetSelectedCount">Wybrano: '+state.selected.size+'</strong><button class="btn btn-outline" type="button" data-cf-fleet-action="edit">Edytuj dane</button><button class="btn btn-solid" type="button" data-cf-fleet-action="add">Dodaj do floty</button><button class="btn btn-danger" type="button" data-cf-fleet-action="remove">Usuń z floty</button></div>':'');
+        (window.CFFleetBulkBridge?.canEdit?.()?'<div class="cf-fleet-actions"><strong id="cfFleetSelectedCount">Wybrano: '+state.selected.size+'</strong><button class="btn btn-outline" type="button" data-cf-fleet-action="edit">Edytuj dane</button><button class="btn btn-solid" type="button" data-cf-fleet-action="add">Dodaj do floty</button><button class="btn btn-danger" type="button" data-cf-fleet-action="remove">Usuń z floty</button></div>':'');
       const target=document.querySelector('#reportOverlay .vehicle-list-toolbar')||table?.parentElement||document.getElementById('reportBody');
       if(target?.parentElement && target.id!=='reportBody') target.parentElement.insertBefore(toolbar,target);
       else target?.prepend(toolbar);

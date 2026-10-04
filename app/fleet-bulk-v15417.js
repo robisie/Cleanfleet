@@ -253,5 +253,6 @@
     updateSelectionUi();
   }
 
+  ensureStyles();
   window.CFFleetBulk={bind};
 })();

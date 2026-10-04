@@ -2,6 +2,23 @@
   'use strict';
 
   const state={selected:new Map(),lastSearch:[]};
+  let registry={},cfSupabase=null,cfActiveCompanyId=null,options={typ:[],marka:[]};
+  let escapeHtml=v=>String(v??''),cfBillingCompanyOptions=()=>'',cfBillingCompanyCurrency=()=> 'PLN';
+  let showToast=()=>{},loadAll=async()=>{},showAllOutstanding=async()=>{},showConfirm=()=>{};
+
+  function applyContext(ctx={}){
+    registry=ctx.registry||{};
+    cfSupabase=ctx.cfSupabase||null;
+    cfActiveCompanyId=ctx.cfActiveCompanyId||null;
+    options=ctx.options||{typ:[],marka:[]};
+    escapeHtml=typeof ctx.escapeHtml==='function'?ctx.escapeHtml:escapeHtml;
+    cfBillingCompanyOptions=typeof ctx.cfBillingCompanyOptions==='function'?ctx.cfBillingCompanyOptions:cfBillingCompanyOptions;
+    cfBillingCompanyCurrency=typeof ctx.cfBillingCompanyCurrency==='function'?ctx.cfBillingCompanyCurrency:cfBillingCompanyCurrency;
+    showToast=typeof ctx.showToast==='function'?ctx.showToast:showToast;
+    loadAll=typeof ctx.loadAll==='function'?ctx.loadAll:loadAll;
+    showAllOutstanding=typeof ctx.showAllOutstanding==='function'?ctx.showAllOutstanding:showAllOutstanding;
+    showConfirm=typeof ctx.showConfirm==='function'?ctx.showConfirm:showConfirm;
+  }
 
   function norm(v){return String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'');}
   function esc(v){return typeof escapeHtml==='function'?escapeHtml(v):String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -251,7 +268,8 @@
     `;
     document.head.appendChild(style);
   }
-  function bind(){
+  function bind(ctx){
+    applyContext(ctx);
     ensureStyles();
     const table=document.getElementById('allVehiclesTable');
     if(!document.getElementById('cfFleetBulkToolbar')){

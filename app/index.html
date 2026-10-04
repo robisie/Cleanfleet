@@ -12658,7 +12658,8 @@ function uid(){
     reload:()=>loadAll(),
     openList:()=>showAllOutstanding(),
     toast:message=>showToast(message),
-    confirm:(title,message,action)=>showConfirm(title,message,action)
+    confirm:(title,message,action)=>showConfirm(title,message,action),
+    canEdit:()=>cfIsAdmin()||cfIsFleetEmployee()
   };
 
   function reportShell(title, controlsHtml, bodyHtml){

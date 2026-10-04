@@ -118,6 +118,22 @@
       if(error)throw error;
     }
   }
+  async function syncOpenBilling(plates,patch){
+    if(!Object.prototype.hasOwnProperty.call(patch,'billing_company_id'))return;
+    const selected=new Set(plates.map(norm));
+    const billed=new Set((invoiceItems||[]).map(x=>String(x.wash_record_id||'')));
+    const openIds=(records||[])
+      .filter(r=>selected.has(norm(r.tablica))&&!r.zaplacone&&!billed.has(String(r.id)))
+      .map(r=>r.id).filter(Boolean);
+    for(let i=0;i<openIds.length;i+=75){
+      const ids=openIds.slice(i,i+75);
+      const {error}=await cfSupabase.from('wash_records').update({
+        billing_company_id:patch.billing_company_id||null,
+        currency:patch.currency||'PLN'
+      }).in('id',ids);
+      if(error)throw error;
+    }
+  }
   async function refreshList(message){
     if(typeof loadAll==='function')await loadAll();
     state.selected.clear();
@@ -147,10 +163,15 @@
       btn.disabled=true;btn.textContent='Zapisuję…';
       try{
         if(mode==='edit'){
-          await updateBatches(existing.map(x=>x.plate),patch);
+          const existingPlates=existing.map(x=>x.plate);
+          await updateBatches(existingPlates,patch);
+          await syncOpenBilling(existingPlates,patch);
         }else{
           const existingPlates=existing.map(x=>x.plate);
-          if(existingPlates.length)await updateBatches(existingPlates,{...patch,in_fleet:true,fleet_removed_at:null});
+          if(existingPlates.length){
+            await updateBatches(existingPlates,{...patch,in_fleet:true,fleet_removed_at:null});
+            await syncOpenBilling(existingPlates,patch);
+          }
           const unknown=chosen.filter(x=>!x.exists);
           if(unknown.length){
             const payloads=unknown.map(x=>({
@@ -233,12 +254,14 @@
     ensureStyles();
     const table=document.getElementById('allVehiclesTable');
     if(!document.getElementById('cfFleetBulkToolbar')){
+      state.selected.clear();
+      state.lastSearch=[];
       const toolbar=document.createElement('section');
       toolbar.id='cfFleetBulkToolbar';
       toolbar.className='cf-fleet-bulk-toolbar';
       toolbar.innerHTML='<div class="cf-fleet-search-row"><textarea id="cfFleetBulkSearch" rows="2" placeholder="Wklej tablice, np. SB1234A, SB5678B, SB9012C"></textarea><button type="button" class="btn btn-solid" id="cfFleetBulkSearchBtn">Szukaj</button></div>'+
         '<div id="cfFleetBulkResults" hidden></div>'+
-        '<div class="cf-fleet-actions"><strong id="cfFleetSelectedCount">Wybrano: '+state.selected.size+'</strong><button class="btn btn-outline" type="button" data-cf-fleet-action="edit">Edytuj dane</button><button class="btn btn-solid" type="button" data-cf-fleet-action="add">Dodaj do floty</button><button class="btn btn-danger" type="button" data-cf-fleet-action="remove">Usuń z floty</button></div>';
+        ((cfIsAdmin?.()||cfIsFleetEmployee?.())?'<div class="cf-fleet-actions"><strong id="cfFleetSelectedCount">Wybrano: '+state.selected.size+'</strong><button class="btn btn-outline" type="button" data-cf-fleet-action="edit">Edytuj dane</button><button class="btn btn-solid" type="button" data-cf-fleet-action="add">Dodaj do floty</button><button class="btn btn-danger" type="button" data-cf-fleet-action="remove">Usuń z floty</button></div>':'');
       const target=document.querySelector('#reportOverlay .vehicle-list-toolbar')||table?.parentElement||document.getElementById('reportBody');
       if(target?.parentElement && target.id!=='reportBody') target.parentElement.insertBefore(toolbar,target);
       else target?.prepend(toolbar);

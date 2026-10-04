@@ -214,6 +214,41 @@
         const {data:saved,error}=await q;
         if(error)throw error;
 
+        // Jeżeli edytujemy przypomnienie cykliczne, ta sama reguła mailowa ma
+        // obowiązywać także wszystkie już istniejące przyszłe wystąpienia tej serii.
+        if(reminder?.id && host.querySelector('#cfrRecurrence').value!=='none'){
+          const currentBase=reminder.mail_anchor_due_at||reminder.due_at||reminder.start_at||reminder.remind_at;
+          const currentTitle=String(reminder.title||'').trim();
+          let futureQuery=client.from('cf_reminders')
+            .update({
+              mail_invoice_enabled:useMail,
+              mail_folder:useMail?mailFolder:null,
+              mail_sender:useMail?(mailSender||null):null,
+              mail_subject_contains:useMail?(mailSubject||null):null,
+              mail_attachment_contains:useMail?(mailAttachment||null):null,
+              mail_scan_days_before:useMail?mailDays:2,
+              mail_scan_status:useMail?'waiting':'off',
+              mail_last_checked_at:null,
+              mail_last_error:null,
+              mail_source_message_uid:null,
+              mail_source_subject:null,
+              mail_source_received_at:null,
+              mail_source_attachment:null,
+              mail_invoice_detected_at:null,
+              mail_candidate:null
+            })
+            .eq('user_id',user.id)
+            .eq('recurrence',host.querySelector('#cfrRecurrence').value)
+            .eq('title',currentTitle)
+            .neq('id',reminder.id)
+            .in('status',['active','snoozed']);
+          if(reminder.payee==null) futureQuery=futureQuery.is('payee',null);
+          else futureQuery=futureQuery.eq('payee',reminder.payee);
+          if(currentBase) futureQuery=futureQuery.gt('due_at',currentBase);
+          const {error:futureError}=await futureQuery;
+          if(futureError) console.warn('CleanFleet reminder future mail propagation:',futureError);
+        }
+
         let scanResult=null;
         if(useMail&&saved?.id){
           saveBtn.textContent='Sprawdzam pocztę…';

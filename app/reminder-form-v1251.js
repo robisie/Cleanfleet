@@ -216,37 +216,47 @@
 
         // Jeżeli edytujemy przypomnienie cykliczne, ta sama reguła mailowa ma
         // obowiązywać także wszystkie już istniejące przyszłe wystąpienia tej serii.
+        // Każde przyszłe wystąpienie zachowuje własną kotwicę terminu/miesiąca.
         if(reminder?.id && host.querySelector('#cfrRecurrence').value!=='none'){
           const currentBase=reminder.mail_anchor_due_at||reminder.due_at||reminder.start_at||reminder.remind_at;
           const currentTitle=String(reminder.title||'').trim();
-          let futureQuery=client.from('cf_reminders')
-            .update({
-              mail_invoice_enabled:useMail,
-              mail_folder:useMail?mailFolder:null,
-              mail_sender:useMail?(mailSender||null):null,
-              mail_subject_contains:useMail?(mailSubject||null):null,
-              mail_attachment_contains:useMail?(mailAttachment||null):null,
-              mail_scan_days_before:useMail?mailDays:2,
-              mail_scan_status:useMail?'waiting':'off',
-              mail_last_checked_at:null,
-              mail_last_error:null,
-              mail_source_message_uid:null,
-              mail_source_subject:null,
-              mail_source_received_at:null,
-              mail_source_attachment:null,
-              mail_invoice_detected_at:null,
-              mail_candidate:null
-            })
+          let futureSelect=client.from('cf_reminders')
+            .select('id,due_at,start_at,remind_at,mail_anchor_due_at')
             .eq('user_id',user.id)
             .eq('recurrence',host.querySelector('#cfrRecurrence').value)
             .eq('title',currentTitle)
             .neq('id',reminder.id)
             .in('status',['active','snoozed']);
-          if(reminder.payee==null) futureQuery=futureQuery.is('payee',null);
-          else futureQuery=futureQuery.eq('payee',reminder.payee);
-          if(currentBase) futureQuery=futureQuery.gt('due_at',currentBase);
-          const {error:futureError}=await futureQuery;
-          if(futureError) console.warn('CleanFleet reminder future mail propagation:',futureError);
+          if(reminder.payee==null) futureSelect=futureSelect.is('payee',null);
+          else futureSelect=futureSelect.eq('payee',reminder.payee);
+          if(currentBase) futureSelect=futureSelect.gt('due_at',currentBase);
+          const {data:futureRows,error:futureReadError}=await futureSelect;
+          if(futureReadError){
+            console.warn('CleanFleet reminder future mail propagation read:',futureReadError);
+          }else{
+            for(const futureRow of futureRows||[]){
+              const futureAnchor=futureRow.mail_anchor_due_at||futureRow.due_at||futureRow.start_at||futureRow.remind_at||null;
+              const {error:futureError}=await client.from('cf_reminders').update({
+                mail_invoice_enabled:useMail,
+                mail_folder:useMail?mailFolder:null,
+                mail_sender:useMail?(mailSender||null):null,
+                mail_subject_contains:useMail?(mailSubject||null):null,
+                mail_attachment_contains:useMail?(mailAttachment||null):null,
+                mail_scan_days_before:useMail?mailDays:2,
+                mail_anchor_due_at:useMail?futureAnchor:null,
+                mail_scan_status:useMail?'waiting':'off',
+                mail_last_checked_at:null,
+                mail_last_error:null,
+                mail_source_message_uid:null,
+                mail_source_subject:null,
+                mail_source_received_at:null,
+                mail_source_attachment:null,
+                mail_invoice_detected_at:null,
+                mail_candidate:null
+              }).eq('id',futureRow.id).eq('user_id',user.id);
+              if(futureError) console.warn('CleanFleet reminder future mail propagation:',futureError);
+            }
+          }
         }
 
         let scanResult=null;

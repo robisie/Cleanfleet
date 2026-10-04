@@ -15177,15 +15177,16 @@ function uid(){
     }
     const body = rows.map(r => `
       <tr data-vehicle-type="${escapeHtml(r.type_group || 'BEZ TYPU')}">
-        <td>${escapeHtml(r.typ)}</td>
-        <td><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><button type="button" class="report-plate-link mono" data-vehicle-profile="${escapeHtml(r.tablica)}">${escapeHtml(r.tablica)}</button><button type="button" class="history-button vehicle-history-btn" data-history-plate="${escapeHtml(r.tablica)}">Historia</button>${(cfIsAdmin()||cfIsFleetEmployee())?`<button type="button" class="history-button vehicle-edit-btn" data-edit-vehicle="${escapeHtml(r.tablica)}">Edytuj pojazd</button>`:''}</div></td>
+        <td class="cf-vehicle-type-cell">${escapeHtml(r.typ)}</td>
+        <td class="cf-vehicle-plate-cell"><button type="button" class="report-plate-link mono" data-vehicle-profile="${escapeHtml(r.tablica)}">${escapeHtml(r.tablica)}</button></td>
+        <td class="cf-vehicle-row-actions"><div class="cf-vehicle-row-actions-inner"><button type="button" class="history-button vehicle-history-btn" data-history-plate="${escapeHtml(r.tablica)}">Historia</button>${(cfIsAdmin()||cfIsFleetEmployee())?`<button type="button" class="history-button vehicle-edit-btn" data-edit-vehicle="${escapeHtml(r.tablica)}">Edytuj pojazd</button>`:''}</div></td>
         <td>${escapeHtml(r.marka)}</td>
         <td>${r.data_prania ? `<span class="vehicle-last-wash">${fmtDate(r.data_prania)}${(() => { const days=Math.floor((Date.now()-new Date(r.data_prania+'T00:00:00').getTime())/86400000); return days>=(365 / 2) ? ` · ⚠️ ${days} dni` : ''; })()}</span>` : '<span class="record-badge">brak wpisu</span>'}</td>
         <td>${r.zatwierdzone===null ? '—' : `<span class="pill ${r.zatwierdzone?'pill-yes':'pill-no'}">${r.zatwierdzone?'TAK':'NIE'}</span>`}</td>
         <td>${r.zaplacone===null ? '—' : `<span class="pill ${r.zaplacone?'pill-yes':'pill-no'}">${r.zaplacone?'TAK':'NIE'}</span>`}</td>
       </tr>`).join('');
     const wrapper = `<div class="vehicle-list-toolbar" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;margin-bottom:10px;"><span id="vehicleTypeFilterLabel" class="confirm-text" style="margin:0;font-weight:600;">Wszystkie pojazdy · ${rows.length}</span></div>`;
-    const table = `<div class="vehicle-table-scroll"><table class="report" id="allVehiclesTable"><thead><tr><th>Typ</th><th>Tablica</th><th>Marka</th><th>Ostatnie pranie</th><th>Zatw.</th><th>Zapł.</th></tr></thead><tbody>${body}</tbody></table></div>`;
+    const table = `<div class="vehicle-table-scroll"><table class="report" id="allVehiclesTable"><thead><tr><th class="cf-vehicle-type-head">Typ</th><th class="cf-vehicle-plate-head">Tablica</th><th class="cf-vehicle-actions-head">Akcje</th><th>Marka</th><th>Ostatnie pranie</th><th>Zatw.</th><th>Zapł.</th></tr></thead><tbody>${body}</tbody></table></div>`;
     return wrapper + table;
   }
 

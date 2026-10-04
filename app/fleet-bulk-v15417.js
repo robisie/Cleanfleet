@@ -19,7 +19,7 @@
   }
   function registryMap(){
     const map=new Map();
-    Object.keys(registry||{}).forEach(plate=>{const k=norm(plate);if(k)map.set(k,plate);});
+    Object.keys(window.CFFleetBulkBridge?.getRegistry?.()||{}).forEach(plate=>{const k=norm(plate);if(k)map.set(k,plate);});
     return map;
   }
   function selectedEntries(){return [...state.selected.values()];}
@@ -39,7 +39,7 @@
     updateSelectionUi();
   }
   function itemForPlate(plate){
-    const info=registry?.[plate]||{};
+    const info=window.CFFleetBulkBridge?.getRegistry?.()?.[plate]||{};
     return {query:plate,plate,exists:true,inFleet:info.in_fleet!==false,info};
   }
   function renderSearchResults(){
@@ -64,7 +64,7 @@
   function doSearch(){
     const input=document.getElementById('cfFleetBulkSearch');
     const items=parse(input?.value||'');
-    if(!items.length){showToast('Wpisz co najmniej jedną tablicę.');return;}
+    if(!items.length){window.CFFleetBulkBridge?.toast?.('Wpisz co najmniej jedną tablicę.');return;}
     const map=registryMap();
     state.lastSearch=items.map(x=>{
       const plate=map.get(x.key)||'';
@@ -79,11 +79,11 @@
   function commonFieldsHtml(mode){
     return '<div class="confirm-text">Te same uzupełnione wartości zostaną zapisane we wszystkich wybranych pojazdach. Puste pola nie zmienią istniejących danych.</div>'+
       '<div class="cf-fleet-bulk-edit-grid">'+
-      '<label class="field"><span>Typ</span><input id="cfFleetBulkType" type="text" list="cfFleetBulkTypeList" placeholder="bez zmian"><datalist id="cfFleetBulkTypeList">'+((options?.typ||[]).map(x=>'<option value="'+esc(x)+'">').join(''))+'</datalist></label>'+
-      '<label class="field"><span>Marka</span><input id="cfFleetBulkBrand" type="text" list="cfFleetBulkBrandList" placeholder="bez zmian"><datalist id="cfFleetBulkBrandList">'+((options?.marka||[]).map(x=>'<option value="'+esc(x)+'">').join(''))+'</datalist></label>'+
+      '<label class="field"><span>Typ</span><input id="cfFleetBulkType" type="text" list="cfFleetBulkTypeList" placeholder="bez zmian"><datalist id="cfFleetBulkTypeList">'+((window.CFFleetBulkBridge?.getOptions?.()?.typ||[]).map(x=>'<option value="'+esc(x)+'">').join(''))+'</datalist></label>'+
+      '<label class="field"><span>Marka</span><input id="cfFleetBulkBrand" type="text" list="cfFleetBulkBrandList" placeholder="bez zmian"><datalist id="cfFleetBulkBrandList">'+((window.CFFleetBulkBridge?.getOptions?.()?.marka||[]).map(x=>'<option value="'+esc(x)+'">').join(''))+'</datalist></label>'+
       '<label class="field"><span>Model</span><input id="cfFleetBulkModel" type="text" placeholder="bez zmian"></label>'+
       '<label class="field"><span>Rocznik</span><input id="cfFleetBulkYear" type="number" min="1950" max="2100" placeholder="bez zmian"></label>'+
-      '<label class="field cf-span-2"><span>Spółka rozliczeniowa</span><select id="cfFleetBulkBilling"><option value="__NOCHANGE__">Bez zmian</option>'+cfBillingCompanyOptions('',true)+'</select></label>'+
+      '<label class="field cf-span-2"><span>Spółka rozliczeniowa</span><select id="cfFleetBulkBilling"><option value="__NOCHANGE__">Bez zmian</option>'+window.CFFleetBulkBridge?.billingCompanyOptions?.('',true)||''+'</select></label>'+
       '<label class="field cf-span-2"><span>Uwagi o pojeździe</span><textarea id="cfFleetBulkNotes" rows="3" placeholder="bez zmian"></textarea></label>'+
       '</div>';
   }
@@ -92,7 +92,7 @@
     let year;
     if(yearRaw){
       year=Number(yearRaw);
-      if(!Number.isInteger(year)||year<1950||year>2100){showToast('Sprawdź rocznik.');return null;}
+      if(!Number.isInteger(year)||year<1950||year>2100){window.CFFleetBulkBridge?.toast?.('Sprawdź rocznik.');return null;}
     }
     const billing=String(document.getElementById('cfFleetBulkBilling')?.value||'__NOCHANGE__');
     const patch={};
@@ -107,14 +107,14 @@
     if(notes)patch.vehicle_notes=notes;
     if(billing!=='__NOCHANGE__'){
       patch.billing_company_id=billing||null;
-      patch.currency=cfBillingCompanyCurrency(billing||null,'PLN');
+      patch.currency=window.CFFleetBulkBridge?.billingCurrency?.(billing||null,'PLN')||'PLN';
     }
     return patch;
   }
   async function updateBatches(plates,patch){
     for(let i=0;i<plates.length;i+=75){
       const batch=plates.slice(i,i+75);
-      const {error}=await cfSupabase.from('vehicles').update(patch).eq('company_id',cfActiveCompanyId).in('plate',batch);
+      const {error}=await window.CFFleetBulkBridge.getClient().from('vehicles').update(patch).eq('company_id',window.CFFleetBulkBridge.getCompanyId()).in('plate',batch);
       if(error)throw error;
     }
   }
@@ -135,16 +135,16 @@
     }
   }
   async function refreshList(message){
-    if(typeof loadAll==='function')await loadAll();
+    await window.CFFleetBulkBridge?.reload?.();
     state.selected.clear();
-    if(typeof showAllOutstanding==='function')await showAllOutstanding();
-    if(message)showToast(message);
+    await window.CFFleetBulkBridge?.openList?.();
+    if(message)window.CFFleetBulkBridge?.toast?.(message);
   }
   function openCommonModal(mode){
     const chosen=selectedEntries();
     if(!chosen.length)return;
     const existing=chosen.filter(x=>x.exists);
-    if(mode==='edit'&&!existing.length){showToast('Zaznaczone tablice nie istnieją jeszcze w bazie.');return;}
+    if(mode==='edit'&&!existing.length){window.CFFleetBulkBridge?.toast?.('Zaznaczone tablice nie istnieją jeszcze w bazie.');return;}
     const root=document.getElementById('modalRoot');
     const previous=document.getElementById('cfFleetBulkEditOverlay');previous?.remove();
     const overlay=document.createElement('div');
@@ -175,10 +175,10 @@
           const unknown=chosen.filter(x=>!x.exists);
           if(unknown.length){
             const payloads=unknown.map(x=>({
-              plate:norm(x.query),company_id:cfActiveCompanyId,type:'',brand:'',...patch,in_fleet:true,fleet_removed_at:null
+              plate:norm(x.query),company_id:window.CFFleetBulkBridge.getCompanyId(),type:'',brand:'',...patch,in_fleet:true,fleet_removed_at:null
             }));
             for(let i=0;i<payloads.length;i+=75){
-              const {error}=await cfSupabase.from('vehicles').insert(payloads.slice(i,i+75));
+              const {error}=await window.CFFleetBulkBridge.getClient().from('vehicles').insert(payloads.slice(i,i+75));
               if(error)throw error;
             }
           }
@@ -187,22 +187,22 @@
         await refreshList(mode==='add'?'Pojazdy dodane do aktywnej floty.':'Zapisano zmiany w pojazdach.');
       }catch(error){
         console.error('CleanFleet fleet bulk save:',error);
-        showToast('Nie udało się zapisać zmian: '+(error?.message||'błąd'));
+        window.CFFleetBulkBridge?.toast?.('Nie udało się zapisać zmian: '+(error?.message||'błąd'));
         btn.disabled=false;btn.textContent=mode==='add'?'Dodaj do floty':'Zapisz zmiany';
       }
     });
   }
   function removeSelected(){
     const plates=selectedEntries().filter(x=>x.exists&&x.inFleet).map(x=>x.plate);
-    if(!plates.length){showToast('Wśród zaznaczonych nie ma aktywnych pojazdów floty.');return;}
-    showConfirm(
+    if(!plates.length){window.CFFleetBulkBridge?.toast?.('Wśród zaznaczonych nie ma aktywnych pojazdów floty.');return;}
+    window.CFFleetBulkBridge?.confirm?.(
       'Usunąć z aktywnej floty?',
       'Wybrane pojazdy ('+plates.length+') znikną z aktywnej listy floty. Ich karty, historia prań, zdjęcia i rozliczenia pozostaną w bazie.',
       async()=>{
         try{
           await updateBatches(plates,{in_fleet:false,fleet_removed_at:new Date().toISOString()});
           await refreshList('Pojazdy usunięte z aktywnej floty. Historia została zachowana.');
-        }catch(error){showToast('Nie udało się usunąć pojazdów z floty: '+(error?.message||'błąd'));}
+        }catch(error){window.CFFleetBulkBridge?.toast?.('Nie udało się usunąć pojazdów z floty: '+(error?.message||'błąd'));}
       }
     );
   }

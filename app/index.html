@@ -10331,7 +10331,8 @@ function uid(){
             type:v.typ||'',brand:v.marka||'',model:v.model||null,
             production_year:v.rocznik===''||v.rocznik==null?null:Number(v.rocznik),
             fleet_number:v.numer_taborowy||null,assigned_driver:!!v.przypisany,
-            driver_name:v.przypisany?(v.kierowca||null):null,vehicle_notes:v.uwagi_pojazdu||null,billing_company_id:v.billing_company_id||null,currency:cfBillingCompanyCurrency(v.billing_company_id,v.waluta)
+            driver_name:v.przypisany?(v.kierowca||null):null,vehicle_notes:v.uwagi_pojazdu||null,billing_company_id:v.billing_company_id||null,currency:cfBillingCompanyCurrency(v.billing_company_id,v.waluta),
+            in_fleet:v.in_fleet!==false,fleet_removed_at:v.in_fleet===false?(v.fleet_removed_at||null):null
           }).eq('plate',plate).eq('company_id',cfActiveCompanyId);
         }else{
           result = await cfSupabase.from('vehicles').insert({
@@ -10339,7 +10340,8 @@ function uid(){
             model:v.model||null,
             production_year:v.rocznik===''||v.rocznik==null?null:Number(v.rocznik),
             fleet_number:v.numer_taborowy||null,assigned_driver:!!v.przypisany,
-            driver_name:v.przypisany?(v.kierowca||null):null,vehicle_notes:v.uwagi_pojazdu||null,billing_company_id:v.billing_company_id||null,currency:cfBillingCompanyCurrency(v.billing_company_id,v.waluta)
+            driver_name:v.przypisany?(v.kierowca||null):null,vehicle_notes:v.uwagi_pojazdu||null,billing_company_id:v.billing_company_id||null,currency:cfBillingCompanyCurrency(v.billing_company_id,v.waluta),
+            in_fleet:v.in_fleet!==false,fleet_removed_at:v.in_fleet===false?(v.fleet_removed_at||null):null
           });
         }
         if(result?.error) throw result.error;
@@ -10362,7 +10364,8 @@ function uid(){
           model:v.model||null,
           production_year:v.rocznik===''||v.rocznik==null?null:Number(v.rocznik),
           fleet_number:v.numer_taborowy||null,assigned_driver:!!v.przypisany,
-          driver_name:v.przypisany?(v.kierowca||null):null,vehicle_notes:v.uwagi_pojazdu||null,billing_company_id:v.billing_company_id||null,currency:cfBillingCompanyCurrency(v.billing_company_id,v.waluta)
+          driver_name:v.przypisany?(v.kierowca||null):null,vehicle_notes:v.uwagi_pojazdu||null,billing_company_id:v.billing_company_id||null,currency:cfBillingCompanyCurrency(v.billing_company_id,v.waluta),
+          in_fleet:v.in_fleet!==false,fleet_removed_at:v.in_fleet===false?(v.fleet_removed_at||null):null
         };
         const existsRemotely = cfRemoteVehiclePlates.has(changedPlate);
 
@@ -10374,7 +10377,8 @@ function uid(){
               type:payload.type,brand:payload.brand,model:payload.model,
               production_year:payload.production_year,fleet_number:payload.fleet_number,
               assigned_driver:payload.assigned_driver,driver_name:payload.driver_name,
-              vehicle_notes:payload.vehicle_notes,billing_company_id:payload.billing_company_id,currency:payload.currency
+              vehicle_notes:payload.vehicle_notes,billing_company_id:payload.billing_company_id,currency:payload.currency,
+              in_fleet:payload.in_fleet,fleet_removed_at:payload.fleet_removed_at
             })
             .eq('plate', changedPlate)
             .eq('company_id', cfActiveCompanyId));
@@ -10393,7 +10397,7 @@ function uid(){
         cfRemoteVehiclePlates.add(changedPlate);
       } else {
         // Import / pełna synchronizacja nadal zapisuje całą listę.
-        const rows = Object.entries(registry).map(([plate,v])=>({plate,type:v.typ||'',brand:v.marka||'',billing_company_id:v.billing_company_id||null,currency:cfBillingCompanyCurrency(v.billing_company_id,v.waluta),company_id:cfActiveCompanyId}));
+        const rows = Object.entries(registry).map(([plate,v])=>({plate,type:v.typ||'',brand:v.marka||'',billing_company_id:v.billing_company_id||null,currency:cfBillingCompanyCurrency(v.billing_company_id,v.waluta),company_id:cfActiveCompanyId,in_fleet:v.in_fleet!==false,fleet_removed_at:v.in_fleet===false?(v.fleet_removed_at||null):null}));
         if(rows.length){
           await cfRetrySupabase(() => cfSupabase.from('vehicles').upsert(rows, {onConflict:'plate'}));
         }
@@ -16187,9 +16191,13 @@ function uid(){
       const plate = normalizePlate(row.tablica);
       if(!plate) return;
       if(newRegistry[plate]) updated++; else added++;
+      const previous=newRegistry[plate]||registry[plate]||{};
       newRegistry[plate] = {
-        typ: row.typ || (newRegistry[plate] && newRegistry[plate].typ) || '',
-        marka: row.marka || (newRegistry[plate] && newRegistry[plate].marka) || ''
+        ...previous,
+        typ: row.typ || previous.typ || '',
+        marka: row.marka || previous.marka || '',
+        in_fleet:true,
+        fleet_removed_at:null
       };
     });
 

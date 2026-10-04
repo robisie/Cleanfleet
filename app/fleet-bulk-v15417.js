@@ -121,13 +121,13 @@
   async function syncOpenBilling(plates,patch){
     if(!Object.prototype.hasOwnProperty.call(patch,'billing_company_id'))return;
     const selected=new Set(plates.map(norm));
-    const billed=new Set((invoiceItems||[]).map(x=>String(x.wash_record_id||'')));
-    const openIds=(records||[])
+    const billed=new Set((window.CFFleetBulkBridge?.getInvoiceItems?.()||[]).map(x=>String(x.wash_record_id||'')));
+    const openIds=(window.CFFleetBulkBridge?.getRecords?.()||[])
       .filter(r=>selected.has(norm(r.tablica))&&!r.zaplacone&&!billed.has(String(r.id)))
       .map(r=>r.id).filter(Boolean);
     for(let i=0;i<openIds.length;i+=75){
       const ids=openIds.slice(i,i+75);
-      const {error}=await cfSupabase.from('wash_records').update({
+      const {error}=await window.CFFleetBulkBridge.getClient().from('wash_records').update({
         billing_company_id:patch.billing_company_id||null,
         currency:patch.currency||'PLN'
       }).in('id',ids);

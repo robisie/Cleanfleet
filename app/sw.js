@@ -1,4 +1,4 @@
-// CleanFleet v1.54.14 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
+// CleanFleet v1.54.15 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -16,7 +16,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  if (url.origin === self.location.origin && (url.pathname === '/app/period-picker.js' || url.pathname === '/app/exchange-rate.js' || url.pathname === '/app/reports-catalog.js' || url.pathname === '/app/reports-engine.js' || url.pathname === '/app/reports-ui.js' || url.pathname === '/app/reports.css' || url.pathname === '/app/accounting-documents-v1510.js' || url.pathname === '/app/mail-documents.js' || url.pathname === '/app/accounting-package.js' || url.pathname === '/app/ksef-pdf.js' || url.pathname === '/app/accounting-reconcile.js' || url.pathname === '/app/accounting-history.js' || url.pathname === '/app/accounting-decisions.js')) {
+  if (url.origin === self.location.origin && (url.pathname === '/app/period-picker.js' || url.pathname === '/app/exchange-rate.js' || url.pathname === '/app/reports-catalog.js' || url.pathname === '/app/reports-engine.js' || url.pathname === '/app/reports-ui.js' || url.pathname === '/app/reports.css' || url.pathname === '/app/accounting-documents-v1510.js' || url.pathname === '/app/mail-documents.js' || url.pathname === '/app/accounting-package.js' || url.pathname === '/app/ksef-pdf.js' || url.pathname === '/app/accounting-reconcile.js' || url.pathname === '/app/accounting-history.js' || url.pathname === '/app/accounting-decisions.js' || url.pathname === '/app/reminder-form-v1251.js')) {
     event.respondWith(fetch(req, { cache: 'no-store' }));
     return;
   }
@@ -55,7 +55,7 @@ self.addEventListener('fetch', event => {
       html = html.replace(/<script src="\/app\/calendar-touch-v1251\.js\?v=[^"]+"><\/script>/g, '');
       html = html.replace(/<script src="\/app\/calendar-reminder-edit-v1261\.js\?v=[^"]+"><\/script>/g, '');
       html = html.replace(/<script src="\/app\/calendar-ageing-dnd-v1270\.js\?v=[^"]+"><\/script>/g, '');
-      const calendarScripts = '<script src="/app/reminder-form-v1251.js?v=20261004-15414"></script>\n' +
+      const calendarScripts = '<script src="/app/reminder-form-v1251.js?v=20261004-15415"></script>\n' +
         '<script src="/app/calendar-touch-v1251.js?v=20260917-3"></script>\n' +
         '<script src="/app/calendar-reminder-edit-v1261.js?v=20260917-1"></script>\n' +
         '<script src="/app/calendar-ageing-dnd-v1270.js?v=20260917-2"></script>';
@@ -202,7 +202,7 @@ self.addEventListener('fetch', event => {
       '<script src="/app/ui-v1209.js?v=20260915-3"></script>\n' +
       '<script src="/app/calendar-add-v1215.js?v=20260915-2"></script>\n' +
       '<script src="/app/calendar-weather-v1218.js?v=20260916-3"></script>\n' +
-      '<script src="/app/reminder-form-v1251.js?v=20261004-15414"></script>\n' +
+      '<script src="/app/reminder-form-v1251.js?v=20261004-15415"></script>\n' +
       '<script src="/app/calendar-today-tile-v1262.js?v=20260917-5"></script>\n' +
       '<script src="/app/taxes-v1310.js?v=20260918-6"></script>\n' +
       '<script src="/app/admin-dashboard-v1270.js?v=20260928-130133"></script>';

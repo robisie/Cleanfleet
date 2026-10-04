@@ -43,7 +43,9 @@
   function updateSelectionUi(){
     const count=state.selected.size;
     const label=document.getElementById('cfFleetSelectedCount');
+    const actions=document.querySelector('#cfFleetBulkToolbar .cf-fleet-actions');
     if(label)label.textContent='Wybrano: '+count;
+    if(actions)actions.style.display=count>0?'flex':'none';
     document.querySelectorAll('[data-cf-fleet-action]').forEach(btn=>btn.disabled=!count);
     document.querySelectorAll('[data-cf-fleet-select]').forEach(cb=>{cb.checked=state.selected.has(norm(cb.value));});
     document.querySelectorAll('[data-cf-fleet-table-select]').forEach(cb=>{cb.checked=state.selected.has(norm(cb.value));});
@@ -248,7 +250,7 @@
       .cf-fleet-bulk-toolbar{margin:14px 0;padding:12px;border:1px solid var(--line,#dfe3df);border-radius:12px;background:#f8f8f5}
       .cf-fleet-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:stretch}
       .cf-fleet-search-row textarea{box-sizing:border-box;width:100%;min-height:46px;resize:vertical;border:1px solid var(--line-strong,#ccd2cd);border-radius:9px;background:#fff;padding:10px 12px;font:600 13px/1.35 'JetBrains Mono',monospace;text-transform:uppercase}
-      .cf-fleet-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+      .cf-fleet-actions{display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
       .cf-fleet-actions strong{margin-right:auto;font-size:12px}
       .cf-fleet-bulk-result-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}
       .cf-fleet-bulk-result{display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--line,#dfe3df);border-radius:9px;background:#fff;min-width:0}
@@ -257,7 +259,8 @@
       .cf-fleet-bulk-result span{display:flex;flex-direction:column;min-width:0}.cf-fleet-bulk-result strong{font:800 12px/1.2 'JetBrains Mono',monospace}.cf-fleet-bulk-result small{margin-top:3px;color:var(--ink-soft,#747b76);font-size:10px;white-space:normal}
       .cf-fleet-bulk-edit-sheet{max-width:680px!important}.cf-fleet-bulk-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin-top:12px}.cf-fleet-bulk-edit-grid .cf-span-2{grid-column:span 2}
       .cf-fleet-inactive-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:10px 12px;border:1px solid #e2b866;border-radius:10px;background:#fff8e8;color:#674a10;font-size:12px}.cf-fleet-inactive-banner span{font-size:10px;opacity:.85}
-      #allVehiclesTable th:first-child,#allVehiclesTable td:first-child{text-align:center;width:34px}
+      #allVehiclesTable th:first-child,#allVehiclesTable td:first-child{text-align:center;width:34px;min-width:34px;max-width:34px;padding-left:4px;padding-right:4px}
+      #allVehiclesTable th:nth-child(2),#allVehiclesTable td:nth-child(2){width:92px;min-width:78px;max-width:110px;white-space:nowrap;padding-left:8px;padding-right:8px}
       @media(max-width:620px){
         .cf-fleet-search-row{grid-template-columns:1fr}.cf-fleet-search-row .btn{width:100%}
         .cf-fleet-bulk-result-list{grid-template-columns:1fr}

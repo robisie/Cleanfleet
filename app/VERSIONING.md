@@ -110,3 +110,5 @@ CleanFleet v1.54.17: zarządzanie aktywną flotą bez kasowania historii. Pojazd
 CleanFleet v1.54.18: dopracowany widok „Lista wszystkich samochodów”. Kolumna typu pojazdu jest węższa, a pasek operacji zbiorczych (Edytuj dane / Dodaj do floty / Usuń z floty) pozostaje całkowicie ukryty przy braku zaznaczenia i pojawia się dopiero po wybraniu co najmniej jednego pojazdu. Bez zaznaczenia widoczna pozostaje wyłącznie wyszukiwarka i przycisk „Szukaj”.
 
 CleanFleet v1.54.19: poprawiony układ tabeli w „Lista wszystkich samochodów”. Kolumna typu pojazdu ma stałą kompaktową szerokość, a odzyskane miejsce przechodzi głównie na kolumnę tablicy. Przy braku zaznaczonych pojazdów akcje zbiorcze pozostają ukryte — widoczna jest tylko wyszukiwarka i przycisk „Szukaj”.
+
+CleanFleet v1.54.20: tabela „Lista wszystkich samochodów” rozdziela tablicę rejestracyjną od przycisków Historia / Edytuj pojazd. Szerokość kolumn Typ, Tablica i Akcje jest wyliczana po renderowaniu na podstawie najszerszej faktycznej zawartości i ustawiana na 110% tej szerokości; pozostałe kolumny zachowują dotychczasowe zachowanie. Akcje zbiorcze pozostają ukryte do momentu zaznaczenia pojazdu.

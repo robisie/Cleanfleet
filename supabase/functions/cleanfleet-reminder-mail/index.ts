@@ -96,9 +96,9 @@ async function inspectPdf(bytes:Uint8Array,filename:string,context:any){
   const prompt=[
     'Przeanalizuj załączony PDF jako potencjalną fakturę dla przypomnienia o płatności.',
     'Zwróć WYŁĄCZNIE JSON bez markdownu:',
-    '{"is_invoice":true,"matches_reminder":true,"invoice_number":"...","amount":123.45,"currency":"PLN","invoice_date":"YYYY-MM-DD","due_date":"YYYY-MM-DD","seller":"...","document_month_match":true,"confidence":"high|medium|low"}',
+    '{"is_invoice":true,"matches_reminder":true,"invoice_number":"...","reference_number":"...","amount":123.45,"currency":"PLN","invoice_date":"YYYY-MM-DD","due_date":"YYYY-MM-DD","seller":"...","confidence":"high|medium|low"}',
     'amount ma oznaczać końcową kwotę DO ZAPŁATY, nie netto ani VAT.',
-    'due_date to termin płatności, invoice_date to data wystawienia. document_month_match ma być true tylko wtedy, gdy faktura dotyczy target_month z kontekstu.',
+    'due_date to termin płatności, invoice_date to data wystawienia. invoice_number to właściwy numer faktury/dokumentu. Jeżeli dokument ma pola „Numer dokumentu” i „Numer referencyjny”, invoice_number MUSI być wartością z „Numer dokumentu”, a reference_number z „Numer referencyjny”. Nigdy nie podstawiaj numeru referencyjnego, numeru klienta, zamówienia ani polecenia zapłaty jako invoice_number.',
     'Nie zgaduj. Jeśli któregokolwiek pola nie da się wiarygodnie ustalić, użyj null i obniż confidence.',
     'matches_reminder oznacza zgodność faktury z opisem przypomnienia i danymi wiadomości.',
     'Kontekst przypomnienia: '+JSON.stringify(context)
@@ -119,11 +119,11 @@ async function inspectPdf(bytes:Uint8Array,filename:string,context:any){
     is_invoice:parsed.is_invoice===true,
     matches_reminder:parsed.matches_reminder===true,
     invoice_number:clean(parsed.invoice_number,120)||null,
+    reference_number:clean(parsed.reference_number,120)||null,
     amount:Number.isFinite(amount)&&amount>=0?Math.round(amount*100)/100:null,
     currency:clean(parsed.currency,8).toUpperCase()||null,
     invoice_date:validDate(parsed.invoice_date)||null,
     due_date:validDate(parsed.due_date)||null,
-    document_month_match:parsed.document_month_match===true,
     seller:clean(parsed.seller,160)||null,
     confidence:['high','medium','low'].includes(parsed.confidence)?parsed.confidence:'low'
   };
@@ -147,7 +147,8 @@ async function scanReminder(r:any){
     await client.mailboxOpen(resolveFolder(folders,folder),{readOnly:true});
     const targetMonth=localParts(r.mail_anchor_due_at||r.due_at).date.slice(0,7);
     const [ty,tm]=targetMonth.split('-').map(Number);
-    const from=new Date(Date.UTC(ty,tm-1,1,0,0,0));
+    const monthStart=new Date(Date.UTC(ty,tm-1,1,0,0,0));
+    const from=new Date(monthStart.getTime()-14*86400000);
     const before=new Date(Date.UTC(tm===12?ty+1:ty,tm===12?0:tm,1,0,0,0));
     const search:any={since:from,before};if(sender)search.from=sender;if(subjectNeedle)search.subject=subjectNeedle;
     const uids=await client.search(search,{uid:true});
@@ -156,7 +157,6 @@ async function scanReminder(r:any){
     const candidates:any[]=[];
     for(const m of messages){
       const received=receivedDay(m);
-      if(!received.startsWith(targetMonth+'-'))continue;
       const subject=clean(m.envelope?.subject,300),subjectNorm=norm(subject);
       const senders=(m.envelope?.from||[]).map((x:any)=>norm(x.address)).filter(Boolean);
       if(sender&&!senders.includes(sender))continue;
@@ -171,14 +171,14 @@ async function scanReminder(r:any){
       if(item.p.size>MAX_PDF)continue;
       const bytes=await downloadPart(client,item.m.uid,item.p);
       const parsed=await inspectPdf(bytes,item.p.filename,{title:r.title,payee:r.payee||'',expected_due:localParts(r.mail_anchor_due_at||r.due_at).date,target_month:targetMonth,email_sender:item.sender,email_subject:item.subject,attachment:item.p.filename});
-      if(!parsed.is_invoice||!parsed.document_month_match)continue;
-      if(parsed.invoice_date&&!parsed.invoice_date.startsWith(targetMonth+'-'))continue;
+      if(!parsed.is_invoice)continue;
+      if(!parsed.due_date||!parsed.due_date.startsWith(targetMonth+'-'))continue;
       const candidate={...parsed,source:{uid:item.m.uid,subject:item.subject,received:item.received,attachment:item.p.filename,sender:item.sender}};
       best=candidate;
       if(parsed.confidence==='high'&&parsed.matches_reminder)break;
     }
     if(!best)return {found:false};
-    const auto=best.confidence==='high'&&best.matches_reminder&&best.document_month_match&&best.invoice_number&&best.amount!=null&&best.due_date&&best.currency==='PLN';
+    const auto=best.confidence==='high'&&best.matches_reminder&&best.invoice_number&&best.amount!=null&&best.due_date&&best.due_date.startsWith(targetMonth+'-')&&best.currency==='PLN';
     const sourcePatch={
       mail_last_checked_at:now.toISOString(),
       mail_last_error:null,

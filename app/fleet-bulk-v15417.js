@@ -276,7 +276,7 @@
         paddingMax=Math.max(paddingMax,cellPadding(cell));
         contentMax=Math.max(contentMax,contentMeasure(cell));
       });
-      const width=Math.ceil(contentMax*1.10+paddingMax);
+      const width=Math.ceil(contentMax+paddingMax+15);
       cells.forEach(cell=>{
         cell.style.width=px(width);
         cell.style.minWidth=px(width);

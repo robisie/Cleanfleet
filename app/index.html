@@ -12646,6 +12646,18 @@ function uid(){
   }
 
   window.cfReportShell = reportShell;
+  window.CFFleetBulkBridge = {
+    getRegistry:()=>registry,
+    getOptions:()=>options,
+    getClient:()=>cfSupabase,
+    getCompanyId:()=>cfActiveCompanyId,
+    billingCompanyOptions:(value,allowEmpty)=>cfBillingCompanyOptions(value,allowEmpty),
+    billingCurrency:(billingCompanyId,fallback)=>cfBillingCompanyCurrency(billingCompanyId,fallback),
+    reload:()=>loadAll(),
+    openList:()=>showAllOutstanding(),
+    toast:message=>showToast(message),
+    confirm:(title,message,action)=>showConfirm(title,message,action)
+  };
 
   function reportShell(title, controlsHtml, bodyHtml){
     const html = `

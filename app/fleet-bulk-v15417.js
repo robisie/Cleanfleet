@@ -231,7 +231,7 @@
   }
   function bind(){
     ensureStyles();
-    const table=document.getElementById('allVehiclesTable');if(!table)return;
+    const table=document.getElementById('allVehiclesTable');
     if(!document.getElementById('cfFleetBulkToolbar')){
       const toolbar=document.createElement('section');
       toolbar.id='cfFleetBulkToolbar';
@@ -239,8 +239,9 @@
       toolbar.innerHTML='<div class="cf-fleet-search-row"><textarea id="cfFleetBulkSearch" rows="2" placeholder="Wklej tablice, np. SB1234A, SB5678B, SB9012C"></textarea><button type="button" class="btn btn-solid" id="cfFleetBulkSearchBtn">Szukaj</button></div>'+
         '<div id="cfFleetBulkResults" hidden></div>'+
         '<div class="cf-fleet-actions"><strong id="cfFleetSelectedCount">Wybrano: '+state.selected.size+'</strong><button class="btn btn-outline" type="button" data-cf-fleet-action="edit">Edytuj dane</button><button class="btn btn-solid" type="button" data-cf-fleet-action="add">Dodaj do floty</button><button class="btn btn-danger" type="button" data-cf-fleet-action="remove">Usuń z floty</button></div>';
-      const target=document.querySelector('#reportOverlay .vehicle-list-toolbar')||table.parentElement;
-      target?.parentElement?.insertBefore(toolbar,target);
+      const target=document.querySelector('#reportOverlay .vehicle-list-toolbar')||table?.parentElement||document.getElementById('reportBody');
+      if(target?.parentElement && target.id!=='reportBody') target.parentElement.insertBefore(toolbar,target);
+      else target?.prepend(toolbar);
       document.getElementById('cfFleetBulkSearchBtn')?.addEventListener('click',doSearch);
       document.getElementById('cfFleetBulkSearch')?.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter')doSearch();});
       toolbar.querySelector('[data-cf-fleet-action="edit"]')?.addEventListener('click',()=>openCommonModal('edit'));

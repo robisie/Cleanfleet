@@ -10400,7 +10400,9 @@ function uid(){
         const currentPlates = new Set(Object.keys(registry));
         const removed = [...cfRemoteVehiclePlates].filter(plate=>!currentPlates.has(plate));
         if(removed.length){
-          await cfRetrySupabase(() => cfSupabase.from('vehicles').delete().eq('company_id',cfActiveCompanyId).in('plate', removed));
+          const removedAt=new Date().toISOString();
+          await cfRetrySupabase(() => cfSupabase.from('vehicles').update({in_fleet:false,fleet_removed_at:removedAt}).eq('company_id',cfActiveCompanyId).in('plate', removed));
+          removed.forEach(plate=>currentPlates.add(plate));
         }
         cfRemoteVehiclePlates = currentPlates;
       }

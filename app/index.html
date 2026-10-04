@@ -15441,7 +15441,7 @@ function uid(){
     const table = document.getElementById('allVehiclesTable');
     const label = document.getElementById('vehicleTypeFilterLabel');
     const cards = document.querySelectorAll('.vehicle-filter-card');
-    if(!table) return;
+    if(!table){ window.CFFleetBulk?.bind?.(); return; }
     const plural = (n) => n === 1 ? 'pojazd' : (n >= 2 && n <= 4 ? 'pojazdy' : 'pojazdów');
     const update = (value, card) => {
       cfAllVehiclesFilter = value || 'ALL';

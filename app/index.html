@@ -12651,6 +12651,8 @@ function uid(){
     getOptions:()=>options,
     getClient:()=>cfSupabase,
     getCompanyId:()=>cfActiveCompanyId,
+    getRecords:()=>records,
+    getInvoiceItems:()=>invoiceItems,
     billingCompanyOptions:(value,allowEmpty)=>cfBillingCompanyOptions(value,allowEmpty),
     billingCurrency:(billingCompanyId,fallback)=>cfBillingCompanyCurrency(billingCompanyId,fallback),
     reload:()=>loadAll(),

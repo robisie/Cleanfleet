@@ -1,0 +1,14 @@
+@neslinesli93/qpdf-wasm 0.3.0
+Source: https://github.com/neslinesli93/qpdf-wasm
+NPM package license: ISC
+Original dist/qpdf.js and dist/qpdf.wasm are unmodified.
+
+QPDF 12.2.0
+Copyright (c) 2005-2021 Jay Berkenbilt
+Copyright (c) 2022-2025 Jay Berkenbilt and Manfred Holger
+Licensed under the Apache License, Version 2.0. See LICENSE-qpdf.txt.
+Source: https://github.com/qpdf/qpdf
+
+The WASM build also links zlib and libjpeg-turbo.
+Their license notices are retained in LICENSE-zlib.txt and LICENSE-jpeg-turbo.md.
+Build source and versions: https://github.com/neslinesli93/qpdf-wasm/blob/master/Dockerfile

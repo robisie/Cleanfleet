@@ -116,3 +116,5 @@ CleanFleet v1.54.20: tabela „Lista wszystkich samochodów” rozdziela tablic�
 CleanFleet v1.54.21: szerokość kolumn Typ, Tablica i Akcje w „Lista wszystkich samochodów” jest liczona jako najszersza rzeczywista zawartość danej kolumny + 15 px, bez przelicznika procentowego. Pozostałe kolumny zachowują dotychczasową szerokość.
 
 CleanFleet v1.54.22: naprawa powrotu z pełnoekranowej prognozy pogody. Przycisk „← CleanFleet” nie korzysta już z history.back(), które na iPadOS/Safari potrafiło przywrócić aplikację z BFCache z widocznym loaderem bez ponownego startu. Powrót prowadzi bezpośrednio do /app/, a aplikacja ma dodatkowe zabezpieczenie pageshow dla powrotów z pamięci przeglądarki.
+
+CleanFleet v1.54.28: loader startowy pokazuje aktualnie ładowaną wersję aplikacji pod komunikatem stanu. Numer jest zgodny z wersją widoczną w nagłówku aplikacji; po uruchomieniu loader dodatkowo synchronizuje ten tekst z elementem wersji aplikacji.

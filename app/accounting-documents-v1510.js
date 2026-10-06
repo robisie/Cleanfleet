@@ -5,7 +5,7 @@
   const OVERLAY_ID = 'cfAccountingDocsOverlay';
   const STYLE_ID = 'cfAccountingDocsStyle1510';
   let observer = null;
-  let selectedFiles = { organizer: [] };
+  let selectedFiles = { organizer: [], organizerPurchases: [] };
   let priorBodyOverflow = '';
   let bankFiles = [];
   let bankResults = [];
@@ -318,7 +318,7 @@
     if(!isAdmin() || allRun)return;
     if(ksefRun || ksefConfigRun || bankBusy || window.CFAccountingMail?.isBusy?.() || window.CFAccountingReconcile?.isBusy?.()){allStatus('Poczekaj na zakończenie bieżącej operacji.');return;}
     if(!window.CFAccountingPackage || !window.CFAccountingMail || !window.CFAccountingReconcile){allStatus('Odśwież aplikację — brakuje modułu paczki.');return;}
-    const month=document.getElementById('cfAccountingMonth').value,organizer=[...selectedFiles.organizer];
+    const month=document.getElementById('cfAccountingMonth').value,organizer=[...selectedFiles.organizer],organizerPurchases=[...selectedFiles.organizerPurchases];
     const controller=new AbortController();allRun=controller;allBusy(true);const check=()=>{if(controller.signal.aborted || !isAdmin() || document.getElementById('cfAccountingMonth').value!==month)throw new DOMException('Anulowano','AbortError');};
     try{
       if(bankFiles.length && bankResults.length!==bankFiles.length)throw new Error('mBank: najpierw przekonwertuj wybrane CSV na MT940.');
@@ -341,10 +341,10 @@
       const purchaseFiles=window.CFAccountingReconcile.attachmentFiles(purchaseAttachments);
       allStatus('Dołączanie zaznaczonych załączników poczty…');
       const mail=await window.CFAccountingMail.exportFiles(controller.signal,allStatus);check();
-      if(!organizer.length && !purchaseFiles.length && !bank.length && !mail.length && !Object.values(ksef).some(result=>result?.count>0))throw new Error('Przygotuj dokumenty lub zaznacz załączniki, zanim pobierzesz paczkę.');
-      const result=await window.CFAccountingPackage.build({month,ksef,organizerFiles:organizer,purchaseFiles,bankResults:bank,mailFiles:mail,signal:controller.signal,onProgress:allStatus});check();
+      if(!organizer.length && !organizerPurchases.length && !purchaseFiles.length && !bank.length && !mail.length && !Object.values(ksef).some(result=>result?.count>0))throw new Error('Przygotuj dokumenty lub zaznacz załączniki, zanim pobierzesz paczkę.');
+      const result=await window.CFAccountingPackage.build({month,ksef,organizerFiles:organizer,organizerPurchaseFiles:organizerPurchases,purchaseFiles,bankResults:bank,mailFiles:mail,signal:controller.signal,onProgress:allStatus});check();
       const url=URL.createObjectURL(new Blob([result.bytes],{type:'application/zip'})),link=document.createElement('a');link.href=url;link.download='Dokumenty-'+month+'.zip';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
-      allElement('Confirm').hidden=true;const c=result.counts;allStatus('ZIP gotowy. KSeF: '+c.purchases+' zakupowych i '+c.sales+' sprzedażowych. Zakupowe spoza KSeF: '+c.externalPurchases+' PDF. mOrganizer: '+c.organizer+' PDF. MT940: '+c.bank+'. Poczta: '+c.mail+' załączników. Raport kasowy: pusty folder.');
+      allElement('Confirm').hidden=true;const c=result.counts;allStatus('ZIP gotowy. KSeF: '+c.purchases+' zakupowych i '+c.sales+' sprzedażowych. Zakupowe spoza KSeF: '+c.externalPurchases+' PDF. mOrganizer — sprzedażowe: '+c.organizer+' PDF. MT940: '+c.bank+'. Poczta: '+c.mail+' załączników. Raport kasowy: pusty folder.');
     }catch(error){allStatus(error.name==='AbortError'?'Anulowano przygotowanie paczki.':'Nie utworzono wspólnego ZIP: '+error.message);}
     finally{if(allRun===controller){allRun=null;allBusy(false);}}
   }
@@ -430,11 +430,14 @@
     const input = document.getElementById('cfAccountingMonth');
     const label = document.getElementById('cfAccountingMonthLabel');
     if (label) label.textContent = monthLabel(input?.value || '');
+    const month=input?.value||'';
+    let folder='MIESIĄC';try{folder=window.CFAccountingPackage.monthFolder(month);}catch(_){}
+    for(const [id,destination] of [['cfAccountingOrganizerPath','faktury sprzedażowe'],['cfAccountingOrganizerPurchasePath','faktury zakupowe']]){const path=document.getElementById(id);if(path)path.textContent='Folder w ZIP: '+folder+' / '+destination+' /';}
     const number=bankElement('Number');if(number && !number.dataset.custom)number.value=String(Number(input?.value?.split('-')[1]) || 1);
   }
 
   function fileCard(type, files) {
-    const target = document.getElementById(type === 'bank' ? 'cfAccountingBankFile' : 'cfAccountingOrganizerFile');
+    const target = document.getElementById(type === 'bank' ? 'cfAccountingBankFile' : type === 'organizerPurchases' ? 'cfAccountingOrganizerPurchaseFile' : 'cfAccountingOrganizerFile');
     if (!target) return;
     const list = Array.isArray(files) ? files : files ? [files] : [];
     if (!list.length) {
@@ -468,7 +471,7 @@
             '<div class="cf-accounting-source-grid">',
               '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>KSeF</h2><p>Faktury z wybranego miesiąca oraz odświeżenie historii trzech poprzednich. Uzupełnij historię roku pobiera brakujące miesiące od stycznia (bieżący rok — do dziś).</p></div><span class="cf-accounting-status">Połączenie KSeF</span></div><form id="cfKsefForm" class="cf-ksef-form"><label for="cfKsefNip">NIP firmy<input id="cfKsefNip" type="text" inputmode="numeric" maxlength="15" autocomplete="off" required></label><label for="cfKsefToken">Token KSeF<span class="cf-ksef-token-row"><input id="cfKsefToken" type="password" autocomplete="new-password" spellcheck="false" required data-saved="false"><button id="cfKsefSave" type="button">Zapisz</button></span></label><label for="cfKsefEnvironment">Środowisko<select id="cfKsefEnvironment"><option value="production">Produkcyjne — rzeczywiste faktury</option><option value="test">Testowe — dane testowe</option></select></label><button id="cfKsefStart" type="submit">Pobierz faktury z KSeF</button><button id="cfKsefHistoryYear" type="button">Uzupełnij historię roku</button><button id="cfKsefCancel" type="button" hidden>Anuluj pobieranie</button></form><p id="cfKsefStatus" role="status" aria-live="polite">Token musi mieć uprawnienie do przeglądania faktur. Kliknij Zapisz, aby go zapamiętać.</p><p id="cfKsefHistoryStatus" role="status">Historia zakupów jest zapisywana na koncie po pobraniu KSeF.</p><button id="cfKsefHistoryRetry" type="button" class="cf-ksef-download" hidden>Zapisz historię ponownie</button><button id="cfKsefpurchases" type="button" class="cf-ksef-download" hidden>Pobierz faktury zakupowe</button><button id="cfKsefsales" type="button" class="cf-ksef-download" hidden>Pobierz faktury sprzedażowe</button></article>',
               '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>mBank</h2><p>Pełny eksport CSV historii rachunku za wybrany miesiąc.</p></div><span class="cf-accounting-status">CSV → MT940</span></div><label class="cf-accounting-upload">Wybierz pliki CSV<input id="cfAccountingBankInput" type="file" accept=".csv,text/csv" multiple></label><div class="cf-accounting-file" id="cfAccountingBankFile"></div><div class="cf-ksef-form"><label for="cfAccountingBankNumber">Numer wyciągu<input id="cfAccountingBankNumber" type="number" min="1" max="99999" step="1"></label><label for="cfAccountingBankEncoding">Kodowanie MT940<select id="cfAccountingBankEncoding"><option value="utf-8">UTF-8</option><option value="windows-1250">Windows-1250</option></select></label><button id="cfAccountingBankConvert" type="button">Konwertuj CSV na MT940</button></div><p id="cfAccountingBankStatus" class="cf-bank-status" role="status" aria-live="polite">Jeden pełny CSV na rachunek. Konwersja odbywa się w przeglądarce. Do importu wybierz w programie księgowym format MT940 standard i zgodne kodowanie.</p><div id="cfAccountingBankResults"></div></article>',
-              '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>mOrganizer</h2><p>Eksportowane paczki faktur w plikach PDF. Możesz zaznaczyć kilka plików jednocześnie.</p></div><span class="cf-accounting-status">Plik z komputera</span></div><label class="cf-accounting-upload">Wybierz pliki PDF<input id="cfAccountingOrganizerInput" type="file" accept=".pdf,application/pdf" multiple></label><div class="cf-accounting-file" id="cfAccountingOrganizerFile"></div></article>',
+              '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>mOrganizer</h2><p>Eksportowane paczki faktur w plikach PDF. Możesz zaznaczyć kilka plików jednocześnie.</p></div><span class="cf-accounting-status">Plik z komputera</span></div><h3>Faktury sprzedażowe</h3><p id="cfAccountingOrganizerPath">Folder w ZIP: MIESIĄC / faktury sprzedażowe /</p><label class="cf-accounting-upload">Wybierz PDF-y sprzedażowe<input id="cfAccountingOrganizerInput" type="file" accept=".pdf,application/pdf" multiple></label><div class="cf-accounting-file" id="cfAccountingOrganizerFile"></div><h3>Faktury zakupowe</h3><p id="cfAccountingOrganizerPurchasePath">Folder w ZIP: MIESIĄC / faktury zakupowe /</p><label class="cf-accounting-upload">Wybierz PDF-y zakupowe<input id="cfAccountingOrganizerPurchaseInput" type="file" accept=".pdf,application/pdf" multiple></label><div class="cf-accounting-file" id="cfAccountingOrganizerPurchaseFile"></div></article>',
               '<article class="cf-accounting-source" id="cfMailMount"></article>',
             '</div>',
             '</fieldset>',
@@ -512,10 +515,11 @@
           else bankStatus('Wybrane pliki: '+bankFiles.length+'. Kliknij Konwertuj CSV na MT940.');
           bankFileLabels();
         }
-        if (input?.id === 'cfAccountingOrganizerInput') {
+        if (['cfAccountingOrganizerInput','cfAccountingOrganizerPurchaseInput'].includes(input?.id)) {
           const files = Array.from(input.files || []);
-          selectedFiles.organizer = files.filter(file => /\.pdf$/i.test(file.name) || file.type === 'application/pdf');
-          fileCard('organizer', selectedFiles.organizer);
+          const kind=input.id==='cfAccountingOrganizerPurchaseInput'?'organizerPurchases':'organizer';
+          selectedFiles[kind] = files.filter(file => /\.pdf$/i.test(file.name) || file.type === 'application/pdf');
+          fileCard(kind, selectedFiles[kind]);
         }
       });
       document.body.appendChild(overlay);
@@ -526,6 +530,7 @@
     if (monthInput && !monthInput.value) monthInput.value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
     bankFileLabels();
     fileCard('organizer', selectedFiles.organizer);
+    fileCard('organizerPurchases', selectedFiles.organizerPurchases);
     updateMonth();
     priorBodyOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -558,7 +563,7 @@
       forgetKsefView();
       window.CFAccountingMail?.reset();
       resetBank();bankFiles=[];bankFileLabels();
-      purchaseAttachments.clear();selectedFiles.organizer=[];fileCard('organizer',selectedFiles.organizer);
+      purchaseAttachments.clear();selectedFiles.organizer=[];selectedFiles.organizerPurchases=[];fileCard('organizer',selectedFiles.organizer);fileCard('organizerPurchases',selectedFiles.organizerPurchases);
     }
   }
 

@@ -73,12 +73,13 @@
   const ksefElement = id => document.getElementById('cfKsef' + id);
   function ksefStatus(message) { const el=ksefElement('Status'); if(el)el.textContent=message; }
   function resetKsef() {
+    window.CFKsefPreview?.close();const preview=ksefElement('Preview');if(preview)preview.hidden=true;
     invalidateReview();
     ksefRun?.abort(); ksefRun=null; ksefResults={}; busyKsef(false);if(ksefElement('HistoryStatus'))ksefElement('HistoryStatus').textContent='Historia zakupów jest zapisywana na koncie po pobraniu KSeF.';if(ksefElement('HistoryRetry'))ksefElement('HistoryRetry').hidden=true;
     for(const kind of ['purchases','sales']) {const el=ksefElement(kind);if(el){el.hidden=true;el.disabled=true;}}
   }
   function busyKsef(busy) {
-    for(const id of ['Nip','Token','Environment','Start','Save','HistoryYear','HistoryRetry']){const el=ksefElement(id);if(el)el.disabled=busy || Boolean(ksefConfigRun);}
+    for(const id of ['Nip','Token','Environment','Start','Save','HistoryYear','HistoryRetry','Preview']){const el=ksefElement(id);if(el)el.disabled=busy || Boolean(ksefConfigRun);}
     const month=document.getElementById('cfAccountingMonth');if(month)month.disabled=busy;
     const cancel=ksefElement('Cancel');if(cancel)cancel.hidden=!busy;
   }
@@ -248,6 +249,7 @@
         result.month=month;button.hidden=false;button.disabled=!result.blob;
         button.textContent=(kind==='purchases'?'Faktury zakupowe':'Faktury sprzedażowe')+': '+result.count+(result.blob?' · Pobierz PDF-y (ZIP)':' · Brak faktur');
       }
+      const preview=ksefElement('Preview');if(preview)preview.hidden=false;
       const currentSaved=await saveHistory(signal);
       try{
         if(!window.CFAccountingHistory)throw new Error('Odśwież aplikację — brakuje modułu historii.');
@@ -469,7 +471,7 @@
           '<fieldset id="cfAccountingInputs" style="border:0;padding:0;margin:18px 0 0;min-width:0">',
             '<div class="cf-accounting-period"><label for="cfAccountingMonth">Miesiąc rozliczeniowy</label><input id="cfAccountingMonth" type="month"></div>',
             '<div class="cf-accounting-source-grid">',
-              '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>KSeF</h2><p>Faktury z wybranego miesiąca oraz odświeżenie historii trzech poprzednich. Uzupełnij historię roku pobiera brakujące miesiące od stycznia (bieżący rok — do dziś).</p></div><span class="cf-accounting-status">Połączenie KSeF</span></div><form id="cfKsefForm" class="cf-ksef-form"><label for="cfKsefNip">NIP firmy<input id="cfKsefNip" type="text" inputmode="numeric" maxlength="15" autocomplete="off" required></label><label for="cfKsefToken">Token KSeF<span class="cf-ksef-token-row"><input id="cfKsefToken" type="password" autocomplete="new-password" spellcheck="false" required data-saved="false"><button id="cfKsefSave" type="button">Zapisz</button></span></label><label for="cfKsefEnvironment">Środowisko<select id="cfKsefEnvironment"><option value="production">Produkcyjne — rzeczywiste faktury</option><option value="test">Testowe — dane testowe</option></select></label><button id="cfKsefStart" type="submit">Pobierz faktury z KSeF</button><button id="cfKsefHistoryYear" type="button">Uzupełnij historię roku</button><button id="cfKsefCancel" type="button" hidden>Anuluj pobieranie</button></form><p id="cfKsefStatus" role="status" aria-live="polite">Token musi mieć uprawnienie do przeglądania faktur. Kliknij Zapisz, aby go zapamiętać.</p><p id="cfKsefHistoryStatus" role="status">Historia zakupów jest zapisywana na koncie po pobraniu KSeF.</p><button id="cfKsefHistoryRetry" type="button" class="cf-ksef-download" hidden>Zapisz historię ponownie</button><button id="cfKsefpurchases" type="button" class="cf-ksef-download" hidden>Pobierz faktury zakupowe</button><button id="cfKsefsales" type="button" class="cf-ksef-download" hidden>Pobierz faktury sprzedażowe</button></article>',
+              '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>KSeF</h2><p>Faktury z wybranego miesiąca oraz odświeżenie historii trzech poprzednich. Uzupełnij historię roku pobiera brakujące miesiące od stycznia (bieżący rok — do dziś).</p></div><span class="cf-accounting-status">Połączenie KSeF</span></div><form id="cfKsefForm" class="cf-ksef-form"><label for="cfKsefNip">NIP firmy<input id="cfKsefNip" type="text" inputmode="numeric" maxlength="15" autocomplete="off" required></label><label for="cfKsefToken">Token KSeF<span class="cf-ksef-token-row"><input id="cfKsefToken" type="password" autocomplete="new-password" spellcheck="false" required data-saved="false"><button id="cfKsefSave" type="button">Zapisz</button></span></label><label for="cfKsefEnvironment">Środowisko<select id="cfKsefEnvironment"><option value="production">Produkcyjne — rzeczywiste faktury</option><option value="test">Testowe — dane testowe</option></select></label><button id="cfKsefStart" type="submit">Pobierz faktury z KSeF</button><button id="cfKsefHistoryYear" type="button">Uzupełnij historię roku</button><button id="cfKsefCancel" type="button" hidden>Anuluj pobieranie</button></form><p id="cfKsefStatus" role="status" aria-live="polite">Token musi mieć uprawnienie do przeglądania faktur. Kliknij Zapisz, aby go zapamiętać.</p><p id="cfKsefHistoryStatus" role="status">Historia zakupów jest zapisywana na koncie po pobraniu KSeF.</p><button id="cfKsefHistoryRetry" type="button" class="cf-ksef-download" hidden>Zapisz historię ponownie</button><button id="cfKsefpurchases" type="button" class="cf-ksef-download" hidden>Pobierz faktury zakupowe</button><button id="cfKsefsales" type="button" class="cf-ksef-download" hidden>Pobierz faktury sprzedażowe</button><button id="cfKsefPreview" type="button" class="cf-ksef-download" hidden>Podgląd</button></article>',
               '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>mBank</h2><p>Pełny eksport CSV historii rachunku za wybrany miesiąc.</p></div><span class="cf-accounting-status">CSV → MT940</span></div><label class="cf-accounting-upload">Wybierz pliki CSV<input id="cfAccountingBankInput" type="file" accept=".csv,text/csv" multiple></label><div class="cf-accounting-file" id="cfAccountingBankFile"></div><div class="cf-ksef-form"><label for="cfAccountingBankNumber">Numer wyciągu<input id="cfAccountingBankNumber" type="number" min="1" max="99999" step="1"></label><label for="cfAccountingBankEncoding">Kodowanie MT940<select id="cfAccountingBankEncoding"><option value="utf-8">UTF-8</option><option value="windows-1250">Windows-1250</option></select></label><button id="cfAccountingBankConvert" type="button">Konwertuj CSV na MT940</button></div><p id="cfAccountingBankStatus" class="cf-bank-status" role="status" aria-live="polite">Jeden pełny CSV na rachunek. Konwersja odbywa się w przeglądarce. Do importu wybierz w programie księgowym format MT940 standard i zgodne kodowanie.</p><div id="cfAccountingBankResults"></div></article>',
               '<article class="cf-accounting-source"><div class="cf-accounting-source-top"><div><h2>mOrganizer</h2><p>Eksportowane paczki faktur w plikach PDF. Możesz zaznaczyć kilka plików jednocześnie.</p></div><span class="cf-accounting-status">Plik z komputera</span></div><h3>Faktury sprzedażowe</h3><p id="cfAccountingOrganizerPath">Folder w ZIP: MIESIĄC / faktury sprzedażowe /</p><label class="cf-accounting-upload">Wybierz PDF-y sprzedażowe<input id="cfAccountingOrganizerInput" type="file" accept=".pdf,application/pdf" multiple></label><div class="cf-accounting-file" id="cfAccountingOrganizerFile"></div><h3>Faktury zakupowe</h3><p id="cfAccountingOrganizerPurchasePath">Folder w ZIP: MIESIĄC / faktury zakupowe /</p><label class="cf-accounting-upload">Wybierz PDF-y zakupowe<input id="cfAccountingOrganizerPurchaseInput" type="file" accept=".pdf,application/pdf" multiple></label><div class="cf-accounting-file" id="cfAccountingOrganizerPurchaseFile"></div></article>',
               '<article class="cf-accounting-source" id="cfMailMount"></article>',
@@ -497,6 +499,7 @@
         if(event.target.id==='cfKsefCancel')ksefRun?.abort();
         if(event.target.id==='cfKsefpurchases')saveKsef('purchases');
         if(event.target.id==='cfKsefsales')saveKsef('sales');
+        if(event.target.id==='cfKsefPreview'&&isAdmin()&&!ksefRun){if(window.CFKsefPreview)window.CFKsefPreview.open(ksefResults,document.getElementById('cfAccountingMonth').value);else ksefStatus('Odśwież aplikację — brakuje modułu podglądu.');}
         if (event.target === overlay || event.target.closest('[data-cf-accounting-close]')) closeModule();
       });
       overlay.addEventListener('change', event => {
@@ -541,6 +544,7 @@
   }
 
   function closeModule() {
+    window.CFKsefPreview?.close();
     allRun?.abort();
     window.CFAccountingMail?.close();
     const overlay = document.getElementById(OVERLAY_ID);

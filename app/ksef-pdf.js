@@ -19,7 +19,7 @@ function invoiceData(bytes,name){
  if(!/^\d{10}$/.test(nip) || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !text(fa,'P_2'))throw new Error(name+': brakuje danych identyfikacyjnych faktury.');
  const nrKSeF=name.split(/[\\/]/).at(-1).match(/^(\d{10}-\d{8}-[0-9a-f]{12}-[0-9a-f]{2})\.xml$/i)?.[1] || '';
  const payment=get(fa,'Platnosc'),accounts=Array.from(payment?.children || []).filter(node=>['RachunekBankowy','RachunekBankowyFaktora'].includes(node.localName)).map(node=>text(node,'NrRB')).filter(Boolean);
- return {nip,date,nrKSeF,number:text(fa,'P_2'),seller:text(get(get(doc.documentElement,'Podmiot1'),'DaneIdentyfikacyjne'),'Nazwa'),gross:text(fa,'P_15'),currency:text(fa,'KodWaluty'),type:text(fa,'RodzajFaktury'),accounts};
+ return {nip,date,nrKSeF,number:text(fa,'P_2'),seller:text(get(get(doc.documentElement,'Podmiot1'),'DaneIdentyfikacyjne'),'Nazwa'),buyer:text(get(get(doc.documentElement,'Podmiot2'),'DaneIdentyfikacyjne'),'Nazwa'),buyerNip:text(get(get(doc.documentElement,'Podmiot2'),'DaneIdentyfikacyjne'),'NIP'),gross:text(fa,'P_15'),currency:text(fa,'KodWaluty'),type:text(fa,'RodzajFaktury'),accounts};
 }
 async function convert({archive,count,signal,environment='production',onProgress=()=>{},onInvoice=()=>{}},render){
  check(signal);if(!Number.isInteger(count)||count<0)throw new Error('Niepoprawna liczba faktur KSeF.');

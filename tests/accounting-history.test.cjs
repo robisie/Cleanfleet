@@ -28,7 +28,7 @@ test('export metadata fills history from authoritative KSeF fields, including ze
  for(const json of [[metadata],{invoices:[metadata]}]){
   const z=new Zip();z.file(id+'.xml','<verified invoice/>');z.file('_metadata.json',JSON.stringify(json));
   const items=await h.archiveMetadata(z,1);assert.equal(items[0].gross,0);assert.equal(h.cleanInvoices(items,'2026-08')[0].gross,'0.00');
-  const merged=h.mergeMetadata([invoice({gross:'',accounts:['12345678901234567890123456']})],items);assert.deepEqual(merged[0].accounts,['12345678901234567890123456']);assert.equal(merged[0].gross,0);
+  const merged=h.mergeMetadata([invoice({gross:'',buyer:'Nabywca testowy',buyerNip:'6351861297',accounts:['12345678901234567890123456']})],items);assert.deepEqual(merged[0].accounts,['12345678901234567890123456']);assert.equal(merged[0].gross,0);assert.equal(merged[0].buyer,'Nabywca testowy');assert.equal(merged[0].buyerNip,'6351861297');
   assert.throws(()=>h.mergeMetadata([invoice({number:'different invoice'})],items),/niezgodne/);
  }
  const noMetadata=new Zip();noMetadata.file(id+'.xml','xml');assert.equal(await h.archiveMetadata(noMetadata,1),null);

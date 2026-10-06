@@ -48,7 +48,7 @@ async function archiveMetadata(archive,count,signal){
 function mergeMetadata(invoices,metadata){
  if(!metadata)return invoices;
  const source=new Map((invoices||[]).map(i=>[String(i.nrKSeF||'').toLowerCase(),i]));
- return metadata.map(m=>{const xml=source.get(m.nrKSeF.toLowerCase());if(xml && (xml.nip!==m.nip||xml.number!==m.number||xml.date!==m.date))throw new Error('Dane zestawienia KSeF są niezgodne z fakturą '+m.number+'.');return {...m,accounts:xml?.accounts||[]};});
+ return metadata.map(m=>{const xml=source.get(m.nrKSeF.toLowerCase());if(xml && (xml.nip!==m.nip||xml.number!==m.number||xml.date!==m.date))throw new Error('Dane zestawienia KSeF są niezgodne z fakturą '+m.number+'.');return {...m,buyer:xml?.buyer||'',buyerNip:xml?.buyerNip||'',accounts:xml?.accounts||[]};});
 }
 async function owner(client){if(!client)throw new Error('Brak połączenia z historią. Odśwież aplikację.');const {data,error}=await client.auth.getUser();if(error||!data?.user?.id)throw new Error('Zaloguj się ponownie, aby zapisać lub odczytać historię.');return data.user.id;}
 async function save(client,context,invoices,signal){const s=scope(context),clean=cleanInvoices(invoices,s.month),user_id=await owner(client);const query=client.from(TABLE).upsert({...s,user_id,invoices:clean,invoice_count:clean.length,updated_at:new Date().toISOString()},{onConflict:'user_id,environment,nip,month'});const {error}=await (signal?query.abortSignal(signal):query);if(error)throw new Error('Nie udało się zapisać historii KSeF. '+error.message);return clean.length;}

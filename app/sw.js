@@ -11,6 +11,12 @@ self.addEventListener('fetch', event => {
   const req = event.request;
   const url = new URL(req.url);
 
+  // Robisię has its own interface; do not inject CleanFleet scripts into it.
+  if (url.origin === self.location.origin && url.pathname.startsWith('/app/robisie/')) {
+    event.respondWith(fetch(req, { cache: 'no-store' }));
+    return;
+  }
+
   if (url.origin === self.location.origin && url.pathname.startsWith('/app/priv/')) {
     event.respondWith(fetch(req, { cache: 'no-store' }));
     return;

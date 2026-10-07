@@ -1,0 +1,716 @@
+[
+  {
+    "id": "service-5",
+    "category": "Demontaż i przygotowanie do remontu",
+    "name": "Pozostałe prace demontażowe i przygotowawcze",
+    "base": 70.0,
+    "unit": ""
+  },
+  {
+    "id": "service-6",
+    "category": "Demontaż i przygotowanie do remontu",
+    "name": "Zabezpieczanie mieszkania przed remontem",
+    "base": 20.0,
+    "unit": ""
+  },
+  {
+    "id": "service-7",
+    "category": "Demontaż i przygotowanie do remontu",
+    "name": "Demontaż drzwi wew",
+    "base": 140.0,
+    "unit": ""
+  },
+  {
+    "id": "service-8",
+    "category": "Demontaż i przygotowanie do remontu",
+    "name": "Demontaż drzwi zew",
+    "base": 230.0,
+    "unit": ""
+  },
+  {
+    "id": "service-9",
+    "category": "Demontaż i przygotowanie do remontu",
+    "name": "Demontaż okien ",
+    "base": 100.0,
+    "unit": ""
+  },
+  {
+    "id": "service-10",
+    "category": "Demontaż i przygotowanie do remontu",
+    "name": "Burzenie ścianki GK",
+    "base": 40.0,
+    "unit": ""
+  },
+  {
+    "id": "service-11",
+    "category": "Demontaż i przygotowanie do remontu",
+    "name": "Burzenie ścianki murowanej",
+    "base": 75.0,
+    "unit": ""
+  },
+  {
+    "id": "service-12",
+    "category": "Demontaż i przygotowanie do remontu",
+    "name": "Skuwanie płytek",
+    "base": 35.0,
+    "unit": ""
+  },
+  {
+    "id": "service-13",
+    "category": "Demontaż i przygotowanie do remontu",
+    "name": "Demontaż paneli podłogowych / gumolitu ",
+    "base": 25.0,
+    "unit": ""
+  },
+  {
+    "id": "service-14",
+    "category": "Demontaż i przygotowanie do remontu",
+    "name": "Skuwanie płytek podłogowych",
+    "base": 40.0,
+    "unit": ""
+  },
+  {
+    "id": "service-15",
+    "category": "Demontaż i przygotowanie do remontu",
+    "name": "Demontaż pieca kaflowego",
+    "base": 500.0,
+    "unit": ""
+  },
+  {
+    "id": "service-16",
+    "category": "Demontaż i przygotowanie do remontu",
+    "name": "Zrywanie starych tapet",
+    "base": 12.0,
+    "unit": ""
+  },
+  {
+    "id": "service-17",
+    "category": "Demontaż i przygotowanie do remontu",
+    "name": "Usuwanie starej farby ze ścian",
+    "base": 8.0,
+    "unit": ""
+  },
+  {
+    "id": "service-18",
+    "category": "Demontaż i przygotowanie do remontu",
+    "name": "Demontaż punktu wod-kan",
+    "base": 120.0,
+    "unit": ""
+  },
+  {
+    "id": "service-19",
+    "category": "Demontaż i przygotowanie do remontu",
+    "name": "Demontaż starej instalacji elektrycznej",
+    "base": 30.0,
+    "unit": ""
+  },
+  {
+    "id": "service-20",
+    "category": "Demontaż i przygotowanie do remontu",
+    "name": "Demontaż paneli ściennych / boazerii",
+    "base": 30.0,
+    "unit": ""
+  },
+  {
+    "id": "service-21",
+    "category": "ŚCIANY",
+    "name": "Wstawienie drzwi wew",
+    "base": 300.0,
+    "unit": ""
+  },
+  {
+    "id": "service-22",
+    "category": "ŚCIANY",
+    "name": "Wykucie otworu w ścianie z cegły",
+    "base": 220.0,
+    "unit": ""
+  },
+  {
+    "id": "service-23",
+    "category": "ŚCIANY",
+    "name": "Poszerzenie otworu drzwiowego",
+    "base": 150.0,
+    "unit": ""
+  },
+  {
+    "id": "service-24",
+    "category": "ŚCIANY",
+    "name": "Wstawienie drzwi zew",
+    "base": 750.0,
+    "unit": ""
+  },
+  {
+    "id": "service-25",
+    "category": "ŚCIANY",
+    "name": "Murowanie ścian działowych ",
+    "base": 50.0,
+    "unit": ""
+  },
+  {
+    "id": "service-26",
+    "category": "ŚCIANY",
+    "name": "Montaż paneli ściennych / deski na konstrukcji drewnianej",
+    "base": 80.0,
+    "unit": ""
+  },
+  {
+    "id": "service-27",
+    "category": "PODŁOGI",
+    "name": "Płyty OSB",
+    "base": 40.0,
+    "unit": ""
+  },
+  {
+    "id": "service-28",
+    "category": "PODŁOGI",
+    "name": "Listwy przyścienne",
+    "base": 20.0,
+    "unit": ""
+  },
+  {
+    "id": "service-29",
+    "category": "PODŁOGI",
+    "name": "Panele podłogowe",
+    "base": 25.0,
+    "unit": ""
+  },
+  {
+    "id": "service-30",
+    "category": "PODŁOGI",
+    "name": "Montaż legarów drewnianych",
+    "base": 20.0,
+    "unit": ""
+  },
+  {
+    "id": "service-31",
+    "category": "PODŁOGI",
+    "name": "Montaż listw progowych",
+    "base": 20.0,
+    "unit": ""
+  },
+  {
+    "id": "service-32",
+    "category": "PODŁOGI",
+    "name": "Posadzka",
+    "base": 85.0,
+    "unit": ""
+  },
+  {
+    "id": "service-33",
+    "category": "PODŁOGI",
+    "name": "Wyrównywanie podłogi",
+    "base": 30.0,
+    "unit": ""
+  },
+  {
+    "id": "service-34",
+    "category": "PODŁOGI",
+    "name": "Wylewka samopozioująca",
+    "base": 27.0,
+    "unit": ""
+  },
+  {
+    "id": "service-35",
+    "category": "PODŁOGI",
+    "name": "Układanie wykładziny PCV",
+    "base": 25.0,
+    "unit": ""
+  },
+  {
+    "id": "service-36",
+    "category": "PODŁOGI",
+    "name": "Panele Winylowe  na podkładzie ",
+    "base": 30.0,
+    "unit": ""
+  },
+  {
+    "id": "service-37",
+    "category": "PODSTAWOWE USŁUGI",
+    "name": "Montaż parapetów",
+    "base": 55.0,
+    "unit": ""
+  },
+  {
+    "id": "service-38",
+    "category": "PODSTAWOWE USŁUGI",
+    "name": "aaaaaaa",
+    "base": 10.0,
+    "unit": ""
+  },
+  {
+    "id": "service-39",
+    "category": "INSTALCJE ELEKTRYCZNE",
+    "name": "Bruzdowanie",
+    "base": 25.0,
+    "unit": ""
+  },
+  {
+    "id": "service-40",
+    "category": "INSTALCJE ELEKTRYCZNE",
+    "name": "Instalacja gniazdka",
+    "base": 45.0,
+    "unit": ""
+  },
+  {
+    "id": "service-41",
+    "category": "INSTALCJE ELEKTRYCZNE",
+    "name": "Instalacja światła",
+    "base": 45.0,
+    "unit": ""
+  },
+  {
+    "id": "service-42",
+    "category": "INSTALCJE ELEKTRYCZNE",
+    "name": "Ułożenie przewodów",
+    "base": 15.0,
+    "unit": ""
+  },
+  {
+    "id": "service-43",
+    "category": "INSTALCJE ELEKTRYCZNE",
+    "name": "Wykonanie instalacji podtynkowej",
+    "base": 20.0,
+    "unit": ""
+  },
+  {
+    "id": "service-44",
+    "category": "INSTALCJE ELEKTRYCZNE",
+    "name": "Montaż skrzynki podtynkowej/natynkowej",
+    "base": 160.0,
+    "unit": ""
+  },
+  {
+    "id": "service-45",
+    "category": "INSTALCJE ELEKTRYCZNE",
+    "name": "Montaż i podłączenie lampy sufitowej (pojedyncze mocowanie)",
+    "base": 50.0,
+    "unit": ""
+  },
+  {
+    "id": "service-46",
+    "category": "TYNKI I GIPSY",
+    "name": "Gładź ściany lub zbrojenie płyt na Q3",
+    "base": 30.0,
+    "unit": ""
+  },
+  {
+    "id": "service-47",
+    "category": "TYNKI I GIPSY",
+    "name": "Gładź sufity lub zbrojenie płyt na Q3",
+    "base": 35.0,
+    "unit": ""
+  },
+  {
+    "id": "service-48",
+    "category": "TYNKI I GIPSY",
+    "name": "Kamień dekoracyjny - płytki imitacja cegieł itp.",
+    "base": 70.0,
+    "unit": ""
+  },
+  {
+    "id": "service-49",
+    "category": "TYNKI I GIPSY",
+    "name": "Naprawa ubytków",
+    "base": 10.0,
+    "unit": ""
+  },
+  {
+    "id": "service-50",
+    "category": "TYNKI I GIPSY",
+    "name": "Tynkowanie (cem-wap)",
+    "base": 38.0,
+    "unit": ""
+  },
+  {
+    "id": "service-51",
+    "category": "TYNKI I GIPSY",
+    "name": "Tynkowanie (gipsowe)",
+    "base": 32.0,
+    "unit": ""
+  },
+  {
+    "id": "service-52",
+    "category": "ZABUDOWY I OKŁADZINY GK",
+    "name": "Płyty GK na klej / na kapeluszowe / m-system",
+    "base": 30.0,
+    "unit": ""
+  },
+  {
+    "id": "service-53",
+    "category": "ZABUDOWY I OKŁADZINY GK",
+    "name": "Sufity podwieszane z płyt karton gips",
+    "base": 110.0,
+    "unit": ""
+  },
+  {
+    "id": "service-54",
+    "category": "ZABUDOWY I OKŁADZINY GK",
+    "name": "Ścianki działowe z płyt GK",
+    "base": 65.0,
+    "unit": ""
+  },
+  {
+    "id": "service-55",
+    "category": "ZABUDOWY I OKŁADZINY GK",
+    "name": "Zmiana kierunku ściany z płyty gips-karton",
+    "base": 35.0,
+    "unit": ""
+  },
+  {
+    "id": "service-56",
+    "category": "ZABUDOWY I OKŁADZINY GK",
+    "name": "Wykonanie otworu drzwiowego w ściance GK",
+    "base": 100.0,
+    "unit": ""
+  },
+  {
+    "id": "service-57",
+    "category": "ZABUDOWY I OKŁADZINY GK",
+    "name": "Montaż ocieplenia w stelażu GK",
+    "base": 10.0,
+    "unit": ""
+  },
+  {
+    "id": "service-58",
+    "category": "ZABUDOWY I OKŁADZINY GK",
+    "name": "Budowa przedścianek",
+    "base": 85.0,
+    "unit": ""
+  },
+  {
+    "id": "service-59",
+    "category": "ZABUDOWY I OKŁADZINY GK",
+    "name": "Zabudowa poddasza",
+    "base": 80.0,
+    "unit": ""
+  },
+  {
+    "id": "service-60",
+    "category": "ZABUDOWY I OKŁADZINY GK",
+    "name": "Budowa półki pod sufitem",
+    "base": 80.0,
+    "unit": ""
+  },
+  {
+    "id": "service-61",
+    "category": "ZABUDOWY I OKŁADZINY GK",
+    "name": "Półki z płyty gipsowej",
+    "base": 85.0,
+    "unit": ""
+  },
+  {
+    "id": "service-62",
+    "category": "ZABUDOWY I OKŁADZINY GK",
+    "name": "Nietypowa zabudowa",
+    "base": 100.0,
+    "unit": ""
+  },
+  {
+    "id": "service-63",
+    "category": "ZABUDOWY I OKŁADZINY GK",
+    "name": "Montaż klapy rewizyjnej",
+    "base": 100.0,
+    "unit": ""
+  },
+  {
+    "id": "service-64",
+    "category": "GRUNTOWANIE I MALOWANIE",
+    "name": "Malowanie ścian i sufitów (trzy warstwy)",
+    "base": 15.0,
+    "unit": ""
+  },
+  {
+    "id": "service-65",
+    "category": "GRUNTOWANIE I MALOWANIE",
+    "name": "Gruntowanie ścian ",
+    "base": 4.0,
+    "unit": ""
+  },
+  {
+    "id": "service-66",
+    "category": "GRUNTOWANIE I MALOWANIE",
+    "name": "Gruntowanie sufitów",
+    "base": 4.0,
+    "unit": ""
+  },
+  {
+    "id": "service-67",
+    "category": "TAPETY",
+    "name": "Tapetowanie ścian",
+    "base": 55.0,
+    "unit": ""
+  },
+  {
+    "id": "service-68",
+    "category": "TAPETY",
+    "name": "Tapetowanie ścian wzorek",
+    "base": 35.0,
+    "unit": ""
+  },
+  {
+    "id": "service-69",
+    "category": "UKŁADANIE PŁYTEK",
+    "name": "Układanie gresu podłoga",
+    "base": 125.0,
+    "unit": ""
+  },
+  {
+    "id": "service-70",
+    "category": "UKŁADANIE PŁYTEK",
+    "name": "Układanie glazury Ściany (od 30x30)",
+    "base": 95.0,
+    "unit": ""
+  },
+  {
+    "id": "service-71",
+    "category": "UKŁADANIE PŁYTEK",
+    "name": "Układanie glazury Ściany (do 30x30)",
+    "base": 135.0,
+    "unit": ""
+  },
+  {
+    "id": "service-72",
+    "category": "UKŁADANIE PŁYTEK",
+    "name": "Układanie megaformatu",
+    "base": 300.0,
+    "unit": ""
+  },
+  {
+    "id": "service-73",
+    "category": "UKŁADANIE PŁYTEK",
+    "name": "Układanie mozaiki",
+    "base": 170.0,
+    "unit": ""
+  },
+  {
+    "id": "service-74",
+    "category": "UKŁADANIE PŁYTEK",
+    "name": "Montaż cokołów",
+    "base": 45.0,
+    "unit": ""
+  },
+  {
+    "id": "service-75",
+    "category": "UKŁADANIE PŁYTEK",
+    "name": "Szlifowanie płytek pod kąt 45",
+    "base": 70.0,
+    "unit": ""
+  },
+  {
+    "id": "service-76",
+    "category": "UKŁADANIE PŁYTEK",
+    "name": "Fugowanie",
+    "base": 25.0,
+    "unit": ""
+  },
+  {
+    "id": "service-77",
+    "category": "UKŁADANIE PŁYTEK",
+    "name": "Wykonanie otworu w płytce",
+    "base": 50.0,
+    "unit": ""
+  },
+  {
+    "id": "service-78",
+    "category": "UKŁADANIE PŁYTEK",
+    "name": "Montaż listwy wykończeniowej",
+    "base": 40.0,
+    "unit": ""
+  },
+  {
+    "id": "service-79",
+    "category": "HYDRAULIKA",
+    "name": "Instalacja wodno-kanalizacyjna zmywarka",
+    "base": 400.0,
+    "unit": ""
+  },
+  {
+    "id": "service-80",
+    "category": "HYDRAULIKA",
+    "name": "Instalacja wodno-kanalizacyjna umywalka / zlewozmywak",
+    "base": 400.0,
+    "unit": ""
+  },
+  {
+    "id": "service-81",
+    "category": "HYDRAULIKA",
+    "name": "Instalacja wodno-kanalizacyjna prysznic",
+    "base": 400.0,
+    "unit": ""
+  },
+  {
+    "id": "service-82",
+    "category": "HYDRAULIKA",
+    "name": "Instalacja wodno-kanalizacyjna pralka",
+    "base": 400.0,
+    "unit": ""
+  },
+  {
+    "id": "service-83",
+    "category": "HYDRAULIKA",
+    "name": "Instalacja wodno-kanalizacyjna geberit",
+    "base": 400.0,
+    "unit": ""
+  },
+  {
+    "id": "service-84",
+    "category": "HYDRAULIKA",
+    "name": "Montaż i zabudowa geberitu",
+    "base": 350.0,
+    "unit": ""
+  },
+  {
+    "id": "service-85",
+    "category": "HYDRAULIKA",
+    "name": "Montaż miski WC",
+    "base": 100.0,
+    "unit": ""
+  },
+  {
+    "id": "service-86",
+    "category": "HYDRAULIKA",
+    "name": "Montaż wanny",
+    "base": 200.0,
+    "unit": ""
+  },
+  {
+    "id": "service-87",
+    "category": "HYDRAULIKA",
+    "name": "Obudowa wanny",
+    "base": 500.0,
+    "unit": ""
+  },
+  {
+    "id": "service-88",
+    "category": "HYDRAULIKA",
+    "name": "Montaż kabiny prysznicowej",
+    "base": 350.0,
+    "unit": ""
+  },
+  {
+    "id": "service-89",
+    "category": "HYDRAULIKA",
+    "name": "Montaż umywalki",
+    "base": 100.0,
+    "unit": ""
+  },
+  {
+    "id": "service-90",
+    "category": "HYDRAULIKA",
+    "name": "Montaż baterii / kraników ",
+    "base": 90.0,
+    "unit": ""
+  },
+  {
+    "id": "service-91",
+    "category": "HYDRAULIKA",
+    "name": "Hydroizolacja - folia w płynie",
+    "base": 35.0,
+    "unit": ""
+  },
+  {
+    "id": "service-92",
+    "category": "HYDRAULIKA",
+    "name": "Hydroizolacja - masy uszczelniające",
+    "base": 45.0,
+    "unit": ""
+  },
+  {
+    "id": "service-93",
+    "category": "HYDRAULIKA",
+    "name": "Zatapianie taśmy w hydroizolacji",
+    "base": 10.0,
+    "unit": ""
+  },
+  {
+    "id": "service-94",
+    "category": "HYDRAULIKA",
+    "name": "Montaż odpływu liniowego + formowanie spadku",
+    "base": 850.0,
+    "unit": ""
+  },
+  {
+    "id": "service-95",
+    "category": "CENTRALNE OGRZEWANIE",
+    "name": "Montaż/demontaż grzejnika",
+    "base": 100.0,
+    "unit": ""
+  },
+  {
+    "id": "service-96",
+    "category": "CENTRALNE OGRZEWANIE",
+    "name": "Podłączenie jednego punktu grzejnego",
+    "base": 170.0,
+    "unit": ""
+  },
+  {
+    "id": "service-97",
+    "category": "CENTRALNE OGRZEWANIE",
+    "name": "Odpowietrzenie grzejnika",
+    "base": 40.0,
+    "unit": ""
+  },
+  {
+    "id": "service-98",
+    "category": "DROBNE PRACE",
+    "name": "Wymiana żarówki halogenowej",
+    "base": 20.0,
+    "unit": ""
+  },
+  {
+    "id": "service-99",
+    "category": "DROBNE PRACE",
+    "name": "Wymiana żarówki zwykłej",
+    "base": 15.0,
+    "unit": ""
+  },
+  {
+    "id": "service-100",
+    "category": "DROBNE PRACE",
+    "name": "Montaż mebli",
+    "base": 65.0,
+    "unit": ""
+  },
+  {
+    "id": "service-101",
+    "category": "DROBNE PRACE",
+    "name": "Wieszanie i ustawianie mebli",
+    "base": 65.0,
+    "unit": ""
+  },
+  {
+    "id": "service-102",
+    "category": "DROBNE PRACE",
+    "name": "Wieszanie karniszy - mb",
+    "base": 45.0,
+    "unit": ""
+  },
+  {
+    "id": "service-103",
+    "category": "DROBNE PRACE",
+    "name": "Montaż klamki drzwi pokojowe",
+    "base": 30.0,
+    "unit": ""
+  },
+  {
+    "id": "service-104",
+    "category": "DROBNE PRACE",
+    "name": "Montaż klamki i rozety drzwi pokojowe",
+    "base": 55.0,
+    "unit": ""
+  },
+  {
+    "id": "service-105",
+    "category": "ZABUDOWY I OKŁADZINY GK",
+    "name": "Montaż taśmy narożnej tufftape",
+    "base": 30.0,
+    "unit": ""
+  },
+  {
+    "id": "service-106",
+    "category": "ZABUDOWY I OKŁADZINY GK",
+    "name": "Obróbka okna dachowego",
+    "base": 670.0,
+    "unit": ""
+  }
+]

@@ -6,11 +6,11 @@ import * as C from '../app/robisie/core.js';
 test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów',async()=>{
  const catalog=JSON.parse(await fs.readFile(new URL('../app/robisie/catalog.json',import.meta.url),'utf8'));
  const radios=catalog.map(x=>({value:x.id,checked:false}));
- const listeners=new Map();const nodes=new Map();const node=key=>{if(!nodes.has(key))nodes.set(key,{innerHTML:'',textContent:'',style:{},classList:{toggle(){}},isConnected:true,showModal(){},close(){},querySelectorAll:()=>radios});return nodes.get(key);};
+ const savedSettings=[];const listeners=new Map();const nodes=new Map();const node=key=>{if(!nodes.has(key))nodes.set(key,{innerHTML:'',textContent:'',style:{},options:[{value:''},{value:'m²'},{value:'__robisie_custom_unit__'}],focus(){},classList:{toggle(){}},isConnected:true,showModal(){},close(){},querySelectorAll:()=>radios});return nodes.get(key);};
  const context=vm.createContext({console,crypto,structuredClone,FormData:class extends Map{constructor(entries){super(Object.entries(entries));}},setTimeout,clearTimeout,confirm:()=>true,fetch:async()=>({ok:true,json:async()=>catalog}),window:{addEventListener(){},scrollTo(){}},document:{querySelector:node,addEventListener(type,fn){listeners.set(type,fn);}}});
  const source=await fs.readFile(new URL('../app/robisie/app.js',import.meta.url),'utf8');
- const module=new vm.SourceTextModule(source+'\nexport function testLineDialog(){lineDialog("offer");} export function testOffer(){return p().offer;} export function testPicker(){return servicePicker(config.payload.catalog);} export function testRoomLines(){return roomLines("offer",p().offer);}' +'\nexport function testRender(row,settings){all=[structuredClone(row)];selected=structuredClone(row);config={payload:settings,revision:1};configBaseline=structuredClone(config);return [...C.MODULES.map(([key])=>key),"catalog","settings"].map(key=>{view=key;return [key,content()];});}',{context});
- await module.link(spec=>{const values=spec.includes('core')?C:{restoreSession:()=>null};const keys=Object.keys(values);return new vm.SyntheticModule(keys,function(){for(const key of keys)this.setExport(key,values[key]);},{context});});
+ const module=new vm.SourceTextModule(source+'\nexport function testLineDialog(){lineDialog("offer");} export function testOffer(){return p().offer;} export function testPicker(){return servicePicker(config.payload.catalog);} export function testRoomLines(){return roomLines("offer",p().offer);} export function testUnits(current=""){return unitField(current);} ' +'\nexport function testRender(row,settings){all=[structuredClone(row)];selected=structuredClone(row);config={payload:settings,revision:1};configBaseline=structuredClone(config);return [...C.MODULES.map(([key])=>key),"catalog","settings"].map(key=>{view=key;return [key,content()];});}',{context});
+ await module.link(spec=>{const values=spec.includes('core')?C:{restoreSession:()=>null,saveSettings:async(payload,revision)=>{const row={payload:structuredClone(payload),revision:revision+1};savedSettings.push(row);return row;}};const keys=Object.keys(values);return new vm.SyntheticModule(keys,function(){for(const key of keys)this.setExport(key,values[key]);},{context});});
  await module.evaluate();await new Promise(resolve=>setTimeout(resolve,10));
  const payload=C.newProject('Remont testowy','Inwestor testowy');payload.rooms=[{id:'r',name:'Kuchnia',length:4,width:3,height:2.6}];
  payload.offer=[{id:'l',roomId:'r',serviceId:'a',name:'Malowanie',category:'Ściany',unit:'m²',qty:12,price:100,included:true}];payload.works=structuredClone(payload.offer);payload.works[0].done=true;
@@ -49,4 +49,19 @@ test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów
  await node('#modal-form').onsubmit({preventDefault(){},target:{serviceId:chosen.id,roomId:'r',name:chosen.name,unit:'m²',qty:'3',price:String(node('#f-price').value),days:'0',hours:'0',note:''}});
  const saved=module.namespace.testOffer().at(-1);
  assert.equal(saved.serviceId,chosen.id);assert.equal(saved.category,chosen.category);assert.equal(saved.qty,3);assert.equal(saved.price,C.round(chosen.base*1.35));
+ const unitHtml=module.namespace.testUnits('Godz');
+ assert.ok(unitHtml.includes('<select id="f-unit"'));assert.ok(unitHtml.includes('value="Godz" selected'));assert.ok(unitHtml.includes('Dodaj własną…'));
+ module.namespace.testLineDialog();
+ node('#f-unit').value='__robisie_custom_unit__';node('#f-unit').onchange();
+ assert.equal(node('#custom-unit-field').hidden,false);assert.equal(node('#f-customUnit').required,true);
+ await node('#modal-form').onsubmit({preventDefault(){},target:{serviceId:chosen.id,roomId:'r',name:chosen.name,unit:'__robisie_custom_unit__',customUnit:'  panel  ',qty:'2',price:'40',days:'0',hours:'0',note:''}});
+ assert.equal(savedSettings.length,1);assert.ok(savedSettings[0].payload.units.includes('panel'));
+ assert.equal(module.namespace.testOffer().at(-1).unit,'panel');
+ assert.ok(module.namespace.testUnits().includes('<option value="panel"'));
+ // Reload from the settings returned by persistence: available for a later investment.
+ module.namespace.testRender(row,savedSettings[0].payload);
+ assert.ok(module.namespace.testUnits().includes('<option value="panel"'));
+ module.namespace.testLineDialog();
+ await node('#modal-form').onsubmit({preventDefault(){},target:{serviceId:chosen.id,roomId:'r',name:chosen.name,unit:'panel',qty:'1',price:'40',days:'0',hours:'0',note:''}});
+ assert.equal(savedSettings.length,1);
 });

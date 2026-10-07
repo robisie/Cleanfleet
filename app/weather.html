@@ -244,10 +244,17 @@
     finally{$('loading').classList.add('hidden');loading=false;}
   }
 
-  $('backBtn').addEventListener('click',()=>{
+  const embedded=window.parent!==window && new URLSearchParams(window.location.search).get('embedded')==='1';
+  function returnFromWeather(){
+    if(embedded){window.parent.postMessage({type:'cf-weather-close'},window.location.origin);return;}
     try{ sessionStorage.setItem('cf_return_from_weather','1'); }catch(_){}
     window.location.replace('/app/');
-  });
+  }
+  if(embedded){
+    $('backBtn').hidden=true;
+    document.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();returnFromWeather();}});
+  }
+  $('backBtn').addEventListener('click',returnFromWeather);
   $('refreshBtn').addEventListener('click',()=>load(true));
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&Date.now()-lastLoad>=REFRESH_MS)load(true);});
   timer=setInterval(()=>load(true),REFRESH_MS);

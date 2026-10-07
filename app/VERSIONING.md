@@ -122,3 +122,5 @@ CleanFleet v1.54.28: loader startowy pokazuje aktualnie ładowaną wersję aplik
 CleanFleet v1.55.0: moduł administratora Dojazdy — potwierdzane adresy (Photon), punkty pośrednie z kolejnością, drogowa odległość OSRM/FOSSGIS, spalanie i cena paliwa, koszt paliwa i powrót przez te same punkty. Usługi publiczne z limitem zapytań, obsługą błędów i timeoutem. Bez zmian w bazie danych.
 
 CleanFleet v1.55.1: naprawa otwierania kafelka Dojazdy — kontrola uprawnień przez udostępniony cfBackupBridge.isAdmin zamiast prywatnej funkcji w głównym IIFE.
+
+CleanFleet v1.55.2: pełna prognoza pogody otwierana w oknie wewnątrz aplikacji. Powrót zamyka okno bez nawigacji i przeładowania głównego widoku, z zachowaniem jego stanu. Escape działa również wewnątrz prognozy; wiadomości zamknięcia są weryfikowane według origin i okna nadawcy.

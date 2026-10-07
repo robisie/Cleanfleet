@@ -7,7 +7,7 @@ function fixture(){
   setAttribute(key,value){this.attributes[key]=value;}
   addEventListener(type,fn){this.events.set(type,fn);}
   remove(){this.parent.children=this.parent.children.filter(node=>node!==this);this.isConnected=false;}
-  focus(){document.activeElement=this;}
+  focus(options){this.focusOptions=options;document.activeElement=this;}
  }
  const all=root=>[root,...root.children.flatMap(all)];
  const body=new Element('body'),head=new Element('head'),screen=new Element('main'),button=new Element('button');
@@ -21,7 +21,7 @@ test('return closes only the weather window and preserves previous view, scroll 
  const f=fixture();f.window.cfOpenFullWeather();f.window.cfOpenFullWeather();assert.equal(f.document.body.children.length,2);assert.equal(f.screen.inert,true);
  const overlay=f.document.getElementById('cfFullWeatherOverlay'),back=overlay.children[0].children[0].children[0];
  const frame=overlay.children[0].children[1];assert.match(frame.src,/weather.html\?embedded=1/);
- back.events.get('click')();assert.equal(f.document.body.children.length,1);assert.equal(f.document.body.children[0],f.screen);assert.equal(f.screen.value,'selected company and filters');assert.equal(f.screen.scrollTop,380);assert.equal(f.screen.inert,false);assert.equal(f.document.activeElement,f.button);assert.equal(f.windowEvents.size,0);assert.equal(f.documentEvents.size,0);
+ back.events.get('click')();assert.equal(f.document.body.children.length,1);assert.equal(f.document.body.children[0],f.screen);assert.equal(f.screen.value,'selected company and filters');assert.equal(f.screen.scrollTop,380);assert.equal(f.screen.inert,false);assert.equal(f.document.activeElement,f.button);assert.equal(f.button.focusOptions.preventScroll,true);assert.equal(f.windowEvents.size,0);assert.equal(f.documentEvents.size,0);
 });
 test('close messages must come from the forecast frame and the application origin',()=>{
  const f=fixture();f.window.cfOpenFullWeather();const overlay=f.document.getElementById('cfFullWeatherOverlay'),frame=overlay.children[0].children[1],message=f.windowEvents.get('message');

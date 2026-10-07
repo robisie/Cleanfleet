@@ -124,3 +124,5 @@ CleanFleet v1.55.0: moduł administratora Dojazdy — potwierdzane adresy (Photo
 CleanFleet v1.55.1: naprawa otwierania kafelka Dojazdy — kontrola uprawnień przez udostępniony cfBackupBridge.isAdmin zamiast prywatnej funkcji w głównym IIFE.
 
 CleanFleet v1.55.2: pełna prognoza pogody otwierana w oknie wewnątrz aplikacji. Powrót zamyka okno bez nawigacji i przeładowania głównego widoku, z zachowaniem jego stanu. Escape działa również wewnątrz prognozy; wiadomości zamknięcia są weryfikowane według origin i okna nadawcy.
+
+CleanFleet v1.55.3: przywrócenie fokusu po zamknięciu pełnej prognozy używa preventScroll, aby nie przewijać wcześniejszego ekranu do przycisku pogody. Przycisk Powrót pozostaje w jednej linii na telefonie.

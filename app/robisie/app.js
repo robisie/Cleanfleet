@@ -1,5 +1,5 @@
-import * as C from './core.js?v=1.0.1';
-import * as API from './api.js?v=1.0.1';
+import * as C from './core.js?v=1.0.2';
+import * as API from './api.js?v=1.0.2';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',mobileOpen=false,configBaseline=null;
 const statuses={przygotowanie:'Przygotowanie',oferta:'Oferta',prace:'W realizacji',odbior:'Do odbioru',zakonczona:'Zakończona'};
@@ -113,7 +113,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
  if(a==='logout'){if(!checkDirty())return;API.logout();selected=null;dirty=false;loginView();return;}
  if(a==='reload'){await load();return;}
  if(a==='nav'||a==='back'||a==='open'){if(!checkDirty())return;if(dirty){if(selected)selected=structuredClone(all.find(x=>x.id===selected.id));config=structuredClone(configBaseline);}dirty=false;mobileOpen=false;if(a==='open'){selected=structuredClone(all.find(x=>x.id===id));view='overview';}else if(a==='back'){selected=null;view='dashboard';}else view=b.dataset.view;lineFilter='';render();window.scrollTo(0,0);return;}
- if(a==='new-project'){modal('Nowa inwestycja',input('name','Nazwa inwestycji','','text','required')+input('investor','Imię i nazwisko inwestora','','text','required')+input('date','Data nadania numeru umowy',C.today(),'date','required')+'<p class="muted">Numer zostanie nadany w bazie według schematu UUR-RS/rok/miesiąc/kolejny numer w roku.</p>',async fd=>{const row=await API.createProject(C.newProject(fd.get('name'),fd.get('investor'),fd.get('date')),fd.get('date'));selected=Array.isArray(row)?row[0]:row;all.unshift(structuredClone(selected));view='data';dirty=false;});return;}
+ if(a==='new-project'){modal('Nowa inwestycja',input('name','Nazwa inwestycji','','text','required')+input('investor','Imię i nazwisko inwestora','','text','required')+input('date','Data nadania numeru umowy',C.today(),'date','required')+'<p class="muted">Numer zostanie nadany w bazie według schematu UUR-RS/rok/miesiąc/kolejny numer w danym miesiącu.</p>',async fd=>{const row=await API.createProject(C.newProject(fd.get('name'),fd.get('investor'),fd.get('date')),fd.get('date'));selected=Array.isArray(row)?row[0]:row;all.unshift(structuredClone(selected));view='data';dirty=false;});return;}
  if(a==='save'){b.disabled=true;await save();return;}if(a==='save-settings'){b.disabled=true;await saveConfig();return;}
  if(a==='room-add'||a==='room-edit'){roomDialog(id);return;}
  if(a==='line-add'||a==='line-edit'){lineDialog(b.dataset.kind,id);return;}

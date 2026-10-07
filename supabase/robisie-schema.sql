@@ -1,7 +1,9 @@
--- Robisię 1.0.0. Independent admin-only project workspace.
+-- Robisię 1.0.2. Independent admin-only project workspace.
 create table public.rs_number_counters (
- year integer primary key check(year between 2000 and 9999),
- last_number integer not null check(last_number > 0)
+ year integer not null check(year between 2000 and 9999),
+ month integer not null check(month between 1 and 12),
+ last_number integer not null check(last_number > 0),
+ primary key(year,month)
 );
 create table public.rs_projects (
  id uuid primary key default gen_random_uuid(),
@@ -14,7 +16,7 @@ create table public.rs_projects (
  revision bigint not null default 1,
  created_at timestamptz not null default now(),
  updated_at timestamptz not null default now(),
- unique(year,serial)
+ unique(year,month,serial)
 );
 create index rs_projects_owner on public.rs_projects(owner_id,created_at desc);
 create table public.rs_settings (
@@ -50,8 +52,8 @@ begin
  if auth.uid() is null or not public.cf_is_admin() then raise exception 'Dostęp tylko dla administratora.'; end if;
  if p_date is null or p_payload is null or jsonb_typeof(p_payload)<>'object' then raise exception 'Nieprawidłowe dane inwestycji.'; end if;
  v_year:=extract(year from p_date);v_month:=extract(month from p_date);
- insert into public.rs_number_counters(year,last_number) values(v_year,1)
- on conflict(year) do update set last_number=rs_number_counters.last_number+1
+ insert into public.rs_number_counters(year,month,last_number) values(v_year,v_month,1)
+ on conflict(year,month) do update set last_number=rs_number_counters.last_number+1
  returning last_number into v_serial;
  insert into public.rs_projects(contract_number,year,month,serial,payload)
  values('UUR-RS/'||v_year||'/'||lpad(v_month::text,2,'0')||'/'||case when v_serial<1000 then lpad(v_serial::text,3,'0') else v_serial::text end,v_year,v_month,v_serial,p_payload)

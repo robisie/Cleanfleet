@@ -1,5 +1,5 @@
-import * as C from './core.js';
-import * as API from './api.js';
+import * as C from './core.js?v=1.0.1';
+import * as API from './api.js?v=1.0.1';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',mobileOpen=false,configBaseline=null;
 const statuses={przygotowanie:'Przygotowanie',oferta:'Oferta',prace:'W realizacji',odbior:'Do odbioru',zakonczona:'Zakończona'};

@@ -1,6 +1,6 @@
 const URL='https://nxmrobbhfqijmbjjzbof.supabase.co';
 const KEY='sb_publishable_9lz7NUv2-MloX7MEcH2-vQ_AZS8IIHz';
-const SESSION_KEY='sb-nxmrobbhfqijmbjjzbof-auth-token';
+const SESSION_KEY='robisie-auth-session-v1';
 let session=null;
 export const getSession=()=>session;
 export function restoreSession(){try{session=JSON.parse(localStorage.getItem(SESSION_KEY));}catch{session=null;}return session;}

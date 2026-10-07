@@ -118,3 +118,5 @@ CleanFleet v1.54.21: szerokość kolumn Typ, Tablica i Akcje w „Lista wszystki
 CleanFleet v1.54.22: naprawa powrotu z pełnoekranowej prognozy pogody. Przycisk „← CleanFleet” nie korzysta już z history.back(), które na iPadOS/Safari potrafiło przywrócić aplikację z BFCache z widocznym loaderem bez ponownego startu. Powrót prowadzi bezpośrednio do /app/, a aplikacja ma dodatkowe zabezpieczenie pageshow dla powrotów z pamięci przeglądarki.
 
 CleanFleet v1.54.28: loader startowy pokazuje aktualnie ładowaną wersję aplikacji pod komunikatem stanu. Numer jest zgodny z wersją widoczną w nagłówku aplikacji; po uruchomieniu loader dodatkowo synchronizuje ten tekst z elementem wersji aplikacji.
+
+CleanFleet v1.55.0: moduł administratora Dojazdy — potwierdzane adresy (Photon), punkty pośrednie z kolejnością, drogowa odległość OSRM/FOSSGIS, spalanie i cena paliwa, koszt paliwa i powrót przez te same punkty. Usługi publiczne z limitem zapytań, obsługą błędów i timeoutem. Bez zmian w bazie danych.

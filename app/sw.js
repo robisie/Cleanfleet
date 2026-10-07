@@ -1,4 +1,4 @@
-// CleanFleet v1.54.28 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
+// CleanFleet v1.55.0 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -16,7 +16,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  if (url.origin === self.location.origin && (url.pathname === '/app/period-picker.js' || url.pathname === '/app/exchange-rate.js' || url.pathname === '/app/reports-catalog.js' || url.pathname === '/app/reports-engine.js' || url.pathname === '/app/reports-ui.js' || url.pathname === '/app/reports.css' || url.pathname === '/app/accounting-documents-v1510.js' || url.pathname === '/app/mail-documents.js' || url.pathname === '/app/pdf-unlock.js' || url.pathname === '/app/pdf-unlock-worker.js' || url.pathname === '/app/pdf-unlock-core.js' || url.pathname === '/app/accounting-package.js' || url.pathname === '/app/ksef-pdf.js' || url.pathname === '/app/ksef-preview.js' || url.pathname === '/app/accounting-reconcile.js' || url.pathname === '/app/accounting-history.js' || url.pathname === '/app/accounting-decisions.js' || url.pathname === '/app/reminder-form-v1251.js' || url.pathname === '/app/fleet-bulk-v15417.js')) {
+  if (url.origin === self.location.origin && (url.pathname === '/app/dojazdy.js' || url.pathname === '/app/period-picker.js' || url.pathname === '/app/exchange-rate.js' || url.pathname === '/app/reports-catalog.js' || url.pathname === '/app/reports-engine.js' || url.pathname === '/app/reports-ui.js' || url.pathname === '/app/reports.css' || url.pathname === '/app/accounting-documents-v1510.js' || url.pathname === '/app/mail-documents.js' || url.pathname === '/app/pdf-unlock.js' || url.pathname === '/app/pdf-unlock-worker.js' || url.pathname === '/app/pdf-unlock-core.js' || url.pathname === '/app/accounting-package.js' || url.pathname === '/app/ksef-pdf.js' || url.pathname === '/app/ksef-preview.js' || url.pathname === '/app/accounting-reconcile.js' || url.pathname === '/app/accounting-history.js' || url.pathname === '/app/accounting-decisions.js' || url.pathname === '/app/reminder-form-v1251.js' || url.pathname === '/app/fleet-bulk-v15417.js')) {
     event.respondWith(fetch(req, { cache: 'no-store' }));
     return;
   }

@@ -24,7 +24,7 @@
     menuBtn:'menu',plateCameraBtn:'plateCamera',financeBtn:'payments',statsBtn:'financialStats',exportPdfBtn:'pdf',fleetUpdateBtn:'fleetUpdate',
     exportExcelBtn:'backup',importBtn:'restore',cfNotificationsBtn:'notifications',cfChangeNotificationsBtn:'changes',cfCompaniesBtn:'companies',cfEmployeesBtn:'employees',
     cfCompanyUsersCard:'employees',
-    cfCompanyPurchasesCard:'purchases',cfCompanyEarningsCard:'earnings',cfCompanyRemindersCard:'reminders',cfCompanyReportsCard:'reports',
+    cfCompanyPurchasesCard:'purchases',cfCompanyFinancesCard:'earnings',cfCompanyRemindersCard:'reminders',cfCompanyReportsCard:'reports',
     cfCompanyStatisticsCard:'statistics',cfCompanyAddCard:'addCompany',cfCompanyTaxesCard:'payments',cfChatFab:'mainChat'
   };
 

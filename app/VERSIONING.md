@@ -130,3 +130,5 @@ CleanFleet v1.55.3: przywrócenie fokusu po zamknięciu pełnej prognozy używa 
 CleanFleet v1.55.4: Dojazdy — wybór benzyny Pb95 lub diesla ON, bieżące ogólnopolskie średnie detaliczne AutoCentrum.pl z datą sprawdzenia, przycisk Użyj tej ceny i odświeżanie. Własna cena nie jest automatycznie nadpisywana. Notowanie aktualizowane codziennie przez GitHub Actions, z kontrolą daty i odrzucaniem nieaktualnych danych.
 
 CleanFleet v1.55.5 / Moje płatności v1.0.12: Gotówka — stały formularz kwoty, opisu i wpływu/wydatku, saldo całej listy i usuwanie przez X. Wpisy zapisane we wspólnym zaszyfrowanym sejfie płatności; starsze sejfy startują z pustą listą gotówki. Zapis, zmiana PIN i kopie zachowują listę.
+
+CleanFleet v1.55.6 / Moje finanse v1.1.0: jeden kafelek administratora i cztery zakładki — Moje zarobki, Moje płatności, Dojazdy, Gotówka. Wspólne odblokowanie dotychczasowym hasłem płatności i automatyczna blokada całego okna. Historia zarobków i szyfrowany sejf płatności/gotówki zachowane; kalkulator osadzony bez dodatkowego okna. Przełączanie nie przeładowuje aplikacji.

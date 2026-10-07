@@ -1,4 +1,4 @@
-// CleanFleet v1.55.5 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
+// CleanFleet v1.55.6 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -16,7 +16,7 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  if (url.origin === self.location.origin && (url.pathname === '/app/weather-window.js' || url.pathname === '/app/layout-v11913.js' || url.pathname === '/app/dojazdy.js' || url.pathname === '/app/period-picker.js' || url.pathname === '/app/exchange-rate.js' || url.pathname === '/app/reports-catalog.js' || url.pathname === '/app/reports-engine.js' || url.pathname === '/app/reports-ui.js' || url.pathname === '/app/reports.css' || url.pathname === '/app/accounting-documents-v1510.js' || url.pathname === '/app/mail-documents.js' || url.pathname === '/app/pdf-unlock.js' || url.pathname === '/app/pdf-unlock-worker.js' || url.pathname === '/app/pdf-unlock-core.js' || url.pathname === '/app/accounting-package.js' || url.pathname === '/app/ksef-pdf.js' || url.pathname === '/app/ksef-preview.js' || url.pathname === '/app/accounting-reconcile.js' || url.pathname === '/app/accounting-history.js' || url.pathname === '/app/accounting-decisions.js' || url.pathname === '/app/reminder-form-v1251.js' || url.pathname === '/app/fleet-bulk-v15417.js')) {
+  if (url.origin === self.location.origin && (url.pathname === '/app/finances.js' || url.pathname === '/app/weather-window.js' || url.pathname === '/app/layout-v11913.js' || url.pathname === '/app/dojazdy.js' || url.pathname === '/app/period-picker.js' || url.pathname === '/app/exchange-rate.js' || url.pathname === '/app/reports-catalog.js' || url.pathname === '/app/reports-engine.js' || url.pathname === '/app/reports-ui.js' || url.pathname === '/app/reports.css' || url.pathname === '/app/accounting-documents-v1510.js' || url.pathname === '/app/mail-documents.js' || url.pathname === '/app/pdf-unlock.js' || url.pathname === '/app/pdf-unlock-worker.js' || url.pathname === '/app/pdf-unlock-core.js' || url.pathname === '/app/accounting-package.js' || url.pathname === '/app/ksef-pdf.js' || url.pathname === '/app/ksef-preview.js' || url.pathname === '/app/accounting-reconcile.js' || url.pathname === '/app/accounting-history.js' || url.pathname === '/app/accounting-decisions.js' || url.pathname === '/app/reminder-form-v1251.js' || url.pathname === '/app/fleet-bulk-v15417.js')) {
     event.respondWith(fetch(req, { cache: 'no-store' }));
     return;
   }
@@ -81,7 +81,7 @@ self.addEventListener('fetch', event => {
       html = html.replace('</head>', '<link rel="stylesheet" href="/app/glass-icons.css?v=13068">\n</head>');
     }
     if (!html.includes('/app/glass-icons.js')) {
-      html = html.replace('</body>', '<script src="/app/glass-icons.js?v=13068"><\/script>\n</body>');
+      html = html.replace('</body>', '<script src="/app/glass-icons.js?v=20261007-1556"><\/script>\n</body>');
     }
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){

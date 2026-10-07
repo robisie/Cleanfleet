@@ -1,4 +1,4 @@
-# Moje płatności v1.0.11
+# Moje płatności v1.0.12
 
 Separate application at `/app/priv/index.html`. The administrator dashboard links to it; it does not read or change fleet data. Uses the existing administrator Auth session and a separate user-selected PIN (minimum six characters) or password. Database stores only AES-GCM ciphertext. PBKDF2-SHA256, 600,000 iterations, random 16-byte salt; fresh 12-byte IV per save. Key remains in memory. PIN loss is unrecoverable; copies remain encrypted with their original PIN. A longer password improves resistance to guessing. The HTML shell is public, but payment content is encrypted and owner/admin RLS protects ciphertext access.
 
@@ -25,3 +25,5 @@ Similar-name suggestions during contractor selection are same-currency only. The
 The main toolbar offers manual merging: select at least two rules, choose the retained rule name/settings, and save with one merge button. The union of controlled intervals and all histories/recipient variants are retained. Currency, month allocation and title filter must agree; incompatible rules are rejected before mutation. Import disables merging while PDFs are being read. Bank-account/card merges retain both identity types.
 
 Above the watched list, the current-month schedule shows rule names and expected payment deadlines, sorted by date. It follows Warsaw current date independently of the selected history year, respects active control periods/month offsets and clamps deadlines to the last day of shorter months. Locking clears the schedule names from the DOM.
+
+Cash ledger v1.0.12: positive PLN grosze, income/expense direction, short description, creation date and deletion. Cash is included in the same encrypted vault, PIN change and backups. Legacy vaults without a cash property initialize an empty ledger. All-time balance is independent of bank payment totals and year selection. Only the list scrolls, keeping entry controls and balance visible.

@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "prices": {
+    "petrol95": 6.79,
+    "diesel": 7.78
+  },
+  "as_of": "2026-10-07",
+  "checked_at": "2026-10-07T17:29:54.288Z",
+  "currency": "PLN",
+  "unit": "l",
+  "scope": "Polska",
+  "kind": "average_retail",
+  "source": "e-petrol.pl",
+  "source_url": "https://www.e-petrol.pl/"
+}

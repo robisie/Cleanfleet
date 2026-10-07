@@ -1,0 +1,35 @@
+name: Update fuel prices
+on:
+  schedule:
+    - cron: '30 15 * * *'
+  push:
+    paths:
+      - scripts/fuel-prices-core.mjs
+      - scripts/update-fuel-prices.mjs
+      - .github/workflows/update-fuel-prices.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: update-fuel-prices
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/update-fuel-prices.mjs
+      - name: Publish updated notation
+        run: |
+          if git diff --quiet -- app/fuel-prices.json; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/fuel-prices.json
+          git commit -m 'Update national fuel price notation'
+          git pull --rebase origin main
+          git push origin HEAD:main

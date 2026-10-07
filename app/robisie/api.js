@@ -20,3 +20,5 @@ export const settings=()=>request('/rest/v1/rs_settings?select=*');
 export const createProject=(payload,date)=>rpc('rs_create_project',{p_payload:payload,p_date:date});
 export const saveProject=(project,payload)=>rpc('rs_save_project',{p_id:project.id,p_payload:payload,p_revision:project.revision});
 export const saveSettings=(payload,revision)=>rpc('rs_save_settings',{p_payload:payload,p_revision:revision});
+
+export const deleteProject=project=>rpc('rs_delete_project',{p_id:project.id,p_revision:project.revision});

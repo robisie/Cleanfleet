@@ -136,7 +136,7 @@
       try{
         const controller=new AbortController();
         timer=setTimeout(()=>controller.abort(),20000);
-        const response=await fetch('https://raw.githubusercontent.com/robisie/Cleanfleet/main/app/fuel-prices.json',{cache:'no-store',signal:controller.signal});
+        const response=await fetch('https://raw.githubusercontent.com/robisie/Cleanfleet/main/app/fuel-prices.json?t='+Date.now(),{cache:'no-store',signal:controller.signal});
         if(lifetime.signal.aborted||!admin())return;
         if(!response.ok)throw new Error('Nie udało się pobrać ceny.');
         const data=await response.json();

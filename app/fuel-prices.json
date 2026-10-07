@@ -1,15 +1,17 @@
 {
   "ok": true,
   "prices": {
-    "petrol95": 6.79,
-    "diesel": 7.78
+    "petrol95": 7.07,
+    "diesel": 8.18
   },
   "as_of": "2026-10-07",
-  "checked_at": "2026-10-07T17:29:54.288Z",
+  "checked_at": "2026-10-07T17:34:02.226Z",
+  "date_kind": "checked",
+  "source_updated": "24h temu",
   "currency": "PLN",
   "unit": "l",
   "scope": "Polska",
   "kind": "average_retail",
-  "source": "e-petrol.pl",
-  "source_url": "https://www.e-petrol.pl/"
+  "source": "AutoCentrum.pl",
+  "source_url": "https://www.autocentrum.pl/paliwa/ceny-paliw/"
 }

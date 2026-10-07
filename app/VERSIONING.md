@@ -127,4 +127,4 @@ CleanFleet v1.55.2: pełna prognoza pogody otwierana w oknie wewnątrz aplikacji
 
 CleanFleet v1.55.3: przywrócenie fokusu po zamknięciu pełnej prognozy używa preventScroll, aby nie przewijać wcześniejszego ekranu do przycisku pogody. Przycisk Powrót pozostaje w jednej linii na telefonie.
 
-CleanFleet v1.55.4: Dojazdy — wybór benzyny Pb95 lub diesla ON, bieżące ogólnopolskie średnie detaliczne e-petrol.pl z datą notowania, przycisk Użyj tej ceny i odświeżanie. Własna cena nie jest automatycznie nadpisywana. Notowanie aktualizowane codziennie przez GitHub Actions, z kontrolą daty i odrzucaniem nieaktualnych danych.
+CleanFleet v1.55.4: Dojazdy — wybór benzyny Pb95 lub diesla ON, bieżące ogólnopolskie średnie detaliczne AutoCentrum.pl z datą sprawdzenia, przycisk Użyj tej ceny i odświeżanie. Własna cena nie jest automatycznie nadpisywana. Notowanie aktualizowane codziennie przez GitHub Actions, z kontrolą daty i odrzucaniem nieaktualnych danych.

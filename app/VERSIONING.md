@@ -120,3 +120,5 @@ CleanFleet v1.54.22: naprawa powrotu z pełnoekranowej prognozy pogody. Przycisk
 CleanFleet v1.54.28: loader startowy pokazuje aktualnie ładowaną wersję aplikacji pod komunikatem stanu. Numer jest zgodny z wersją widoczną w nagłówku aplikacji; po uruchomieniu loader dodatkowo synchronizuje ten tekst z elementem wersji aplikacji.
 
 CleanFleet v1.55.0: moduł administratora Dojazdy — potwierdzane adresy (Photon), punkty pośrednie z kolejnością, drogowa odległość OSRM/FOSSGIS, spalanie i cena paliwa, koszt paliwa i powrót przez te same punkty. Usługi publiczne z limitem zapytań, obsługą błędów i timeoutem. Bez zmian w bazie danych.
+
+CleanFleet v1.55.1: naprawa otwierania kafelka Dojazdy — kontrola uprawnień przez udostępniony cfBackupBridge.isAdmin zamiast prywatnej funkcji w głównym IIFE.

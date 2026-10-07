@@ -1,7 +1,10 @@
-/* CleanFleet Dojazdy v1.55.0. Addresses: Photon; road distances: OSRM/FOSSGIS. */
+/* CleanFleet Dojazdy v1.55.1. Addresses: Photon; road distances: OSRM/FOSSGIS. */
 (() => {
   'use strict';
-  const admin = () => typeof cfIsAdmin === 'function' && cfIsAdmin();
+  const admin = () => {
+    try { return Boolean(window.cfBackupBridge?.isAdmin?.()); }
+    catch (_) { return false; }
+  };
   const number = value => Number(String(value).trim().replace(',', '.'));
   const fmt = (value, digits=2) => value.toLocaleString('pl-PL', {minimumFractionDigits:digits, maximumFractionDigits:digits});
   const calculate = (meters, consumption, price) => {

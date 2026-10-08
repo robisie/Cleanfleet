@@ -132,3 +132,5 @@ CleanFleet v1.55.4: Dojazdy — wybór benzyny Pb95 lub diesla ON, bieżące og�
 CleanFleet v1.55.5 / Moje płatności v1.0.12: Gotówka — stały formularz kwoty, opisu i wpływu/wydatku, saldo całej listy i usuwanie przez X. Wpisy zapisane we wspólnym zaszyfrowanym sejfie płatności; starsze sejfy startują z pustą listą gotówki. Zapis, zmiana PIN i kopie zachowują listę.
 
 CleanFleet v1.55.6 / Moje finanse v1.1.0: jeden kafelek administratora i cztery zakładki — Moje zarobki, Moje płatności, Dojazdy, Gotówka. Wspólne odblokowanie dotychczasowym hasłem płatności i automatyczna blokada całego okna. Historia zarobków i szyfrowany sejf płatności/gotówki zachowane; kalkulator osadzony bez dodatkowego okna. Przełączanie nie przeładowuje aplikacji.
+
+CleanFleet v1.55.7: biblioteki potrzebne do startu pochodzą z lokalnych plików aplikacji; ekran startowy wykrywa brak uruchomienia kodu i limituje sprawdzanie sesji. Poprawka dla przeglądarek Androida z zawodnym dostępem do CDN.

@@ -1,6 +1,6 @@
-import * as C from './core.js?v=1.0.14';
-import * as API from './api.js?v=1.0.14';
-import * as PDF from './pdf.js?v=1.0.14';
+import * as C from './core.js?v=1.0.15';
+import * as API from './api.js?v=1.0.15';
+import * as PDF from './pdf.js?v=1.0.15';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set();
@@ -9,7 +9,7 @@ const defaults=()=>({catalog:structuredClone(catalog),markup:35,company:{name:'R
 const p=()=>selected?.payload;
 const title=()=>C.MODULES.find(x=>x[0]===view)?.[1]||({dashboard:'Panel administratora',catalog:'Cennik usług',settings:'Dane wykonawcy'}[view]||'Robisię');
 const btn=(action,label,cls='',extra='')=>`<button type="button" data-action="${action}" class="${cls}" ${extra}>${label}</button>`;
-const input=(name,label,value='',type='text',extra='')=>`<div class="field"><label for="f-${esc(name)}">${label}</label><input id="f-${esc(name)}" name="${esc(name)}" type="${type}" value="${esc(value)}" ${extra}></div>`;
+const input=(name,label,value='',type='text',extra='')=>`<div class="field"><label for="f-${esc(name)}">${label}</label><input id="f-${esc(name)}" name="${esc(name)}" type="${type}" value="${esc(value)}" ${p()?.calculationPrecision==='source'&&type==='number'?extra.replace(/step="[^"]+"/g,'step="any"'):extra}></div>`;
 const text=(name,label,value='',extra='')=>`<div class="field"><label for="f-${esc(name)}">${label}</label><textarea id="f-${esc(name)}" name="${esc(name)}" ${extra}>${esc(value)}</textarea></div>`;
 const field=(name,label,value,type='text',extra='')=>input(name,label,value,type,`data-field="${name}" ${extra}`);
 const metric=(label,value,cls='')=>`<div class="metric ${cls}"><small>${label}</small><strong>${value}</strong></div>`;

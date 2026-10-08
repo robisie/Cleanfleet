@@ -10,3 +10,5 @@ dialog.line-modal[open]{display:flex;flex-direction:column;width:min(1120px,calc
 .brand-logo{display:block;width:132px;height:auto;object-fit:contain;flex:none}.login .brand-logo{width:min(280px,100%);margin:0 0 18px}.loading{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:32px}.loading .brand-logo{width:min(360px,80vw)}.loading p{margin:0;color:#677181}@media(max-width:720px){.topbar .brand-logo{width:110px}}
 
 .pdf-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pdf-choice{display:flex;align-items:center;gap:12px;border:1px solid #e2e6eb;border-radius:10px;padding:14px;cursor:pointer;font-size:14px;min-height:60px}.pdf-choice input{flex:none;margin:0}.pdf-choice:has(input:checked){background:#fff5dc;border-color:#c6a658}@media(max-width:600px){.pdf-choices{grid-template-columns:1fr}}
+
+.contract-preview-signatures{display:flex;gap:24px;justify-content:space-between;margin-top:48px;text-align:center}.contract-preview-signatures>span{flex:1;min-width:0}

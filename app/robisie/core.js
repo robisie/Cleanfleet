@@ -1,4 +1,4 @@
-export const VERSION='1.0.13';
+export const VERSION='1.0.14';
 export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['rooms','Pomieszczenia i pomiary'],['offer','Oferta wstępna'],['contract','Umowa'],['works','Realizacja i kalkulacja'],['summary','Zestawienie prac'],['payments','Etapy i płatności'],['purchases','Zakupy i materiały'],['journal','Dziennik prac'],['handover','Odbiór inwestycji']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -7,11 +7,12 @@ export const money=v=>new Intl.NumberFormat('pl-PL',{style:'currency',currency:'
 export const quantity=v=>new Intl.NumberFormat('pl-PL',{maximumFractionDigits:3}).format(number(v));
 export const round=v=>Math.round((number(v)+Number.EPSILON)*100)/100;
 export function attachment(project,prefix,version){return `${prefix}-${project.contract_number.replace('UUR-','')}${version?'/V'+version:''}`;}
+const geometrySignature=(parts,shared,openings,height)=>JSON.stringify([parts.map(p=>[number(p.length),number(p.width),number(p.height??height)]),number(shared),number(openings)]);
 export function roomArea(room){
  const parts=room.parts?.length?room.parts:[room];
  const floor=parts.reduce((s,p)=>s+number(p.length)*number(p.width),0);
  const wall=parts.reduce((s,p)=>s+2*(number(p.length)+number(p.width))*number(p.height??room.height),0);
- const snapshot=room.sourceAreas;if(snapshot&&snapshot.geometry===JSON.stringify([parts,number(room.sharedWalls),number(room.openings)]))return {...snapshot.values,perimeter:parts.reduce((s,p)=>s+2*(number(p.length)+number(p.width)),0)};
+ const snapshot=room.sourceAreas;let reference;try{reference=snapshot&&JSON.parse(snapshot.geometry);}catch{}if(reference&&geometrySignature(reference[0],reference[1],reference[2],room.height)===geometrySignature(parts,room.sharedWalls,room.openings,room.height))return {...snapshot.values,perimeter:parts.reduce((s,p)=>s+2*(number(p.length)+number(p.width)),0)};
  return {floor,ceiling:floor,walls:Math.max(0,wall-number(room.sharedWalls)-number(room.openings)),perimeter:parts.reduce((s,p)=>s+2*(number(p.length)+number(p.width)),0)};
 }
 export const lineValue=line=>line.included===false?0:round(number(line.qty)*number(line.price));

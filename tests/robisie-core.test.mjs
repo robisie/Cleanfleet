@@ -7,7 +7,7 @@ test('pomiary sumują części i odliczają otwory oraz wspólne ściany',()=>{
 });
 test('historyczny pomiar źródłowy obowiązuje do zmiany geometrii',()=>{
  const room={parts:[{length:1.12,width:3.31,height:2.6},{length:1.22,width:2.32,height:2.6}],openings:0,sharedWalls:0};room.sourceAreas={geometry:JSON.stringify([room.parts,0,0]),values:{floor:3.7072,ceiling:3.7072,walls:41.444}};
- assert.equal(C.roomArea(room).floor,3.7072);room.parts[1].width=3;assert.equal(C.roomArea(room).floor,7.3672);
+ assert.equal(C.roomArea(room).floor,3.7072);room.parts=room.parts.map(p=>({height:p.height,width:p.width,length:p.length}));assert.equal(C.roomArea(room).floor,3.7072);room.parts[1].width=3;assert.equal(C.roomArea(room).floor,7.3672);
 });
 test('import Numbers zaokrągla sumę, zachowując precyzję cen i salda',()=>{
  const lines=[{qty:1,price:1.004,done:true,calculationPrecision:'source'},{qty:1,price:1.004,done:true,calculationPrecision:'source'}];assert.equal(C.workTotals(lines).after,2.01);

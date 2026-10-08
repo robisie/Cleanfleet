@@ -1,6 +1,6 @@
-import * as C from './core.js?v=1.0.10';
-import * as API from './api.js?v=1.0.10';
-import * as PDF from './pdf.js?v=1.0.10';
+import * as C from './core.js?v=1.0.11';
+import * as API from './api.js?v=1.0.11';
+import * as PDF from './pdf.js?v=1.0.11';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set();
@@ -22,7 +22,7 @@ function checkDirty(){if(!dirty)return true;return confirm('Masz niezapisane zmi
 function markDirty(){dirty=true;const bar=$('#save-state');if(bar)bar.textContent='Niezapisane zmiany';}
 function roomName(id){return p()?.rooms.find(r=>r.id===id)?.name||'Cała inwestycja';}
 function card(content){return `<section class="card">${content}</section>`;}
-function documents(){const s=selected;return [['UMOWA',s.contract_number],['WYMIARY',C.attachment(s,'WYM')],['OFERTA',C.attachment(s,'OFE',p().acceptedOffers?.at(-1)?.version||1)],['KALKULACJA KOŃCOWA',C.attachment(s,'KAL-K')],['ROZLICZENIE',C.attachment(s,'ROZ')],['DZIENNIK',C.attachment(s,'DZR')],['PROTOKÓŁ',C.attachment(s,'PZO')]];}
+function documents(){const s=selected;return [['UMOWA',s.contract_number],['WYMIARY',C.attachment(s,'WYM')],['OFERTA',C.attachment(s,'OFE',p().acceptedOffers?.at(-1)?.version||1)],['KALKULACJA KOŃCOWA',C.attachment(s,'KAL-K')],['ROZLICZENIE',C.attachment(s,'ROZ')],['DZIENNIK',C.attachment(s,'DZR')],['PROTOKÓŁ',C.attachment(s,'PZO')],['MATERIAŁY',C.attachment(s,'ZRM')]];}
 async function start(){
  try{catalog=await fetch('./catalog.json').then(r=>{if(!r.ok)throw new Error('Nie można wczytać cennika.');return r.json();});
  if(!API.restoreSession()){loginView();return;}await load();

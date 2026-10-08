@@ -1,4 +1,4 @@
-export const VERSION='1.0.12';
+export const VERSION='1.0.13';
 export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['rooms','Pomieszczenia i pomiary'],['offer','Oferta wstępna'],['contract','Umowa'],['works','Realizacja i kalkulacja'],['summary','Zestawienie prac'],['payments','Etapy i płatności'],['purchases','Zakupy i materiały'],['journal','Dziennik prac'],['handover','Odbiór inwestycji']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -11,10 +11,13 @@ export function roomArea(room){
  const parts=room.parts?.length?room.parts:[room];
  const floor=parts.reduce((s,p)=>s+number(p.length)*number(p.width),0);
  const wall=parts.reduce((s,p)=>s+2*(number(p.length)+number(p.width))*number(p.height??room.height),0);
+ const snapshot=room.sourceAreas;if(snapshot&&snapshot.geometry===JSON.stringify([parts,number(room.sharedWalls),number(room.openings)]))return {...snapshot.values,perimeter:parts.reduce((s,p)=>s+2*(number(p.length)+number(p.width)),0)};
  return {floor,ceiling:floor,walls:Math.max(0,wall-number(room.sharedWalls)-number(room.openings)),perimeter:parts.reduce((s,p)=>s+2*(number(p.length)+number(p.width)),0)};
 }
 export const lineValue=line=>line.included===false?0:round(number(line.qty)*number(line.price));
-export function workTotals(lines,discount=0){const before=round(lines.reduce((s,l)=>s+lineValue(l),0));return {before,after:round(before*(1-number(discount)/100)),done:round(lines.filter(l=>l.done).reduce((s,l)=>s+lineValue(l),0)*(1-number(discount)/100)),hours:lines.reduce((s,l)=>s+number(l.hours),0),days:lines.reduce((s,l)=>s+number(l.days),0)};}
+const calculationValue=line=>line.calculationPrecision==='source'?(line.included===false?0:number(line.qty)*number(line.price)):lineValue(line);
+export function workTotals(lines,discount=0){const raw=lines.reduce((s,l)=>s+calculationValue(l),0),factor=1-number(discount)/100;return {before:round(raw),after:round((lines.some(l=>l.calculationPrecision==='source')?raw:round(raw))*factor),done:round(lines.filter(l=>l.done).reduce((s,l)=>s+calculationValue(l),0)*factor),hours:lines.reduce((s,l)=>s+number(l.hours),0),days:lines.reduce((s,l)=>s+number(l.days),0)};}
+
 export function purchaseTotals(p){
  const spent=round((p.purchases||[]).filter(x=>x.paid).reduce((s,x)=>s+number(x.amount),0));
  const charged=round((p.purchases||[]).filter(x=>x.paid).reduce((s,x)=>s+number(x.charge),0));
@@ -26,7 +29,7 @@ export function totals(p){
  const accepted=p.acceptedOffers?.at(-1);
  const agreed=accepted?workTotals(accepted.lines,accepted.discount).after:offer.after;
  const paid=round((p.receipts||[]).filter(x=>x.kind!=='materials').reduce((s,x)=>s+number(x.amount),0));
- return {offer,works,materials,agreed,paid,remaining:round(works.after+materials.charged-paid-materials.advances),workRemaining:round(works.after-paid),change:round(works.after-agreed)};
+ return {offer,works,materials,agreed,paid,remaining:round(p.calculationPrecision==='source'?((p.works||[]).reduce((s,l)=>s+calculationValue(l),0)*(1-number(p.workDiscount??p.discount)/100)+(p.purchases||[]).filter(x=>x.paid).reduce((s,x)=>s+number(x.charge),0)-(p.receipts||[]).reduce((s,x)=>s+number(x.amount),0)):works.after+materials.charged-paid-materials.advances),workRemaining:round(works.after-paid),change:round(works.after-agreed)};
 }
 export function aggregate(lines){const map=new Map();for(const l of lines){if(l.included===false)continue;const key=l.serviceId+'|'+l.name+'|'+l.unit;const row=map.get(key)||{name:l.name,category:l.category,unit:l.unit,qty:0,value:0};row.qty+=number(l.qty);row.value=round(row.value+lineValue(l));map.set(key,row);}return [...map.values()].sort((a,b)=>a.category.localeCompare(b.category,'pl')||a.name.localeCompare(b.name,'pl'));}
 export function newProject(name,investor,date=today()){

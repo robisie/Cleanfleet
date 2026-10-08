@@ -1,6 +1,6 @@
-import * as C from './core.js?v=1.0.9';
-import * as API from './api.js?v=1.0.9';
-import * as PDF from './pdf.js?v=1.0.9';
+import * as C from './core.js?v=1.0.10';
+import * as API from './api.js?v=1.0.10';
+import * as PDF from './pdf.js?v=1.0.10';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set();

@@ -1,6 +1,6 @@
-import * as C from './core.js?v=1.0.16';
-import * as API from './api.js?v=1.0.16';
-import * as PDF from './pdf.js?v=1.0.16';
+import * as C from './core.js?v=1.0.17';
+import * as API from './api.js?v=1.0.17';
+import * as PDF from './pdf.js?v=1.0.17';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',shopFilter=null,mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set();
@@ -61,10 +61,10 @@ function paymentsView(){const d=p(),t=C.totals(d),percent=d.stages.reduce((s,x)=
 const shopName=value=>String(value??'').trim().replace(/\s+/g,' ');
 const shopKey=value=>shopName(value).toLocaleLowerCase('pl');
 function purchaseShopFilters(){
- const groups=new Map();for(const item of p().purchases){const key=shopKey(item.shop);if(!groups.has(key))groups.set(key,{name:shopName(item.shop)||'Bez sklepu',count:0});groups.get(key).count++;}
+ const groups=new Map();for(const item of p().purchases){const key=shopKey(item.shop);if(!groups.has(key))groups.set(key,{name:shopName(item.shop)||'Bez sklepu',count:0,amount:0});const group=groups.get(key);group.count++;group.amount+=C.number(item.amount);}
  if(shopFilter!==null&&!groups.has(shopFilter))shopFilter=null;
- const tile=(key,name,count)=>btn('purchase-shop',`<strong>${esc(name)}</strong><small>Zakupy: ${count}</small>`,`shop-filter${shopFilter===key?' active':''}`,`data-shop="${esc(key??'')}"${key===null?' data-all="true"':''} aria-pressed="${shopFilter===key}"`);
- return `<div class="shop-filters" role="group" aria-label="Filtruj zakupy według sklepu">${tile(null,'Wszystkie',p().purchases.length)}${[...groups].sort((a,b)=>a[1].name.localeCompare(b[1].name,'pl')).map(([key,g])=>tile(key,g.name,g.count)).join('')}</div>`;
+ const tile=(key,name,count,amount)=>btn('purchase-shop',`<strong>${esc(name)}</strong><small>Zakupy: ${count}</small><span class="shop-filter-amount" aria-label="Łączna kwota zakupów">${money(amount)}</span>`,`shop-filter${shopFilter===key?' active':''}`,`data-shop="${esc(key??'')}"${key===null?' data-all="true"':''} aria-pressed="${shopFilter===key}"`);
+ return `<div class="shop-filters" role="group" aria-label="Filtruj zakupy według sklepu">${tile(null,'Wszystkie',p().purchases.length,[...groups.values()].reduce((sum,g)=>sum+g.amount,0))}${[...groups].sort((a,b)=>a[1].name.localeCompare(b[1].name,'pl')).map(([key,g])=>tile(key,g.name,g.count,g.amount)).join('')}</div>`;
 }
 function purchasesView(){const t=C.purchaseTotals(p()),filters=purchaseShopFilters(),items=p().purchases.filter(x=>shopFilter===null||shopKey(x.shop)===shopFilter);return `<div class="metrics">${metric('Otrzymane zaliczki',money(t.advances))}${metric('Faktyczne wydatki',money(t.spent))}${metric('Koszt dla inwestora',money(t.charged))}${metric(t.balance>=0?'Do zwrotu inwestorowi':'Dopłata inwestora',money(Math.abs(t.balance)),'gold')}${metric('Faktycznie pozostało',money(t.actualBalance))}${metric('Różnica rozliczenia',money(t.difference))}</div>${card(`<div class="toolbar"><h2>Zakupy materiałów</h2>${btn('purchase-add','Dodaj zakup','primary')}</div>${filters}<p class="muted purchase-filter-info" aria-live="polite">Pokazano ${items.length} z ${p().purchases.length} zakupów. Podsumowanie finansowe obejmuje całą inwestycję.</p>${table(['Data','Sklep','Zakup / dokument','Kwota zakupu','Koszt inwestora','Opłacono',''],items.map(x=>`<tr><td>${date(x.date)}</td><td>${esc(x.shop)}</td><td>${esc(x.description)}<br><span class="muted">${esc(x.invoice)}</span></td><td class="num">${money(x.amount)}</td><td class="num">${money(x.charge)}</td><td>${x.paid?'Tak':'Nie'}</td><td>${btn('purchase-edit','Edytuj','',`data-id="${x.id}"`)}</td></tr>`).join(''))}<p class="muted" style="margin-top:16px">Saldo obejmuje opłacone zakupy. Zaliczki dodajesz w module „Etapy i płatności”. Koszt inwestora można ustalić niezależnie od kwoty zakupu.</p>`)} `;}
 function journalView(){return card(`<div class="toolbar"><h2>Wpisy dziennika</h2>${btn('journal-add','Dodaj wpis','primary')}</div>${p().journal.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(x=>`<div class="history"><div class="toolbar"><strong>${date(x.date)} · ${esc(x.roomId?roomName(x.roomId):'Cała inwestycja')}</strong>${btn('journal-edit','Edytuj','',`data-id="${x.id}"`)}</div><p style="white-space:pre-wrap">${esc(x.description)}</p><p class="muted">Potwierdzenie inwestora: ${x.investorConfirmed?'tak':'brak'} · wykonawcy: ${x.contractorConfirmed?'tak':'brak'}</p></div>`).join('')||'<div class="empty">Brak wpisów w dzienniku.</div>'}`);}

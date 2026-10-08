@@ -25,7 +25,7 @@ test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów
  const shopRow=structuredClone(row);
  shopRow.payload.purchases=[
   {id:'s1',shop:' Market A ',description:'Zakup pierwszy',amount:100,charge:110,paid:true},
-  {id:'s2',shop:'market a',description:'Zakup drugi',amount:200,charge:220,paid:true},
+  {id:'s2',shop:'market a',description:'Zakup drugi',amount:200.25,charge:220,paid:false},
   {id:'s3',shop:'Market B & C',description:'Zakup trzeci',amount:50,charge:55,paid:true},
   {id:'s4',shop:'',description:'Zakup bez sklepu',amount:10,charge:10,paid:true}
  ];
@@ -33,6 +33,12 @@ test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów
  let purchases=module.namespace.testPurchases();
  assert.equal((purchases.match(/data-action="purchase-shop"/g)||[]).length,4);
  assert.ok(purchases.includes('Market B &amp; C')&&purchases.includes('Bez sklepu'));
+ const shopTiles=purchases.match(/<button[^>]*data-action="purchase-shop"[\s\S]*?<\/button>/g);
+ assert.ok(shopTiles.find(tile=>tile.includes('data-all="true"')).includes(C.money(360.25)));
+ assert.ok(shopTiles.find(tile=>tile.includes('data-shop="market a"')).includes(C.money(300.25)));
+ assert.ok(shopTiles.find(tile=>tile.includes('data-shop="market b &amp; c"')).includes(C.money(50)));
+ assert.ok(shopTiles.find(tile=>tile.includes('data-shop=""')&&!tile.includes('data-all')).includes(C.money(10)));
+
  const filterClick=dataset=>listeners.get('click')({target:{closest:()=>({dataset:{action:'purchase-shop',...dataset}})}});
  await filterClick({shop:'market a'});purchases=module.namespace.testPurchases();
  assert.ok(purchases.includes('Zakup pierwszy')&&purchases.includes('Zakup drugi'));

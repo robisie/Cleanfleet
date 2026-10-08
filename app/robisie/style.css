@@ -14,3 +14,5 @@ dialog.line-modal[open]{display:flex;flex-direction:column;width:min(1120px,calc
 .contract-preview-signatures{display:flex;gap:24px;justify-content:space-between;margin-top:48px;text-align:center}.contract-preview-signatures>span{flex:1;min-width:0}
 
 .shop-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0}.shop-filter{text-align:left;padding:16px;min-width:0;border-radius:12px;background:#f7f9fa}.shop-filter strong{display:block;overflow-wrap:anywhere;margin-bottom:6px}.shop-filter small{color:#677181}.shop-filter.active{border-color:#b79442;background:#faf5e7;box-shadow:inset 0 0 0 1px #b79442}.shop-filter.active strong{color:#806520}.purchase-filter-info{margin:0 0 16px}@media(max-width:720px){.shop-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.shop-filter{padding:12px}}
+
+.shop-filter-amount{display:block;font-weight:700;margin-top:8px;overflow-wrap:anywhere}

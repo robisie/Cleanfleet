@@ -138,3 +138,5 @@ CleanFleet v1.55.7: biblioteki potrzebne do startu pochodzą z lokalnych plików
 CleanFleet v1.55.8: zapisane reguły zarobków i lista kontrahentów wczytują się niezależnie od przeliczenia historii EUR oraz powiązanych wpisów prania. Przy błędzie historii pozostają dostępne reguły i podpowiedzi, z możliwością ponowienia odczytu. Akcje reguł/dodawania czekają na odczyt danych zamiast otwierać pustą listę.
 
 CleanFleet v1.55.10: aparat zapisuje każde ujęcie lokalnie od razu, bez zamykania serii; w razie błędu ujęcie trafia do ręcznego zapisu. Miniaturki mają biały X zamiast ikony kosza.
+
+CleanFleet v1.55.11: niezależna orientacja podglądu i pionowego interfejsu aparatu, obsługa opóźnionego obrotu Safari i usunięcie starej rejestracji SW z modułu aparatu. ZIP zapisany lokalnie jako odpowiedź attachment, pobieranie pliku na iOS zamiast kopiowania do systemowego share sheet; odtworzenie gotowej paczki po restarcie PWA i czyszczenie zdjęć wyłącznie po osobnym potwierdzeniu użytkownika.

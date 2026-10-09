@@ -6,6 +6,7 @@
   let torchOn=false;
   let rearDevices=[],ultraDevice=null,mainDevice=null,teleDevice=null,currentLens='1';
   let cameraOrientationBound=false;
+  let orientationTimer=null;
 
   const toast=m=>{try{typeof showToast==='function'?showToast(m):console.info(m)}catch(_){console.info(m)}};
   const cameraSize={width:{ideal:4096},height:{ideal:3072},aspectRatio:{ideal:4/3},resizeMode:{ideal:'none'}};
@@ -28,6 +29,8 @@
 
   function resetCameraPortraitFallback(){
     if(!overlay)return;
+    const video=overlay.querySelector('.cf-cam-video');
+    if(video){video.style.width='';video.style.height='';video.style.transform='';}
     overlay.style.width='';
     overlay.style.height='';
     overlay.style.top='';
@@ -51,28 +54,45 @@
 
     overlay.style.width=`${height}px`;
     overlay.style.height=`${width}px`;
-    overlay.style.top='50%';
-    overlay.style.left='50%';
+    overlay.style.top=`${height/2+(window.visualViewport?.offsetTop||0)}px`;
+    overlay.style.left=`${width/2+(window.visualViewport?.offsetLeft||0)}px`;
     overlay.style.right='auto';
     overlay.style.bottom='auto';
     overlay.style.transformOrigin='50% 50%';
     overlay.style.transform=`translate(-50%,-50%) rotate(${rotation}deg)`;
+    // Safari rotates the video frame with the viewport. Keep its preview independent
+    // of the counter-rotated controls, without cropping the horizontal frame.
+    const stage=overlay.querySelector('.cf-cam-stage'),video=overlay.querySelector('.cf-cam-video');
+    if(stage&&video){
+      video.style.width=`${stage.clientHeight}px`;
+      video.style.height=`${stage.clientWidth}px`;
+      video.style.transform=`rotate(${-rotation}deg)`;
+    }
+  }
+
+  function scheduleCameraOrientation(){
+    applyCameraPortraitFallback();
+    clearTimeout(orientationTimer);
+    orientationTimer=setTimeout(applyCameraPortraitFallback,250);
   }
 
   function bindCameraOrientationFallback(){
     if(cameraOrientationBound)return;
     cameraOrientationBound=true;
-    window.addEventListener('resize',applyCameraPortraitFallback,{passive:true});
-    window.addEventListener('orientationchange',applyCameraPortraitFallback,{passive:true});
-    window.visualViewport?.addEventListener?.('resize',applyCameraPortraitFallback,{passive:true});
+    window.screen?.orientation?.addEventListener?.('change',scheduleCameraOrientation);
+    window.addEventListener('resize',scheduleCameraOrientation,{passive:true});
+    window.addEventListener('orientationchange',scheduleCameraOrientation,{passive:true});
+    window.visualViewport?.addEventListener?.('resize',scheduleCameraOrientation,{passive:true});
   }
 
   function unbindCameraOrientationFallback(){
     if(!cameraOrientationBound)return;
     cameraOrientationBound=false;
-    window.removeEventListener('resize',applyCameraPortraitFallback);
-    window.removeEventListener('orientationchange',applyCameraPortraitFallback);
-    window.visualViewport?.removeEventListener?.('resize',applyCameraPortraitFallback);
+    clearTimeout(orientationTimer);
+    window.screen?.orientation?.removeEventListener?.('change',scheduleCameraOrientation);
+    window.removeEventListener('resize',scheduleCameraOrientation);
+    window.removeEventListener('orientationchange',scheduleCameraOrientation);
+    window.visualViewport?.removeEventListener?.('resize',scheduleCameraOrientation);
   }
 
   async function lockCameraPortrait(){
@@ -96,21 +116,21 @@
   function ensureStyle(){
     if(document.getElementById('cfPhotoCamera1216Style'))return;
     const s=document.createElement('style');s.id='cfPhotoCamera1216Style';s.textContent=`
-      .cf-cam-overlay{position:fixed;inset:0;z-index:200500;background:#000;display:none;flex-direction:column;color:#fff}
+      .cf-cam-overlay{box-sizing:border-box;position:fixed;inset:0;z-index:200500;background:#000;display:none;flex-direction:column;color:#fff}
       .cf-cam-overlay.open{display:flex}
-      .cf-cam-top{height:64px;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(0,0,0,.72);gap:10px}
+      .cf-cam-top{box-sizing:border-box;flex-shrink:0;height:64px;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(0,0,0,.72);gap:10px}
       .cf-cam-top button,.cf-cam-bottom button{border:0;border-radius:12px;font:800 14px/1 system-ui;padding:12px 16px;cursor:pointer}
       .cf-cam-cancel{background:#2c2c2c;color:#fff}.cf-cam-done{background:#9fbd17;color:#111}
       .cf-cam-count{font:800 14px/1.2 system-ui;text-align:center}
       .cf-cam-stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#000}
-      .cf-cam-video{width:100%;height:100%;object-fit:contain;background:#000}
+      .cf-cam-video{position:absolute;flex-shrink:0;width:100%;height:100%;object-fit:contain;background:#000}
       .cf-cam-flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .12s}.cf-cam-flash.on{opacity:.65}
       .cf-cam-zoom{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:3;display:flex;gap:8px;padding:5px 7px;border-radius:999px;background:rgba(0,0,0,.48);backdrop-filter:blur(8px)}
       .cf-cam-zoom button{width:48px;height:36px;border:0;border-radius:999px;background:rgba(255,255,255,.16);color:#fff;font:800 13px/1 system-ui;cursor:pointer}
       .cf-cam-zoom button.active{background:#9fbd17;color:#111}.cf-cam-zoom button:disabled{opacity:.32;cursor:default}
       .cf-cam-torch{min-width:70px;min-height:48px;border:1px solid #777;border-radius:14px;background:#222;color:#fff;font:700 12px system-ui;padding:8px}.cf-cam-torch[aria-pressed="true"]{background:#9fbd17;color:#111;border-color:#9fbd17}
       .cf-cam-device{background:#161616;color:#fff;padding:8px 12px;font:12px system-ui}.cf-cam-device select{max-width:100%;background:#242424;color:#fff;border:1px solid #555;border-radius:8px;padding:8px}.cf-cam-lens-note{margin:6px 0 0;color:#ccc;font-size:11px}
-      .cf-cam-bottom{min-height:112px;display:flex;align-items:center;justify-content:center;gap:24px;padding:14px;background:rgba(0,0,0,.78)}
+      .cf-cam-bottom{box-sizing:border-box;flex-shrink:0;min-height:112px;display:flex;align-items:center;justify-content:center;gap:24px;padding:14px;background:rgba(0,0,0,.78)}
       .cf-cam-switch{background:#2c2c2c;color:#fff;width:52px;height:52px;padding:0!important;border-radius:50%!important;font-size:24px!important}
       .cf-cam-shutter{width:76px;height:76px;padding:0!important;border-radius:50%!important;background:#fff!important;border:6px solid #777!important;box-shadow:0 0 0 3px #fff inset}
       .cf-cam-spacer{width:52px;height:52px}
@@ -224,7 +244,7 @@
     stopStream();
     async function connect(id){
       stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{deviceId:{exact:id},...cameraSize}});
-      const v=ensureOverlay().querySelector('.cf-cam-video');v.srcObject=stream;await v.play();
+      const v=ensureOverlay().querySelector('.cf-cam-video');v.srcObject=stream;await v.play();scheduleCameraOrientation();
     }
     try{await connect(device.deviceId);return true;}
     catch(e){
@@ -272,7 +292,7 @@ const box=overlay.querySelector('.cf-cam-zoom');box.style.display=facing==='envi
   async function startStream(){
     stopStream();if(!navigator.mediaDevices?.getUserMedia)throw new Error('Aparat w aplikacji nie jest dostępny na tym urządzeniu.');
     stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:facing},...cameraSize}});
-    const v=ensureOverlay().querySelector('.cf-cam-video');v.srcObject=stream;await v.play();
+    const v=ensureOverlay().querySelector('.cf-cam-video');v.srcObject=stream;await v.play();scheduleCameraOrientation();
     if(facing==='environment'){await discoverRearDevices();currentLens='1';updateZoomUi();await setLens('0.5',true);if(currentLens!=='0.5')updateZoomUi();}else{currentLens='1';updateZoomUi();}
   }
 
@@ -287,6 +307,7 @@ const box=overlay.querySelector('.cf-cam-zoom');box.style.display=facing==='envi
       const o=ensureOverlay();
       o.classList.add('open');
       document.documentElement.style.overflow='hidden';
+      scheduleCameraOrientation();
       await lockCameraPortrait();
       busy=false;
       await startStream();
@@ -333,11 +354,11 @@ const box=overlay.querySelector('.cf-cam-zoom');box.style.display=facing==='envi
     const ctx=c.getContext('2d',{alpha:false});
     if(facing==='user'){ctx.translate(w,0);ctx.scale(-1,1)}
     ctx.drawImage(v,0,0,w,h);
-    return await new Promise((resolve,reject)=>c.toBlob(
+    try{return await new Promise((resolve,reject)=>c.toBlob(
       b=>b?resolve(b):reject(new Error('Nie udało się zrobić zdjęcia')),
       'image/jpeg',
       1
-    ));
+    ));}finally{c.width=0;c.height=0;}
   }
 
   async function capture(){
@@ -376,30 +397,4 @@ const box=overlay.querySelector('.cf-cam-zoom');box.style.display=facing==='envi
     if(document.visibilityState==='hidden'&&overlay?.classList.contains('open'))stopStream();
     if(document.visibilityState==='visible'&&overlay?.classList.contains('open'))applyCameraPortraitFallback();
   });
-})();
-
-// CleanFleet v1.30.129 — bootstrap aplikacji i wymuszenie aktualnego Service Workera.
-(()=>{
-  'use strict';
-  const VERSION='1.30.129';
-  const start=()=>{
-    const version=document.getElementById('cfAppVersion');
-    if(version)version.textContent=`Wersja aplikacji: v${VERSION}`;
-
-    if(!document.querySelector('link[href*="/app/glass-icons.css"]')){
-      const link=document.createElement('link');
-      link.rel='stylesheet';link.href='/app/glass-icons.css?v=13068';
-      document.head.appendChild(link);
-    }
-    if(!document.querySelector('script[src*="/app/glass-icons.js"]')){
-      const script=document.createElement('script');
-      script.src='/app/glass-icons.js?v=13068';script.defer=true;
-      document.body.appendChild(script);
-    }
-    if('serviceWorker' in navigator){
-      navigator.serviceWorker.register('/app/sw.js?v=20260927-130129',{updateViaCache:'none'})
-        .then(registration=>registration.update()).catch(error=>console.warn('CleanFleet icon SW update:',error));
-    }
-  };
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();

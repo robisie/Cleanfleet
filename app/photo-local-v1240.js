@@ -233,30 +233,66 @@
         removed=true;
       }catch(e){console.error(e);status.textContent='Nie udało się wyczyścić zdjęć. Spróbuj ponownie.';}
       finally{busy=false;clear.disabled=false;close.disabled=false;window.cfPhotoSession?.setBusy(false);}
-      if(removed){el.remove();document.dispatchEvent(new CustomEvent('cf:photos-saved',{detail:{recordId}}));renderLocal().catch(console.error);toast('Wyczyszczono zdjęcia lokalne tego wpisu.');}
+      if(removed){
+        try{const ready=JSON.parse(sessionStorage.getItem('cf-photo-zip-ready')||'null');if(ready&&String(ready.recordId)===String(recordId)){await (await caches.open('cleanfleet-photo-download-v1')).delete(ready.url);sessionStorage.removeItem('cf-photo-zip-ready');}}catch(error){console.warn('CleanFleet ZIP cleanup',error)}
+        el.remove();document.dispatchEvent(new CustomEvent('cf:photos-saved',{detail:{recordId}}));renderLocal().catch(console.error);toast('Wyczyszczono zdjęcia lokalne tego wpisu.');}
     };
   }
 
-  function shareDialog(file,recordId){
+  const ZIP_CACHE='cleanfleet-photo-download-v1';
+  const ZIP_READY_KEY='cf-photo-zip-ready';
+  const isAppleMobile=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+
+  async function retainZip(file,recordId){
+    if(!navigator.serviceWorker?.controller||!window.caches)return null;
+    const url=`/app/photo-download/${uid()}/${encodeURIComponent(file.name)}`;
+    const cache=await caches.open(ZIP_CACHE);
+    // Retain one ready ZIP on disk, so a suspended/restarted PWA can recover it.
+    await cache.put(url,new Response(file,{headers:{
+      'Content-Type':'application/zip',
+      'Content-Disposition':`attachment; filename="${file.name.replace(/[^A-Za-z0-9._-]/g,'_')}"; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+      'Content-Length':String(file.size)
+    }}));
+    const ready={url,name:file.name,size:file.size,recordId};
+    sessionStorage.setItem(ZIP_READY_KEY,JSON.stringify(ready));
+    for(const key of await cache.keys())if(new URL(key.url).pathname!==url)await cache.delete(key);
+    return ready;
+  }
+
+  function shareDialog(file,recordId,ready=null){
     document.querySelector('.cf-local-zip-ready')?.remove();
     const el=document.createElement('div');el.className='cf-local-zip-ready';
-    el.innerHTML=`<div class="cf-local-zip-card"><h3>Paczka zdjęć gotowa</h3><div style="font-size:12px;font-weight:900;word-break:break-word">${file.name}</div><div style="font-size:10px;color:#6f756f;margin:5px 0 14px">${(file.size/1024/1024).toFixed(1)} MB · utworzono lokalnie</div><button data-local-share type="button">Udostępnij / zapisz do iCloud</button><button data-local-close type="button">Zamknij</button></div>`;
+    el.innerHTML='<div class="cf-local-zip-card"><h3>Paczka zdjęć gotowa</h3><div data-zip-name style="font-size:12px;font-weight:900;word-break:break-word"></div><div data-zip-size style="font-size:10px;color:#6f756f;margin:5px 0 14px"></div><a data-local-download>Zapisz ZIP w Plikach</a><button data-local-share type="button">Udostępnij ZIP</button><p data-zip-status role="status"></p><button data-local-cleaned type="button">ZIP zapisany — wyczyść zdjęcia</button><button data-local-close type="button">Zamknij</button></div>';
     document.body.appendChild(el);
-    el.querySelector('[data-local-close]').onclick=()=>el.remove();
-    const share=el.querySelector('[data-local-share]'),close=el.querySelector('[data-local-close]');
-    share.onclick=async()=>{
-      if(share.disabled)return;share.disabled=true;close.disabled=true;
+    el.querySelector('[data-zip-name]').textContent=file.name;
+    el.querySelector('[data-zip-size]').textContent=`${(file.size/1024/1024).toFixed(1)} MB · utworzono lokalnie`;
+    const download=el.querySelector('[data-local-download]'),share=el.querySelector('[data-local-share]'),status=el.querySelector('[data-zip-status]');
+    const url=ready?.url||URL.createObjectURL(file);
+    download.href=url;download.download=file.name;
+    if(!ready){download.target="_blank";download.rel="noopener";}
+    const close=()=>{el.remove();if(!ready)setTimeout(()=>URL.revokeObjectURL(url),60000)};
+    el.querySelector('[data-local-close]').onclick=close;
+    el.querySelector('[data-local-cleaned]').onclick=()=>{close();cleanupDialog(recordId)};
+    download.onclick=()=>{status.textContent='Sprawdź pobrany ZIP w aplikacji Pliki. Zdjęcia pozostają w CleanFleet.';};
+    // File sharing on iOS can terminate the PWA for a large ZIP. Hand off a disk-backed
+    // attachment response instead of copying it to the share sheet.
+    if(isAppleMobile()||!navigator.share||!file.slice){
+      share.hidden=true;
+      status.textContent='Wybierz zapis pliku ZIP. Gotowa paczka pozostaje dostępna w CleanFleet.';
+    }else share.onclick=async()=>{
+      if(share.disabled)return;share.disabled=true;
       try{
-        if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]})))await navigator.share({files:[file],title:file.name});
-        else{const u=URL.createObjectURL(file),a=document.createElement('a');a.href=u;a.download=file.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),30000)}
-        el.remove();cleanupDialog(recordId);
-      }catch(e){if(e?.name!=='AbortError'){console.error(e);toast('Nie udało się udostępnić ZIP-a.')}}finally{share.disabled=false;close.disabled=false;}
+        if(navigator.canShare&&!navigator.canShare({files:[file]})){download.click();return;}
+        await navigator.share({files:[file]});
+        status.textContent='Sprawdź zapis ZIP-a. Zdjęcia pozostają w CleanFleet.';
+      }catch(e){if(e?.name!=='AbortError'){console.error(e);status.textContent='Użyj przycisku „Zapisz ZIP w Plikach”.';}}
+      finally{share.disabled=false;}
     };
   }
 
   async function exportCombined(recordId){
     if(busy||window.cfPhotoSession?.get()?.busy)return;busy=true;window.cfPhotoSession?.setBusy(true);
-    try{const file=await makeCombinedZip(recordId);clearBuildProgress();shareDialog(file,recordId)}catch(e){console.error(e);clearBuildProgress();toast(e?.message||'Nie udało się utworzyć ZIP-a.')}finally{busy=false;window.cfPhotoSession?.setBusy(false)}
+    try{clearPreviews();const file=await makeCombinedZip(recordId);let ready=null;try{ready=await retainZip(file,recordId)}catch(error){console.warn('CleanFleet ZIP retention',error)}clearBuildProgress();shareDialog(file,recordId,ready)}catch(e){console.error(e);clearBuildProgress();toast(e?.message||'Nie udało się utworzyć ZIP-a.')}finally{busy=false;window.cfPhotoSession?.setBusy(false)}
   }
 
   async function saveToPhotos(recordId){
@@ -310,7 +346,7 @@
   function ensureStyles(){
     if(document.getElementById('cfPhotoLocal1240Style'))return;
     const s=document.createElement('style');s.id='cfPhotoLocal1240Style';s.textContent=`
-      .cf-photo-local{margin:8px 0 12px;padding:10px;border:1px solid #dfe5da;border-radius:12px;background:#fbfcf8}.cf-photo-local-head{display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:900}.cf-photo-local-meta{font-size:9px;color:#626a63;margin-top:5px}.cf-photo-local-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px}.cf-photo-local-thumb{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:#ecefea}.cf-photo-local-thumb img{width:100%;height:100%;object-fit:cover}.cf-photo-local-thumb button{position:absolute;right:3px;top:3px;width:20px;height:20px;border:0;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:13px;line-height:20px;padding:0}.cf-photo-local-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.cf-photo-local-actions button{border:1px solid #ccd1c7;background:#fff;border-radius:9px;padding:8px 10px;font-size:10px;font-weight:900}.cf-photo-local-actions .primary{background:#9fbd17;border-color:#9fbd17;color:#111}.cf-local-zip-ready{position:fixed;inset:0;z-index:300500;background:rgba(15,18,16,.48);display:flex;align-items:center;justify-content:center;padding:18px}.cf-local-zip-card{width:min(390px,100%);background:#fff;border-radius:20px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.3);color:#171a18}.cf-local-zip-card h3{margin:0 0 8px;font-size:20px}.cf-local-zip-card button{width:100%;border:0;border-radius:12px;padding:13px;font-weight:900;font-size:14px;margin-top:8px}.cf-local-zip-card [data-local-share]{background:#9fbd17;color:#111}.cf-local-zip-card [data-local-close]{background:#f0f2ef;color:#333}`;document.head.appendChild(s)
+      .cf-photo-local{margin:8px 0 12px;padding:10px;border:1px solid #dfe5da;border-radius:12px;background:#fbfcf8}.cf-photo-local-head{display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:900}.cf-photo-local-meta{font-size:9px;color:#626a63;margin-top:5px}.cf-photo-local-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px}.cf-photo-local-thumb{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:#ecefea}.cf-photo-local-thumb img{width:100%;height:100%;object-fit:cover}.cf-photo-local-thumb button{position:absolute;right:3px;top:3px;width:20px;height:20px;border:0;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:13px;line-height:20px;padding:0}.cf-photo-local-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.cf-photo-local-actions button{border:1px solid #ccd1c7;background:#fff;border-radius:9px;padding:8px 10px;font-size:10px;font-weight:900}.cf-photo-local-actions .primary{background:#9fbd17;border-color:#9fbd17;color:#111}.cf-local-zip-ready{position:fixed;inset:0;z-index:300500;background:rgba(15,18,16,.48);display:flex;align-items:center;justify-content:center;padding:18px}.cf-local-zip-card{width:min(390px,100%);background:#fff;border-radius:20px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.3);color:#171a18}.cf-local-zip-card h3{margin:0 0 8px;font-size:20px}.cf-local-zip-card button{width:100%;border:0;border-radius:12px;padding:13px;font-weight:900;font-size:14px;margin-top:8px}.cf-local-zip-card [data-local-download]{display:block;text-align:center;text-decoration:none;border-radius:12px;padding:13px;font-weight:900;font-size:14px;margin-top:8px;background:#9fbd17;color:#111}.cf-local-zip-card [hidden]{display:none!important}.cf-local-zip-card [data-local-share]{background:#9fbd17;color:#111}.cf-local-zip-card [data-local-close]{background:#f0f2ef;color:#333}`;document.head.appendChild(s)
   }
 
   function ensureLocalBox(){
@@ -385,6 +421,10 @@
 
   async function start(){
     ensureStyles();events();
+    try{
+      const ready=JSON.parse(sessionStorage.getItem(ZIP_READY_KEY)||'null');
+      if(ready&&window.caches&&(await (await caches.open(ZIP_CACHE)).match(ready.url)))shareDialog({name:ready.name,size:ready.size},ready.recordId,ready);
+    }catch(error){console.warn('CleanFleet ZIP recovery',error)}
     try{await navigator.storage?.persist?.()}catch(_){ }
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();

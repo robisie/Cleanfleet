@@ -1,4 +1,4 @@
-// CleanFleet v1.55.10 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
+// CleanFleet v1.55.11 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -10,6 +10,20 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const req = event.request;
   const url = new URL(req.url);
+
+  // Local ZIP downloads are attachment responses, never application navigation.
+  if(url.origin===self.location.origin&&url.pathname.startsWith('/app/photo-download/')){
+    event.respondWith((async()=>{
+      const cache=await caches.open('cleanfleet-photo-download-v1');
+      const response=await cache.match(url.pathname);
+      if(!response)return new Response('ZIP nie jest dostępny. Utwórz paczkę ponownie w CleanFleet.',{status:404,headers:{'Content-Type':'text/plain; charset=utf-8'}});
+      const headers=new Headers(response.headers);
+      headers.set('Cache-Control','no-store');
+      headers.set('X-Content-Type-Options','nosniff');
+      return new Response(response.body,{headers});
+    })());
+    return;
+  }
 
   // Robisię has its own interface; do not inject CleanFleet scripts into it.
   if (url.origin === self.location.origin && url.pathname.startsWith('/app/robisie/')) {
@@ -82,14 +96,14 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text(); 
     // Keep the visible version in sync for pages served through this worker.
-    html = html.replace(/v1\.55\.(?:8|9)/g, 'v1.55.10');
+    html = html.replace(/v1\.55\.(?:8|9|10)\b/g, 'v1.55.11');
     html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13095');
 
     if (!html.includes('/app/glass-icons.css')) {
       html = html.replace('</head>', '<link rel="stylesheet" href="/app/glass-icons.css?v=13068">\n</head>');
     }
     if (!html.includes('/app/glass-icons.js')) {
-      html = html.replace('</body>', '<script src="/app/glass-icons.js?v=20261009-15510"><\/script>\n</body>');
+      html = html.replace('</body>', '<script src="/app/glass-icons.js?v=20261009-15511"><\/script>\n</body>');
     }
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
@@ -203,9 +217,9 @@ self.addEventListener('fetch', event => {
       '<script src="/app/weather-refresh-v12311.js?v=20260923-13068"></script>\n' +
       '<script src="/app/layout-v11913.js?v=20260923-13068"></script>\n' +
       '<script src="/app/operations-v1200.js?v=20261009-1559"></script>\n' +
-      '<script src="/app/photo-local-v1240.js?v=20261009-15510"></script>\n' +
+      '<script src="/app/photo-local-v1240.js?v=20261009-15511"></script>\n' +
       '<script src="/app/photo-local-ui-v1232.js?v=20260919-13032"></script>\n' +
-      '<script src="/app/photo-camera-v1213.js?v=20261009-15510"></script>\n' +
+      '<script src="/app/photo-camera-v1213.js?v=20261009-15511"></script>\n' +
       '<script src="/app/calendar-v1203.js?v=20260917-2"></script>\n' +
       '<script src="/app/ui-v1209.js?v=20260915-3"></script>\n' +
       '<script src="/app/calendar-add-v1215.js?v=20260915-2"></script>\n' +

@@ -18,6 +18,16 @@
       .cf-syncbar.cf-syncbar-after-attention{margin:12px 0 12px;padding:0;border:0;background:transparent}
       .cf-weather-full-btn{border:1px solid #dfe7e2;background:#f5f8f6;color:#31483a;border-radius:999px;padding:7px 10px;font-size:10px;font-weight:850;cursor:pointer;white-space:nowrap}
       .cf-weather-full-btn:active{transform:scale(.98)}
+      /* A long description must not set the flex basis of the vehicle column. */
+      @media(max-width:639px){
+        #recordsList .record-top > div:first-child{flex:1 1 0%;min-width:0;max-width:100%}
+        #recordsList .record-top > div:last-child{flex:0 0 auto;min-width:0;max-width:40%}
+        #recordsList .record-top .record-meta{overflow-wrap:anywhere;word-break:normal}
+        #recordsList .record-top .record-plate-line{min-width:0;max-width:100%;flex-wrap:wrap}
+        #recordsList .record-top .record-badges{max-width:100%}
+        #recordsList .record-top .record-badge,
+        #recordsList .record-top .record-type-badge{box-sizing:border-box;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+      }
       @media(max-width:520px){.cf-syncbar.cf-syncbar-after-attention{margin:10px 0 10px}.cf-weather-full-btn{padding:6px 8px;font-size:9px}}
     `;
     document.head.appendChild(style);

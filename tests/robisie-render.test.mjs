@@ -7,11 +7,11 @@ import * as PDF from '../app/robisie/pdf.js';
 test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów',async()=>{
  const catalog=JSON.parse(await fs.readFile(new URL('../app/robisie/catalog.json',import.meta.url),'utf8'));
  const radios=catalog.map(x=>({value:x.id,checked:false}));
- let confirmDelete=true,deleteFails=false,confirmation='';let printedHtml='';const deletions=[];const savedSettings=[];const listeners=new Map();const nodes=new Map();const node=key=>{if(!nodes.has(key))nodes.set(key,{innerHTML:'',textContent:'',style:{},options:[{value:''},{value:'m²'},{value:'__robisie_custom_unit__'}],focus(){},classList:{toggle(){}},isConnected:true,showModal(){},close(){},querySelectorAll:()=>radios});return nodes.get(key);};
+ let confirmDelete=true,deleteFails=false,confirmation='';let printedHtml='';const deletions=[];const savedSettings=[];const createdProjects=[];const listeners=new Map();const nodes=new Map();const node=key=>{if(!nodes.has(key))nodes.set(key,{innerHTML:'',textContent:'',style:{},options:[{value:''},{value:'m²'},{value:'__robisie_custom_unit__'}],focus(){},classList:{toggle(){}},isConnected:true,showModal(){},close(){},querySelectorAll:()=>radios});return nodes.get(key);};
  const context=vm.createContext({console,crypto,structuredClone,URL,FormData:class extends Map{constructor(entries){super(Object.entries(entries));}getAll(key){const v=this.get(key);return Array.isArray(v)?v:v?[v]:[];}},setTimeout,clearTimeout,confirm:message=>{confirmation=message;return confirmDelete;},fetch:async()=>({ok:true,json:async()=>catalog}),window:{location:{href:'https://cleanfleet.pl/app/robisie/'},open:()=>({document:{write:html=>{printedHtml=html;},close(){}}}),addEventListener(){},scrollTo(){}},document:{querySelector:node,addEventListener(type,fn){listeners.set(type,fn);}}});
  const source=await fs.readFile(new URL('../app/robisie/app.js',import.meta.url),'utf8');
- const module=new vm.SourceTextModule(source+'\nexport function testPurchases(){return purchasesView();} export function testDirty(){return dirty;} export function testLineDialog(){lineDialog("offer");} export function testOffer(){return p().offer;} export function testPicker(){return servicePicker(config.payload.catalog);} export function testRoomLines(){return roomLines("offer",p().offer);} export function testUnits(current=""){return unitField(current);} export async function testDelete(id){await removeProject(id);} export function testProjects(){return all;} export function testProjectRows(){return projectRows(all);} export function testPdfChooser(){view="overview";dirty=false;pdfDialog();} ' +'\nexport function testRender(row,settings){all=[structuredClone(row)];selected=structuredClone(row);config={payload:settings,revision:1};configBaseline=structuredClone(config);return [...C.MODULES.map(([key])=>key),"catalog","settings"].map(key=>{view=key;return [key,content()];});}',{context});
- await module.link(spec=>{const values=spec.includes('core')?C:spec.includes('pdf')?PDF:{restoreSession:()=>null,deleteProject:async project=>{deletions.push(structuredClone(project));if(deleteFails)throw new Error('Brak połączenia');return project.id;},saveSettings:async(payload,revision)=>{const row={payload:structuredClone(payload),revision:revision+1};savedSettings.push(row);return row;}};const keys=Object.keys(values);return new vm.SyntheticModule(keys,function(){for(const key of keys)this.setExport(key,values[key]);},{context});});
+ const module=new vm.SourceTextModule(source+'\nexport function testSummary(){return summaryView();} export function testDashboard(){return dashboard();} export function testPurchaseDialog(){purchaseDialog();} export function testShops(){return shopSuggestions();} export function testPurchases(){return purchasesView();} export function testDirty(){return dirty;} export function testLineDialog(){lineDialog("offer");} export function testOffer(){return p().offer;} export function testPicker(){return servicePicker(config.payload.catalog);} export function testRoomLines(){return roomLines("offer",p().offer);} export function testUnits(current=""){return unitField(current);} export async function testDelete(id){await removeProject(id);} export function testProjects(){return all;} export function testProjectRows(){return projectRows(all);} export function testPdfChooser(){view="overview";dirty=false;pdfDialog();} ' +'\nexport function testRender(row,settings){all=[structuredClone(row)];selected=structuredClone(row);config={payload:settings,revision:1};configBaseline=structuredClone(config);return [...C.MODULES.map(([key])=>key),"catalog","settings"].map(key=>{view=key;return [key,content()];});}',{context});
+ await module.link(spec=>{const values=spec.includes('core')?C:spec.includes('pdf')?PDF:{restoreSession:()=>null,createProject:async(payload,date)=>{const row={id:'new-project',contract_number:'UUR-RS/2026/10/002',payload:structuredClone(payload),revision:1};createdProjects.push({row,date});return row;},deleteProject:async project=>{deletions.push(structuredClone(project));if(deleteFails)throw new Error('Brak połączenia');return project.id;},saveSettings:async(payload,revision)=>{const row={payload:structuredClone(payload),revision:revision+1};savedSettings.push(row);return row;}};const keys=Object.keys(values);return new vm.SyntheticModule(keys,function(){for(const key of keys)this.setExport(key,values[key]);},{context});});
  await module.evaluate();await new Promise(resolve=>setTimeout(resolve,10));
  const payload=C.newProject('Remont testowy','Inwestor testowy');payload.rooms=[{id:'r',name:'Kuchnia',length:4,width:3,height:2.6}];
  payload.offer=[{id:'l',roomId:'r',serviceId:'a',name:'Malowanie',category:'Ściany',unit:'m²',qty:12,price:100,included:true}];payload.works=structuredClone(payload.offer);payload.works[0].done=true;
@@ -22,6 +22,25 @@ test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów
  assert.ok(results.find(([key])=>key==='overview')[1].includes('WYM-RS/2026/10/001'));
  assert.ok(results.find(([key])=>key==='contract')[1].includes('OFE-RS/2026/10/001/V1'));
  assert.equal(catalog.length,102);
+ assert.ok(module.namespace.testProjectRows().includes('data-project-row="true"'));
+ assert.ok(module.namespace.testProjectRows().includes(C.money(1200)));
+ const finished=structuredClone(row);finished.payload.status='zakonczona';finished.payload.receipts.push({kind:'materials',amount:2000});finished.payload.sourceImport={fileName:'Historyczny plik',sheetNumbers:[1,2],notes:['Notatka']};
+ const finishedViews=module.namespace.testRender(finished,{catalog,company:{}});
+ assert.ok(module.namespace.testDashboard().includes('Zarobione łącznie'));
+ assert.ok(module.namespace.testDashboard().includes('<strong>'+C.money(500)+'</strong>'));
+ const overview=finishedViews.find(([key])=>key==='overview')[1];assert.ok(overview.includes('<details class="import-history">'));assert.ok(!overview.includes('<details class="import-history" open'));
+ const summaryRow=structuredClone(row);summaryRow.payload.works.push({id:'l2',name:'A praca',category:'Podłogi',unit:'m²',qty:2,price:10,included:true});
+ module.namespace.testRender(summaryRow,{catalog,company:{}});
+ await listeners.get('click')({target:{closest:()=>({dataset:{action:'summary-sort',key:'qty'}})}});
+ let summaryHtml=module.namespace.testSummary();assert.ok(summaryHtml.includes('aria-sort="ascending"'));assert.ok(summaryHtml.indexOf('A praca')<summaryHtml.indexOf('Malowanie'));
+ await listeners.get('click')({target:{closest:()=>({dataset:{action:'summary-sort',key:'qty'}})}});
+ summaryHtml=module.namespace.testSummary();assert.ok(summaryHtml.includes('aria-sort="descending"'));assert.ok(summaryHtml.indexOf('Malowanie')<summaryHtml.indexOf('A praca'));
+ await listeners.get('click')({target:{closest:()=>({dataset:{action:'project-copy',id:'p'}})}});
+ assert.equal((node('#dialog').innerHTML.match(/name="copySection"/g)||[]).length,C.COPY_SECTIONS.length);
+ await node('#modal-form').onsubmit({preventDefault(){},target:{name:'Nowa inwestycja',investor:'Nowy inwestor',date:'2026-10-09',copySection:['offer']}});
+ assert.equal(createdProjects.length,1);assert.equal(createdProjects[0].date,'2026-10-09');assert.equal(createdProjects[0].row.payload.offer.length,1);assert.equal(createdProjects[0].row.payload.rooms.length,1);assert.equal(createdProjects[0].row.payload.receipts.length,0);
+ module.namespace.testRender(row,{catalog,markup:35,company:{}});
+
  const shopRow=structuredClone(row);
  shopRow.payload.purchases=[
   {id:'s1',shop:' Market A ',description:'Zakup pierwszy',amount:100,charge:110,paid:true},
@@ -101,6 +120,13 @@ test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów
  module.namespace.testLineDialog();
  await node('#modal-form').onsubmit({preventDefault(){},target:{serviceId:chosen.id,roomId:'r',name:chosen.name,unit:'panel',qty:'1',price:'40',days:'0',hours:'0',note:''}});
  assert.equal(savedSettings.length,1);
+
+ module.namespace.testPurchaseDialog();assert.ok(node('#dialog').innerHTML.includes('list="shop-suggestions"'));assert.ok(node('#dialog').innerHTML.includes('<option value="Test">'));
+ await node('#modal-form').onsubmit({preventDefault(){},target:{date:'2026-10-09',shop:' Nowy Sklep ',amount:'10',charge:'12',description:'Testowy zakup',invoice:'',paid:'on'}});
+ assert.ok(savedSettings.at(-1).payload.shops.includes('Nowy Sklep'));
+ assert.ok(module.namespace.testShops().includes('Nowy Sklep'));
+ const persistent=savedSettings.at(-1).payload;
+ module.namespace.testRender(row,persistent);assert.ok(module.namespace.testShops().includes('Nowy Sklep'));
  module.namespace.testPdfChooser();
  assert.equal((node('#dialog').innerHTML.match(/name="pdfModule"/g)||[]).length,PDF.MODULES.length);
  await node('#modal-form').onsubmit({preventDefault(){},target:{pdfModule:['data','rooms']}});

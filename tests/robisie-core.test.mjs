@@ -29,3 +29,20 @@ test('zestawienie sumuje usługę w wielu pomieszczeniach, nie miesza jednostek'
  const result=C.aggregate([{serviceId:'a',name:'Malowanie',category:'Ściany',unit:'m²',qty:20,price:10},{serviceId:'a',name:'Malowanie',category:'Ściany',unit:'m²',qty:30,price:12}]);
  assert.equal(result.length,1);assert.equal(result[0].qty,50);assert.equal(result[0].value,560);
 });
+test('pomiary mają dwa miejsca i zaokrąglenie w górę bez błędu zmiennoprzecinkowego',()=>{
+ assert.equal(C.roundUp(1.001),1.01);assert.equal(C.roundUp('2,345'),2.35);assert.equal(C.roundUp(1.1),1.1);assert.equal(C.roundUp(1.12),1.12);assert.equal(C.measurement(3.7072),'3,71');assert.equal(C.measurement(2),'2,00');
+});
+test('kopia ma nowe identyfikatory i relacje, bez starych wpłat, numerów i akceptacji',()=>{
+ const source=C.newProject('Stara','Inwestor','2025-01-01');source.status='zakonczona';source.rooms=[{id:'room',name:'Hol',length:2,width:3,height:2.6}];source.offer=[{id:'offer',roomId:'room',name:'Praca',qty:10,price:20,done:true}];source.works=[{id:'work',roomId:'room',qty:8,price:20,done:true}];source.receipts=[{kind:'work',amount:160},{kind:'materials',amount:50}];source.acceptedOffers=[{version:3,lines:source.offer}];source.changes=[{accepted:true}];source.contractText='Stary numer UUR-RS/2025/01/001';source.sourceImport={fileName:'Historia'};source.purchases=[{id:'purchase',date:'2025-01-01',shop:'Sklep',amount:50,charge:60,paid:true,invoice:'STARA FV'}];source.journal=[{id:'journal',roomId:'room',date:'2025-01-01',description:'Opis',investorConfirmed:true}];source.stages[0].due='2025-01-01';source.stages[0].invoice='FV';source.handover={date:'2025-01-01',notes:'Uwagi',accepted:true};const snapshot=structuredClone(source);
+ const copy=C.copyProject(source,C.COPY_SECTIONS.map(x=>x[0]),'Nowa','Nowy inwestor','2026-10-09');
+ assert.deepEqual(source,snapshot);assert.equal(copy.name,'Nowa');assert.equal(copy.investor,'Nowy inwestor');assert.equal(copy.contractDate,'2026-10-09');assert.equal(copy.status,'przygotowanie');
+ assert.notEqual(copy.rooms[0].id,'room');assert.equal(copy.offer[0].roomId,copy.rooms[0].id);assert.equal(copy.works[0].roomId,copy.rooms[0].id);assert.equal(copy.journal[0].roomId,copy.rooms[0].id);assert.notEqual(copy.offer[0].id,'offer');assert.equal(copy.works[0].done,false);
+ assert.equal(copy.receipts.length,0);assert.equal(copy.acceptedOffers.length,0);assert.equal(copy.changes.length,0);assert.equal(copy.contractText,'');assert.equal(copy.sourceImport,undefined);assert.equal(copy.purchases[0].paid,false);assert.equal(copy.purchases[0].invoice,'');assert.equal(copy.stages[0].due,'');assert.equal(copy.stages[0].invoice,'');assert.equal(copy.journal[0].date,'');assert.equal(copy.journal[0].investorConfirmed,false);assert.equal(copy.handover.accepted,false);assert.equal(C.totals(copy).paid,0);assert.equal(C.purchaseTotals(copy).spent,0);
+ const partial=C.copyProject(source,['offer'],'Częściowa','Test');assert.equal(partial.offer.length,1);assert.equal(partial.rooms.length,1);assert.equal(partial.works.length,0);assert.equal(partial.purchases.length,0);assert.equal(partial.journal.length,0);
+});
+test('zestawienie sortuje liczby numerycznie w obu kierunkach i nie zmienia danych',()=>{
+ const rows=[{name:'B',category:'Ściany',qty:10,value:100},{name:'A',category:'Podłogi',qty:2,value:200}];assert.deepEqual(C.sortSummary(rows,'qty').map(x=>x.qty),[2,10]);assert.deepEqual(C.sortSummary(rows,'value',-1).map(x=>x.value),[200,100]);assert.deepEqual(C.sortSummary(rows,'name').map(x=>x.name),['A','B']);assert.equal(rows[0].name,'B');
+});
+test('kwota wiersza inwestycji bierze kalkulację prac, a przed realizacją ofertę',()=>{
+ const p=C.newProject('Test','Test');p.offer=[{qty:1,price:100}];p.discount=10;assert.equal(C.finalWorkAmount(p),90);p.works=[{qty:2,price:100}];p.workDiscount=20;assert.equal(C.finalWorkAmount(p),160);
+});

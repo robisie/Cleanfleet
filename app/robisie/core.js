@@ -1,4 +1,4 @@
-export const VERSION='1.0.17';
+export const VERSION='1.0.18';
 export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['rooms','Pomieszczenia i pomiary'],['offer','Oferta wstępna'],['contract','Umowa'],['works','Realizacja i kalkulacja'],['summary','Zestawienie prac'],['payments','Etapy i płatności'],['purchases','Zakupy i materiały'],['journal','Dziennik prac'],['handover','Odbiór inwestycji']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -6,6 +6,26 @@ export function number(v){const n=Number(String(v??'').replace(',','.'));return 
 export const money=v=>new Intl.NumberFormat('pl-PL',{style:'currency',currency:'PLN'}).format(number(v));
 export const quantity=v=>new Intl.NumberFormat('pl-PL',{maximumFractionDigits:3}).format(number(v));
 export const round=v=>Math.round((number(v)+Number.EPSILON)*100)/100;
+export const roundUp=v=>{const scaled=number(v)*100;return Math.ceil(scaled-Number.EPSILON*Math.max(1,Math.abs(scaled))*4)/100;};
+export const measurement=v=>new Intl.NumberFormat('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2}).format(roundUp(v));
+export const finalWorkAmount=p=>(p.works?.length?totals(p).works.after:totals(p).agreed);
+export function sortSummary(rows,key='category',direction=1){return [...rows].sort((a,b)=>{const comparison=['qty','value'].includes(key)?number(a[key])-number(b[key]):String(a[key]??'').localeCompare(String(b[key]??''),'pl',{numeric:true});return direction*comparison||String(a.name??'').localeCompare(String(b.name??''),'pl');});}
+export const COPY_SECTIONS=[['data','Dane inwestora i adresy'],['rooms','Pomieszczenia i pomiary'],['offer','Oferta wstępna'],['works','Zakres prac do realizacji'],['contract','Warunki umowy'],['stages','Etapy płatności (bez wpłat)'],['purchases','Lista materiałów i zakupów (nieopłacona)'],['journal','Treść dziennika (bez dat i potwierdzeń)'],['handover','Uwagi do odbioru (bez akceptacji)']];
+export function copyProject(source,sections,name,investor,date=today()){
+ const chosen=new Set(sections),result=newProject(name,investor,date),roomIds=new Map();
+ if(chosen.has('data'))for(const key of ['address','investorAddress','phone','email','pesel'])result[key]=structuredClone(source[key]??'');
+ if(['rooms','offer','works','journal'].some(key=>chosen.has(key)))result.rooms=(source.rooms||[]).map(room=>{const id=uid();roomIds.set(room.id,id);return {...structuredClone(room),id};});
+ const lines=items=>(items||[]).map(line=>({...structuredClone(line),id:uid(),roomId:roomIds.get(line.roomId)||'',done:false}));
+ if(chosen.has('offer')){result.offer=lines(source.offer);result.discount=number(source.discount);result.materialEstimate=number(source.materialEstimate);}
+ if(chosen.has('works')){result.works=lines(source.works);result.workDiscount=number(source.workDiscount??source.discount);}
+ if(source.calculationPrecision==='source'&&(chosen.has('offer')||chosen.has('works')))result.calculationPrecision='source';
+ if(chosen.has('contract'))for(const key of ['paymentDays','materialAdvance','terminationPercent','contractPlace'])result[key]=structuredClone(source[key]??result[key]);
+ if(chosen.has('stages'))result.stages=(source.stages||[]).map(stage=>({...structuredClone(stage),id:uid(),due:'',invoice:''}));
+ if(chosen.has('purchases'))result.purchases=(source.purchases||[]).map(item=>({id:uid(),date:'',shop:item.shop||'',description:item.description||'',invoice:'',amount:number(item.amount),charge:number(item.charge),paid:false}));
+ if(chosen.has('journal'))result.journal=(source.journal||[]).map(item=>({id:uid(),date:'',roomId:roomIds.get(item.roomId)||'',description:item.description||'',investorConfirmed:false,contractorConfirmed:false}));
+ result.handover={date:'',receiver:chosen.has('handover')?source.handover?.receiver||'':'',notes:chosen.has('handover')?source.handover?.notes||'':'',accepted:false};
+ return result;
+}
 export function attachment(project,prefix,version){return `${prefix}-${project.contract_number.replace('UUR-','')}${version?'/V'+version:''}`;}
 const geometrySignature=(parts,shared,openings,height)=>JSON.stringify([parts.map(p=>[number(p.length),number(p.width),number(p.height??height)]),number(shared),number(openings)]);
 export function roomArea(room){

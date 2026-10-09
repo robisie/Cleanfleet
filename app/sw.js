@@ -1,4 +1,4 @@
-// CleanFleet v1.55.8 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
+// CleanFleet v1.55.9 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -81,6 +81,8 @@ self.addEventListener('fetch', event => {
     if (!response.ok || !type.includes('text/html')) return response;
 
     let html = await response.text(); 
+    // Keep the visible version in sync for pages served through this worker.
+    html = html.replace(/v1\.55\.8/g, 'v1.55.9');
     html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13095');
 
     if (!html.includes('/app/glass-icons.css')) {
@@ -200,10 +202,10 @@ self.addEventListener('fetch', event => {
     const injectedScripts = '<script src="/app/weather-v6.js?v=20260923-13068"></script>\n' +
       '<script src="/app/weather-refresh-v12311.js?v=20260923-13068"></script>\n' +
       '<script src="/app/layout-v11913.js?v=20260923-13068"></script>\n' +
-      '<script src="/app/operations-v1200.js?v=20260927-130128"></script>\n' +
+      '<script src="/app/operations-v1200.js?v=20261009-1559"></script>\n' +
       '<script src="/app/photo-local-v1240.js?v=20260927-130129"></script>\n' +
       '<script src="/app/photo-local-ui-v1232.js?v=20260919-13032"></script>\n' +
-      '<script src="/app/photo-camera-v1213.js?v=20260927-130129"></script>\n' +
+      '<script src="/app/photo-camera-v1213.js?v=20261009-1559"></script>\n' +
       '<script src="/app/calendar-v1203.js?v=20260917-2"></script>\n' +
       '<script src="/app/ui-v1209.js?v=20260915-3"></script>\n' +
       '<script src="/app/calendar-add-v1215.js?v=20260915-2"></script>\n' +

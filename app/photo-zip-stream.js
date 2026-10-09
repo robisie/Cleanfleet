@@ -5,7 +5,8 @@
   const u16=v=>{const a=new Uint8Array(2);new DataView(a.buffer).setUint16(0,v,true);return a};
   const u32=v=>{const a=new Uint8Array(4);new DataView(a.buffer).setUint32(0,v>>>0,true);return a};
   const join=parts=>{const out=new Uint8Array(parts.reduce((n,p)=>n+p.length,0));let at=0;for(const p of parts){out.set(p,at);at+=p.length}return out};
-  function crcUpdate(crc,bytes){for(const b of bytes){crc^=b;for(let k=0;k<8;k++)crc=(crc>>>1)^((crc&1)?0xedb88320:0)}return crc>>>0}
+  const crcTable=Uint32Array.from({length:256},(_,n)=>{let c=n;for(let k=0;k<8;k++)c=(c>>>1)^((c&1)?0xedb88320:0);return c>>>0});
+  function crcUpdate(crc,bytes){for(const b of bytes)crc=(crc>>>8)^crcTable[(crc^b)&255];return crc>>>0}
   function dosDateTime(date){return {time:((date.getHours()&31)<<11)|((date.getMinutes()&63)<<5)|Math.floor(date.getSeconds()/2),date:((Math.max(1980,date.getFullYear())-1980)<<9)|((date.getMonth()+1)<<5)|date.getDate()}}
   function stripMpoFromJpeg(bytes){
     if(!(bytes instanceof Uint8Array)||bytes.length<4||bytes[0]!==0xff||bytes[1]!==0xd8)return null;

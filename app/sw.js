@@ -1,5 +1,5 @@
-importScripts('/app/photo-zip-stream.js?v=20261009-15512');
-// CleanFleet v1.55.12 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
+importScripts('/app/photo-zip-stream.js?v=20261009-15513');
+// CleanFleet v1.55.13 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -102,14 +102,14 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text(); 
     // Keep the visible version in sync for pages served through this worker.
-    html = html.replace(/v1\.55\.(?:8|9|10|11)\b/g, 'v1.55.12');
+    html = html.replace(/v1\.55\.(?:8|9|10|11|12)\b/g, 'v1.55.13');
     html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13095');
 
     if (!html.includes('/app/glass-icons.css')) {
       html = html.replace('</head>', '<link rel="stylesheet" href="/app/glass-icons.css?v=13068">\n</head>');
     }
     if (!html.includes('/app/glass-icons.js')) {
-      html = html.replace('</body>', '<script src="/app/glass-icons.js?v=20261009-15512"><\/script>\n</body>');
+      html = html.replace('</body>', '<script src="/app/glass-icons.js?v=20261009-15513"><\/script>\n</body>');
     }
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
@@ -223,9 +223,9 @@ self.addEventListener('fetch', event => {
       '<script src="/app/weather-refresh-v12311.js?v=20260923-13068"></script>\n' +
       '<script src="/app/layout-v11913.js?v=20260923-13068"></script>\n' +
       '<script src="/app/operations-v1200.js?v=20261009-1559"></script>\n' +
-      '<script src="/app/photo-local-v1240.js?v=20261009-15512"></script>\n' +
+      '<script src="/app/photo-local-v1240.js?v=20261009-15513"></script>\n' +
       '<script src="/app/photo-local-ui-v1232.js?v=20260919-13032"></script>\n' +
-      '<script src="/app/photo-camera-v1213.js?v=20261009-15512"></script>\n' +
+      '<script src="/app/photo-camera-v1213.js?v=20261009-15513"></script>\n' +
       '<script src="/app/calendar-v1203.js?v=20260917-2"></script>\n' +
       '<script src="/app/ui-v1209.js?v=20260915-3"></script>\n' +
       '<script src="/app/calendar-add-v1215.js?v=20260915-2"></script>\n' +

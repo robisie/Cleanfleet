@@ -207,7 +207,7 @@
       }catch(e){console.error(e);status.textContent='Nie udało się wyczyścić zdjęć. Spróbuj ponownie.';}
       finally{busy=false;clear.disabled=false;close.disabled=false;window.cfPhotoSession?.setBusy(false);}
       if(removed){
-        try{const ready=JSON.parse(sessionStorage.getItem('cf-photo-zip-ready')||'null');if(ready&&String(ready.recordId)===String(recordId)){await (await caches.open('cleanfleet-photo-download-v1')).delete(ready.url);sessionStorage.removeItem('cf-photo-zip-ready');}}catch(error){console.warn('CleanFleet ZIP cleanup',error)}
+        try{const ready=JSON.parse(sessionStorage.getItem('cf-photo-zip-ready')||'null');if(ready&&String(ready.recordId)===String(recordId)){await (await caches.open('cleanfleet-photo-download-v1')).delete(ready.url);if(ready.diskName&&navigator.storage?.getDirectory){const root=await navigator.storage.getDirectory(),dir=await root.getDirectoryHandle('cleanfleet-photo-exports');await dir.removeEntry(ready.diskName).catch(()=>{});}sessionStorage.removeItem('cf-photo-zip-ready');}}catch(error){console.warn('CleanFleet ZIP cleanup',error)}
         el.remove();document.dispatchEvent(new CustomEvent('cf:photos-saved',{detail:{recordId}}));renderLocal().catch(console.error);toast('Wyczyszczono zdjęcia lokalne tego wpisu.');}
     };
   }
@@ -232,35 +232,90 @@
     return ready;
   }
 
+  const ZIP_FILE_DIR='cleanfleet-photo-exports';
+  async function prepareZipFile(ready,onProgress,signal){
+    if(!navigator.storage?.getDirectory)throw new Error('Ta przeglądarka nie obsługuje przygotowania dużego ZIP-a. Zaktualizuj system lub użyj Safari.');
+    const root=await navigator.storage.getDirectory(),dir=await root.getDirectoryHandle(ZIP_FILE_DIR,{create:true});
+    const diskName=uid()+'.zip',handle=await dir.getFileHandle(diskName,{create:true});
+    let writer=null,reader=null,completed=false;
+    try{
+      if(!handle.createWritable)throw new Error('Zapis dużego ZIP-a wymaga nowszej wersji Safari.');
+      writer=await handle.createWritable();
+      const response=await fetch(ready.url,{signal,cache:'no-store'});
+      if(!response.ok||!response.headers.get('content-type')?.includes('application/zip'))throw new Error('Nie udało się rozpocząć tworzenia ZIP-a. Otwórz CleanFleet ponownie.');
+      reader=response.body.getReader();let bytes=0,lastUpdate=0;
+      while(true){
+        if(signal?.aborted)throw new DOMException('Anulowano','AbortError');
+        const part=await reader.read();if(part.done)break;
+        await writer.write(part.value);bytes+=part.value.byteLength;
+        if(Date.now()-lastUpdate>=200){onProgress(bytes,ready.size,false);lastUpdate=Date.now();}
+      }
+      if(signal?.aborted)throw new DOMException('Anulowano','AbortError');
+      onProgress(bytes,ready.size,false);
+      await writer.close();writer=null;
+      const diskFile=await handle.getFile();
+      // File wraps the disk-backed bytes; no arrayBuffer/Blob containing the whole ZIP.
+      const file=new File([diskFile],ready.name,{type:'application/zip',lastModified:diskFile.lastModified});
+      ready.diskName=diskName;ready.size=file.size;
+      sessionStorage.setItem(ZIP_READY_KEY,JSON.stringify(ready));completed=true;
+      onProgress(file.size,file.size,true);
+      for await(const [name] of dir.entries())if(name!==diskName)try{await dir.removeEntry(name)}catch(_){}
+      return file;
+    }finally{
+      if(reader)try{await reader.cancel()}catch(_){}
+      if(writer)try{await writer.abort()}catch(_){}
+      if(!completed)try{await dir.removeEntry(diskName)}catch(_){}
+    }
+  }
+
+  async function readPreparedZip(ready){
+    if(!ready.diskName)return null;
+    try{
+      const root=await navigator.storage.getDirectory(),dir=await root.getDirectoryHandle(ZIP_FILE_DIR);
+      const file=await (await dir.getFileHandle(ready.diskName)).getFile();
+      return new File([file],ready.name,{type:'application/zip',lastModified:file.lastModified});
+    }catch(_){return null}
+  }
+
   function shareDialog(file,recordId,ready=null){
     document.querySelector('.cf-local-zip-ready')?.remove();
     const el=document.createElement('div');el.className='cf-local-zip-ready';
-    el.innerHTML='<div class="cf-local-zip-card"><h3>Pobierz paczkę zdjęć</h3><div data-zip-name style="font-size:12px;font-weight:900;word-break:break-word"></div><div data-zip-size style="font-size:10px;color:#6f756f;margin:5px 0 14px"></div><a data-local-download>Zapisz ZIP w Plikach</a><button data-local-share type="button">Udostępnij ZIP</button><p data-zip-status role="status"></p><button data-local-cleaned type="button">ZIP zapisany — wyczyść zdjęcia</button><button data-local-close type="button">Zamknij</button></div>';
+    el.innerHTML='<div class="cf-local-zip-card" role="dialog" aria-modal="true" aria-label="Paczka zdjęć"><h3 data-zip-title>Przygotowanie ZIP-a</h3><div data-zip-name style="font-size:12px;font-weight:900;word-break:break-word"></div><div data-zip-size style="font-size:11px;color:#6f756f;margin:5px 0 14px"></div><progress data-zip-progress max="100" value="0" aria-label="Postęp tworzenia ZIP" style="width:100%;height:16px;accent-color:#9fbd17"></progress><p data-zip-status role="status" aria-live="polite"></p><button data-local-prepare type="button">Przygotuj ZIP ponownie</button><a data-local-download target="_blank" rel="noopener" hidden>Zapisz ZIP w Plikach</a><button data-local-cleaned type="button" hidden>ZIP zapisany — wyczyść zdjęcia</button><button data-local-close type="button">Anuluj</button></div>';
     document.body.appendChild(el);
+    const title=el.querySelector('[data-zip-title]'),size=el.querySelector('[data-zip-size]'),progress=el.querySelector('[data-zip-progress]'),status=el.querySelector('[data-zip-status]'),download=el.querySelector('[data-local-download]'),close=el.querySelector('[data-local-close]'),retry=el.querySelector('[data-local-prepare]'),cleanup=el.querySelector('[data-local-cleaned]');
     el.querySelector('[data-zip-name]').textContent=file.name;
-    el.querySelector('[data-zip-size]').textContent=ready?.streaming?`Około ${(file.size/1024/1024).toFixed(1)} MB · ZIP tworzony podczas pobierania`:`${(file.size/1024/1024).toFixed(1)} MB · utworzono lokalnie`;
-    const download=el.querySelector('[data-local-download]'),share=el.querySelector('[data-local-share]'),status=el.querySelector('[data-zip-status]');
-    const url=ready?.url||URL.createObjectURL(file);
-    download.href=url;download.download=file.name;
-    if(!ready){download.target="_blank";download.rel="noopener";}
-    const close=()=>{el.remove();if(!ready)setTimeout(()=>URL.revokeObjectURL(url),60000)};
-    el.querySelector('[data-local-close]').onclick=close;
-    el.querySelector('[data-local-cleaned]').onclick=()=>{close();cleanupDialog(recordId)};
-    download.onclick=()=>{status.textContent='Sprawdź pobrany ZIP w aplikacji Pliki. Zdjęcia pozostają w CleanFleet.';};
-    // File sharing on iOS can terminate the PWA for a large ZIP. Hand off a disk-backed
-    // attachment response instead of copying it to the share sheet.
-    if(isAppleMobile()||!navigator.share||!file.slice){
-      share.hidden=true;
-      status.textContent=ready?.streaming?'ZIP będzie tworzony podczas pobierania. Poczekaj na zakończenie zapisu w Plikach. Zdjęcia pozostają w CleanFleet.':'Wybierz zapis pliku ZIP. Gotowa paczka pozostaje dostępna w CleanFleet.';
-    }else share.onclick=async()=>{
-      if(share.disabled)return;share.disabled=true;
+    let controller=null,url=null,closed=false;
+    function dismiss(){closed=true;controller?.abort();el.remove();if(url)setTimeout(()=>URL.revokeObjectURL(url),60000);}
+    close.onclick=dismiss;
+    cleanup.onclick=()=>{dismiss();cleanupDialog(recordId)};
+    function update(bytes,total,done){
+      if(closed)return;
+      progress.value=done?100:Math.min(99,total?Math.floor(bytes/total*100):0);
+      size.textContent=`${(bytes/1024/1024).toFixed(1)} MB${done?'':` / około ${(total/1024/1024).toFixed(1)} MB`}`;
+      status.textContent=done?'ZIP gotowy. Kliknij „Zapisz ZIP w Plikach”. Okno zapisu otworzy się osobno; możesz wrócić do CleanFleet.':'Trwa tworzenie i zapis ZIP-a na urządzeniu… Pozostaw CleanFleet otwarty.';
+    }
+    function finish(prepared){
+      if(closed)return;
+      file=prepared;url=URL.createObjectURL(prepared);download.href=url;download.download=prepared.name;download.target='_blank';download.rel='noopener';
+      title.textContent='ZIP gotowy do zapisania';update(prepared.size,prepared.size,true);
+      download.hidden=false;retry.hidden=true;close.textContent='Zamknij';controller=null;
+    }
+    async function prepare(){
+      if(closed||controller)return;
+      controller=new AbortController();retry.hidden=true;download.hidden=true;cleanup.hidden=true;close.textContent='Anuluj';title.textContent='Przygotowanie ZIP-a';update(0,ready?.size||file.size,false);
       try{
-        if(navigator.canShare&&!navigator.canShare({files:[file]})){download.click();return;}
-        await navigator.share({files:[file]});
-        status.textContent='Sprawdź zapis ZIP-a. Zdjęcia pozostają w CleanFleet.';
-      }catch(e){if(e?.name!=='AbortError'){console.error(e);status.textContent='Użyj przycisku „Zapisz ZIP w Plikach”.';}}
-      finally{share.disabled=false;}
-    };
+        const prepared=await prepareZipFile(ready,update,controller.signal);
+        finish(prepared);
+      }catch(error){
+        if(!closed){title.textContent='Nie ukończono ZIP-a';status.textContent=error?.name==='AbortError'?'Anulowano przygotowanie. Zdjęcia pozostają w CleanFleet.':(error?.name==='QuotaExceededError'?'Brak miejsca na przygotowanie ZIP-a. Zwolnij miejsce na urządzeniu i spróbuj ponownie.':error?.message||'Nie udało się przygotować ZIP-a.');retry.hidden=false;close.textContent='Zamknij';}
+      }finally{controller=null;}
+    }
+    retry.onclick=prepare;
+    download.onclick=()=>{status.textContent='Zapis otworzył się w osobnym oknie. Wybierz „Otwórz w…” / zapis w Plikach. Wróć do CleanFleet po zakończeniu zapisu.';cleanup.hidden=false;};
+    if(file.slice){finish(file);return;}
+    // Old manifest-only ready dialogs are rebuilt with visible, cancellable progress.
+    update(0,ready?.size||file.size,false);retry.hidden=true;
+    readPreparedZip(ready).then(prepared=>{if(closed)return;if(prepared)finish(prepared);else prepare()});
   }
 
   async function exportCombined(recordId){
@@ -319,7 +374,7 @@
   function ensureStyles(){
     if(document.getElementById('cfPhotoLocal1240Style'))return;
     const s=document.createElement('style');s.id='cfPhotoLocal1240Style';s.textContent=`
-      .cf-photo-local{margin:8px 0 12px;padding:10px;border:1px solid #dfe5da;border-radius:12px;background:#fbfcf8}.cf-photo-local-head{display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:900}.cf-photo-local-meta{font-size:9px;color:#626a63;margin-top:5px}.cf-photo-local-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px}.cf-photo-local-thumb{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:#ecefea}.cf-photo-local-thumb img{width:100%;height:100%;object-fit:cover}.cf-photo-local-thumb button{position:absolute;right:3px;top:3px;width:20px;height:20px;border:0;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:13px;line-height:20px;padding:0}.cf-photo-local-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.cf-photo-local-actions button{border:1px solid #ccd1c7;background:#fff;border-radius:9px;padding:8px 10px;font-size:10px;font-weight:900}.cf-photo-local-actions .primary{background:#9fbd17;border-color:#9fbd17;color:#111}.cf-local-zip-ready{position:fixed;inset:0;z-index:300500;background:rgba(15,18,16,.48);display:flex;align-items:center;justify-content:center;padding:18px}.cf-local-zip-card{width:min(390px,100%);background:#fff;border-radius:20px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.3);color:#171a18}.cf-local-zip-card h3{margin:0 0 8px;font-size:20px}.cf-local-zip-card button{width:100%;border:0;border-radius:12px;padding:13px;font-weight:900;font-size:14px;margin-top:8px}.cf-local-zip-card [data-local-download]{display:block;text-align:center;text-decoration:none;border-radius:12px;padding:13px;font-weight:900;font-size:14px;margin-top:8px;background:#9fbd17;color:#111}.cf-local-zip-card [hidden]{display:none!important}.cf-local-zip-card [data-local-share]{background:#9fbd17;color:#111}.cf-local-zip-card [data-local-close]{background:#f0f2ef;color:#333}`;document.head.appendChild(s)
+      .cf-photo-local{margin:8px 0 12px;padding:10px;border:1px solid #dfe5da;border-radius:12px;background:#fbfcf8}.cf-photo-local-head{display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:900}.cf-photo-local-meta{font-size:9px;color:#626a63;margin-top:5px}.cf-photo-local-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px}.cf-photo-local-thumb{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:#ecefea}.cf-photo-local-thumb img{width:100%;height:100%;object-fit:cover}.cf-photo-local-thumb button{position:absolute;right:3px;top:3px;width:20px;height:20px;border:0;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:13px;line-height:20px;padding:0}.cf-photo-local-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.cf-photo-local-actions button{border:1px solid #ccd1c7;background:#fff;border-radius:9px;padding:8px 10px;font-size:10px;font-weight:900}.cf-photo-local-actions .primary{background:#9fbd17;border-color:#9fbd17;color:#111}.cf-local-zip-ready{box-sizing:border-box;position:fixed;inset:0;z-index:300500;background:rgba(15,18,16,.48);display:flex;align-items:center;justify-content:center;padding:max(18px,env(safe-area-inset-top)) 18px max(18px,env(safe-area-inset-bottom))}.cf-local-zip-card{width:min(390px,100%);max-height:calc(100dvh - 48px);overflow:auto;box-sizing:border-box;background:#fff;border-radius:20px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.3);color:#171a18}.cf-local-zip-card h3{margin:0 0 8px;font-size:20px}.cf-local-zip-card button{width:100%;border:0;border-radius:12px;padding:13px;font-weight:900;font-size:14px;margin-top:8px}.cf-local-zip-card [data-local-download]{display:block;text-align:center;text-decoration:none;border-radius:12px;padding:13px;font-weight:900;font-size:14px;margin-top:8px;background:#9fbd17;color:#111}.cf-local-zip-card [hidden]{display:none!important}.cf-local-zip-card [data-local-share]{background:#9fbd17;color:#111}.cf-local-zip-card [data-local-close]{background:#f0f2ef;color:#333}`;document.head.appendChild(s)
   }
 
   function ensureLocalBox(){

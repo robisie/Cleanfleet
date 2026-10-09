@@ -134,3 +134,5 @@ CleanFleet v1.55.5 / Moje płatności v1.0.12: Gotówka — stały formularz kwo
 CleanFleet v1.55.6 / Moje finanse v1.1.0: jeden kafelek administratora i cztery zakładki — Moje zarobki, Moje płatności, Dojazdy, Gotówka. Wspólne odblokowanie dotychczasowym hasłem płatności i automatyczna blokada całego okna. Historia zarobków i szyfrowany sejf płatności/gotówki zachowane; kalkulator osadzony bez dodatkowego okna. Przełączanie nie przeładowuje aplikacji.
 
 CleanFleet v1.55.7: biblioteki potrzebne do startu pochodzą z lokalnych plików aplikacji; ekran startowy wykrywa brak uruchomienia kodu i limituje sprawdzanie sesji. Poprawka dla przeglądarek Androida z zawodnym dostępem do CDN.
+
+CleanFleet v1.55.8: zapisane reguły zarobków i lista kontrahentów wczytują się niezależnie od przeliczenia historii EUR oraz powiązanych wpisów prania. Przy błędzie historii pozostają dostępne reguły i podpowiedzi, z możliwością ponowienia odczytu. Akcje reguł/dodawania czekają na odczyt danych zamiast otwierać pustą listę.

@@ -46,3 +46,8 @@ test('zestawienie sortuje liczby numerycznie w obu kierunkach i nie zmienia dany
 test('kwota wiersza inwestycji bierze kalkulację prac, a przed realizacją ofertę',()=>{
  const p=C.newProject('Test','Test');p.offer=[{qty:1,price:100}];p.discount=10;assert.equal(C.finalWorkAmount(p),90);p.works=[{qty:2,price:100}];p.workDiscount=20;assert.equal(C.finalWorkAmount(p),160);
 });
+test('ryczałt i obniżka z historii nie tworzą fikcyjnych wpłat',()=>{
+ const p=C.newProject('Historia','Test');p.calculationPrecision='source';p.offer=[{qty:1,price:90,calculationPrecision:'source'}];p.acceptedOffers=[{lines:p.offer,discount:0,agreedAmount:100}];p.works=[{qty:1,price:150,calculationPrecision:'source'}];p.receipts=[{kind:'work',amount:100},{kind:'materials',amount:20}];p.purchases=[{paid:true,amount:22,charge:25}];p.workCredit=30;
+ const t=C.totals(p);assert.equal(t.agreed,100);assert.equal(t.paid,100);assert.equal(t.workRemaining,20);assert.equal(t.remaining,25);assert.equal(C.finalWorkAmount(p),120);
+ const copied=C.copyProject(p,['offer','works'],'Kopia','Test');assert.equal(copied.workCredit,undefined);assert.equal(copied.acceptedOffers.length,0);
+});

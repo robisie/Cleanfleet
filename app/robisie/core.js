@@ -1,4 +1,4 @@
-export const VERSION='1.0.18';
+export const VERSION='1.0.19';
 export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['rooms','Pomieszczenia i pomiary'],['offer','Oferta wstępna'],['contract','Umowa'],['works','Realizacja i kalkulacja'],['summary','Zestawienie prac'],['payments','Etapy i płatności'],['purchases','Zakupy i materiały'],['journal','Dziennik prac'],['handover','Odbiór inwestycji']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -8,7 +8,7 @@ export const quantity=v=>new Intl.NumberFormat('pl-PL',{maximumFractionDigits:3}
 export const round=v=>Math.round((number(v)+Number.EPSILON)*100)/100;
 export const roundUp=v=>{const scaled=number(v)*100;return Math.ceil(scaled-Number.EPSILON*Math.max(1,Math.abs(scaled))*4)/100;};
 export const measurement=v=>new Intl.NumberFormat('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2}).format(roundUp(v));
-export const finalWorkAmount=p=>(p.works?.length?totals(p).works.after:totals(p).agreed);
+export const finalWorkAmount=p=>(p.works?.length?round(totals(p).works.after-number(p.workCredit)):totals(p).agreed);
 export function sortSummary(rows,key='category',direction=1){return [...rows].sort((a,b)=>{const comparison=['qty','value'].includes(key)?number(a[key])-number(b[key]):String(a[key]??'').localeCompare(String(b[key]??''),'pl',{numeric:true});return direction*comparison||String(a.name??'').localeCompare(String(b.name??''),'pl');});}
 export const COPY_SECTIONS=[['data','Dane inwestora i adresy'],['rooms','Pomieszczenia i pomiary'],['offer','Oferta wstępna'],['works','Zakres prac do realizacji'],['contract','Warunki umowy'],['stages','Etapy płatności (bez wpłat)'],['purchases','Lista materiałów i zakupów (nieopłacona)'],['journal','Treść dziennika (bez dat i potwierdzeń)'],['handover','Uwagi do odbioru (bez akceptacji)']];
 export function copyProject(source,sections,name,investor,date=today()){
@@ -45,12 +45,13 @@ export function purchaseTotals(p){
  const advances=round((p.receipts||[]).filter(x=>x.kind==='materials').reduce((s,x)=>s+number(x.amount),0));
  return {spent,charged,advances,actualBalance:round(advances-spent),balance:round(advances-charged),difference:round(charged-spent)};
 }
+export const acceptedAmount=offer=>offer.agreedAmount!=null?round(offer.agreedAmount):workTotals(offer.lines,offer.discount).after;
 export function totals(p){
  const offer=workTotals(p.offer||[],p.discount),works=workTotals(p.works||[],p.workDiscount??p.discount),materials=purchaseTotals(p);
  const accepted=p.acceptedOffers?.at(-1);
- const agreed=accepted?workTotals(accepted.lines,accepted.discount).after:offer.after;
+ const agreed=accepted?acceptedAmount(accepted):offer.after,workCredit=round(p.workCredit);
  const paid=round((p.receipts||[]).filter(x=>x.kind!=='materials').reduce((s,x)=>s+number(x.amount),0));
- return {offer,works,materials,agreed,paid,remaining:round(p.calculationPrecision==='source'?((p.works||[]).reduce((s,l)=>s+calculationValue(l),0)*(1-number(p.workDiscount??p.discount)/100)+(p.purchases||[]).filter(x=>x.paid).reduce((s,x)=>s+number(x.charge),0)-(p.receipts||[]).reduce((s,x)=>s+number(x.amount),0)):works.after+materials.charged-paid-materials.advances),workRemaining:round(works.after-paid),change:round(works.after-agreed)};
+ return {offer,works,materials,agreed,paid,workCredit,remaining:round(p.calculationPrecision==='source'?((p.works||[]).reduce((s,l)=>s+calculationValue(l),0)*(1-number(p.workDiscount??p.discount)/100)+(p.purchases||[]).filter(x=>x.paid).reduce((s,x)=>s+number(x.charge),0)-(p.receipts||[]).reduce((s,x)=>s+number(x.amount),0)-workCredit):works.after+materials.charged-paid-materials.advances-workCredit),workRemaining:round(works.after-paid-workCredit),change:round(works.after-agreed)};
 }
 export function aggregate(lines){const map=new Map();for(const l of lines){if(l.included===false)continue;const key=l.serviceId+'|'+l.name+'|'+l.unit;const row=map.get(key)||{name:l.name,category:l.category,unit:l.unit,qty:0,value:0};row.qty+=number(l.qty);row.value=round(row.value+lineValue(l));map.set(key,row);}return [...map.values()].sort((a,b)=>a.category.localeCompare(b.category,'pl')||a.name.localeCompare(b.name,'pl'));}
 export function newProject(name,investor,date=today()){

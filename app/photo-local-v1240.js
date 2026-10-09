@@ -53,7 +53,7 @@
   async function all(){
     const db=await openDb();return new Promise((resolve,reject)=>{
       const rows=[],t=db.transaction(STORE,'readonly'),r=t.objectStore(STORE).openCursor();
-      r.onsuccess=()=>{const c=r.result;if(!c)return;const {bytes,blob,thumbnail,...meta}=c.value;rows.push(meta);c.continue()};
+      r.onsuccess=()=>{const c=r.result;if(!c)return;const {bytes,blob,thumbnail,...meta}=c.value;rows.push({...meta,size:blob?.size||bytes?.byteLength||0});c.continue()};
       t.oncomplete=()=>resolve(rows);t.onerror=()=>reject(t.error);t.onabort=()=>reject(t.error);
     });
   }
@@ -188,33 +188,6 @@
   }
   function clearBuildProgress(){document.querySelector('#cfPhotoOverlay [data-local-progress]')?.replaceChildren()}
 
-  async function makeCombinedZip(recordId){
-    const items=await byRecord(recordId);
-    const before=items.filter(x=>x.kind==='przed'),after=items.filter(x=>x.kind==='po');
-    const meta=await metadata(recordId);
-    const root=`${meta.date}/${meta.plate}`;
-    const ordered=[{path:`${root}/przed/`},{path:`${root}/po/`},...before.map((x,i)=>({x,path:`${root}/przed/${String(i+1).padStart(3,'0')}.${extFor(x.name,x.mime)}`})),...after.map((x,i)=>({x,path:`${root}/po/${String(i+1).padStart(3,'0')}.${extFor(x.name,x.mime)}`}))];
-    const locals=[],centrals=[];let offset=0;const dt=dosDateTime();
-    for(let i=0;i<ordered.length;i++){
-      const {x,path}=ordered[i];showBuildProgress(i,ordered.length,`Przygotowanie ${path}`);
-      const row=x?await getPhoto(x.id):null;if(x&&!row)throw new Error('Zdjęcie nie jest już dostępne.');
-      let source=new Blob([]),bytes=new Uint8Array(),finalPath=path;
-      if(row){
-        const prepared=await preparePhotoForExport(row);
-        source=prepared.blob;bytes=prepared.bytes;
-        if(prepared.normalized)finalPath=path.replace(/\.[^.\/]+$/,'.jpg');
-      }
-      const nameBytes=enc.encode(finalPath),crc=crc32(bytes),size=bytes.byteLength;
-      const local=new Blob([u32(0x04034b50),u16(20),u16(0x0800),u16(0),u16(dt.time),u16(dt.date),u32(crc),u32(size),u32(size),u16(nameBytes.length),u16(0),nameBytes,source]);
-      locals.push(local);
-      const central=new Blob([u32(0x02014b50),u16(20),u16(20),u16(0x0800),u16(0),u16(dt.time),u16(dt.date),u32(crc),u32(size),u32(size),u16(nameBytes.length),u16(0),u16(0),u16(0),u16(0),u32(finalPath.endsWith('/')?0x10:0),u32(offset),nameBytes]);
-      centrals.push(central);offset+=local.size;showBuildProgress(i+1,ordered.length,`Gotowe ${i+1} z ${ordered.length}`);await new Promise(r=>setTimeout(r,0));
-    }
-    const centralOffset=offset,centralSize=centrals.reduce((s,b)=>s+b.size,0),end=new Blob([u32(0x06054b50),u16(0),u16(0),u16(ordered.length),u16(ordered.length),u32(centralSize),u32(centralOffset),u16(0)]);
-    const blob=new Blob([...locals,...centrals,end],{type:'application/zip'});
-    return new File([blob],`${meta.type}_${meta.plate}_${meta.date}.zip`,{type:'application/zip',lastModified:Date.now()});
-  }
-
   function cleanupDialog(recordId){
     const el=document.createElement('div');el.className='cf-local-zip-ready';
     el.innerHTML='<div class="cf-local-zip-card"><h3>Wyczyścić zdjęcia lokalne?</h3><p>Jeśli paczka ZIP została zapisana, możesz usunąć zdjęcia PRZED i PO tego wpisu z urządzenia. Tej operacji nie można cofnąć.</p><p data-cleanup-status role="status"></p><button data-local-cleanup type="button">Wyczyść zdjęcia lokalne tego wpisu</button><button data-local-close type="button">Zamknij</button></div>';
@@ -243,17 +216,17 @@
   const ZIP_READY_KEY='cf-photo-zip-ready';
   const isAppleMobile=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 
-  async function retainZip(file,recordId){
-    if(!navigator.serviceWorker?.controller||!window.caches)return null;
-    const url=`/app/photo-download/${uid()}/${encodeURIComponent(file.name)}`;
+  async function prepareZipDownload(recordId){
+    if(!navigator.serviceWorker?.controller||!window.caches)throw new Error('Uruchom ponownie CleanFleet, aby włączyć pobieranie ZIP.');
+    const items=await byRecord(recordId),meta=await metadata(recordId),root=`${meta.date}/${meta.plate}`;
+    const entries=[{path:`${root}/przed/`},{path:`${root}/po/`}];
+    for(const kind of ['przed','po'])items.filter(x=>x.kind===kind).forEach((x,i)=>entries.push({id:x.id,path:`${root}/${kind}/${String(i+1).padStart(3,'0')}.${extFor(x.name,x.mime)}`}));
+    const name=`${meta.type}_${meta.plate}_${meta.date}.zip`,url=`/app/photo-download/${uid()}/${encodeURIComponent(name)}`;
+    const manifest={format:'photo-zip-stream-v1',name,createdAt:Date.now(),entries};
     const cache=await caches.open(ZIP_CACHE);
-    // Retain one ready ZIP on disk, so a suspended/restarted PWA can recover it.
-    await cache.put(url,new Response(file,{headers:{
-      'Content-Type':'application/zip',
-      'Content-Disposition':`attachment; filename="${file.name.replace(/[^A-Za-z0-9._-]/g,'_')}"; filename*=UTF-8''${encodeURIComponent(file.name)}`,
-      'Content-Length':String(file.size)
-    }}));
-    const ready={url,name:file.name,size:file.size,recordId};
+    // Persist only names/IDs, never a second copy of all photos or a complete ZIP.
+    await cache.put(url,new Response(JSON.stringify(manifest),{headers:{'Content-Type':'application/json'}}));
+    const ready={url,name,size:items.reduce((n,x)=>n+(x.size||0),0),recordId,streaming:true};
     sessionStorage.setItem(ZIP_READY_KEY,JSON.stringify(ready));
     for(const key of await cache.keys())if(new URL(key.url).pathname!==url)await cache.delete(key);
     return ready;
@@ -262,10 +235,10 @@
   function shareDialog(file,recordId,ready=null){
     document.querySelector('.cf-local-zip-ready')?.remove();
     const el=document.createElement('div');el.className='cf-local-zip-ready';
-    el.innerHTML='<div class="cf-local-zip-card"><h3>Paczka zdjęć gotowa</h3><div data-zip-name style="font-size:12px;font-weight:900;word-break:break-word"></div><div data-zip-size style="font-size:10px;color:#6f756f;margin:5px 0 14px"></div><a data-local-download>Zapisz ZIP w Plikach</a><button data-local-share type="button">Udostępnij ZIP</button><p data-zip-status role="status"></p><button data-local-cleaned type="button">ZIP zapisany — wyczyść zdjęcia</button><button data-local-close type="button">Zamknij</button></div>';
+    el.innerHTML='<div class="cf-local-zip-card"><h3>Pobierz paczkę zdjęć</h3><div data-zip-name style="font-size:12px;font-weight:900;word-break:break-word"></div><div data-zip-size style="font-size:10px;color:#6f756f;margin:5px 0 14px"></div><a data-local-download>Zapisz ZIP w Plikach</a><button data-local-share type="button">Udostępnij ZIP</button><p data-zip-status role="status"></p><button data-local-cleaned type="button">ZIP zapisany — wyczyść zdjęcia</button><button data-local-close type="button">Zamknij</button></div>';
     document.body.appendChild(el);
     el.querySelector('[data-zip-name]').textContent=file.name;
-    el.querySelector('[data-zip-size]').textContent=`${(file.size/1024/1024).toFixed(1)} MB · utworzono lokalnie`;
+    el.querySelector('[data-zip-size]').textContent=ready?.streaming?`Około ${(file.size/1024/1024).toFixed(1)} MB · ZIP tworzony podczas pobierania`:`${(file.size/1024/1024).toFixed(1)} MB · utworzono lokalnie`;
     const download=el.querySelector('[data-local-download]'),share=el.querySelector('[data-local-share]'),status=el.querySelector('[data-zip-status]');
     const url=ready?.url||URL.createObjectURL(file);
     download.href=url;download.download=file.name;
@@ -278,7 +251,7 @@
     // attachment response instead of copying it to the share sheet.
     if(isAppleMobile()||!navigator.share||!file.slice){
       share.hidden=true;
-      status.textContent='Wybierz zapis pliku ZIP. Gotowa paczka pozostaje dostępna w CleanFleet.';
+      status.textContent=ready?.streaming?'ZIP będzie tworzony podczas pobierania. Poczekaj na zakończenie zapisu w Plikach. Zdjęcia pozostają w CleanFleet.':'Wybierz zapis pliku ZIP. Gotowa paczka pozostaje dostępna w CleanFleet.';
     }else share.onclick=async()=>{
       if(share.disabled)return;share.disabled=true;
       try{
@@ -292,7 +265,7 @@
 
   async function exportCombined(recordId){
     if(busy||window.cfPhotoSession?.get()?.busy)return;busy=true;window.cfPhotoSession?.setBusy(true);
-    try{clearPreviews();const file=await makeCombinedZip(recordId);let ready=null;try{ready=await retainZip(file,recordId)}catch(error){console.warn('CleanFleet ZIP retention',error)}clearBuildProgress();shareDialog(file,recordId,ready)}catch(e){console.error(e);clearBuildProgress();toast(e?.message||'Nie udało się utworzyć ZIP-a.')}finally{busy=false;window.cfPhotoSession?.setBusy(false)}
+    try{clearPreviews();const ready=await prepareZipDownload(recordId);clearBuildProgress();shareDialog({name:ready.name,size:ready.size},recordId,ready)}catch(e){console.error(e);clearBuildProgress();toast(e?.message||'Nie udało się przygotować pobierania ZIP-a.')}finally{busy=false;window.cfPhotoSession?.setBusy(false)}
   }
 
   async function saveToPhotos(recordId){

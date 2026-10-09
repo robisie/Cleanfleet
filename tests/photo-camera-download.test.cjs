@@ -9,7 +9,7 @@ function localHarness(){
  const c=cacheHarness(),storage=new Map();
  const context={window:{},document:{addEventListener(){},readyState:'loading'},navigator:{serviceWorker:{controller:{}},userAgent:'iPhone',platform:'iPhone',maxTouchPoints:5},TextEncoder,Blob,File,Response,URL,crypto:require('node:crypto').webcrypto,console,caches:{open:async()=>c.cache},sessionStorage:{setItem:(k,v)=>storage.set(k,v),getItem:k=>storage.get(k)}};
  context.window.caches=context.caches;
- let source=fs.readFileSync('app/photo-local-v1240.js','utf8').replace("  if(document.readyState==='loading')",'  window.harness={retainZip,shareDialog,isAppleMobile,makeCombinedZip};\n  if(document.readyState===\'loading\')');
+ let source=fs.readFileSync('app/photo-local-v1240.js','utf8').replace("  if(document.readyState==='loading')",'  window.harness={prepareZipDownload,shareDialog,isAppleMobile,setSources:(rows,meta)=>{byRecord=async()=>rows;metadata=async()=>meta}};\n  if(document.readyState===\'loading\')');
  vm.runInNewContext(source,context);return {context,c,storage,h:context.window.harness};
 }
 test('camera controls remain portrait for both landscape directions; preview is counter-rotated independently',async()=>{
@@ -23,15 +23,14 @@ test('camera controls remain portrait for both landscape directions; preview is 
  context.window.screen.orientation.angle=270;h.applyCameraPortraitFallback();assert.match(overlay.style.transform,/rotate\(90deg\)/);assert.equal(video.style.transform,'rotate(-90deg)');
  context.window.visualViewport.width=390;context.window.visualViewport.height=844;h.applyCameraPortraitFallback();assert.equal(overlay.style.transform,'');assert.equal(video.style.transform,'');
 });
-test('ready ZIP survives a new runtime and keeps exact image bytes; only previous ZIP is replaced',async()=>{
- const {h,c,storage,context}=localHarness();const zip=new Zip();zip.file('01.10.2026/TEST/przed/001.jpg',Buffer.from([255,216,0,255,217]));zip.folder('01.10.2026/TEST/po');
- const file=new File([await zip.generateAsync({type:'uint8array'})],'BUS_TEST_01.10.2026.zip',{type:'application/zip'});const ready=await h.retainZip(file,'record');
- const handlers={};vm.runInNewContext(fs.readFileSync('app/sw.js','utf8'),{self:{location:{origin},addEventListener:(name,fn)=>handlers[name]=fn},caches:context.caches,URL,Response,Headers});
- let result;handlers.fetch({request:{url:origin+ready.url,mode:'navigate'},respondWith:r=>result=r});const response=await result;
- assert.equal(response.headers.get('content-type'),'application/zip');assert.match(response.headers.get('content-disposition'),/^attachment;/);assert.equal(response.headers.get('cache-control'),'no-store');
- const restored=await Zip.loadAsync(await response.arrayBuffer());assert.deepEqual(await restored.file('01.10.2026/TEST/przed/001.jpg').async('uint8array'),new Uint8Array([255,216,0,255,217]));assert.equal(JSON.parse(storage.get('cf-photo-zip-ready')).recordId,'record');
- await h.retainZip(file,'second');assert.equal(c.entries.size,1);assert.ok(!c.entries.has(ready.url));
- handlers.fetch({request:{url:origin+ready.url,mode:'navigate'},respondWith:r=>result=r});assert.equal((await result).status,404);
+test('download route streams a persisted manifest and keeps legacy ready ZIPs readable',async()=>{
+ const {c,context}=localHarness();const manifest={format:'photo-zip-stream-v1',name:'test.zip',createdAt:Date.now(),entries:[]};
+ await c.cache.put('/app/photo-download/id/test.zip',new Response(JSON.stringify(manifest),{headers:{'Content-Type':'application/json'}}));
+ const handlers={},self={location:{origin},addEventListener:(name,fn)=>handlers[name]=fn,CFPhotoZipStream:{response:m=>new Response(JSON.stringify(m),{headers:{'Content-Disposition':'attachment; filename="test.zip"'}})}};
+ vm.runInNewContext(fs.readFileSync('app/sw.js','utf8'),{self,importScripts(){},caches:context.caches,URL,Response,Headers});
+ let result;handlers.fetch({request:{url:origin+'/app/photo-download/id/test.zip',mode:'navigate'},respondWith:r=>result=r});const response=await result;
+ assert.match(response.headers.get('content-disposition'),/^attachment;/);assert.equal((await response.json()).entries.length,0);
+ handlers.fetch({request:{url:origin+'/app/photo-download/missing/test.zip',mode:'navigate'},respondWith:r=>result=r});assert.equal((await result).status,404);
 });
 test('iPhone ZIP dialog offers an attachment download, never invokes native share or automatic deletion',()=>{
  const {h,context}=localHarness(),nodes=new Map();
@@ -40,4 +39,13 @@ test('iPhone ZIP dialog offers an attachment download, never invokes native shar
  h.shareDialog({name:'test.zip',size:100},'record',{url:'/app/photo-download/id/test.zip'});
  assert.equal(nodes.get('[data-local-share]').hidden,true);assert.equal(nodes.get('[data-local-download]').href,'/app/photo-download/id/test.zip');assert.equal(nodes.get('[data-local-download]').target,undefined);
  nodes.get('[data-local-download]').onclick();assert.equal(el.removed,undefined);assert.match(nodes.get('[data-zip-status]').textContent,/Zdjęcia pozostają/);
+});
+
+test('preparing 81-photo download persists metadata only and replaces the prior manifest',async()=>{
+ const {h,c,storage}=localHarness();
+ h.setSources(Array.from({length:81},(_,i)=>({id:String(i),kind:i<36?'przed':'po',name:'photo.jpg',mime:'image/jpeg',size:4*1024*1024})),{date:'09.10.2026',plate:'DTV571',type:'SOLOWKA'});
+ const ready=await h.prepareZipDownload('record');const stored=await c.cache.match(ready.url),text=await stored.text(),manifest=JSON.parse(text);
+ assert.equal(manifest.entries.length,83);assert.equal(manifest.format,'photo-zip-stream-v1');assert.ok(text.length<12000);assert.equal(ready.size,81*4*1024*1024);assert.equal(ready.streaming,true);
+ assert.equal(JSON.parse(storage.get('cf-photo-zip-ready')).url,ready.url);
+ await h.prepareZipDownload('record');assert.equal(c.entries.size,1);assert.ok(!c.entries.has(ready.url));
 });

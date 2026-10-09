@@ -1,4 +1,5 @@
-// CleanFleet v1.55.11 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
+importScripts('/app/photo-zip-stream.js?v=20261009-15512');
+// CleanFleet v1.55.12 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -17,6 +18,11 @@ self.addEventListener('fetch', event => {
       const cache=await caches.open('cleanfleet-photo-download-v1');
       const response=await cache.match(url.pathname);
       if(!response)return new Response('ZIP nie jest dostępny. Utwórz paczkę ponownie w CleanFleet.',{status:404,headers:{'Content-Type':'text/plain; charset=utf-8'}});
+      if(response.headers.get('content-type')?.includes('application/json')){
+        const manifest=await response.json();
+        if(manifest.format!=='photo-zip-stream-v1')return new Response('Nieprawidłowa paczka.',{status:400});
+        return self.CFPhotoZipStream.response(manifest,cfGetDownloadPhoto);
+      }
       const headers=new Headers(response.headers);
       headers.set('Cache-Control','no-store');
       headers.set('X-Content-Type-Options','nosniff');
@@ -96,14 +102,14 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text(); 
     // Keep the visible version in sync for pages served through this worker.
-    html = html.replace(/v1\.55\.(?:8|9|10)\b/g, 'v1.55.11');
+    html = html.replace(/v1\.55\.(?:8|9|10|11)\b/g, 'v1.55.12');
     html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13095');
 
     if (!html.includes('/app/glass-icons.css')) {
       html = html.replace('</head>', '<link rel="stylesheet" href="/app/glass-icons.css?v=13068">\n</head>');
     }
     if (!html.includes('/app/glass-icons.js')) {
-      html = html.replace('</body>', '<script src="/app/glass-icons.js?v=20261009-15511"><\/script>\n</body>');
+      html = html.replace('</body>', '<script src="/app/glass-icons.js?v=20261009-15512"><\/script>\n</body>');
     }
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){
@@ -217,9 +223,9 @@ self.addEventListener('fetch', event => {
       '<script src="/app/weather-refresh-v12311.js?v=20260923-13068"></script>\n' +
       '<script src="/app/layout-v11913.js?v=20260923-13068"></script>\n' +
       '<script src="/app/operations-v1200.js?v=20261009-1559"></script>\n' +
-      '<script src="/app/photo-local-v1240.js?v=20261009-15511"></script>\n' +
+      '<script src="/app/photo-local-v1240.js?v=20261009-15512"></script>\n' +
       '<script src="/app/photo-local-ui-v1232.js?v=20260919-13032"></script>\n' +
-      '<script src="/app/photo-camera-v1213.js?v=20261009-15511"></script>\n' +
+      '<script src="/app/photo-camera-v1213.js?v=20261009-15512"></script>\n' +
       '<script src="/app/calendar-v1203.js?v=20260917-2"></script>\n' +
       '<script src="/app/ui-v1209.js?v=20260915-3"></script>\n' +
       '<script src="/app/calendar-add-v1215.js?v=20260915-2"></script>\n' +
@@ -289,3 +295,9 @@ self.addEventListener('notificationclick', event => {
   })());
 });
 
+
+// Each short transaction fetches exactly one original photo. No getAll or full archive.
+async function cfGetDownloadPhoto(id){
+  const db=await new Promise((resolve,reject)=>{const req=indexedDB.open('cleanfleet-photo-local-v1',1);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)});
+  try{return await new Promise((resolve,reject)=>{const tx=db.transaction('photos','readonly'),req=tx.objectStore('photos').get(id);let row;req.onsuccess=()=>row=req.result;tx.oncomplete=()=>resolve(row);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})}finally{db.close()}
+}

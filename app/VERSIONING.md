@@ -140,3 +140,5 @@ CleanFleet v1.55.8: zapisane reguły zarobków i lista kontrahentów wczytują s
 CleanFleet v1.55.10: aparat zapisuje każde ujęcie lokalnie od razu, bez zamykania serii; w razie błędu ujęcie trafia do ręcznego zapisu. Miniaturki mają biały X zamiast ikony kosza.
 
 CleanFleet v1.55.11: niezależna orientacja podglądu i pionowego interfejsu aparatu, obsługa opóźnionego obrotu Safari i usunięcie starej rejestracji SW z modułu aparatu. ZIP zapisany lokalnie jako odpowiedź attachment, pobieranie pliku na iOS zamiast kopiowania do systemowego share sheet; odtworzenie gotowej paczki po restarcie PWA i czyszczenie zdjęć wyłącznie po osobnym potwierdzeniu użytkownika.
+
+CleanFleet v1.55.12: po nagraniu restartu przy 81 pozycjach eksport ZIP nie buduje już całego archiwum w pamięci ani w Cache API. Zachowuje tylko listę identyfikatorów i nazw. Service Worker tworzy ZIP STORE z deskryptorami podczas pobierania, odczytując jedno zdjęcie naraz i emitując bloki 64 KB. Zachowuje jakość, strukturę folderów, bezstratną normalizację MPO i osobne potwierdzenie czyszczenia zdjęć.

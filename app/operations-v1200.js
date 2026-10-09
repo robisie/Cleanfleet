@@ -119,11 +119,11 @@
     try{
       const [cr,rr]=await Promise.all([
         cfSupabase.from('companies').select('id,name,short_name').eq('active',true).order('name'),
-        cfSupabase.from('wash_records').select('id,company_id,plate,type,brand,order_date,order_due_date,wash_date,approved,paid,schedule_status,schedule_proposed_date,priority').is('wash_date',null).order('created_at',{ascending:false})
+        cfSupabase.from('wash_records').select('id,company_id,plate,type,brand,order_date,order_due_date,wash_date,approved,paid,schedule_status,schedule_proposed_date,priority,ordered,created_at,undated_expired_at').is('wash_date',null).order('created_at',{ascending:false})
       ]);
       if(cr.error)throw cr.error;if(rr.error)throw rr.error;
       calendarCompanies=new Map((cr.data||[]).map(c=>[c.id,c]));
-      calendarRows=(rr.data||[]).filter(r=>r.company_id);
+      calendarRows=(rr.data||[]).filter(r=>r.company_id && !scheduleIsUndatedExpired(cfMapRecord(r)));
       renderCalendar();
     }catch(e){console.error('CleanFleet calendar',e);if(root){const b=root.querySelector('[data-cal-body]');if(b)b.innerHTML='<div class="cf-cal-empty">Nie udało się pobrać kalendarza.</div>';}}
     finally{calendarLoading=false;}

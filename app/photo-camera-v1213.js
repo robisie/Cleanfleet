@@ -2,6 +2,7 @@
   'use strict';
 
   let overlay=null,sourceSheet=null,stream=null,facing='environment',shots=[],busy=false;
+  let captureCount=0,cameraRecordId=null,cameraKind=null;
   let torchOn=false;
   let rearDevices=[],ultraDevice=null,mainDevice=null,teleDevice=null,currentLens='1';
   let cameraOrientationBound=false;
@@ -127,7 +128,7 @@
     if(overlay)return overlay;
     ensureStyle();
     overlay=document.createElement('div');overlay.className='cf-cam-overlay';overlay.innerHTML=`
-      <div class="cf-cam-top"><button type="button" class="cf-cam-cancel">Anuluj</button><div class="cf-cam-count">0 zdjęć</div><button type="button" class="cf-cam-done">Gotowe</button></div>
+      <div class="cf-cam-top"><button type="button" class="cf-cam-cancel">Zamknij</button><div class="cf-cam-count">0 zdjęć</div><button type="button" class="cf-cam-done">Gotowe</button></div>
       <div class="cf-cam-stage"><video class="cf-cam-video" autoplay playsinline muted></video><div class="cf-cam-flash"></div><div class="cf-cam-zoom"><button type="button" data-cam-zoom="0.5">0,5×</button><button type="button" data-cam-zoom="1">1×</button><button type="button" data-cam-zoom="2">2×</button></div></div>
       <div class="cf-cam-device"><label>Obiektyw <select data-cam-device aria-label="Obiektyw aparatu"></select></label><div class="cf-cam-lens-note" data-cam-lens-note></div></div>
       <div class="cf-cam-bottom"><button type="button" class="cf-cam-switch" aria-label="Zmień kamerę">↻</button><button type="button" class="cf-cam-shutter" aria-label="Zrób zdjęcie"></button><button type="button" class="cf-cam-torch" aria-label="Włącz lampę" aria-pressed="false">⚡ Lampa</button></div>`;
@@ -183,7 +184,7 @@
   function openLibraryPicker(){tempPicker({accept:'image/*',multiple:true});}
   function openFilesPicker(){tempPicker({accept:null,multiple:true});}
 
-  function updateCount(){if(!overlay)return;const n=shots.length;overlay.querySelector('.cf-cam-count').textContent=n===1?'1 zdjęcie':`${n} zdjęć`;}
+  function updateCount(){if(!overlay)return;const n=captureCount;overlay.querySelector('.cf-cam-count').textContent=(n===1?'1 zdjęcie':`${n} zdjęć`)+(shots.length?' · do zapisu':'');}
   function stopStream(){torchOn=false;try{stream?.getTracks()?.forEach(t=>t.stop())}catch(_){ }stream=null;const v=overlay?.querySelector('.cf-cam-video');if(v)v.srcObject=null;updateTorchUi();}
   function track(){return stream?.getVideoTracks?.()[0]||null;}
   function caps(){try{return track()?.getCapabilities?.()||{}}catch(_){return{}}}
@@ -278,7 +279,11 @@ const box=overlay.querySelector('.cf-cam-zoom');box.style.display=facing==='envi
   async function openCamera(){
     if(busy)return;busy=true;
     try{
-      shots=[];facing='environment';currentLens='1';updateCount();
+      const session=window.cfPhotoSession?.get();
+      if(!session?.record?.id||typeof window.cfPhotoLocalStoreShot!=='function')
+        throw new Error('Zapis zdjęć nie jest gotowy. Odśwież aplikację i spróbuj ponownie.');
+      cameraRecordId=session.record.id;cameraKind=session.kind;
+      shots=[];captureCount=0;facing='environment';currentLens='1';updateCount();
       const o=ensureOverlay();
       o.classList.add('open');
       document.documentElement.style.overflow='hidden';
@@ -286,7 +291,7 @@ const box=overlay.querySelector('.cf-cam-zoom');box.style.display=facing==='envi
       busy=false;
       await startStream();
     }
-    catch(e){console.error('CleanFleet camera',e);closeCamera(false);toast(e?.message||'Nie udało się uruchomić aparatu.');}
+    catch(e){console.error('CleanFleet camera',e);busy=false;closeCamera();toast(e?.message||'Nie udało się uruchomić aparatu.');}
     finally{busy=false}
   }
 
@@ -346,12 +351,14 @@ const box=overlay.querySelector('.cf-cam-zoom');box.style.display=facing==='envi
 
       const ext=photoExtension(blob.type);
       const mime=blob.type||'image/jpeg';
-      shots.push(new File(
+      const file=new File(
         [blob],
-        `CF-${Date.now()}-${String(shots.length+1).padStart(2,'0')}.${ext}`,
+        `CF-${Date.now()}-${String(captureCount+1).padStart(2,'0')}.${ext}`,
         {type:mime,lastModified:Date.now()}
-      ));
-
+      );
+      captureCount++;
+      try{await window.cfPhotoLocalStoreShot(cameraRecordId,cameraKind,file)}
+      catch(error){console.error('CleanFleet camera local save',error);shots.push(file);toast('Nie zapisano ujęcia automatycznie. Po zamknięciu aparatu użyj „Zapisz zdjęcia”.');}
       updateCount();
       const flash=overlay.querySelector('.cf-cam-flash');
       flash.classList.add('on');setTimeout(()=>flash.classList.remove('on'),90);
@@ -362,7 +369,7 @@ const box=overlay.querySelector('.cf-cam-zoom');box.style.display=facing==='envi
   }
 
   function deliverShots(){if(shots.length)deliverFiles(shots);}
-  function closeCamera(save){if(save&&busy)return;stopStream();unlockCameraPortrait();overlay?.classList.remove('open');document.documentElement.style.overflow='';if(save)deliverShots();shots=[];updateCount();busy=false;}
+  function closeCamera(){if(busy)return;stopStream();unlockCameraPortrait();overlay?.classList.remove('open');document.documentElement.style.overflow='';deliverShots();shots=[];captureCount=0;cameraRecordId=null;cameraKind=null;updateCount();busy=false;}
 
   document.addEventListener('click',e=>{const b=e.target.closest?.('[data-photo-add]');if(!b)return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();showSourceSheet();},true);
   document.addEventListener('visibilitychange',()=>{

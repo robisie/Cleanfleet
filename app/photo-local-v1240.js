@@ -77,6 +77,18 @@
     return rows.length;
   }
 
+  // Save a camera shot before allowing the next exposure. The original Blob stays intact.
+  window.cfPhotoLocalStoreShot=async (recordId,kind,file)=>{
+    const session=window.cfPhotoSession?.get();
+    if(!session||String(session.record?.id)!==String(recordId)||!['przed','po'].includes(kind))
+      throw new Error('Nie wybrano wpisu do zapisu zdjęcia.');
+    await put({id:uid(),recordId,kind,recordKind:keyFor(recordId,kind),
+      name:file.name||`zdjecie-${Date.now()}.jpg`,mime:file.type||'image/jpeg',
+      blob:file,thumbnail:null,createdAt:Date.now()});
+    document.dispatchEvent(new CustomEvent('cf:photos-saved',{detail:{recordId}}));
+    renderLocal().catch(error=>console.warn('CleanFleet photo preview',error));
+  };
+
   async function metadata(recordId){
     let data=window.cfPhotoSession?.get()?.record;
     if(!data?.plate||String(data.id)!==String(recordId)){

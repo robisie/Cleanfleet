@@ -51,7 +51,7 @@
     return leadingGlyph.test(el.textContent||'');
   }
   function excluded(el){
-    return !!el?.matches?.('#cfHeaderChangeNotificationsBtn,[data-record-chat],.history-button[data-history-plate],#cfProfileHistory,#btnMonth,#btnYear,#btnAll,#btnBottomMenu,[data-bottom-action],.attention-card,.cf-company-card[data-company-id],#cfCompanyCalendarCard,#cfCalendarTile,#searchBtn,#cfCompanySearchBtn,.cf-modal-back-btn,.cf-native-back-action,button[id^="cfBack"],button[id$="BackBtn"],.cf-company-card-edit,#cfReminderAddBtn,#cfReports button');
+    return !!el?.matches?.('#cfHeaderChangeNotificationsBtn,[data-record-chat],.history-button[data-history-plate],#cfProfileHistory,#btnMonth,#btnYear,#btnAll,#btnBottomMenu,[data-bottom-action],.attention-card,.cf-company-card[data-company-id],#cfCompanyCalendarCard,#cfCalendarTile,#searchBtn,#cfCompanySearchBtn,.cf-modal-back-btn,.cf-native-back-action,button[id^="cfBack"],button[id$="BackBtn"],.cf-company-card-edit,#cfReminderAddBtn,#cfReports button,.cf-photo-remove,.cf-photo-local-thumb button');
   }
   function stripLeading(host){
     if(!host)return;

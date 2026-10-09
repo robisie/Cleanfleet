@@ -136,3 +136,5 @@ CleanFleet v1.55.6 / Moje finanse v1.1.0: jeden kafelek administratora i cztery 
 CleanFleet v1.55.7: biblioteki potrzebne do startu pochodzą z lokalnych plików aplikacji; ekran startowy wykrywa brak uruchomienia kodu i limituje sprawdzanie sesji. Poprawka dla przeglądarek Androida z zawodnym dostępem do CDN.
 
 CleanFleet v1.55.8: zapisane reguły zarobków i lista kontrahentów wczytują się niezależnie od przeliczenia historii EUR oraz powiązanych wpisów prania. Przy błędzie historii pozostają dostępne reguły i podpowiedzi, z możliwością ponowienia odczytu. Akcje reguł/dodawania czekają na odczyt danych zamiast otwierać pustą listę.
+
+CleanFleet v1.55.10: aparat zapisuje każde ujęcie lokalnie od razu, bez zamykania serii; w razie błędu ujęcie trafia do ręcznego zapisu. Miniaturki mają biały X zamiast ikony kosza.

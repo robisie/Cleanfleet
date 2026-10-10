@@ -1,4 +1,4 @@
-export const VERSION='1.0.20';
+export const VERSION='1.0.21';
 export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['rooms','Pomieszczenia i pomiary'],['offer','Oferta wstępna'],['contract','Umowa'],['works','Realizacja i kalkulacja'],['summary','Zestawienie prac'],['payments','Etapy i płatności'],['purchases','Zakupy i materiały'],['journal','Dziennik prac'],['handover','Odbiór inwestycji']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -67,4 +67,36 @@ export function contractTemplate(project,settings){
  const p=project.payload,t=totals(p),company=settings.company||{};
  const stages=p.stages.map(s=>`${s.name}: ${quantity(s.percent)}% (${money(t.agreed*number(s.percent)/100)}), ${s.description}.`).join('\n');
  return `UMOWA O WYKONANIE PRAC REMONTOWYCH\nNumer: ${project.contract_number}\nZawarta dnia ${p.contractDate} w ${p.contractPlace||'……………………'}.\n\nZLECENIODAWCA\n${p.investor||'……………………'}, adres: ${p.investorAddress||'……………………'}, PESEL: ${p.pesel||'……………………'}.\n\nWYKONAWCA\n${company.name||'ROBISIĘ-FER sp. z o.o.'}, ${company.address||'……………………'}, NIP: ${company.nip||'6351861297'}, KRS: ${company.krs||'……………………'}, reprezentowany przez ${company.representative||'Michał Sobota – prezes zarządu'}.\n\n§1. Przedmiot umowy\nWykonawca zobowiązuje się wykonać prace remontowe w nieruchomości przy ${p.address||'……………………'}. Zakres i wynagrodzenie określa oferta ${attachment(project,'OFE',p.acceptedOffers?.at(-1)?.version||1)}. Wymiary pomieszczeń określa załącznik ${attachment(project,'WYM')}.\n\n§2. Termin\nRozpoczęcie: ${p.startDate||'do ustalenia'}. Zakończenie: ${p.endDate||'do ustalenia'}.\n\n§3. Przygotowanie lokalu\nZleceniodawca przygotuje lokal do prac, w szczególności opróżni remontowane pomieszczenia z mebli i dekoracji. Nieprzygotowanie lokalu, które bezpośrednio uniemożliwi lub wstrzyma prace, skutkuje karą umowną 600 zł brutto za każdy dzień roboczy przestoju.\n\n§4. Wynagrodzenie i materiały\nUzgodnione wynagrodzenie za prace wynosi ${money(t.agreed)}. Cena nie obejmuje materiałów. Zleceniodawca dostarcza je na bieżąco lub powierza Wykonawcy ich zakup w swoim imieniu. Uzgodniona zaliczka materiałowa wynosi ${money(p.materialAdvance)} i jest płatna przed rozpoczęciem prac. Zakupy zostaną szczegółowo rozliczone.\n\n§5. Dokumentacja\nZleceniodawca udzieli informacji i udostępni dokumenty potrzebne do prawidłowego wykonania prac. Prace wymagające zezwolenia nie zostaną wykonane bez odpowiedniej dokumentacji.\n\n§6. Rozliczenia\n${stages}\nZapłata nastąpi w ciągu ${p.paymentDays} dni od otrzymania faktury. Rachunek: ${company.account||'……………………'}. Zmiany zakresu i zakupy zostaną rozliczone końcowo zgodnie z kalkulacją ${attachment(project,'KAL-K')} i zestawieniem ${attachment(project,'ROZ')}.\n\n§7. Wykonanie i odbiór\nPrace będą wykonywane zgodnie ze sztuką budowlaną. Odbiór nastąpi zgodnie z ustaleniami stron oraz wymaganiami dotyczącymi wykonywanych prac.\n\n§8. Dostęp do lokalu\nZleceniodawca udostępni klucze na okres realizacji. Wprowadzanie dodatkowych ekip i wykonywanie prac mogących utrudnić realizację wymaga uzgodnienia z Wykonawcą.\n\n§9. Osoby trzecie\nZleceniodawca nie udostępni terenu prac osobom trzecim bez swojej obecności lub obecności Wykonawcy.\n\n§10. Zakończenie przed terminem\nRozliczenie nastąpi według szczegółowej kalkulacji wykonanych prac. Uzgodniona kara za nieuzasadnione rozwiązanie umowy lub niewywiązywanie się z niej wynosi ${quantity(p.terminationPercent)}% sumy końcowego rozliczenia.\n\n§11. Zmiany umowy\nZmiany wymagają formy pisemnej.\n\n§12. Pozostałe sprawy\nW sprawach nieuregulowanych mają zastosowanie przepisy kodeksu cywilnego.\n\n§13. Egzemplarze\nUmowę sporządzono w dwóch jednobrzmiących egzemplarzach, po jednym dla każdej strony.\n\nData i podpis Wykonawcy: ………………………\nData i podpis Inwestora: ………………………`;
+}
+
+// Catalog names and units are shared; each investment retains its price snapshot.
+export const catalogMarkup=(settings,project)=>number(project?.markup??settings.markup??35);
+export const serviceKey=service=>[service.category,service.name,service.unit].map(value=>String(value||'').trim().replace(/\s+/g,' ').toLocaleLowerCase('pl')).join('|');
+export function projectCatalog(settings,project){
+ const snapshots=new Map((project?.catalog||[]).map(item=>[item.id,item]));
+ return (settings.catalog||[]).map(item=>({...structuredClone(item),base:number(snapshots.get(item.id)?.base??item.base)}));
+}
+export function captureCatalog(settings,project){return {...project,catalog:projectCatalog(settings,project),markup:catalogMarkup(settings,project)};}
+export function catalogCorrectionPreview(catalog,percent){
+ const raw=String(percent??'').trim().replace(',','.');const value=Number(raw);
+ if(!raw||!Number.isFinite(value)||value<=-100||value>1000||value===0)throw new Error('Wpisz korektę różną od zera, większą niż −100% i nie większą niż 1000%.');
+ return catalog.map(item=>({id:item.id,name:item.name,category:item.category,before:round(item.base),after:round(number(item.base)*(1+value/100))}));
+}
+export function correctCatalog(settings,percent,reason='',date=new Date().toISOString()){
+ const changes=catalogCorrectionPreview(settings.catalog||[],percent);
+ if(!changes.length)throw new Error('Cennik jest pusty.');
+ const next=structuredClone(settings),prices=new Map(changes.map(item=>[item.id,item.after]));
+ next.catalog=next.catalog.map(item=>({...item,base:prices.get(item.id)}));
+ next.catalogCorrections=[...(next.catalogCorrections||[]),{id:uid(),date,percent:number(percent),reason:String(reason).trim(),changes}];
+ return next;
+}
+export function lastCatalogCorrection(settings){return (settings.catalogCorrections||[]).filter(item=>!item.undoneAt).at(-1);}
+export function undoCatalogCorrection(settings,date=new Date().toISOString()){
+ const last=lastCatalogCorrection(settings);if(!last)throw new Error('Brak korekty do cofnięcia.');
+ const prices=new Map((settings.catalog||[]).map(item=>[item.id,item.base]));
+ if(last.changes.some(item=>!prices.has(item.id)||round(prices.get(item.id))!==item.after))throw new Error('Po korekcie zmieniono ceny usług. Cofnięcie nadpisałoby te zmiany.');
+ const next=structuredClone(settings),previous=new Map(last.changes.map(item=>[item.id,item.before]));
+ next.catalog=next.catalog.map(item=>previous.has(item.id)?{...item,base:previous.get(item.id)}:item);
+ next.catalogCorrections=next.catalogCorrections.map(item=>item.id===last.id?{...item,undoneAt:date}:item);
+ return next;
 }

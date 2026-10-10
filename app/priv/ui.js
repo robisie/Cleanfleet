@@ -70,32 +70,42 @@ function showMergeList(){
 }
 function showMonth(ruleId,month){const rule=state.rules.find(r=>r.id===ruleId),s=P.status(state,rule,month,today());modal(rule.name+' · '+month,`<div class="notice ${s.kind}"><strong>${s.label}</strong><p>Zapłacono: ${money(s.total,rule.currency)}${rule.expected==null?'':' · oczekiwano: '+money(rule.expected,rule.currency)}${s.difference==null?'':' · różnica: '+money(s.difference,rule.currency)}</p></div>${s.transactions.map(t=>`<div class="rule"><b>${t.date} · ${money(t.amount,t.currency)}</b><p>${escape(t.recipient)}</p><p>${escape(t.title)}</p></div>`).join('')||'<p>Nie znaleziono przypisanego przelewu. Możesz sprawdzić i przypisać go w historii.</p>'}`,`<button id="goHistory">Otwórz historię przelewów</button>`);$('goHistory').onclick=showHistory;}
 function showHistory(){modal('Historia przelewów',`<div class="inline"><label>Wyszukaj<input id="historySearch" type="search" placeholder="Odbiorca, tytuł, data"></label><label>Widok<select id="historyFilter"><option value="all">Wszystkie</option><option value="unmatched">Bez dopasowania</option></select></label></div><div id="historyRows"></div>`,'<p>Przypisanie i miesiąc zapisują się od razu po zmianie. „Automatycznie” przywraca rozpoznawanie według listy.</p>');const renderRows=()=>{const q=P.normalize($('historySearch').value),filter=$('historyFilter').value;const tx=state.transactions.filter(t=>(P.tracked([t],state.rules).length||state.rules.some(r=>r.id===t.assignment))&&(filter!=='unmatched'||!P.allocation(state,t)&&t.assignment!=='__ignore__')&&P.normalize(t.recipient+' '+t.title+' '+t.date).includes(q)).sort((a,b)=>b.date.localeCompare(a.date));$('historyRows').innerHTML=tx.map(t=>{const a=P.allocation(state,t);return `<div class="history-row" data-tx="${t.id}"><div><b>${t.date} · ${money(t.amount,t.currency)}</b><p>${escape(t.recipient)}</p><small>${escape(t.sourceName||'')}</small></div><div><p>${escape(t.title)}</p><small>${escape(t.account)}</small><details><summary>Tekst z PDF</summary><p class="source">${escape(t.raw||'')}</p></details></div><div><label>Pozycja<select data-assign><option value="">Automatycznie${a&&!t.assignment?' · '+escape(a.rule.name):''}</option><option value="__ignore__" ${t.assignment==='__ignore__'?'selected':''}>Nie kontroluj</option>${state.rules.filter(r=>r.currency===t.currency).map(r=>`<option value="${r.id}" ${t.assignment===r.id?'selected':''}>${escape(r.name)}</option>`).join('')}</select></label><label>Dotyczy miesiąca<input data-month type="month" value="${escape(t.month||a?.month||'')}"></label></div></div>`;}).join('')||'<p class="empty">Brak przelewów w tym widoku.</p>'; $('historyRows').querySelectorAll('[data-tx]').forEach(row=>{for(const el of row.querySelectorAll('select,input'))el.onchange=()=>action(async()=>{const next=structuredClone(state),target=next.transactions.find(t=>t.id===row.dataset.tx);target.assignment=row.querySelector('[data-assign]').value||null;const m=row.querySelector('[data-month]').value;target.month=m||null;try{await persist(next);renderRows();}catch(e){renderRows();throw e;}});});};$('historySearch').oninput=renderRows;$('historyFilter').onchange=renderRows;renderRows();}
-function choosePdf(mode='history'){if(busy||importInFlight)return;importMode=mode==='contractors'||!state.rules.length?'contractors':'history';$('pdfFile').click();}
-function showContractorUpload(){
-  modal('Dodaj pozycje z wyciągu',`<p>Lista została zapisana. Wybierz PDF, aby wskazać nowych kontrahentów do kontroli.</p><label>Wyciąg z mBanku<input id="contractorPdf" type="file" accept="application/pdf,.pdf" multiple></label>`);
-  $('contractorPdf').onchange=()=>{const files=[...$('contractorPdf').files];$('contractorPdf').value='';handlePdfFiles(files,'contractors');};
+function choosePdf(mode='history'){
+  if(busy||importInFlight||!key||!state)return;
+  importMode=mode==='contractors'||!state.rules.length?'contractors':'history';
+  modal('Zaczytaj wyciąg',`<p>Wybierz wyciąg PDF. Jeśli jest zabezpieczony, podaj hasło do tego dokumentu.</p><form id="statementImportForm"><label>Wyciąg PDF<input id="statementPdf" type="file" accept="application/pdf,.pdf" multiple required></label><label>Hasło do PDF (opcjonalnie)<input id="statementPassword" type="password" autocomplete="off" spellcheck="false" placeholder="Pozostaw puste, jeśli plik nie ma hasła"></label></form><p class="muted">Hasło służy tylko do odczytu pliku. Nie jest zapisywane. Przy kilku plikach użyj wspólnego hasła; o inne aplikacja zapyta osobno.</p>`,`<button type="submit" form="statementImportForm" class="primary">Odczytaj wyciąg</button>`);
+  $('statementImportForm').onsubmit=e=>{
+    e.preventDefault();
+    const files=[...$('statementPdf').files];if(!files.length)return;
+    const password=$('statementPassword').value,mode=importMode;
+    $('statementPassword').value='';$('statementPdf').value='';close();
+    handlePdfFiles(files,mode,password);
+  };
 }
-function handlePdfFiles(files,mode=importMode){
+function showContractorUpload(){choosePdf('contractors');}
+
+function handlePdfFiles(files,mode=importMode,password=''){
   if(!files.length||importInFlight||busy)return;importMode=mode;
-  return action(async()=>{importInFlight=true;const controls=['editList','mergeList','import','history','settings'].map($);controls.forEach(b=>b.disabled=true);try{await preview(files);}finally{importInFlight=false;controls.forEach(b=>b.disabled=false);}});
+  return action(async()=>{importInFlight=true;const controls=['editList','mergeList','import','history','settings'].map($);controls.forEach(b=>b.disabled=true);try{await preview(files,password);}finally{password='';importInFlight=false;controls.forEach(b=>b.disabled=false);}});
 }
 function requestPdfPassword(name,incorrect=false){
   if(!key||!state)return Promise.reject(Error('Narzędzie jest zablokowane.'));
   return new Promise((resolve,reject)=>{
     modal('Hasło do wyciągu',`<p>${escape(name)}</p><p>${incorrect?'Poprzednie hasło było nieprawidłowe. Spróbuj ponownie.':'Ten PDF jest zabezpieczony. Podaj hasło otrzymane z mBanku.'}</p><form id="pdfPasswordForm"><label>Hasło do pliku PDF<input id="pdfPassword" type="password" autocomplete="off" required spellcheck="false"></label></form><p class="muted">Hasło służy tylko do odczytu na tym urządzeniu. Nie zapisujemy go.</p>`,`<div class="toolbar"><button type="submit" form="pdfPasswordForm" class="primary">Odczytaj PDF</button><button type="button" id="cancelPdfPassword">Anuluj odczyt</button></div>`);
     let done=false;
-    const finish=(value,cancel=false)=>{if(done)return;done=true;passwordPromptCancel=null;$('pdfPassword').value='';$('modal').close();$('modalBody').replaceChildren();$('modalFoot').replaceChildren();cancel?reject(Error('Anulowano odczyt wyciągu.')):resolve(value);};
+    const finish=(value,cancel=false)=>{if(done)return;done=true;passwordPromptCancel=null;if($('pdfPassword'))$('pdfPassword').value='';$('modal').close();$('modalBody').replaceChildren();$('modalFoot').replaceChildren();cancel?reject(Error('Anulowano odczyt wyciągu.')):resolve(value);};
     passwordPromptCancel=()=>finish(null,true);
     $('cancelPdfPassword').onclick=passwordPromptCancel;
     $('pdfPasswordForm').onsubmit=e=>{e.preventDefault();const value=$('pdfPassword').value;if(value)finish(value);};
     $('pdfPassword').focus();
   });
 }
-async function readPdf(file){
+async function readPdf(file,password=''){
   if(file.size>25*1024*1024)throw Error('PDF jest za duży. Limit: 25 MB.');
   pdfLib||=await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs');
   pdfLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
-  const task=pdfLib.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false});
+  const task=pdfLib.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false,...(password?{password}:{})});
+  password='';
   let doc,abort;const cancelled=new Promise((_,reject)=>{abort=reject;});
   task.onPassword=(updatePassword,reason)=>{requestPdfPassword(file.name,reason===pdfLib.PasswordResponses.INCORRECT_PASSWORD).then(updatePassword).catch(error=>{abort(error);task.destroy().catch(()=>{});});};
   try{
@@ -114,9 +124,9 @@ function appendImport(next,batches,transactions){
   }
   next.transactions=P.mergeTransactions(next.transactions,P.tracked(transactions,next.rules));
 }
-async function preview(files){
+async function preview(files,password=''){
   const epoch=generation,batches=[],mode=importMode;notice('Odczytuję PDF…');
-  for(const file of files){const parsed=await readPdf(file);if(epoch!==generation)return;const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',await file.arrayBuffer()))].map(x=>x.toString(16).padStart(2,'0')).join('');if(batches.some(b=>b.hash===hash))continue;batches.push({hash,name:file.name,...parsed});}
+  for(const file of files){const parsed=await readPdf(file,password);if(epoch!==generation)return;const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',await file.arrayBuffer()))].map(x=>x.toString(16).padStart(2,'0')).join('');if(batches.some(b=>b.hash===hash))continue;batches.push({hash,name:file.name,...parsed});}
   if(!batches.length)return;
   const transactions=batches.flatMap(b=>b.transactions.map(t=>({...t,id:id(),sourceName:b.name,sourceHash:b.hash}))),unread=batches.flatMap(b=>(b.unread||[]).map(t=>({...t,sourceName:b.name})));
   if(mode==='contractors'){

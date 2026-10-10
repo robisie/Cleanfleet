@@ -158,6 +158,17 @@ test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów
  assert.equal((node('#dialog').innerHTML.match(/name="pdfModule"/g)||[]).length,PDF.MODULES.length);
  await node('#modal-form').onsubmit({preventDefault(){},target:{pdfModule:['data','rooms']}});
  assert.ok(printedHtml.includes('data-module="data"'));assert.ok(printedHtml.includes('data-module="rooms"'));assert.ok(!printedHtml.includes('data-module="offer"'));
+ // Category hints are shared; selecting individual walls stores quantity and its calculation for editing.
+ module.namespace.testRender({...row,payload:{...row.payload,rooms:[{id:'r',name:'Pokój',length:4,width:3,height:2.6}]}},{catalog:structuredClone(catalog),markup:35,company:{}});
+ module.namespace.testLineDialog();assert.ok(node('#dialog').innerHTML.includes('list="category-suggestions"'));assert.ok(node('#dialog').innerHTML.includes('Wybierz konkretne ściany'));
+ node('#f-roomId').value='r';
+ const wallForm=node('#modal-form'),wallQuery=wallForm.querySelectorAll;
+ wallForm.querySelectorAll=()=>[];wallForm['wall-0-0']='on';wallForm['deduction-0-0']='1+1';
+ node('#insert-selected-walls').onclick();assert.equal(node('#f-qty').value,8.4);assert.equal(node('#f-unit').value,'m²');
+ delete wallForm['wall-0-0'];delete wallForm['deduction-0-0'];wallForm.querySelectorAll=wallQuery;
+ await wallForm.onsubmit({preventDefault(){},target:{serviceId:chosen.id,roomId:'r',name:chosen.name,category:chosen.category.toLocaleLowerCase('pl'),unit:'m²',qty:'8.4',price:'10',days:'0',hours:'0',note:''}});
+ const wallLine=module.namespace.testOffer().at(-1);assert.equal(wallLine.qty,8.4);assert.equal(wallLine.category,chosen.category);assert.equal(wallLine.quantityBasis.walls.length,1);assert.equal(wallLine.quantityBasis.roomId,'r');
+ module.namespace.testServiceDialog();assert.ok(node('#dialog').innerHTML.includes('list="category-suggestions"'));
  // Shared custom work persists once and is available to the next investment.
  module.namespace.testRender(row,{catalog:structuredClone(catalog),markup:35,company:{}});
  module.namespace.testLineDialog();

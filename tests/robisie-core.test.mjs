@@ -51,3 +51,13 @@ test('ryczałt i obniżka z historii nie tworzą fikcyjnych wpłat',()=>{
  const t=C.totals(p);assert.equal(t.agreed,100);assert.equal(t.paid,100);assert.equal(t.workRemaining,20);assert.equal(t.remaining,25);assert.equal(C.finalWorkAmount(p),120);
  const copied=C.copyProject(p,['offer','works'],'Kopia','Test');assert.equal(copied.workCredit,undefined);assert.equal(copied.acceptedOffers.length,0);
 });
+test('kategorie korzystają z istniejącej pisowni bez duplikatów spacji i wielkości liter',()=>{
+ const names=C.categoryNames([' Malowanie  ścian ','MALOWANIE ŚCIAN','Hydraulika','',null]);
+ assert.equal(names.length,2);assert.equal(C.canonicalCategory('  malowanie   ŚCIAN ',names),'Malowanie ścian');assert.equal(C.canonicalCategory('Nowa kategoria',names),'Nowa kategoria');assert.throws(()=>C.canonicalCategory('  ',names));
+});
+test('wybrane ściany liczą tylko zaznaczone powierzchnie z indywidualnymi odliczeniami',()=>{
+ const walls=C.roomWalls({length:4,width:3,height:2.6,openings:7});assert.equal(walls.length,4);
+ assert.equal(C.selectedWallArea([{...walls[0],deduction:'1,2+0,8'},{...walls[1],deduction:1}]),15.2);
+ assert.throws(()=>C.selectedWallArea([]));assert.throws(()=>C.selectedWallArea([{...walls[0],deduction:11}]));assert.throws(()=>C.selectedWallArea([{...walls[0],deduction:'2+'}]));
+ assert.equal(C.roomWalls({height:2.6,parts:[{length:4,width:3},{length:2,width:1,height:3}]}).at(-1).area,3);
+});

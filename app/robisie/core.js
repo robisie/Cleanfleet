@@ -1,4 +1,4 @@
-export const VERSION='1.0.23';
+export const VERSION='1.0.24';
 export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['rooms','Pomieszczenia i pomiary'],['offer','Oferta wstępna'],['contract','Umowa'],['works','Realizacja i kalkulacja'],['summary','Zestawienie prac'],['payments','Etapy i płatności'],['purchases','Zakupy i materiały'],['journal','Dziennik prac'],['handover','Odbiór inwestycji']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -15,7 +15,7 @@ export function copyProject(source,sections,name,investor,date=today()){
  const chosen=new Set(sections),result=newProject(name,investor,date),roomIds=new Map();
  if(chosen.has('data'))for(const key of ['address','investorAddress','phone','email','pesel'])result[key]=structuredClone(source[key]??'');
  if(['rooms','offer','works','journal'].some(key=>chosen.has(key)))result.rooms=(source.rooms||[]).map(room=>{const id=uid();roomIds.set(room.id,id);return {...structuredClone(room),id};});
- const lines=items=>(items||[]).map(line=>({...structuredClone(line),id:uid(),roomId:roomIds.get(line.roomId)||'',done:false}));
+ const lines=items=>(items||[]).map(line=>{const item={...structuredClone(line),id:uid(),roomId:roomIds.get(line.roomId)||'',done:false};if(item.quantityBasis)item.quantityBasis.roomId=item.roomId;return item;});
  if(chosen.has('offer')){result.offer=lines(source.offer);result.discount=number(source.discount);result.materialEstimate=number(source.materialEstimate);}
  if(chosen.has('works')){result.works=lines(source.works);result.workDiscount=number(source.workDiscount??source.discount);}
  if(source.calculationPrecision==='source'&&(chosen.has('offer')||chosen.has('works')))result.calculationPrecision='source';
@@ -120,3 +120,8 @@ export function calculateNumber(input){
  const value=sum();space();if(position!==source.length)error();if(!Number.isFinite(value))throw new Error('Wynik działania jest zbyt duży.');
  return Object.is(value,-0)?0:Number.isInteger(value)||/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(source)?value:Number(value.toPrecision(15));
 }
+
+export function categoryNames(values){const names=new Map();for(const value of values){const name=String(value||'').trim().replace(/\s+/g,' '),key=name.toLocaleLowerCase('pl');if(name&&!names.has(key))names.set(key,name);}return [...names.values()].sort((a,b)=>a.localeCompare(b,'pl'));}
+export function canonicalCategory(value,names){const name=String(value||'').trim().replace(/\s+/g,' ');if(!name)throw new Error('Wybierz lub wpisz kategorię pracy.');return names.find(x=>x.toLocaleLowerCase('pl')===name.toLocaleLowerCase('pl'))||name;}
+export function roomWalls(room){if(!room)return [];const parts=room.parts?.length?room.parts:[room];return parts.flatMap((part,i)=>[part.length,part.width,part.length,part.width].map((length,j)=>({id:`${i}-${j}`,name:`${parts.length>1?`Część ${i+1} · `:''}Ściana ${j+1}`,length:number(length),height:number(part.height??room.height),area:roundUp(number(length)*number(part.height??room.height))})));}
+export function selectedWallArea(walls){if(!walls.length)throw new Error('Zaznacz przynajmniej jedną ścianę.');return roundUp(walls.reduce((sum,wall)=>{const area=number(wall.area),deduction=calculateNumber(wall.deduction||0);if(area<=0)throw new Error('Uzupełnij dodatnie wymiary pomieszczenia.');if(deduction<0||deduction>area)throw new Error('Odliczenie musi mieścić się między zerem a powierzchnią ściany.');return sum+area-deduction;},0));}

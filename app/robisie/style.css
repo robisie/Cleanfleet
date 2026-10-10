@@ -31,3 +31,5 @@ dialog.correction-modal>form{display:flex;flex-direction:column;flex:1 1 auto;mi
 .correction-modal th:first-child{width:54%}
 .correction-modal td{overflow-wrap:anywhere}
 @media(max-width:720px){dialog.correction-modal[open]{width:calc(100vw - 24px);max-height:calc(100dvh - max(24px,env(safe-area-inset-top)) - max(24px,env(safe-area-inset-bottom)))}.correction-modal .modal-body{padding:16px}.correction-modal footer{padding:12px 16px}.correction-modal footer .primary{flex:1;white-space:normal}.correction-modal th,.correction-modal td{padding:10px 6px}.correction-modal th:first-child{width:46%}}
+
+.wall-picker{border:1px solid var(--border,#dfe3e7);border-radius:10px;padding:16px;margin-bottom:20px}.wall-picker summary{cursor:pointer;font-weight:700}.wall-choice{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,180px);align-items:center;gap:16px;border-top:1px solid #e5e7eb;padding:12px 0}.wall-choice small{display:block;color:#707987;margin-top:4px}.wall-choice .field{margin:0}@media(max-width:600px){.wall-choice{grid-template-columns:1fr;gap:8px}}

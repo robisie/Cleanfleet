@@ -61,3 +61,11 @@ test('wybrane ściany liczą tylko zaznaczone powierzchnie z indywidualnymi odli
  assert.throws(()=>C.selectedWallArea([]));assert.throws(()=>C.selectedWallArea([{...walls[0],deduction:11}]));assert.throws(()=>C.selectedWallArea([{...walls[0],deduction:'2+'}]));
  assert.equal(C.roomWalls({height:2.6,parts:[{length:4,width:3},{length:2,width:1,height:3}]}).at(-1).area,3);
 });
+test('powierzchnie łączą dwie ściany z sufitem i podłogą bez podwójnego liczenia ścian',()=>{
+ const room={length:4,width:3,height:2.6,openings:2},walls=C.roomWalls(room).slice(0,2).map((wall,i)=>({...wall,deduction:i===0?2:0}));
+ assert.equal(C.selectedSurfaceArea(room,walls,{ceiling:true}),28.2);
+ assert.equal(C.selectedSurfaceArea(room,walls,{ceiling:true,floor:true}),40.2);
+ assert.equal(C.selectedSurfaceArea(room,[],{ceiling:true}),12);
+ assert.equal(C.selectedSurfaceArea(room,walls,{walls:true,ceiling:true}),46.4);
+ assert.throws(()=>C.selectedSurfaceArea(room,[],{}));
+});

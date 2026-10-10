@@ -1,4 +1,4 @@
-export const VERSION='1.0.24';
+export const VERSION='1.0.25';
 export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['rooms','Pomieszczenia i pomiary'],['offer','Oferta wstępna'],['contract','Umowa'],['works','Realizacja i kalkulacja'],['summary','Zestawienie prac'],['payments','Etapy i płatności'],['purchases','Zakupy i materiały'],['journal','Dziennik prac'],['handover','Odbiór inwestycji']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -125,3 +125,5 @@ export function categoryNames(values){const names=new Map();for(const value of v
 export function canonicalCategory(value,names){const name=String(value||'').trim().replace(/\s+/g,' ');if(!name)throw new Error('Wybierz lub wpisz kategorię pracy.');return names.find(x=>x.toLocaleLowerCase('pl')===name.toLocaleLowerCase('pl'))||name;}
 export function roomWalls(room){if(!room)return [];const parts=room.parts?.length?room.parts:[room];return parts.flatMap((part,i)=>[part.length,part.width,part.length,part.width].map((length,j)=>({id:`${i}-${j}`,name:`${parts.length>1?`Część ${i+1} · `:''}Ściana ${j+1}`,length:number(length),height:number(part.height??room.height),area:roundUp(number(length)*number(part.height??room.height))})));}
 export function selectedWallArea(walls){if(!walls.length)throw new Error('Zaznacz przynajmniej jedną ścianę.');return roundUp(walls.reduce((sum,wall)=>{const area=number(wall.area),deduction=calculateNumber(wall.deduction||0);if(area<=0)throw new Error('Uzupełnij dodatnie wymiary pomieszczenia.');if(deduction<0||deduction>area)throw new Error('Odliczenie musi mieścić się między zerem a powierzchnią ściany.');return sum+area-deduction;},0));}
+
+export function selectedSurfaceArea(room,walls,surfaces={}){if(!room)throw new Error('Wybierz pomieszczenie.');if(!walls.length&&!surfaces.walls&&!surfaces.floor&&!surfaces.ceiling)throw new Error('Zaznacz ściany, sufit lub podłogę.');const areas=roomArea(room);return roundUp((surfaces.walls?areas.walls:walls.length?selectedWallArea(walls):0)+(surfaces.floor?areas.floor:0)+(surfaces.ceiling?areas.ceiling:0));}

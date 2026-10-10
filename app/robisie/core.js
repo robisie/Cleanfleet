@@ -1,4 +1,4 @@
-export const VERSION='1.0.22';
+export const VERSION='1.0.23';
 export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['rooms','Pomieszczenia i pomiary'],['offer','Oferta wstępna'],['contract','Umowa'],['works','Realizacja i kalkulacja'],['summary','Zestawienie prac'],['payments','Etapy i płatności'],['purchases','Zakupy i materiały'],['journal','Dziennik prac'],['handover','Odbiór inwestycji']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -99,4 +99,24 @@ export function undoCatalogCorrection(settings,date=new Date().toISOString()){
  next.catalog=next.catalog.map(item=>previous.has(item.id)?{...item,base:previous.get(item.id)}:item);
  next.catalogCorrections=next.catalogCorrections.map(item=>item.id===last.id?{...item,undoneAt:date}:item);
  return next;
+}
+
+// Parse arithmetic as numbers and operators only; never execute user-provided code.
+export function calculateNumber(input){
+ const source=String(input??'').trim().replaceAll(',','.').replaceAll('−','-').replaceAll('×','*').replaceAll('÷','/');
+ if(!source||source.length>500)throw new Error('Wpisz liczbę lub działanie, np. 25+3+7-2.');
+ let position=0,depth=0;
+ const error=()=>{throw new Error('Nieprawidłowe działanie. Użyj liczb, +, −, *, / i nawiasów.');};
+ const space=()=>{while(/\s/.test(source[position]||'')&&position<source.length)position++;};
+ function primary(){space();if(++depth>40)error();let value;
+  const token=source[position];
+  if(token==='+'||token==='-'){position++;value=(token==='-'?-1:1)*primary();}
+  else if(token==='('){position++;value=sum();space();if(source[position++]!==')')error();}
+  else {const match=source.slice(position).match(/^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?/i);if(!match)error();position+=match[0].length;value=Number(match[0]);}
+  depth--;return value;
+ }
+ function product(){let value=primary();space();while(source[position]==='*'||source[position]==='/'){const op=source[position++],right=primary();if(op==='/'&&right===0)throw new Error('Nie można dzielić przez zero.');value=op==='*'?value*right:value/right;space();}return value;}
+ function sum(){let value=product();space();while(source[position]==='+'||source[position]==='-'){const op=source[position++],right=product();value=op==='+'?value+right:value-right;space();}return value;}
+ const value=sum();space();if(position!==source.length)error();if(!Number.isFinite(value))throw new Error('Wynik działania jest zbyt duży.');
+ return Object.is(value,-0)?0:Number.isInteger(value)||/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(source)?value:Number(value.toPrecision(15));
 }

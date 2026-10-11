@@ -1,4 +1,4 @@
-export const VERSION='1.0.36';
+export const VERSION='1.0.37';
 export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['rooms','Pomieszczenia i pomiary'],['offer','Oferta wstępna'],['contract','Umowa'],['works','Kalkulacja końcowa'],['summary','Zestawienie prac'],['payments','Etapy i płatności'],['purchases','Zakupy i materiały'],['journal','Dziennik prac'],['handover','Odbiór inwestycji']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -37,7 +37,8 @@ export function roomArea(room){
 }
 export const lineValue=line=>line.included===false?0:round(number(line.qty)*number(line.price));
 const calculationValue=line=>line.calculationPrecision==='source'?(line.included===false?0:number(line.qty)*number(line.price)):lineValue(line);
-export function workTotals(lines,discount=0){const raw=lines.reduce((s,l)=>s+calculationValue(l),0),factor=1-number(discount)/100;return {before:round(raw),after:round((lines.some(l=>l.calculationPrecision==='source')?raw:round(raw))*factor),done:round(lines.filter(l=>l.done).reduce((s,l)=>s+calculationValue(l),0)*factor),hours:lines.reduce((s,l)=>s+number(l.hours),0),days:lines.reduce((s,l)=>s+number(l.days),0)};}
+export const calculationBasis=(lines,discount)=>JSON.stringify([number(discount),lines.map(l=>[l.id,number(l.qty),number(l.price),l.included!==false]).sort((a,b)=>String(a[0]).localeCompare(String(b[0])))]);
+export function workTotals(lines,discount=0,settlement){const raw=lines.reduce((s,l)=>s+calculationValue(l),0),factor=1-number(discount)/100,doneRaw=lines.filter(l=>l.done).reduce((s,l)=>s+calculationValue(l),0),sourceAmountApplied=settlement&&Number.isFinite(settlement.amount)&&settlement.amount>=0&&settlement.basis===calculationBasis(lines,discount);return {before:round(raw),after:round(sourceAmountApplied?settlement.amount:(lines.some(l=>l.calculationPrecision==='source')?raw:round(raw))*factor),done:round(sourceAmountApplied?(raw?settlement.amount*doneRaw/raw:0):doneRaw*factor),hours:lines.reduce((s,l)=>s+number(l.hours),0),days:lines.reduce((s,l)=>s+number(l.days),0),...(sourceAmountApplied?{sourceAmountApplied:true}:{})};}
 
 export function purchaseTotals(p){
  const spent=round((p.purchases||[]).filter(x=>x.paid).reduce((s,x)=>s+number(x.amount),0));
@@ -72,11 +73,11 @@ export function acceptOfferVersion(project,date=today()){
  return selectOfferVersion(next,version);
 }
 export function totals(p){
- const offer=workTotals(p.offer||[],p.discount),works=workTotals(p.works||[],p.workDiscount??p.discount),materials=purchaseTotals(p);
+ const offer=workTotals(p.offer||[],p.discount,p.sourceCalculation?.offer),works=workTotals(p.works||[],p.workDiscount??p.discount,p.sourceCalculation?.works),materials=purchaseTotals(p);
  const accepted=activeOffer(p);
  const agreed=accepted?acceptedAmount(accepted):offer.after,workCredit=round(p.workCredit);
  const paid=round((p.receipts||[]).filter(x=>x.kind!=='materials').reduce((s,x)=>s+number(x.amount),0));
- return {offer,works,materials,agreed,paid,workCredit,remaining:round(p.calculationPrecision==='source'?((p.works||[]).reduce((s,l)=>s+calculationValue(l),0)*(1-number(p.workDiscount??p.discount)/100)+(p.purchases||[]).filter(x=>x.paid).reduce((s,x)=>s+number(x.charge),0)-(p.receipts||[]).reduce((s,x)=>s+number(x.amount),0)-workCredit):works.after+materials.charged-paid-materials.advances-workCredit),workRemaining:round(works.after-paid-workCredit),change:round(works.after-agreed)};
+ return {offer,works,materials,agreed,paid,workCredit,remaining:round(p.calculationPrecision==='source'?((works.sourceAmountApplied?p.sourceCalculation.works.amount:(p.works||[]).reduce((s,l)=>s+calculationValue(l),0)*(1-number(p.workDiscount??p.discount)/100))+(p.purchases||[]).filter(x=>x.paid).reduce((s,x)=>s+number(x.charge),0)-(p.receipts||[]).reduce((s,x)=>s+number(x.amount),0)-workCredit):works.after+materials.charged-paid-materials.advances-workCredit),workRemaining:round(works.after-paid-workCredit),change:round(works.after-agreed)};
 }
 export function aggregate(lines){const map=new Map();for(const l of lines){if(l.included===false)continue;const key=l.serviceId+'|'+l.name+'|'+l.unit;const row=map.get(key)||{name:l.name,category:l.category,unit:l.unit,qty:0,value:0};row.qty+=number(l.qty);row.value=round(row.value+lineValue(l));map.set(key,row);}return [...map.values()].sort((a,b)=>a.category.localeCompare(b.category,'pl')||a.name.localeCompare(b.name,'pl'));}
 export function newProject(name,investor,date=today()){

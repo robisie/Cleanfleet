@@ -217,7 +217,7 @@ test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów
  node('#purchase-paid').checked=false;node('#purchase-paid').onchange();assert.equal(node('#purchase-payment').hidden,true);assert.equal(node('#f-paidAmount').disabled,true);
  node('#purchase-paid').checked=true;node('#purchase-paid').onchange();assert.equal(node('#purchase-payment').hidden,false);assert.equal(node('#f-paidAmount').disabled,false);
  const countBefore=module.namespace.testPayload().purchases.length,settingsBefore=savedSettings.length;
- await node('#modal-form').onsubmit({preventDefault(){},target:{date:'2026-10-09',shop:'Invalid shop',amount:'10',charge:'12',description:'Invalid',invoice:'',paid:'on',paidAmount:'11'}});
+ await node('#modal-form').onsubmit({preventDefault(){},target:{date:'2026-10-09',shop:'Invalid shop',amount:'10',charge:'10',description:'Invalid',invoice:'',paid:'on',paidAmount:'11'}});
  assert.equal(module.namespace.testPayload().purchases.length,countBefore);assert.equal(savedSettings.length,settingsBefore);
  assert.ok(savedSettings.at(-1).payload.shops.includes('Nowy Sklep'));
  assert.ok(module.namespace.testShops().includes('Nowy Sklep'));

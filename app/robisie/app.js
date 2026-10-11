@@ -1,6 +1,6 @@
-import * as C from './core.js?v=1.0.31';
-import * as API from './api.js?v=1.0.31';
-import * as PDF from './pdf.js?v=1.0.31';
+import * as C from './core.js?v=1.0.32';
+import * as API from './api.js?v=1.0.32';
+import * as PDF from './pdf.js?v=1.0.32';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',shopFilter=null,summarySort={key:'category',direction:1},mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set();
@@ -116,7 +116,7 @@ function numericInputValue(el){
 function writeNumericValue(el,value){if(el.dataset.field){p()[el.dataset.field]=value;markDirty();}else if(el.dataset.config){config.payload[el.dataset.config]=value;markDirty();}else if(el.dataset.line){p()[el.dataset.kind].find(line=>line.id===el.dataset.line)[el.dataset.prop]=value;markDirty();}}
 function commitNumericInput(el,report=false){try{const value=numericInputValue(el);el.setCustomValidity('');el.removeAttribute('aria-invalid');if(String(el.value).trim())el.value=String(value);writeNumericValue(el,value);return true;}catch(error){el.setCustomValidity(error.message);el.setAttribute('aria-invalid','true');if(report){for(let group=el.closest?.('details');group;group=group.parentElement?.closest('details'))group.open=true;el.focus();el.reportValidity();toast(error.message);}return false;}}
 function normalizeNumericFields(root){for(const el of root.querySelectorAll?.('input[data-numeric="true"]')||[]){const dialog=el.closest?.('dialog');if(dialog&&!dialog.open)continue;if(isNumericInput(el)&&!commitNumericInput(el,true))throw new Error(el.validationMessage||'Popraw działanie w polu liczbowym.');}}
-function modal(title,body,onSubmit,remove,layout='',submitLabel='Zapisz'){const d=$('#dialog');d.className=layout;d.innerHTML=`<header><h2>${title}</h2>${btn('close','Zamknij')}</header><form id="modal-form">${layout==='correction-modal'?`<div class="modal-body">${body}</div>`:body}<footer>${remove?btn('delete','Usuń','danger'):''}${btn('close','Anuluj')}<button type="submit" class="primary">${esc(submitLabel)}</button></footer></form>`;
+function modal(title,body,onSubmit,remove,layout='',submitLabel='Zapisz'){const d=$('#dialog');d.className=layout||'scroll-modal';d.innerHTML=`<header><h2>${title}</h2>${btn('close','Zamknij')}</header><form id="modal-form">${layout!=='line-modal'?`<div class="modal-body">${body}</div>`:body}<footer>${remove?btn('delete','Usuń','danger'):''}${btn('close','Anuluj')}<button type="submit" class="primary">${esc(submitLabel)}</button></footer></form>`;
  let submitting=false;$('#modal-form').onsubmit=async e=>{e.preventDefault();if(submitting)return;submitting=true;try{normalizeNumericFields($('#modal-form'));await onSubmit(new FormData(e.target));closeModal();render();}catch(err){toast(err.message);}finally{submitting=false;}};d.oncancel=unlockBackgroundScroll;d.onclose=unlockBackgroundScroll;d.showModal();lockBackgroundScroll();d.scrollTop=0;if(remove)d.querySelector('[data-action="delete"]').onclick=()=>{if(confirm('Usunąć tę pozycję?')){try{remove();markDirty();closeModal();render();}catch(err){toast(err.message);}}};
 }
 function roomDialog(id){const r=p().rooms.find(x=>x.id===id)||{id:C.uid(),name:'',length:0,width:0,height:2.6,openings:0,sharedWalls:0};

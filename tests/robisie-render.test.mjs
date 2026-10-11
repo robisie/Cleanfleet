@@ -112,6 +112,12 @@ test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów
  assert.ok(module.namespace.testRoomLines().split('</details>')[0].includes(' open>'));
  listeners.get('toggle')({target:{dataset:{roomGroup:key},isConnected:true,open:false}});
  assert.ok(!module.namespace.testRoomLines().split('</details>')[0].includes(' open>'));
+ const interleaved=structuredClone(groupedRow);interleaved.payload.offer.push({id:'g1',roomId:'r',name:'GK pierwsza',category:'ZABUDOWY I OKŁADZINY GK',unit:'m²',qty:2,price:10},{id:'d1',roomId:'r',name:'Demontaż testowy',category:'Demontaż i przygotowanie do remontu',unit:'godz.',qty:3,price:20},{id:'g2',roomId:'r',name:'GK druga',category:' zabudowy i okładziny gk ',unit:'m²',qty:4,price:10});
+ const beforeGrouping=JSON.stringify(interleaved.payload.offer);module.namespace.testRender(interleaved,{catalog,markup:35,company:{}});
+ const groupedHtml=module.namespace.testRoomLines().split('</details>')[0];assert.equal((groupedHtml.match(/class="work-category-row"/g)||[]).length,3);
+ assert.ok(groupedHtml.indexOf('Demontaż testowy')<groupedHtml.indexOf('GK pierwsza'));assert.ok(groupedHtml.indexOf('GK pierwsza')<groupedHtml.indexOf('GK druga'));
+ assert.equal((groupedHtml.match(/data-action="line-edit"/g)||[]).length,4);assert.ok(groupedHtml.includes('<small>2 poz.</small>'));assert.equal(JSON.stringify(module.namespace.testOffer()),beforeGrouping);
+ module.namespace.testRender(groupedRow,{catalog,markup:35,company:{}});
  module.namespace.testLineDialog();
  const chosen=catalog.at(-1);const radio=radios.at(-1);radio.checked=true;radio.onchange();
  assert.equal(node('#f-name').value,chosen.name);

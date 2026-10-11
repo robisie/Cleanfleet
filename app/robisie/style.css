@@ -44,3 +44,5 @@ dialog.scroll-modal>form{display:flex;flex-direction:column;flex:1 1 auto;min-he
 .scroll-modal .modal-body{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:24px}
 .scroll-modal footer{flex:none;margin:0;padding:16px 24px;border-top:1px solid #e3e8ed;background:#fff;flex-wrap:wrap}
 @media(max-width:720px){dialog.scroll-modal[open]{max-height:calc(100dvh - max(24px,env(safe-area-inset-top)) - max(24px,env(safe-area-inset-bottom)))}.scroll-modal .modal-body{padding:16px}.scroll-modal footer{padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom))}}
+
+.work-category-row th{background:#f5f7dc;color:#42470c;border-top:1px solid #dce1a7;white-space:normal}.work-category-row .row{justify-content:space-between;gap:8px}.work-category-row small{font-weight:400;color:#677181;white-space:nowrap}

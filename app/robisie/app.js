@@ -1,6 +1,6 @@
-import * as C from './core.js?v=1.0.34';
-import * as API from './api.js?v=1.0.34';
-import * as PDF from './pdf.js?v=1.0.34';
+import * as C from './core.js?v=1.0.35';
+import * as API from './api.js?v=1.0.35';
+import * as PDF from './pdf.js?v=1.0.35';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',shopFilter=null,projectFilter='',projectSearch='',summarySort={key:'category',direction:1},mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set();
@@ -167,7 +167,8 @@ function serviceDialog(id){const x=config.payload.catalog.find(x=>x.id===id)||{i
 async function removeService(id){if(busy||selected)return;if(dirty){toast('Zapisz ustawienia przed usunięciem usługi.');return;}const service=config.payload.catalog.find(item=>item.id===id);if(!service)return;if(!confirm(`Usunąć usługę „${service.name}” z głównego cennika?\n\nZapisane pozycje ofert i realizacji oraz ich ceny pozostaną bez zmian. Usługa zniknie z listy wyboru przy dodawaniu nowych prac.`))return;busy=true;try{const payload=structuredClone(config.payload);payload.catalog=payload.catalog.filter(item=>item.id!==id);await persistCatalog(payload);render();toast('Usunięto usługę z głównego cennika.');}finally{busy=false;}}
 async function removeProject(id){if(busy)return;const project=all.find(x=>x.id===id);if(!project)return;if(!confirm(`Usunąć inwestycję „${project.payload.name}” (${project.contract_number})?\n\nUsunięte zostaną jej pomieszczenia, prace, rozliczenia i historia. Tej operacji nie można cofnąć. Numer umowy nie zostanie użyty ponownie.`))return;busy=true;try{const deleted=await API.deleteProject(project);if(deleted!==project.id)throw new Error('Nie potwierdzono usunięcia inwestycji. Odśwież listę.');all=all.filter(x=>x.id!==id);if(selected?.id===id){selected=null;view='dashboard';dirty=false;}render();toast('Usunięto inwestycję.');}finally{busy=false;}}
 async function setOfferVersion(version,newVersion=false){if(busy)return;normalizeNumericFields(document);const before=structuredClone(selected),wasDirty=dirty;try{selected.payload=newVersion?C.acceptOfferVersion(p()):C.selectOfferVersion(p(),version);markDirty();await save();toast(`Oferta V${p().activeOfferVersion} obowiązuje w kalkulacji końcowej.`);}catch(error){selected=before;dirty=wasDirty;render();throw error;}}
-async function save(){if(busy)return;normalizeNumericFields(document);busy=true;try{const data=C.captureCatalog(config.payload,structuredClone(p())),previous=all.find(s=>s.id===selected.id)?.payload;
+function updateWorkStatus(data){if(['przygotowanie','oferta'].includes(data.status)&&(data.works||[]).some(line=>line.done===true))data.status='prace';}
+async function save(){if(busy)return;normalizeNumericFields(document);busy=true;try{const data=C.captureCatalog(config.payload,structuredClone(p())),previous=all.find(s=>s.id===selected.id)?.payload;updateWorkStatus(data);
  if(previous&&previous.activeOfferVersion===data.activeOfferVersion&&!(previous.works.length===0&&data.acceptedOffers.length>previous.acceptedOffers.length)){const normalize=rows=>rows.map(({done,...rest})=>rest);const changed=C.changeRecord(normalize(previous.works),normalize(data.works));data.changes.push(...changed);}
  const row=await API.saveProject(selected,data);selected=Array.isArray(row)?row[0]:row;all=all.map(x=>x.id===selected.id?structuredClone(selected):x);dirty=false;render();toast('Zapisano zmiany.');
  }finally{busy=false;}}
@@ -183,7 +184,7 @@ document.addEventListener('input',e=>{const el=e.target;
  if(el.dataset.handover){p().handover[el.dataset.handover]=el.type==='checkbox'?el.checked:el.value;markDirty();}
  if(el.dataset.config){config.payload[el.dataset.config]=C.number(el.value);markDirty();}
  if(el.dataset.company){config.payload.company[el.dataset.company]=el.value;markDirty();}
- if(el.dataset.line){const l=p()[el.dataset.kind].find(x=>x.id===el.dataset.line);l[el.dataset.prop]=el.type==='checkbox'?el.checked:C.number(el.value);markDirty();}
+ if(el.dataset.line){const l=p()[el.dataset.kind].find(x=>x.id===el.dataset.line);l[el.dataset.prop]=el.type==='checkbox'?el.checked:C.number(el.value);if(el.dataset.kind==='works'&&el.dataset.prop==='done'&&el.checked)updateWorkStatus(p());markDirty();}
 });
 document.addEventListener('focusout',e=>{if(isNumericInput(e.target))commitNumericInput(e.target);});
 document.addEventListener('keydown',e=>{if(isNumericInput(e.target)&&e.key==='Enter'){e.preventDefault();if(commitNumericInput(e.target,true)){if(e.target.dataset.line||e.target.dataset.field||e.target.dataset.config)render();else e.target.blur();}return;}if(e.target.dataset?.projectRow&&['Enter',' '].includes(e.key)){e.preventDefault();e.target.click();}});

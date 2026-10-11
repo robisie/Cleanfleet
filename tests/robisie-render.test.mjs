@@ -37,6 +37,27 @@ test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów
  discount.value='90+20';listeners.get('input')({target:discount});assert.ok(discount.validationMessage);assert.equal(module.namespace.testCommitNumeric(discount),false);
  module.namespace.testRender(row,{catalog,markup:35,company:{}});
 
+ // First completed calculation item starts the investment and persists its status.
+ const startingRow=structuredClone(row);startingRow.payload.status='oferta';startingRow.payload.works[0].done=false;
+ module.namespace.testRender(startingRow,{catalog,markup:35,company:{}});
+ const completed={type:'checkbox',checked:true,dataset:{line:'l',kind:'works',prop:'done'}};
+ listeners.get('input')({target:completed});
+ assert.equal(module.namespace.testPayload().status,'prace');assert.equal(module.namespace.testDirty(),true);
+ await module.namespace.testSave();
+ assert.equal(module.namespace.testProjects()[0].payload.status,'prace');
+ assert.equal(module.namespace.testProjects()[0].payload.works[0].done,true);
+ completed.checked=false;listeners.get('input')({target:completed});
+ assert.equal(module.namespace.testPayload().status,'prace');
+ for(const status of ['przygotowanie','oferta','odbior','zakonczona']){
+  const item=structuredClone(startingRow);item.payload.status=status;
+  module.namespace.testRender(item,{catalog,markup:35,company:{}});
+  completed.checked=true;listeners.get('input')({target:completed});
+  assert.equal(module.namespace.testPayload().status,['przygotowanie','oferta'].includes(status)?'prace':status);
+ }
+ module.namespace.testRender(startingRow,{catalog,markup:35,company:{}});
+ listeners.get('input')({target:{type:'checkbox',checked:true,dataset:{line:'l',kind:'offer',prop:'included'}}});
+ assert.equal(module.namespace.testPayload().status,'oferta');
+ module.namespace.testRender(row,{catalog,markup:35,company:{}});
  // Status filters intersect search and survive opening an investment and returning.
  const statusRows=['przygotowanie','oferta','prace','odbior','zakonczona'].map((status,i)=>{const item=structuredClone(row);item.id='status-'+i;item.payload.status=status;item.payload.name=i===1?'Oferta Alfa':'Inwestycja Beta '+i;return item;});
  const originalStatusRows=JSON.stringify(statusRows);

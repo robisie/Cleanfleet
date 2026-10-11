@@ -211,7 +211,14 @@ test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów
  assert.equal(savedSettings.length,1);
 
  module.namespace.testPurchaseDialog();assert.ok(node('#dialog').innerHTML.includes('list="shop-suggestions"'));assert.ok(node('#dialog').innerHTML.includes('<option value="Test">'));
- await node('#modal-form').onsubmit({preventDefault(){},target:{date:'2026-10-09',shop:' Nowy Sklep ',amount:'10',charge:'12',description:'Testowy zakup',invoice:'',paid:'on'}});
+ await node('#modal-form').onsubmit({preventDefault(){},target:{date:'2026-10-09',shop:' Nowy Sklep ',amount:'10',charge:'12',description:'Testowy zakup',invoice:'',paid:'on',paidAmount:'4'}});
+ assert.equal(module.namespace.testPayload().purchases.at(-1).paidAmount,4);
+ assert.ok(module.namespace.testPurchases().includes('Częściowo opłacony'));
+ node('#purchase-paid').checked=false;node('#purchase-paid').onchange();assert.equal(node('#purchase-payment').hidden,true);assert.equal(node('#f-paidAmount').disabled,true);
+ node('#purchase-paid').checked=true;node('#purchase-paid').onchange();assert.equal(node('#purchase-payment').hidden,false);assert.equal(node('#f-paidAmount').disabled,false);
+ const countBefore=module.namespace.testPayload().purchases.length,settingsBefore=savedSettings.length;
+ await node('#modal-form').onsubmit({preventDefault(){},target:{date:'2026-10-09',shop:'Invalid shop',amount:'10',charge:'12',description:'Invalid',invoice:'',paid:'on',paidAmount:'11'}});
+ assert.equal(module.namespace.testPayload().purchases.length,countBefore);assert.equal(savedSettings.length,settingsBefore);
  assert.ok(savedSettings.at(-1).payload.shops.includes('Nowy Sklep'));
  assert.ok(module.namespace.testShops().includes('Nowy Sklep'));
  const persistent=savedSettings.at(-1).payload;

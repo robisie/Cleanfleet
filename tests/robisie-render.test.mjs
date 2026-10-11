@@ -58,6 +58,14 @@ test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów
  listeners.get('input')({target:{type:'checkbox',checked:true,dataset:{line:'l',kind:'offer',prop:'included'}}});
  assert.equal(module.namespace.testPayload().status,'oferta');
  module.namespace.testRender(row,{catalog,markup:35,company:{}});
+ // Active works take priority; agreement date and sequence sort numerically newest first.
+ const orderedRows=[['old-work','prace','2024/12/1'],['future-offer','oferta','2027/01/1'],['new-work','prace','2026/10/2'],['month-old','zakonczona','2026/09/100'],['seq-two','oferta','2026/10/2'],['seq-ten','przygotowanie','2026/10/10']].map(([id,status,number])=>{const item=structuredClone(row);item.id=id;item.payload.status=status;item.contract_number='UUR-RS/'+number;return item;});
+ const orderedBefore=JSON.stringify(orderedRows);
+ module.namespace.testProjectFilterRows(orderedRows);
+ assert.deepEqual(Array.from(module.namespace.testFilteredIds()),['new-work','old-work','future-offer','seq-ten','seq-two','month-old']);
+ assert.equal(JSON.stringify(module.namespace.testProjects()),orderedBefore);
+ await listeners.get('click')({target:{closest:()=>({dataset:{action:'project-filter',status:'oferta'}})}});
+ assert.deepEqual(Array.from(module.namespace.testFilteredIds()),['future-offer','seq-two']);
  // Status filters intersect search and survive opening an investment and returning.
  const statusRows=['przygotowanie','oferta','prace','odbior','zakonczona'].map((status,i)=>{const item=structuredClone(row);item.id='status-'+i;item.payload.status=status;item.payload.name=i===1?'Oferta Alfa':'Inwestycja Beta '+i;return item;});
  const originalStatusRows=JSON.stringify(statusRows);

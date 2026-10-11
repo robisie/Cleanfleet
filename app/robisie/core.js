@@ -1,4 +1,4 @@
-export const VERSION='1.0.40';
+export const VERSION='1.0.41';
 export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['rooms','Pomieszczenia i pomiary'],['offer','Oferta wstępna'],['contract','Umowa'],['works','Kalkulacja końcowa'],['summary','Zestawienie prac'],['payments','Etapy i płatności'],['purchases','Zakupy i materiały'],['journal','Dziennik prac'],['handover','Odbiór inwestycji']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -93,7 +93,7 @@ export function totals(p){
  const accepted=activeOffer(p);
  const agreed=accepted?acceptedAmount(accepted):offer.after,workCredit=round(p.workCredit);
  const paid=round((p.receipts||[]).filter(x=>x.kind!=='materials').reduce((s,x)=>s+number(x.amount),0));
- return {offer,works,materials,agreed,paid,workCredit,remaining:round(p.calculationPrecision==='source'?((works.sourceAmountApplied?p.sourceCalculation.works.amount:(p.works||[]).reduce((s,l)=>s+calculationValue(l),0)*(1-number(p.workDiscount??p.discount)/100))+(p.purchases||[]).reduce((s,x)=>s+purchasePayment(x).charged,0)-effectiveReceipts(p).reduce((s,x)=>s+number(x.amount),0)-workCredit):works.after+materials.charged-paid-materials.advances-workCredit),workRemaining:round(works.after-paid-workCredit),change:round(works.after-agreed)};
+ return {offer,works,materials,agreed,paid,workCredit,remaining:round(p.calculationPrecision==='source'?((works.sourceAmountApplied?works.done:(p.works||[]).filter(l=>l.done).reduce((s,l)=>s+calculationValue(l),0)*(1-number(p.workDiscount??p.discount)/100))+(p.purchases||[]).reduce((s,x)=>s+purchasePayment(x).charged,0)-effectiveReceipts(p).reduce((s,x)=>s+number(x.amount),0)-workCredit):works.done+materials.charged-paid-materials.advances-workCredit),workRemaining:round(works.done-paid-workCredit),change:round(works.after-agreed)};
 }
 export function aggregate(lines){const map=new Map();for(const l of lines){if(l.included===false)continue;const key=l.serviceId+'|'+l.name+'|'+l.unit;const row=map.get(key)||{name:l.name,category:l.category,unit:l.unit,qty:0,value:0};row.qty+=number(l.qty);row.value=round(row.value+lineValue(l));map.set(key,row);}return [...map.values()].sort((a,b)=>a.category.localeCompare(b.category,'pl')||a.name.localeCompare(b.name,'pl'));}
 export function newProject(name,investor,date=today()){

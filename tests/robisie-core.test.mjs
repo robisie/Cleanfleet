@@ -47,7 +47,7 @@ test('kwota wiersza inwestycji bierze kalkulację prac, a przed realizacją ofer
  const p=C.newProject('Test','Test');p.offer=[{qty:1,price:100}];p.discount=10;assert.equal(C.finalWorkAmount(p),90);p.works=[{qty:2,price:100}];p.workDiscount=20;assert.equal(C.finalWorkAmount(p),160);
 });
 test('ryczałt i obniżka z historii nie tworzą fikcyjnych wpłat',()=>{
- const p=C.newProject('Historia','Test');p.calculationPrecision='source';p.offer=[{qty:1,price:90,calculationPrecision:'source'}];p.acceptedOffers=[{lines:p.offer,discount:0,agreedAmount:100}];p.works=[{qty:1,price:150,calculationPrecision:'source'}];p.receipts=[{kind:'work',amount:100},{kind:'materials',amount:20}];p.purchases=[{paid:true,amount:22,charge:25}];p.workCredit=30;
+ const p=C.newProject('Historia','Test');p.calculationPrecision='source';p.offer=[{qty:1,price:90,calculationPrecision:'source'}];p.acceptedOffers=[{lines:p.offer,discount:0,agreedAmount:100}];p.works=[{qty:1,price:150,done:true,calculationPrecision:'source'}];p.receipts=[{kind:'work',amount:100},{kind:'materials',amount:20}];p.purchases=[{paid:true,amount:22,charge:25}];p.workCredit=30;
  const t=C.totals(p);assert.equal(t.agreed,100);assert.equal(t.paid,100);assert.equal(t.workRemaining,20);assert.equal(t.remaining,25);assert.equal(C.finalWorkAmount(p),120);
  const copied=C.copyProject(p,['offer','works'],'Kopia','Test');assert.equal(copied.workCredit,undefined);assert.equal(copied.acceptedOffers.length,0);
 });
@@ -69,3 +69,12 @@ test('powierzchnie łączą dwie ściany z sufitem i podłogą bez podwójnego l
  assert.equal(C.selectedSurfaceArea(room,walls,{walls:true,ceiling:true}),46.4);
  assert.throws(()=>C.selectedSurfaceArea(room,[],{}));
 });
+
+ test('należność obejmuje tylko wykonane prace po rabacie, zaliczki i materiały są rozdzielone',()=>{
+ const p=C.newProject('Bieżąca','Test');p.works=[{qty:10,price:20,done:true},{qty:5,price:30,done:false},{qty:1,price:1000,done:true,included:false}];p.workDiscount=10;p.workCredit=10;
+ p.receipts=[{kind:'work',amount:50},{kind:'materials',amount:100}];p.purchases=[{amount:120,charge:120,paid:true}];
+ let t=C.totals(p);assert.equal(t.works.after,315);assert.equal(t.works.done,180);assert.equal(t.workRemaining,120);assert.equal(t.remaining,140);
+ p.receipts[0].amount=200;t=C.totals(p);assert.equal(t.workRemaining,-30);assert.equal(t.remaining,-10);
+ p.works[1].done=true;t=C.totals(p);assert.equal(t.workRemaining,105);assert.equal(t.remaining,125);
+ p.works.forEach(l=>l.done=false);t=C.totals(p);assert.equal(t.works.done,0);assert.equal(t.workRemaining,-210);
+ });

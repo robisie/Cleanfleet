@@ -9,7 +9,7 @@ test('nowa V2 staje się obowiązująca, przenosi zakres i rabat zamiast pozosta
  const before=structuredClone(p),v2=C.acceptOfferVersion(p,'2026-10-12');
  assert.deepEqual(p,before);assert.equal(v2.activeOfferVersion,2);assert.equal(v2.workDiscount,5);assert.deepEqual(v2.works.map(x=>x.id),['a','c']);assert.equal(v2.works[0].qty,15);assert.equal(v2.works[0].done,false);
  assert.equal(C.totals(v2).agreed,427.5);assert.equal(C.totals(v2).works.after,427.5);assert.equal(C.totals(v2).change,0);
- assert.equal(C.totals(v2).workRemaining,377.5);assert.deepEqual(v2.receipts,p.receipts);assert.deepEqual(v2.purchases,p.purchases);
+ assert.equal(C.totals(v2).workRemaining,-50);assert.deepEqual(v2.receipts,p.receipts);assert.deepEqual(v2.purchases,p.purchases);
  assert.equal(v2.acceptedOffers[0].lines[0].qty,10);assert.equal(v2.offerCalculations[1].works[0].done,true);
 });
 test('przełączanie V1/V2 odtwarza własne poprawki i wykonanie bez zmiany wersji oferty',()=>{

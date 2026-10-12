@@ -1,4 +1,4 @@
-export const VERSION='1.0.41';
+export const VERSION='1.0.42';
 export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['rooms','Pomieszczenia i pomiary'],['offer','Oferta wstępna'],['contract','Umowa'],['works','Kalkulacja końcowa'],['summary','Zestawienie prac'],['payments','Etapy i płatności'],['purchases','Zakupy i materiały'],['journal','Dziennik prac'],['handover','Odbiór inwestycji']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -97,7 +97,7 @@ export function totals(p){
 }
 export function aggregate(lines){const map=new Map();for(const l of lines){if(l.included===false)continue;const key=l.serviceId+'|'+l.name+'|'+l.unit;const row=map.get(key)||{name:l.name,category:l.category,unit:l.unit,qty:0,value:0};row.qty+=number(l.qty);row.value=round(row.value+lineValue(l));map.set(key,row);}return [...map.values()].sort((a,b)=>a.category.localeCompare(b.category,'pl')||a.name.localeCompare(b.name,'pl'));}
 export function newProject(name,investor,date=today()){
- return {name,investor,address:'',investorAddress:'',phone:'',email:'',pesel:'',status:'przygotowanie',contractDate:date,contractPlace:'',startDate:'',endDate:'',discount:0,workDiscount:0,materialEstimate:0,rooms:[],offer:[],works:[],acceptedOffers:[],changes:[],purchases:[],receipts:[],journal:[],stages:[{id:uid(),name:'Etap I',percent:40,description:'Prace demontażowe i przygotowawcze, pomiary i kalkulacja materiału',due:'',invoice:''},{id:uid(),name:'Etap II',percent:30,description:'Organizacja materiału, zabudowy i instalacje',due:'',invoice:''},{id:uid(),name:'Etap III',percent:30,description:'Prace wykończeniowe i końcowe rozliczenie',due:'',invoice:''}],paymentDays:7,materialAdvance:0,terminationPercent:0,contractText:'',handover:{date:'',receiver:'',notes:'',accepted:true}};
+ return {name,investor,address:'',investorAddress:'',phone:'',email:'',pesel:'',status:'przygotowanie',contractDate:date,contractPlace:'',startDate:'',endDate:'',discount:0,workDiscount:0,materialEstimate:0,rooms:[],offer:[],works:[],acceptedOffers:[],changes:[],purchases:[],receipts:[],journal:[],trips:[],stages:[{id:uid(),name:'Etap I',percent:40,description:'Prace demontażowe i przygotowawcze, pomiary i kalkulacja materiału',due:'',invoice:''},{id:uid(),name:'Etap II',percent:30,description:'Organizacja materiału, zabudowy i instalacje',due:'',invoice:''},{id:uid(),name:'Etap III',percent:30,description:'Prace wykończeniowe i końcowe rozliczenie',due:'',invoice:''}],paymentDays:7,materialAdvance:0,terminationPercent:0,contractText:'',handover:{date:'',receiver:'',notes:'',accepted:true}};
 }
 export function changeRecord(before,after){
  const a=new Map(before.map(x=>[x.id,x])),b=new Map(after.map(x=>[x.id,x]));const list=[];
@@ -169,3 +169,18 @@ export function roomWalls(room){if(!room)return [];const parts=room.parts?.lengt
 export function selectedWallArea(walls){if(!walls.length)throw new Error('Zaznacz przynajmniej jedną ścianę.');return roundUp(walls.reduce((sum,wall)=>{const area=number(wall.area),deduction=calculateNumber(wall.deduction||0);if(area<=0)throw new Error('Uzupełnij dodatnie wymiary pomieszczenia.');if(deduction<0||deduction>area)throw new Error('Odliczenie musi mieścić się między zerem a powierzchnią ściany.');return sum+area-deduction;},0));}
 
 export function selectedSurfaceArea(room,walls,surfaces={}){if(!room)throw new Error('Wybierz pomieszczenie.');if(!walls.length&&!surfaces.walls&&!surfaces.floor&&!surfaces.ceiling)throw new Error('Zaznacz ściany, sufit lub podłogę.');const areas=roomArea(room);return roundUp((surfaces.walls?areas.walls:walls.length?selectedWallArea(walls):0)+(surfaces.floor?areas.floor:0)+(surfaces.ceiling?areas.ceiling:0));}
+
+// Saved routes belong to one Robisię project. Offer lines retain a priced snapshot.
+export const isTravelService=name=>/^dojazd(?:y)?(?:\s|$|[—–-])/i.test(String(name||'').trim());
+export function savedTrip(data,id=uid()){
+ const name=String(data.name||'').trim(),points=data.points;
+ if(!name||name.length>200)throw new Error('Podaj nazwę trasy (maksymalnie 200 znaków).');
+ if(!Array.isArray(points)||points.length<2||!points.every(point=>point.label&&Array.isArray(point.coords)&&point.coords.length===2&&point.coords.every(Number.isFinite)&&Math.abs(point.coords[0])<=180&&Math.abs(point.coords[1])<=90))throw new Error('Potwierdź wszystkie adresy trasy.');
+ const meters=Number(data.meters),consumption=Number(data.consumption),price=Number(data.price);
+ if(![meters,consumption,price].every(Number.isFinite)||meters<0||consumption<=0||price<=0)throw new Error('Oblicz trasę z poprawną ceną paliwa i spalaniem.');
+ const km=meters/1000,liters=km*consumption/100;
+ return {...structuredClone(data),id,name,meters,consumption,price,km,liters,cost:round(liters*price)};
+}
+export function tripLineData(trip){
+ return {name:'Dojazd — '+trip.name,unit:'szt.',price:round(trip.cost),travelBasis:structuredClone(trip)};
+}

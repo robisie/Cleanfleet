@@ -9,7 +9,7 @@ test('partial purchase payments flow into material and final balances and PDF',(
  assert.equal(C.purchaseTotals(p).spent,1000);assert.equal(C.purchaseTotals(p).balance,-500);assert.equal(C.purchaseTotals(p).outstanding,800);assert.equal(C.totals(p).remaining,500);
  p.calculationPrecision='source';assert.equal(C.totals(p).remaining,500);
  const html=buildDocument({contract_number:'UUR-RS/2026/10/001',payload:p},{company:{},catalog:[]},{modules:['purchases','payments']});
- assert.ok(html.includes('Częściowo opłacony'));assert.ok(html.includes(C.money(800)));assert.ok(html.includes(C.money(1200)));
+ assert.ok(html.includes('Opłacono częściowo'));assert.ok(html.includes(C.money(800)));assert.ok(html.includes(C.money(1200)));
  p.purchases[0].paidAmount=1200;assert.equal(C.purchasePayment(p.purchases[0]).state,'full');assert.equal(C.purchaseTotals(p).outstanding,0);
  p.purchases[0].paid=false;assert.equal(C.purchaseTotals(p).spent,1000);assert.equal(C.purchaseTotals(p).charged,1200);assert.equal(C.purchaseTotals(p).outstanding,1200);
 });

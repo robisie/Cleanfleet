@@ -1,7 +1,7 @@
-import * as Auto from './autosave.js?v=1.0.43';
-import * as C from './core.js?v=1.0.43';
-import * as API from './api.js?v=1.0.43';
-import * as PDF from './pdf.js?v=1.0.43';
+import * as Auto from './autosave.js?v=1.0.44';
+import * as C from './core.js?v=1.0.44';
+import * as API from './api.js?v=1.0.44';
+import * as PDF from './pdf.js?v=1.0.44';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',shopFilter=null,projectFilter='',projectSearch='',summarySort={key:'category',direction:1},mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set();

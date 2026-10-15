@@ -1,6 +1,7 @@
+const withoutUndo=({_undo,...value})=>value;
 // One durable undo step; never nest prior snapshots inside subsequent saves.
-export function snapshot(payload){const value=structuredClone(payload);delete value._undo;return value;}
-export const samePayload=(a,b)=>JSON.stringify(snapshot(a))===JSON.stringify(snapshot(b));
+export function snapshot(payload){const {_undo,...value}=payload;return structuredClone(value);}
+export const samePayload=(a,b)=>JSON.stringify(withoutUndo(a))===JSON.stringify(withoutUndo(b));
 export function withUndo(payload,previous){const value=snapshot(payload);if(previous&&!samePayload(value,previous))value._undo={savedAt:new Date().toISOString(),payload:snapshot(previous)};else if(previous?._undo)value._undo=structuredClone(previous._undo);return value;}
 export class WriteQueue{
  constructor(onChange=()=>{}){this.tail=Promise.resolve();this.pending=0;this.onChange=onChange;}

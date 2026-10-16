@@ -15,7 +15,7 @@ async function authKsef(userId:string){
  if(state.environment!=='production'||state.nip!==SELLER.nip)throw Error('Konfiguracja KSeF nie pasuje do wystawcy.');
  return authenticate(state.token,SELLER.nip,api);
 }
-async function patch(id:string,values:any){return checked(await db.from('bill_invoices').update({...values,updated_at:new Date().toISOString()}).eq('id',id).select().single());}
+async function patch(id:string,values:any,attempt?:string){let query=db.from('bill_invoices').update({...values,updated_at:new Date().toISOString()}).eq('id',id);if(attempt)query=query.eq('send_attempt',attempt);const row=checked(await query.select().maybeSingle());if(!row)throw Error('Operację przejęło inne urządzenie. Odśwież fakturę.');return row;}
 Deno.serve(async req=>{
  const origin=req.headers.get('Origin')||'',headers={'Access-Control-Allow-Origin':origins.includes(origin)?origin:origins[0],'Access-Control-Allow-Headers':'authorization,apikey,content-type,x-client-info','Access-Control-Allow-Methods':'POST,OPTIONS','Cache-Control':'no-store','Vary':'Origin'};
  const json=(value:any,status=200)=>new Response(JSON.stringify(value),{status,headers:{...headers,'Content-Type':'application/json'}});
@@ -92,28 +92,37 @@ Deno.serve(async req=>{
     row=checked(await db.rpc('bill_issue',{p_id:row.id,p_revision:row.revision}));
    }
    if(row.status!=='issued')return json(row);
-   const lock=checked(await db.from('bill_invoices').update({status:'sending',updated_at:new Date().toISOString()}).eq('id',row.id).eq('status','issued').select().maybeSingle());
+   const attempt=crypto.randomUUID();
+   const lock=checked(await db.from('bill_invoices').update({status:'sending',send_attempt:attempt,ksef_session:null,ksef_reference:null,updated_at:new Date().toISOString()}).eq('id',row.id).eq('status','issued').select().maybeSingle());
    if(!lock)return json(await invoice(row.id));
    row=lock;let postStarted=false,session:string|null=null;
    try{
     const xml=row.xml||invoiceXml(row,row.updated_at);
-    row=await patch(row.id,{xml});
+    row=await patch(row.id,{xml},attempt);
     const prepared=await openSession(auth,xml,api);session=prepared.session;
     const encrypted_state=await codec.seal({scope:'bill',userId,invoiceHash:prepared.body.invoiceHash,expires:Date.now()+3650*86400000});
     checked(await db.from('bill_ksef_state').upsert({invoice_id:row.id,encrypted_state}));
-    row=await patch(row.id,{ksef_session:session,ksef_message:'Wysyłanie do KSeF…'});
+    row=await patch(row.id,{ksef_session:session,ksef_message:'Wysyłanie do KSeF…'},attempt);
     postStarted=true;
     const sent=await api('/sessions/online/'+encodeURIComponent(session)+'/invoices',auth.token,prepared.body);
-    row=await patch(row.id,{status:'pending',ksef_reference:sent.referenceNumber,ksef_message:'KSeF przetwarza fakturę.'});
+    row=await patch(row.id,{status:'pending',ksef_reference:sent.referenceNumber,ksef_message:'KSeF przetwarza fakturę.'},attempt);
     try{await api('/sessions/online/'+encodeURIComponent(session)+'/close',auth.token,{});}catch{/* Status polling can continue even when close response is lost. */}
     return json(row);
    }catch(error){
-    row=await patch(row.id,{status:postStarted&&!(error instanceof KsefError&&!error.uncertain)?'uncertain':'issued',ksef_message:postStarted&&!(error instanceof KsefError&&!error.uncertain)?'Nie potwierdzono wyniku wysyłki. Sprawdź status; program nie wyśle jej ponownie automatycznie.':String(error.message).slice(0,1000)});
+    const current=await invoice(row.id);if(current.send_attempt!==attempt)return json(current);
+    row=await patch(row.id,{status:postStarted&&!(error instanceof KsefError&&!error.uncertain)?'uncertain':'issued',ksef_message:postStarted&&!(error instanceof KsefError&&!error.uncertain)?'Nie potwierdzono wyniku wysyłki. Sprawdź status; program nie wyśle jej ponownie automatycznie.':String(error.message).slice(0,1000)},attempt);
     return json({invoice:row,error:row.ksef_message},postStarted?409:502);
    }
   }
   if(body.action==='status'){
-   const row=await invoice(body.id);if(row.status==='accepted'||!row.ksef_session)return json(row);
+   const row=await invoice(body.id);if(row.status==='accepted')return json(row);
+   if(!row.ksef_session){
+    if(row.status==='sending'&&Date.parse(row.updated_at)<Date.now()-90000){
+     const recovered=checked(await db.from('bill_invoices').update({status:'issued',send_attempt:null,ksef_message:'Przerwano przygotowanie wysyłki. Dokument nie został wysłany; możesz ponowić.',updated_at:new Date().toISOString()}).eq('id',row.id).eq('status','sending').is('ksef_session',null).eq('send_attempt',row.send_attempt).select().maybeSingle());
+     return json(recovered||await invoice(row.id));
+    }
+    return json(row);
+   }
    const auth=await authKsef(userId),saved=checked(await db.from('bill_ksef_state').select('encrypted_state').eq('invoice_id',row.id).single());
    const state=await codec.open(saved.encrypted_state,userId,'bill');
    const result=await invoiceStatus({...row,invoiceHash:state.invoiceHash},auth.token,api);

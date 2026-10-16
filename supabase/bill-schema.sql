@@ -17,7 +17,7 @@ create table public.bill_invoices (
  id uuid primary key, creator_id uuid not null references auth.users(id),
  number text unique, payload jsonb not null, revision integer not null default 1,
  status text not null default 'draft' check(status in ('draft','issued','sending','pending','accepted','rejected','uncertain')),
- xml text, ksef_number text, ksef_session text, ksef_reference text, ksef_message text,
+ send_attempt uuid, xml text, ksef_number text, ksef_session text, ksef_reference text, ksef_message text,
  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
 create index bill_invoices_date on public.bill_invoices (created_at desc);

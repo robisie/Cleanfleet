@@ -1,4 +1,4 @@
-export const VERSION='1.0.4';
+export const VERSION='1.0.5';
 export const SELLER={name:'ROBISIĘ-FER SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ',nip:'6351861297',address:'UL. RTM. WITOLDA PILECKIEGO 18',city:'43-190 MIKOŁÓW',country:'PL'};
 export const EXEMPTION='Zwolnienie na podstawie art. 113 ust. 1 lub 9 ustawy o VAT';
 export const logos={cleanfleet:'/assets/cleanfleet-logo.png',robisie:'/app/robisie/assets/robisie-logo.png'};
@@ -13,14 +13,17 @@ export function lineTotal(l){const price=decimal(l.price),qty=decimal(l.qty,3);r
 export function total(p){return p.lines.reduce((s,l)=>s+lineTotal(l),0);}
 export function newInvoice(brand='cleanfleet'){const date=today();return {brand:brand==='robisie'?'robisie':'cleanfleet',issueDate:date,saleDate:date,dueDate:date,currency:'PLN',buyer:{name:'',nip:'',address:'',city:'',country:'PL'},recipient:null,lines:[{name:brand==='robisie'?'Usługi remontowe':'Czyszczenie wnętrza pojazdu',unit:'szt.',qty:'1',price:'0.00'}],payment:'transfer',bank:'',notes:'',source:null};}
 function text(v,max=512){const s=String(v??'').trim();if(s.length>max||/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(s))throw Error('Nieprawidłowa lub zbyt długa treść.');return s;}
+export const partyCountry=p=>p?.country||(String(p?.nip||'').trim().toUpperCase().startsWith('DE')?'DE':'PL');
 export const partyKind=p=>p?.kind||(String(p?.nip||'').trim()?'company':'person');
 export function party(p){
  const kind=partyKind(p);if(!['company','person'].includes(kind))throw Error('Wybierz typ kontrahenta: osoba prywatna lub firma.');
- const result={kind,name:text(p?.name),nip:text(p?.nip,20).replace(/[\s-]/g,''),address:text(p?.address),city:text(p?.city),country:'PL',email:text(p?.email,254),phone:text(p?.phone,30),regon:kind==='company'?text(p?.regon,14):'',krs:kind==='company'?text(p?.krs,10):''};
+ const result={kind,name:text(p?.name),nip:text(p?.nip,20).replace(/[\s-]/g,''),address:text(p?.address),city:text(p?.city),country:partyCountry(p),email:text(p?.email,254),phone:text(p?.phone,30),regon:kind==='company'?text(p?.regon,14):'',krs:kind==='company'?text(p?.krs,10):''};
  if(!result.name||!result.address||!result.city)throw Error(kind==='company'?'Uzupełnij nazwę firmy i pełny adres.':'Uzupełnij imię i nazwisko oraz pełny adres osoby prywatnej.');
  if(kind==='company'&&!result.nip)throw Error('Uzupełnij NIP firmy.');
  if(kind==='person'&&result.nip)throw Error('Osoba prywatna nie używa NIP-u w tym formularzu. Wybierz firmę, jeśli zakup jest na działalność.');
- if(result.nip&&!validNip(result.nip))throw Error('Nieprawidłowy NIP kontrahenta.');
+ if(!['PL','DE'].includes(result.country))throw Error('Wybierz obsługiwany kraj: Polska lub Niemcy.');
+ if(result.nip&&result.country==='DE'){result.nip=result.nip.toUpperCase();if(/^\d{9}$/.test(result.nip))result.nip='DE'+result.nip;if(!/^DE\d{9}$/.test(result.nip))throw Error('Niemiecki numer VAT powinien mieć prefiks DE i 9 cyfr.');}
+ if(result.nip&&result.country==='PL'&&!validNip(result.nip))throw Error('Nieprawidłowy NIP kontrahenta.');
  if(result.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(result.email))throw Error('Podaj poprawny adres e-mail.');
  if(result.phone&&!/^[+\d][\d\s().-]{4,29}$/.test(result.phone))throw Error('Podaj poprawny numer telefonu.');
  if(result.regon&&!/^(?:\d{9}|\d{14})$/.test(result.regon))throw Error('REGON ma 9 lub 14 cyfr.');
@@ -40,8 +43,8 @@ export function normalize(input){
 }
 const xml=v=>esc(v).replace(/&#39;/g,'&apos;');
 const tag=(name,value)=>`<${name}>${xml(value)}</${name}>`;
-const address=p=>`<Adres>${tag('KodKraju','PL')}${tag('AdresL1',p.address)}${tag('AdresL2',p.city)}</Adres>`;
-const identity=p=>`<DaneIdentyfikacyjne>${p.nip?tag('NIP',p.nip):tag('BrakID',1)}${tag('Nazwa',p.name)}</DaneIdentyfikacyjne>`;
+const address=p=>`<Adres>${tag('KodKraju',p.country||'PL')}${tag('AdresL1',p.address)}${tag('AdresL2',p.city)}</Adres>`;
+const identity=p=>`<DaneIdentyfikacyjne>${p.nip?(partyCountry(p)==='DE'?tag('KodUE','DE')+tag('NrVatUE',p.nip.replace(/^DE/,'')):tag('NIP',p.nip)):tag('BrakID',1)}${tag('Nazwa',p.name)}</DaneIdentyfikacyjne>`;
 export function invoiceXml(row,createdAt=new Date().toISOString()){
  const p=normalize(row.payload),amount=(total(p)/100).toFixed(2);
  if(!row.number)throw Error('Brak numeru faktury.');

@@ -1,6 +1,6 @@
-import * as C from './core.js?v=1.0.4';
+import * as C from './core.js?v=1.0.5';
 const e=C.esc;
-function party(p){return `<strong>${e(p.name)}</strong><p>${e(p.address)}<br>${e(p.city)}</p>${p.nip?`<p>NIP: ${e(p.nip)}</p>`:''}`;}
+function party(p){return `<strong>${e(p.name)}</strong><p>${e(p.address)}<br>${e(p.city)}</p>${p.nip?`<p>${C.partyCountry(p)==='DE'?'VAT UE':'NIP'}: ${e(p.nip)}</p>`:''}`;}
 async function qrMarkup(row){if(row.status!=='accepted'||!row.xml||!row.ksef_number)return '';
  const bytes=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(row.xml))),hash=btoa(Array.from(bytes,b=>String.fromCharCode(b)).join('')).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
  const url='https://qr.ksef.mf.gov.pl/invoice/'+C.SELLER.nip+'/'+row.payload.issueDate.split('-').reverse().join('-')+'/'+hash;

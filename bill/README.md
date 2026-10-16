@@ -1,4 +1,4 @@
-# Bill 1.0.4
+# Bill 1.0.5
 
 Admin-only invoicing at `/bill/`. Uses the existing CleanFleet Supabase login, with a separate browser session key. No signup and no direct browser access to billing tables. The server checks the current user and administrator role for every operation.
 
@@ -36,3 +36,6 @@ The admin-only `lookup-nip` action fetches the official MF VAT register at `http
 ## GUS / REGON (1.0.4)
 Production BIR1 lookup uses an administrator-provided GUS production key (Settings). Key is verified by login, encrypted with a dedicated codec and stored only in service-role-only bill_settings. Bootstrap returns only bank and gusConfigured. Settings patches are atomic and cannot erase the other setting. No test credentials are accepted in production. GUS is attempted first, MF is a fallback; returned source and fallback warning are shown. No registry result is automatically saved or issued as an invoice.
 GUS access is free but requires a key from https://api.stat.gov.pl/Home/RegonApi?lang=pl. KSeF credentials do not grant GUS access. No production lookup without the user's key has been verified.
+
+## German TVM buyer (1.0.5)
+Party country PL/DE is retained in forms and XML. German company identifiers use DE + nine digits, serialized as KodUE=DE and NrVatUE without prefix; Polish NIP validation stays unchanged. Invoice VAT treatment is unchanged.

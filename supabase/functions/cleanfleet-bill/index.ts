@@ -60,9 +60,9 @@ Deno.serve(async req=>{
     return json(body.stageId?stageInvoiceSeed(project,String(body.stageId)):investmentInvoiceSeed(project));
    }else if(body.app==='cleanfleet'||body.app==='billing'){
     const billing=body.app==='billing',company=checked(await db.from(billing?'billing_companies':'companies').select('*').eq('id',body.id).single());
-    buyer={kind:'company',name:company.name,nip:(billing?company.tax_id:company.nip)||'',address:company.address||'',city:''};description='Czyszczenie wnętrz pojazdów';currency=billing&&company.currency==='EUR'?'EUR':'PLN';
+    buyer={kind:'company',name:company.name,nip:(billing?company.tax_id:company.nip)||'',address:company.address||'',city:'',country:/^DE/i.test((billing?company.tax_id:company.nip)||'')?'DE':'PL'};description='Czyszczenie wnętrz pojazdów';currency=billing&&company.currency==='EUR'?'EUR':'PLN';
    }else throw Error('Nieprawidłowe źródło danych.');
-   const match=buyer.address.match(/^(.*?)[,\n ]+(\d{2}-\d{3}\s+.+)$/s);if(match){buyer.address=match[1].trim();buyer.city=match[2].trim();}
+   const match=buyer.country==='DE'?buyer.address.replace(/,?\s*Niemcy\s*$/i,'').match(/^(.*?)[,\n ]+(\d{5}\s+.+)$/s):buyer.address.match(/^(.*?)[,\n ]+(\d{2}-\d{3}\s+.+)$/s);if(match){buyer.address=match[1].trim();buyer.city=match[2].trim();}
    return json({buyer,description,currency,source});
   }
   if(body.action==='search'){

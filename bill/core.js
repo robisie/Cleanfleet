@@ -1,4 +1,4 @@
-export const VERSION='1.0.0';
+export const VERSION='1.0.1';
 export const SELLER={name:'ROBISIĘ-FER SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ',nip:'6351861297',address:'UL. RTM. WITOLDA PILECKIEGO 18',city:'43-190 MIKOŁÓW',country:'PL'};
 export const EXEMPTION='Zwolnienie na podstawie art. 113 ust. 1 lub 9 ustawy o VAT';
 export const logos={cleanfleet:'/assets/cleanfleet-logo.png',robisie:'/app/robisie/assets/robisie-logo.png'};
@@ -15,7 +15,7 @@ export function newInvoice(brand='cleanfleet'){const date=today();return {brand:
 function text(v,max=512){const s=String(v??'').trim();if(s.length>max||/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(s))throw Error('Nieprawidłowa lub zbyt długa treść.');return s;}
 export function party(p){const result={name:text(p?.name),nip:text(p?.nip,20).replace(/[\s-]/g,''),address:text(p?.address),city:text(p?.city),country:'PL'};if(!result.name||!result.address||!result.city)throw Error('Uzupełnij nazwę i pełny adres kontrahenta.');if(result.nip&&!validNip(result.nip))throw Error('Nieprawidłowy NIP kontrahenta.');return result;}
 export function normalize(input){
- const p={brand:input?.brand,issueDate:input?.issueDate,saleDate:input?.saleDate,dueDate:input?.dueDate,currency:input?.currency,buyer:party(input?.buyer),recipient:input?.recipient?party(input.recipient):null,payment:input?.payment,bank:text(input?.bank,34).replace(/\s/g,''),notes:text(input?.notes,512),source:input?.source?{app:text(input.source.app,30),id:text(input.source.id,100)}:null};
+ const p={brand:input?.brand,issueDate:input?.issueDate,saleDate:input?.saleDate,dueDate:input?.dueDate,currency:input?.currency,buyer:party(input?.buyer),recipient:input?.recipient?party(input.recipient):null,payment:input?.payment,bank:text(input?.bank,34).replace(/\s/g,''),notes:text(input?.notes,512),source:input?.source?{app:text(input.source.app,30),id:text(input.source.id,100),...(input.source.app==='robisie'&&input.source.stageId?{stageId:text(input.source.stageId,100)}:{})}:null};
  if(!Object.hasOwn(logos,p.brand)||!['PLN','EUR'].includes(p.currency)||!['cash','transfer','card'].includes(p.payment))throw Error('Nieprawidłowy wybór formularza.');
  for(const date of [p.issueDate,p.saleDate,p.dueDate])if(!/^20\d\d-\d\d-\d\d$/.test(date||'')||Number.isNaN(Date.parse(date))||new Date(date).toISOString().slice(0,10)!==date)throw Error('Podaj poprawne daty.');
  if(p.dueDate<p.issueDate)throw Error('Termin płatności nie może poprzedzać wystawienia.');

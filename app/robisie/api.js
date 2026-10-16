@@ -42,3 +42,5 @@ export const saveProject=(project,payload)=>fastSave('rs_save_project_fast',{p_i
 export const saveSettings=(payload,revision,previous)=>fastSave('rs_save_settings_fast',{...changedFields(previous,payload),p_revision:revision,p_undo_saved_at:payload._undo?.savedAt||null},payload,{revision},'/rest/v1/rs_settings?select=*');
 
 export const deleteProject=project=>rpc('rs_delete_project',{p_id:project.id,p_revision:project.revision});
+
+export const stageInvoices=id=>request('/functions/v1/cleanfleet-bill',{method:'POST',body:JSON.stringify({action:'search',sourceApp:'robisie',sourceId:id})});

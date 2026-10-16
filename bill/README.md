@@ -1,4 +1,4 @@
-# Bill 1.0.0
+# Bill 1.0.1
 
 Admin-only invoicing at `/bill/`. Uses the existing CleanFleet Supabase login, with a separate browser session key. No signup and no direct browser access to billing tables. The server checks the current user and administrator role for every operation.
 
@@ -21,3 +21,6 @@ PDF QR codes are generated from the SHA-256 of the exact stored XML and the issu
 XML generator validated against the Ministry's FA(3) XSD, including imported type schemas. Server database tests run inside a rolled-back transaction: October's first number is A3 and repeat issue calls return the same number. Anonymous/authenticated clients have no table or counter-write permissions. No real invoice is sent for testing.
 
 QA PDFs for both logos rendered to single A4 pages and visually inspected. Browser/device QA requires an available browser-control environment; it was unavailable during initial implementation. Real-account end-to-end sending and InvoiceWrite permission require validation in the user's authenticated session.
+
+
+Robisię stage links use `?new=1&brand=robisie&source=<project UUID>&stage=<stage ID>`. The authenticated source action verifies project ownership, reads the stage from the database and prepares its exact agreed-offer share, description and buyer. Existing draft/issued documents are reopened rather than starting another from the same link. The source stage ID survives invoice validation. Robisię refreshes the stage's invoice link on returning to its tab; invoicing never marks it paid. Deployment must include `app/robisie/billing.js` and `app/robisie/core.js` as relative dependencies alongside the existing function files.

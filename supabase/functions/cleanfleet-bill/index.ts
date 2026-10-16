@@ -1,3 +1,4 @@
+import {stageInvoiceSeed} from '../../../app/robisie/billing.js';
 import {createClient} from 'npm:@supabase/supabase-js@2.57.4';
 import {createStateCodec,hash} from '../cleanfleet-ksef/core.js';
 import {normalize,party,invoiceXml,SELLER,today,validBank} from './invoice.js';
@@ -44,6 +45,7 @@ Deno.serve(async req=>{
    let buyer:any={},description='',source={app:body.app,id:body.id},currency='PLN';
    if(body.app==='robisie'){
     const project=checked(await db.from('rs_projects').select('id,contract_number,payload').eq('id',body.id).eq('owner_id',userId).single());
+    if(body.stageId)return json(stageInvoiceSeed(project,String(body.stageId)));
     buyer={name:project.payload.investor||'',nip:'',address:project.payload.investorAddress||'',city:''};description='Usługi remontowe — '+project.payload.name+' · '+project.contract_number;
    }else if(body.app==='cleanfleet'||body.app==='billing'){
     const billing=body.app==='billing',company=checked(await db.from(billing?'billing_companies':'companies').select('*').eq('id',body.id).single());
@@ -55,6 +57,7 @@ Deno.serve(async req=>{
   if(body.action==='search'){
    const q=String(body.q||'').replace(/[^\p{L}\p{N} /_.-]/gu,'').slice(0,100);
    let query=db.from('bill_invoices').select('id,number,payload,revision,status,ksef_number,ksef_session,ksef_reference,ksef_message,created_at,updated_at').order('created_at',{ascending:false}).limit(1000);
+   if(body.sourceApp==='robisie'&&body.sourceId){checked(await db.from('rs_projects').select('id').eq('id',body.sourceId).eq('owner_id',userId).single());query=query.eq('payload->source->>app','robisie').eq('payload->source->>id',body.sourceId);if(body.stageId)query=query.eq('payload->source->>stageId',body.stageId);}
    if(q)query=query.or('number.ilike.%'+q+'%,ksef_number.ilike.%'+q+'%,payload->buyer->>name.ilike.%'+q+'%,payload->buyer->>nip.ilike.%'+q+'%');
    if(/^20\d{2}-(0[1-9]|1[0-2])$/.test(body.month||''))query=query.like('payload->>issueDate',body.month+'%');
    if(['cleanfleet','robisie'].includes(body.brand))query=query.eq('payload->>brand',body.brand);
@@ -74,6 +77,7 @@ Deno.serve(async req=>{
    // Partial drafts are allowed. Full validation happens before any number is allocated.
    if(!body.payload||typeof body.payload!=='object'||Array.isArray(body.payload))throw Error('Nieprawidłowy szkic.');
    if(!/^[0-9a-f-]{36}$/i.test(body.id||''))throw Error('Nieprawidłowy identyfikator szkicu.');
+   if(body.payload.source?.app==='robisie'&&body.payload.source?.stageId){const origin=checked(await db.from('rs_projects').select('id,payload,contract_number').eq('id',body.payload.source.id).eq('owner_id',userId).single());stageInvoiceSeed(origin,body.payload.source.stageId);}
    const existing=checked(await db.from('bill_invoices').select('id,status,revision').eq('id',body.id).maybeSingle());
    if(existing){if(existing.status!=='draft')throw Error('Wystawiona faktura jest zablokowana.');const row=checked(await db.from('bill_invoices').update({payload:body.payload,revision:body.revision+1,updated_at:new Date().toISOString()}).eq('id',body.id).eq('status','draft').eq('revision',body.revision).select().maybeSingle());if(!row)throw Error('Szkic zmienił się na innym urządzeniu. Odśwież przed zapisem.');return json(row);}
    if(body.revision!==0)throw Error('Nie znaleziono pierwotnego szkicu. Odśwież dane.');

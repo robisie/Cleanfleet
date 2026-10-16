@@ -9,3 +9,5 @@ export async function administrator(db){
  return data.user;
 }
 export const modules=Object.freeze({finances:'Moje finanse',taxes:'ZUS i podatki',documents:'Dokumenty księgowe',website:'Statystyki WWW'});
+
+export const applications=Object.freeze({cleanfleet:{name:'CleanFleet',url:'/app/'},robisie:{name:'Robisię',url:'/app/robisie/'},bill:{name:'Bill',url:'/bill/'}});

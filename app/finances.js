@@ -1,4 +1,4 @@
-/* One private finance window. PIN/key remain only in the private vault frame. */
+/* Account-authorized finance window; vault keys stay in the private frame. */
 (()=>{
  'use strict';
  let current=null;
@@ -21,13 +21,13 @@
   styles();
   const previous=document.activeElement,overflow=document.body.style.overflow;
   const overlay=document.createElement('div');overlay.id='cfFinanceWindow';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-labelledby','cfFinanceTitle');
-  overlay.innerHTML=`<section class="cf-finance-shell"><header class="cf-finance-head"><h2 id="cfFinanceTitle">Moje finanse</h2><div><button type="button" data-lock hidden>Zablokuj</button><button type="button" data-close aria-label="Zamknij moje finanse">Powrót</button></div></header><nav class="cf-finance-tabs" role="tablist" aria-label="Zakładki finansów" hidden>${[['earnings','Moje zarobki'],['payments','Moje płatności'],['trips','Dojazdy'],['cash','Gotówka']].map(([id,name])=>`<button type="button" role="tab" id="cfFinanceTab-${id}" data-tab="${id}" aria-controls="${id==='earnings'?'cfFinanceEarnings':id==='trips'?'cfFinanceTrips':'cfFinancePrivate'}" aria-selected="false" tabindex="-1">${name}</button>`).join('')}</nav><p class="cf-finance-status" role="status" aria-live="polite"></p><div class="cf-finance-content"><section id="cfFinanceEarnings" class="cf-finance-pane" role="tabpanel" aria-labelledby="cfFinanceTab-earnings" hidden></section><section id="cfFinancePrivate" class="cf-finance-pane"><iframe class="cf-finance-frame" title="Prywatne finanse i odblokowanie" src="/app/priv/index.html?finance=1&v=121"></iframe></section><section id="cfFinanceTrips" class="cf-finance-pane" role="tabpanel" aria-labelledby="cfFinanceTab-trips" hidden></section></div></section>`;
+  overlay.innerHTML=`<section class="cf-finance-shell"><header class="cf-finance-head"><h2 id="cfFinanceTitle">Moje finanse</h2><div><button type="button" data-lock hidden>Zablokuj</button><button type="button" data-close aria-label="Zamknij moje finanse">Powrót</button></div></header><nav class="cf-finance-tabs" role="tablist" aria-label="Zakładki finansów" hidden>${[['earnings','Moje zarobki'],['payments','Moje płatności'],['trips','Dojazdy'],['cash','Gotówka']].map(([id,name])=>`<button type="button" role="tab" id="cfFinanceTab-${id}" data-tab="${id}" aria-controls="${id==='earnings'?'cfFinanceEarnings':id==='trips'?'cfFinanceTrips':'cfFinancePrivate'}" aria-selected="false" tabindex="-1">${name}</button>`).join('')}</nav><p class="cf-finance-status" role="status" aria-live="polite"></p><div class="cf-finance-content"><section id="cfFinanceEarnings" class="cf-finance-pane" role="tabpanel" aria-labelledby="cfFinanceTab-earnings" hidden></section><section id="cfFinancePrivate" class="cf-finance-pane"><iframe class="cf-finance-frame" title="Prywatne finanse i odblokowanie" src="/app/priv/index.html?finance=1&v=130"></iframe></section><section id="cfFinanceTrips" class="cf-finance-pane" role="tabpanel" aria-labelledby="cfFinanceTab-trips" hidden></section></div></section>`;
   document.body.append(overlay);document.body.style.overflow='hidden';
   const inert=[...document.body.children].filter(el=>el!==overlay&&!['SCRIPT','STYLE','LINK'].includes(el.tagName)).map(el=>[el,el.inert]);inert.forEach(([el])=>el.inert=true);
   const frame=overlay.querySelector('iframe'),nav=overlay.querySelector('nav'),lockButton=overlay.querySelector('[data-lock]'),earnings=overlay.querySelector('#cfFinanceEarnings'),trips=overlay.querySelector('#cfFinanceTrips'),priv=overlay.querySelector('#cfFinancePrivate'),status=overlay.querySelector('.cf-finance-status');
   let unlocked=false,epoch=0,earningsMounted=false,tripMounted=false,timer,selected='';
   const api=()=>{try{return frame.contentWindow.CFPrivateFinance;}catch(_){return null;}};
-  function activity(fromFrame=false){if(!unlocked)return;clearTimeout(timer);timer=setTimeout(lock,document.hidden?60000:600000);if(!fromFrame)api()?.activity();}
+  function activity(fromFrame=false){if(!unlocked)return;if(!fromFrame)api()?.activity();}
   function reset(){unlocked=false;epoch++;clearTimeout(timer);window.cfFinanceEarningsBridge?.lock();window.CFDojazdy?.dispose?.();earnings.replaceChildren();trips.replaceChildren();earningsMounted=false;tripMounted=false;selected='';nav.hidden=true;lockButton.hidden=true;earnings.hidden=true;trips.hidden=true;priv.hidden=false;status.textContent='';}
   function lock(){reset();api()?.lock();}
   function close(){lock();unsubscribe?.();document.removeEventListener('keydown',keyboard,true);document.removeEventListener('pointerdown',pointer,true);document.removeEventListener('scroll',pointer,true);document.removeEventListener('visibilitychange',visibility);window.removeEventListener('message',message);window.removeEventListener('pagehide',close);overlay.remove();inert.forEach(([el,value])=>el.inert=value);document.body.style.overflow=overflow;current=null;previous?.isConnected&&previous.focus({preventScroll:true});}
@@ -44,7 +44,7 @@
    if(tab==='trips'&&!tripMounted){tripMounted=true;window.cfShowDojazdy({host:trips,allowed:()=>unlocked&&admin()});}
   }
   function message(event){if(event.origin!==location.origin||event.source!==frame.contentWindow)return;
-   if(event.data?.type==='cf-finances-unlocked'&&admin()){unlocked=true;nav.hidden=false;lockButton.hidden=false;activity();select('earnings');}
+   if(event.data?.type==='cf-finances-unlocked'&&admin()){unlocked=true;nav.hidden=false;lockButton.hidden=true;activity();select('earnings');}
    if(event.data?.type==='cf-finances-locked')reset();
    if(event.data?.type==='cf-finances-activity')activity(true);
    if(event.data?.type==='cf-finances-close')close();

@@ -6,3 +6,8 @@ export async function keyFor(pin,salt){const raw=await crypto.subtle.importKey('
 export const newSalt=()=>b64(crypto.getRandomValues(new Uint8Array(16)));
 export async function seal(state,key,salt){const iv=crypto.getRandomValues(new Uint8Array(12));const ciphertext=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:enc.encode('private-payments-v1')},key,enc.encode(JSON.stringify(state)));return {version:1,iterations:600000,salt,iv:b64(iv),ciphertext:b64(new Uint8Array(ciphertext))};}
 export async function open(v,key){checkEnvelope(v);const text=await crypto.subtle.decrypt({name:'AES-GCM',iv:bytes(v.iv),additionalData:enc.encode('private-payments-v1')},key,bytes(v.ciphertext));return JSON.parse(dec.decode(text));}
+// Account mode relies on owner/admin RLS. The account key travels with the envelope,
+// so it is no longer a separate user-password security boundary.
+export const newAccountKey=()=>b64(crypto.getRandomValues(new Uint8Array(32)));
+export async function accountEnvelope(state){const accountKey=newAccountKey(),salt=newSalt(),key=await keyFor(accountKey,salt);return {...await seal(state,key,salt),accountKey};}
+export async function openAccount(envelope){if(typeof envelope?.accountKey!=='string'||bytes(envelope.accountKey).length!==32)throw Error('Brak klucza dostępu konta.');const key=await keyFor(envelope.accountKey,envelope.salt);return {state:await open(envelope,key),key};}

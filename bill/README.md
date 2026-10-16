@@ -1,4 +1,4 @@
-# Bill 1.0.5
+# Bill 1.0.6
 
 Admin-only invoicing at `/bill/`. Uses the existing CleanFleet Supabase login, with a separate browser session key. No signup and no direct browser access to billing tables. The server checks the current user and administrator role for every operation.
 
@@ -39,3 +39,9 @@ GUS access is free but requires a key from https://api.stat.gov.pl/Home/RegonApi
 
 ## German TVM buyer (1.0.5)
 Party country PL/DE is retained in forms and XML. German company identifiers use DE + nine digits, serialized as KodUE=DE and NrVatUE without prefix; Polish NIP validation stays unchanged. Invoice VAT treatment is unchanged.
+
+## KSeF browser (1.0.6)
+The KSeF tab reads production sales (Subject1) and purchases (Subject2), including invoices issued outside Bill. Default Polish calendar month; custom inclusive dates up to 99 days; date basis Issue / Invoicing / PermanentStorage. Lists use metadata pages of 250 with explicit load-more/truncation notices. Search and client sorting apply to loaded rows.
+Single PDF retrieves original XML bytes, verifies metadata SHA-256 and renders with the existing pinned CIRF renderer. Bulk PDF uses an asynchronous encrypted KSeF export rather than repeated single-download calls; encrypted/clear part sizes and SHA-256 are checked, then every selected XML is checked against metadata. ZIP contains only selected PDF files, named by unique KSeF numbers. Maximum 250 selected files, 100 MB compressed export, 150 MB extracted XML/PDF output. Cancel stops client requests/conversion and no partial ZIP is offered.
+Saved production KSeF credentials stay server-side. Short-lived encrypted browse/export/part tickets bind access to the authenticated admin user. XML and download URLs are kept only in current-page memory and cleared on logout; no invoice/finance records are modified. Single XML memory cache: 20 MB / 32 invoices. PDF overlay includes close, download and open-in-new-tab for mobile PDF readers. Shared CleanFleet renderer/ZIP assets are reused without modifying them.
+Validation: Bill/crypto/UI tests, actual CIRF PDF generation with visual inspection. Production authenticated read still needs verification with the user's session; no credentials or user session are manufactured for this check.

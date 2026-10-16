@@ -1,4 +1,4 @@
-export const VERSION='1.0.5';
+export const VERSION='1.0.6';
 export const SELLER={name:'ROBISIĘ-FER SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ',nip:'6351861297',address:'UL. RTM. WITOLDA PILECKIEGO 18',city:'43-190 MIKOŁÓW',country:'PL'};
 export const EXEMPTION='Zwolnienie na podstawie art. 113 ust. 1 lub 9 ustawy o VAT';
 export const logos={cleanfleet:'/assets/cleanfleet-logo.png',robisie:'/app/robisie/assets/robisie-logo.png'};

@@ -2,7 +2,9 @@ import {b64,unb64,hash,certificateKey} from '../cleanfleet-ksef/core.js';
 export class KsefError extends Error{constructor(message,uncertain=false){super(message);this.uncertain=uncertain;}}
 export function ksefApi(fetchImpl=fetch){return async(path,token,body,raw=false)=>{
  let r;try{r=await fetchImpl('https://api.ksef.mf.gov.pl/v2'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(25000),redirect:'error'});}catch{throw new KsefError('Brak odpowiedzi KSeF. Sprawdź status wysyłki przed ponowieniem.',true);}
- if(!r.ok){if(r.status===401||r.status===403)throw new KsefError('KSeF odrzucił dostęp. Sprawdź uprawnienie do wystawiania faktur w zapisanym tokenie.');throw new KsefError('KSeF zwrócił HTTP '+r.status+'. Sprawdź status dokumentu.',r.status>=500);}
+ if(r.status===429)throw new KsefError('KSeF ograniczył liczbę zapytań. Spróbuj ponownie za '+(Number(r.headers.get('Retry-After'))||60)+' s.');
+ if(!r.ok){if(r.status===401||r.status===403)throw new KsefError('KSeF odrzucił dostęp. Sprawdź uprawnienia zapisane w tokenie (odczyt faktur wymaga InvoiceRead).');throw new KsefError('KSeF zwrócił HTTP '+r.status+'. Sprawdź status dokumentu.',r.status>=500);}
+ if(raw==='bytes'){const reader=r.body.getReader(),chunks=[];let size=0;try{while(true){const {value,done}=await reader.read();if(done)break;size+=value.length;if(size>10*1024*1024)throw new KsefError('Faktura przekracza limit 10 MB.');chunks.push(value);}}finally{await reader.cancel().catch(()=>{});}const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}return bytes;}
  return raw?await r.text():r.status===204?null:await r.json();
 };}
 export async function authenticate(token,nip,api,pause=ms=>new Promise(r=>setTimeout(r,ms))){
@@ -12,7 +14,7 @@ export async function authenticate(token,nip,api,pause=ms=>new Promise(r=>setTim
  if(!Number.isFinite(challenge.timestampMs))throw Error('Nieprawidłowa odpowiedź uwierzytelnienia KSeF.');
  const encryptedToken=b64(await crypto.subtle.encrypt({name:'RSA-OAEP'},key.key,new TextEncoder().encode(token+'|'+challenge.timestampMs)));
  const auth=await api('/auth/ksef-token',null,{challenge:challenge.challenge,contextIdentifier:{type:'Nip',value:nip},encryptedToken,publicKeyId:key.id});
- for(let i=0;i<15;i++){const status=await api('/auth/'+encodeURIComponent(auth.referenceNumber),auth.authenticationToken.token);if(status.status.code===200){const access=await api('/auth/token/redeem',auth.authenticationToken.token,{});return {token:access.accessToken.token,keyFor};}if(status.status.code!==100)throw Error('KSeF odrzucił token lub jego uprawnienia.');await pause(1000);}
+ for(let i=0;i<15;i++){const status=await api('/auth/'+encodeURIComponent(auth.referenceNumber),auth.authenticationToken.token);if(status.status.code===200){const access=await api('/auth/token/redeem',auth.authenticationToken.token,{});return {token:access.accessToken.token,expires:Date.parse(access.accessToken.validUntil)-10000,keyFor};}if(status.status.code!==100)throw Error('KSeF odrzucił token lub jego uprawnienia.');await pause(1000);}
  throw Error('KSeF nadal sprawdza dostęp. Spróbuj za chwilę.');
 }
 export async function openSession(auth,xml,api){

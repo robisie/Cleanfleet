@@ -1,3 +1,4 @@
+import {createArchiveService} from './archive.js';
 import {gus,lookupWithFallback} from './gus.js';
 import {lookupCompany} from './registry.js';
 import {stageInvoiceSeed,investmentInvoiceSeed} from '../../../app/robisie/billing.js';
@@ -10,6 +11,7 @@ const db=createClient(Deno.env.get('SUPABASE_URL')!,secret,{auth:{persistSession
 const credentials=createStateCodec(secret,'saved-credentials-v1'),codec=createStateCodec(secret,'bill-ksef-v1'),api=ksefApi();
 const gusCodec=createStateCodec(secret,'bill-gus-config-v1');
 async function savedGusKey(){const row=checked(await db.from('bill_settings').select('payload').single());return row?.payload?.gusKeyCiphertext?(await gusCodec.open(row.payload.gusKeyCiphertext,SELLER.nip,'gus-config')).key:'';}
+const archive=createArchiveService({authorizeKsef:authKsef,secret,api});
 const origins=['https://cleanfleet.pl','https://www.cleanfleet.pl'];
 function checked(r:any){if(r.error)throw Error(r.error.code==='23505'?'Ten NIP lub numer już istnieje.':r.error.message);return r.data;}
 async function invoice(id:string){if(!/^[0-9a-f-]{36}$/i.test(id||''))throw Error('Nieprawidłowy identyfikator.');const row=checked(await db.from('bill_invoices').select('*').eq('id',id).single());if(!row)throw Error('Nie znaleziono faktury.');return row;}
@@ -36,6 +38,7 @@ Deno.serve(async req=>{
   if(role.error||role.data?.role!=='admin')return json({error:'Dostęp tylko dla administratora.'},403);
   const raw=await req.text();if(raw.length>300000)return json({error:'Żądanie jest za duże.'},413);
   const body=JSON.parse(raw);
+  if(String(body.action||'').startsWith('ksef-')){const result=await archive(body,userId);return result instanceof Uint8Array?new Response(result,{headers:{...headers,'Content-Type':'application/octet-stream'}}):json(result);}
   if(body.action==='lookup-nip')return json(await lookupWithFallback(body.nip,await savedGusKey(),{mfLookup:lookupCompany}));
   if(body.action==='gus-save-key'){
    const key=String(body.key||'').trim();if(!/^[a-zA-Z0-9]{20}$/.test(key)||key==='abcde12345abcde12345')throw Error('Podaj własny 20-znakowy klucz produkcyjny GUS.');

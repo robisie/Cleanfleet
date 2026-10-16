@@ -1,0 +1,32 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFile} from 'node:fs/promises';
+import {createRequire} from 'node:module';
+import * as C from '../bill/core.js';
+import * as D from '../bill/ksef-data.js';
+const Zip=createRequire(import.meta.url)('../app/vendor/jszip-3.10.1.min.js');
+async function setup(){
+ const nodes=new Map(),blobUrls=new Map(),node=key=>{if(!nodes.has(key))nodes.set(key,{textContent:'',value:'',innerHTML:'',dataset:{}});return nodes.get(key);};
+ const root={innerHTML:'',querySelector:node,querySelectorAll:()=>[]};let count=0;
+ const context=vm.createContext({console,crypto,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,Blob,File,Map,Set,AbortController,DOMException,atob,btoa,setTimeout,clearTimeout,URL:{createObjectURL:blob=>{const key='blob:'+(count++);blobUrls.set(key,blob);return key;},revokeObjectURL:key=>blobUrls.delete(key)},window:{JSZip:Zip,CFKsefRenderer:{generateInvoice:async()=>new Blob(['%PDF-1.7 fixture'])}},DOMParser:class{parseFromString(){return {doctype:null,documentElement:{localName:'Faktura'},getElementsByTagName:()=>[]};}},document:{}});
+ const code=await readFile(new URL('../bill/ksef.js',import.meta.url),'utf8');
+ const m=new vm.SourceTextModule(code+`\nexport function setupTest(node,call,rows=[]){root=node;api=call;state=initial();state.loaded=true;state.rows=rows;state.query={kind:state.kind,from:state.from,to:state.to,dateType:state.dateType,sort:'Desc'};state.selected=new Set(rows.map(r=>r.ksefNumber));draw();}export {run,load,downloadSelected};export function testState(){return {state,ready,message,busy:!!controller};}`,{context});
+ await m.link(spec=>{const values=spec.includes('ksef-data')?D:C;return new vm.SyntheticModule(Object.keys(values),function(){for(const[k,v]of Object.entries(values))this.setExport(k,v);},{context});});await m.evaluate();return {n:m.namespace,root,blobUrls,node};
+}
+const number=i=>'6351861297-20261016-123456789ABC-'+String(i).padStart(2,'0');
+const row=i=>({ksefNumber:number(i),invoiceNumber:'FV/'+i,issueDate:'2026-10-16',seller:{nip:'6351861297',name:'<img src=x onerror=alert(1)>'},buyer:{name:'Nabywca'},grossAmount:100,currency:'PLN'});
+test('KSeF panel escapes metadata, merges pages and changes month without keeping old selection',async()=>{
+ const {n,root}=await setup(),calls=[];n.setupTest(root,async body=>{calls.push(body);return {invoices:[row(body.page+1)],page:body.page,hasMore:body.page===0,ticket:'encrypted'};});
+ await n.run(n.load);await n.run(signal=>n.load(signal,true));assert.equal(n.testState().state.rows.length,2);assert.equal(calls[1].page,1);assert.equal(calls[1].ticket,'encrypted');assert.match(root.innerHTML,/&lt;img src=x/);assert.ok(!root.innerHTML.includes('<img src=x'));
+ root.onchange({target:{id:'kf-all',checked:true,dataset:{}}});assert.equal(n.testState().state.selected.size,2);root.onchange({target:{id:'kf-month',value:'2026-02',dataset:{}}});assert.equal(n.testState().state.from,'2026-02-01');assert.equal(n.testState().state.to,'2026-02-28');assert.equal(n.testState().state.rows.length,0);assert.equal(n.testState().state.selected.size,0);assert.equal(n.testState().state.query,null);
+});
+test('selected PDFs use one bulk export, verify AES/hashes and produce only selected PDFs in ZIP',async()=>{
+ const {n,root,blobUrls}=await setup(),xml=new TextEncoder().encode('<Faktura>Łódź</Faktura>'),rows=[row(1),row(2)];for(const r of rows)r.invoiceHash=await D.digest(xml);const archive=new Zip();for(const r of rows)archive.file(r.ksefNumber+'.xml',xml);const plain=await archive.generateAsync({type:'uint8array',compression:'STORE'});const key=crypto.getRandomValues(new Uint8Array(32)),iv=crypto.getRandomValues(new Uint8Array(16)),aes=await crypto.subtle.importKey('raw',key,'AES-CBC',false,['encrypt']),encrypted=new Uint8Array(await crypto.subtle.encrypt({name:'AES-CBC',iv},aes,plain));const b64=bytes=>Buffer.from(bytes).toString('base64'),calls=[];
+ n.setupTest(root,async(body,options)=>{calls.push(body.action);if(body.action==='ksef-export-start')return {ticket:'export',key:b64(key),iv:b64(iv)};if(body.action==='ksef-export-status')return {status:'ready',invoiceCount:2,size:plain.length,parts:[{ticket:'part',partSize:plain.length,partHash:await D.digest(plain)}]};if(body.action==='ksef-export-part'){assert.equal(options.binary,true);return encrypted;}throw Error('Unexpected direct invoice request');},rows);
+ await n.run(n.downloadSelected);const {ready,message}=n.testState();assert.ok(ready,message);assert.equal(ready.count,2);const zip=await Zip.loadAsync(await blobUrls.get(ready.url).arrayBuffer());assert.deepEqual(Object.keys(zip.files).sort(),rows.map(r=>r.ksefNumber+'.pdf').sort());assert.deepEqual(calls,['ksef-export-start','ksef-export-status','ksef-export-part']);assert.match(root.innerHTML,/Zapisz paczkę ZIP/);
+});
+test('cancellation aborts pending request and never offers a partial ZIP',async()=>{
+ const {n,root}=await setup();n.setupTest(root,async(body,{signal})=>new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(new DOMException('Anulowano','AbortError')),{once:true})));
+ const work=n.run(n.load);root.onclick({target:{closest:()=>({dataset:{kf:'cancel'}})},stopPropagation(){}});await work;assert.equal(n.testState().busy,false);assert.equal(n.testState().ready,null);assert.match(n.testState().message,/Anulowano/);
+});

@@ -1,11 +1,11 @@
 {
   "ok": true,
   "prices": {
-    "petrol95": 6.77,
+    "petrol95": 6.79,
     "diesel": 7.8
   },
-  "as_of": "2026-10-15",
-  "checked_at": "2026-10-15T19:18:48.936Z",
+  "as_of": "2026-10-16",
+  "checked_at": "2026-10-16T18:55:00.168Z",
   "date_kind": "checked",
   "source_updated": "24h temu",
   "currency": "PLN",

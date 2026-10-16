@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
-const html=fs.readFileSync(require('node:path').join(__dirname,'../app/index.html'),'utf8');
+const html=fs.readFileSync(require('node:path').join(__dirname,'../pack/earnings.js'),'utf8');
 const ctx=vm.createContext({});vm.runInContext(html.slice(html.indexOf('function cfBuildEarningPreset('),html.indexOf('function cfEarningsMoney(')),ctx);
 test('latest manual entry supplies preset; automatic wash earnings never replace it',()=>{
  const rows=[{contractor:'TVM',description:'old',total_amount:200,employee_amount:60,work_date:'2026-09-01'},

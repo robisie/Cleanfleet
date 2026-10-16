@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
-const html=fs.readFileSync(require('node:path').join(__dirname,'../app/index.html'),'utf8');
+const html=fs.readFileSync(require('node:path').join(__dirname,'../pack/earnings.js'),'utf8');
 const body=html.slice(html.indexOf('  async function loadRows(){',html.indexOf('async function cfShowEarnings(')),html.indexOf('\n  function filtered(){',html.indexOf('async function cfShowEarnings(')));
 const contractors=html.slice(html.indexOf('  function cfEarningContractors(){'),html.indexOf('\n  function cfOpenEarningRules(){'));
 function setup({conversionError=false,linkedError=false,earningError=false,ruleError=false,locked=false}={}){

@@ -589,6 +589,8 @@
     window.addEventListener('pagehide', () => { allRun?.abort();observer?.disconnect();purchaseAttachments.clear();window.CFAccountingMail?.reset();forgetKsefView();resetBank();bankFiles=[]; });
   }
 
+  window.CFAccountingDocuments={open:openModule,close:closeModule};
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
   else boot();
 })();

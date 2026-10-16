@@ -2,12 +2,12 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const html=fs.readFileSync('app/index.html','utf8');
 const renderer=html.slice(html.indexOf('function cfRenderCompanyChooser(){'),html.indexOf('\nconst CF_REMINDER_CATEGORIES'));
 for(const width of [390,820,1280])for(const hasCompanies of [false,true])for(const admin of [true,false]){
- test(`finance tile present only for admin at ${width}px, companies=${hasCompanies}`,()=>{
+ test(`Pack entry replaces finance tile for admin at ${width}px, companies=${hasCompanies}`,()=>{
   const grid={innerHTML:'',querySelectorAll:()=>[]};const noop=()=>{};
-  const context={window:{innerWidth:width},document:{getElementById:id=>id==='cfCompanyGrid'?grid:null},cfIsAdmin:()=>admin,cfCanGlobalAnalytics:()=>true,cfCompanies:hasCompanies?[{id:'company',name:'Firma'}]:[],cfCompanyStats:new Map(),cfCompanyDisplayName:c=>c.name,escapeHtml:s=>s,cfRefreshReminderTileCount:noop};
+  const context={window:{innerWidth:width},URL,location:{href:'https://cleanfleet.pl/app/'},document:{getElementById:id=>id==='cfCompanyGrid'?grid:null},cfIsAdmin:()=>admin,cfCanGlobalAnalytics:()=>true,cfCompanies:hasCompanies?[{id:'company',name:'Firma'}]:[],cfCompanyStats:new Map(),cfCompanyDisplayName:c=>c.name,escapeHtml:s=>s,cfRefreshReminderTileCount:noop};
   for(const name of ['cfShowGlobalEmployees','cfShowPurchases','cfShowEarningsGate','cfShowReminders','cfOpenWebsiteStatsPanel','cfShowBackupHub','cfShowStatistics','cfShowAdminReports','cfOpenAddCompany'])context[name]=noop;
   vm.runInNewContext(renderer+';cfRenderCompanyChooser();',context);
-  assert.equal((grid.innerHTML.match(/id="cfCompanyFinancesCard"/g)||[]).length,admin?1:0);
+  assert.equal((grid.innerHTML.match(/id="cfCompanyFinancesCard"/g)||[]).length,0);
   assert.ok(!grid.innerHTML.includes('cfCompanyPrivatePaymentsCard'));assert.ok(!grid.innerHTML.includes('cfCompanyDojazdyCard'));assert.ok(!grid.innerHTML.includes('cfCompanyEarningsCard'));
  });
 }

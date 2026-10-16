@@ -1,0 +1,34 @@
+import {client,administrator,modules,URL as apiURL,KEY} from './auth.js?v=100';
+const name=new URL(location.href).searchParams.get('module');let live=false,user=null,observer;
+window.RobisiePack=true;
+window.CF_SUPABASE_URL=apiURL;window.CF_SUPABASE_KEY=KEY;window.cfSupabase=client();
+window.cfIsAdmin=()=>live;
+window.escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+window.showToast=text=>{const el=document.getElementById('toast');el.textContent=text;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),3000);};
+window.cfBackupBridge={isAdmin:()=>live,getClient:()=>window.cfSupabase,toast:window.showToast};
+window.cfRefreshExchangeRate=async(required=true)=>{try{const {data,error}=await window.cfSupabase.functions.invoke('cleanfleet-exchange-rate',{body:{}});if(error||!data?.ok)throw Error('Nie udało się pobrać kursu mBanku.');window.CFExchange.set(data);return data;}catch(error){if(required)throw error;return null;}};
+const send=(type,extra={})=>{if(parent!==window)parent.postMessage({type,...extra},location.origin);};
+const close=()=>{live=false;window.CFFinance?.close();window.cfFinanceEarningsBridge?.lock();window.CFAccountingMail?.reset();document.getElementById('modalRoot').replaceChildren();send('robisie-pack-close');};
+function deny(message){live=false;observer?.disconnect();window.CFFinance?.close();window.CFAccountingMail?.reset();document.getElementById('modalRoot').replaceChildren();const status=document.getElementById('moduleStatus');status.hidden=false;status.textContent=message;send('robisie-pack-denied',{message});}
+function load(src){return new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=resolve;script.onerror=()=>reject(Error('Nie udało się wczytać modułu. Odśwież Robisię Pack.'));document.head.append(script);});}
+const scripts={
+ finances:['/app/vendor/xlsx-0.18.5.full.min.js','/app/period-picker.js?v=1532','/app/exchange-rate.js?v=1531','/pack/earnings.js?v=100','/app/dojazdy.js?v=20261007-1556','/app/finances.js?v=20261016-1560'],
+ taxes:['/app/taxes-v1310.js?v=20260918-6'],
+ website:['/app/period-picker.js?v=1532','/pack/website-stats.js?v=100'],
+ documents:['/app/vendor/jszip-3.10.1.min.js','/app/vendor/jspdf-2.5.1.umd.min.js','/app/vendor/jspdf-autotable-3.8.2.min.js','/app/mbank-mt940.js?v=20261002-1520','/app/pdf-unlock.js?v=20261006-15424','/app/mail-documents.js?v=20261006-15424','/app/ksef-preview.js?v=20261006-15427','/app/ksef-pdf.js?v=20261006-15425','/app/accounting-package.js?v=20261006-15423','/app/accounting-history.js?v=20261006-15425','/app/accounting-decisions.js?v=20261002-15123','/app/accounting-reconcile.js?v=20261002-15123','/app/accounting-documents-v1510.js?v=20261016-1560']
+};
+try{
+ if(!Object.hasOwn(modules,name))throw Error('Nie znaleziono modułu.');
+ user=await administrator(window.cfSupabase);if(!user)throw Error('Zaloguj się w Robisię Pack.');live=true;
+ window.cfSupabase.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT'||session&&session.user.id!==user.id)deny('Sesja administratora została zakończona.');});
+ for(const src of scripts[name]){if(!live)break;await load(src);}if(!live)throw Error('Sesja została zakończona.');
+ document.getElementById('moduleStatus').hidden=true;
+ if(name==='finances')window.CFFinance.open();
+ if(name==='taxes')await window.cfShowTaxes();
+ if(name==='website')window.cfOpenWebsiteStatsPanel();
+ if(name==='documents')window.CFAccountingDocuments.open();
+ const selectors={finances:'#cfFinanceWindow',taxes:'#cfTaxesOverlay',website:'#cfWebsiteStatsOverlay',documents:'#cfAccountingDocsOverlay.cf-open'};
+ observer=new MutationObserver(()=>{if(live&&!document.querySelector(selectors[name]))close();});observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class']});
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&live)administrator(window.cfSupabase).then(allowed=>{if(!allowed||allowed.id!==user.id)deny('Sesja została zakończona.');}).catch(error=>deny(error.message));});
+}catch(error){deny(error.message);}
+window.addEventListener('pagehide',()=>{live=false;observer?.disconnect();window.CFFinance?.lock();window.CFAccountingMail?.reset();});

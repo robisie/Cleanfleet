@@ -1,0 +1,22 @@
+import {client,administrator,modules} from './auth.js?v=100';
+const $=id=>document.getElementById(id),db=client();let user=null,epoch=0,current='',frame=null;
+function clearModule(){epoch++;frame?.remove();frame=null;current='';$('frameHost').replaceChildren();$('workspace').hidden=true;$('dashboard').hidden=false;document.querySelectorAll('[data-module]').forEach(b=>b.classList.remove('selected'));document.querySelectorAll('[data-home]').forEach(b=>b.classList.add('selected'));}
+function gate(message='Zaloguj się kontem administratora.'){user=null;clearModule();$('panel').hidden=true;$('login').hidden=false;$('loginForm').hidden=false;$('loginInfo').textContent=message;$('userEmail').textContent='';}
+async function verify(){const allowed=await administrator(db);if(!allowed){gate();return false;}if(user&&user.id!==allowed.id)clearModule();user=allowed;$('login').hidden=true;$('panel').hidden=false;$('userEmail').textContent=user.email||'';return true;}
+async function openModule(name){
+ if(!Object.hasOwn(modules,name))return;if(current===name&&frame)return;
+ try{if(!await verify())return;}catch(error){gate(error.message);return;}
+ clearModule();document.querySelectorAll('[data-home]').forEach(b=>b.classList.remove('selected'));current=name;$('dashboard').hidden=true;$('workspace').hidden=false;$('moduleTitle').textContent=modules[name];$('moduleError').textContent='';
+ frame=document.createElement('iframe');frame.title=modules[name];frame.src='/pack/module.html?module='+name+'&v=100';frame.setAttribute('allow','clipboard-write; web-share');$('frameHost').append(frame);
+ document.querySelectorAll('[data-module]').forEach(b=>b.classList.toggle('selected',b.dataset.module===name));
+ const url=new URL(location.href);url.searchParams.set('module',name);history.replaceState(null,'',url);window.scrollTo({top:0,behavior:'auto'});
+}
+function home(){clearModule();history.replaceState(null,'','/pack/');}
+$('loginForm').onsubmit=async event=>{event.preventDefault();const button=$('signIn');button.disabled=true;$('loginError').textContent='';const password=$('password').value;$('password').value='';document.activeElement?.blur();try{const result=await db.auth.signInWithPassword({email:$('email').value.trim(),password});if(result.error)throw Error('Nieprawidłowy e-mail lub hasło.');if(await verify()){const module=new URL(location.href).searchParams.get('module');if(module)await openModule(module);}}catch(error){gate();$('loginError').textContent=error.message;}finally{button.disabled=false;}};
+$('logout').onclick=async()=>{gate('Wylogowano.');const {error}=await db.auth.signOut();if(error)$('loginError').textContent='Nie udało się zakończyć sesji na serwerze. Spróbuj ponownie.';};
+$('closeModule').onclick=home;document.querySelectorAll('[data-home]').forEach(b=>b.onclick=home);document.querySelectorAll('[data-module]').forEach(b=>b.onclick=()=>openModule(b.dataset.module));
+window.addEventListener('message',event=>{if(event.origin!==location.origin||event.source!==frame?.contentWindow)return;if(event.data?.type==='robisie-pack-close')home();if(event.data?.type==='robisie-pack-denied')gate(event.data.message||'Brak dostępu.');});
+db.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT'||user&&session&&session.user.id!==user.id)gate('Sesja została zakończona. Zaloguj się ponownie.');});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&user)verify().catch(error=>gate(error.message));});
+window.addEventListener('pagehide',()=>clearModule());
+try{if(await verify()){const module=new URL(location.href).searchParams.get('module');if(module)await openModule(module);}}catch(error){gate(error.message);}

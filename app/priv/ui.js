@@ -192,4 +192,4 @@ window.CFPrivateFinance={
  select(tab){if(!key||!state||busy||importInFlight||$('modal').open)return false;if(!['payments','cash'].includes(tab))return false;$('financePaymentsPane').hidden=tab!=='payments';$('financeCashPane').hidden=tab!=='cash';if(tab==='cash'){if(!$('cashRows'))showCash($('financeCashPane'));else cashRefresh?.();}return true;}
 };
 if(financeEmbedded){document.documentElement.classList.add('finance-embedded');financeNotify('cf-finances-locked');init();}
-else location.replace('/app/?finances=1');
+else location.replace('/pack/?module=finances');

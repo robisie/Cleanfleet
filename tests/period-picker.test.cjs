@@ -46,7 +46,8 @@ test('universal reports apply selected month, current month and all dates, and a
 });
 test('purchase and earnings filters include both month boundaries and preserve other filters',()=>{
  for(const [name,end,prefix,dateField] of [['filteredRows','cfRowsInRange','cfPurchase','purchase_date'],['filtered','render','cfEarning','work_date']]){
-  const section=html.slice(html.indexOf('  function '+name+'(){'),html.indexOf('  function '+end+'(){',html.indexOf('  function '+name+'(){')));
+  const input=name==='filtered'?fs.readFileSync('pack/earnings.js','utf8'):html;
+  const section=input.slice(input.indexOf('  function '+name+'(){'),input.indexOf('  function '+end+'(){',input.indexOf('  function '+name+'(){')));
   // Purchases helper has arguments; delimit its declaration instead.
   const source=name==='filteredRows'?html.slice(html.indexOf('  function filteredRows(){'),html.indexOf('  function cfRowsInRange(')):section;
   const fields={};for(const key of ['Period','CategoryFilter','CompanyFilter','Contractor','Paid','From','To','Sort'])fields[prefix+key]={value:''};

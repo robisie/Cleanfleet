@@ -1,5 +1,5 @@
 importScripts('/app/photo-zip-stream.js?v=20261010-15517');
-// CleanFleet v1.55.21 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
+// CleanFleet v1.56.0 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -32,7 +32,7 @@ self.addEventListener('fetch', event => {
   }
 
   // Robisię has its own interface; do not inject CleanFleet scripts into it.
-  if (url.origin === self.location.origin && url.pathname.startsWith('/app/robisie/')) {
+  if (url.origin === self.location.origin && (url.pathname.startsWith('/app/robisie/') || url.pathname.startsWith('/pack/') || url.pathname.startsWith('/bill/'))) {
     event.respondWith(fetch(req, { cache: 'no-store' }));
     return;
   }
@@ -102,7 +102,7 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text(); 
     // Keep the visible version in sync for pages served through this worker.
-    html = html.replace(/v1\.55\.(?:8|9|10|11|12|13|14|15|16)\b/g, 'v1.55.21');
+    html = html.replace(/v1\.55\.(?:8|9|10|11|12|13|14|15|16)\b/g, 'v1.56.0');
     html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13095');
 
     if (!html.includes('/app/glass-icons.css')) {
@@ -232,7 +232,6 @@ self.addEventListener('fetch', event => {
       '<script src="/app/calendar-weather-v1218.js?v=20260916-3"></script>\n' +
       '<script src="/app/reminder-form-v1251.js?v=20261004-15415"></script>\n' +
       '<script src="/app/calendar-today-tile-v1262.js?v=20260917-5"></script>\n' +
-      '<script src="/app/taxes-v1310.js?v=20260918-6"></script>\n' +
       '<script src="/app/admin-dashboard-v1270.js?v=20260928-130133"></script>';
     if (html.includes('</body>')) html = html.replace('</body>', `${injectedScripts}\n</body>`);
     else html += injectedScripts;

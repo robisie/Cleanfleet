@@ -36,10 +36,18 @@ export function createGusClient({fetchImpl=fetch,endpoint=GUS_ENDPOINT,pause=()=
   return gusResult(new TextDecoder().decode(bytes),method);
  }
  async function session(key,fn){const sid=await call('Zaloguj',`<b:pKluczUzytkownika>${esc(key)}</b:pKluczUzytkownika>`);if(!/^[\w-]{20}$/.test(sid))throw Error('GUS nie zaakceptował klucza dostępu.');try{return await fn(sid);}finally{await call('Wyloguj',`<b:pIdentyfikatorSesji>${esc(sid)}</b:pIdentyfikatorSesji>`,sid).catch(()=>{});}}
- return {check:key=>session(key,async()=>true),lookup:(value,key)=>{const nip=String(value||'').replace(/[\s-]/g,'');if(!validNip(nip))throw Error('Wpisz poprawny polski NIP (10 cyfr).');return session(key,async sid=>{const result=await call('DaneSzukajPodmioty',`<b:pParametryWyszukiwania xmlns:d="${NS}/DataContract"><d:Nip>${nip}</d:Nip></b:pParametryWyszukiwania>`,sid);return companyFromGus(result||'<root/>',nip);});}};
+ return {check:key=>session(key,async()=>true),lookup:(value,key)=>{const nip=String(value||'').replace(/[\s-]/g,'');if(!validNip(nip))throw Error('Wpisz poprawny polski NIP (10 cyfr).');return session(key,async sid=>{const result=await call('DaneSzukajPodmioty',`<b:pParametryWyszukiwania xmlns:d="${NS}/DataContract"><d:Nip>${nip}</d:Nip></b:pParametryWyszukiwania>`,sid);const company=companyFromGus(result||'<root/>',nip);
+ const record=nodes(parse(result||'<root/>'),'dane').find(n=>content(nodes(n,'Regon')[0])===company.buyer.regon);
+ if(record&&content(nodes(record,'Typ')[0])==='F'&&content(nodes(record,'SilosID')[0])==='1'){
+  try{const report=await call('DanePobierzPelnyRaport',`<b:pRegon>${esc(company.buyer.regon.slice(0,9))}</b:pRegon><b:pNazwaRaportu>BIR12OsFizycznaDzialalnoscCeidg</b:pNazwaRaportu>`,sid);
+   const rows=nodes(parse(report),'dane').filter(n=>content(nodes(n,'fiz_regon9')[0])===company.buyer.regon.slice(0,9));const name=rows.length===1?content(nodes(rows[0],'fiz_nazwa')[0]):'';
+   if(!name||name.length>512)throw Error('Brak pełnej nazwy.');company.buyer.name=name;company.source='GUS — pełny raport działalności CEIDG';
+  }catch{company.warning=[company.warning,'Pełny raport działalności jest niedostępny. Sprawdź i uzupełnij pełną nazwę firmy ręcznie.'].filter(Boolean).join(' ');}
+ }
+ return company;});}};
 }
 export const gus=createGusClient();
 export async function lookupWithFallback(nip,key,{gusClient=gus,mfLookup}={}){
  if(key){try{return await gusClient.lookup(nip,key);}catch{try{const result=await mfLookup(nip);return {...result,warning:[result.warning,'Nie udało się pobrać danych z GUS. Użyto wykazu MF.'].filter(Boolean).join(' ')};}catch{throw Error('Nie udało się pobrać danych z GUS ani MF. Sprawdź klucz GUS w Ustawieniach lub uzupełnij dane ręcznie.');}}}
- try{return await mfLookup(nip);}catch(error){throw Error(error.message+' Aby korzystać z rejestru REGON, dodaj klucz GUS w Ustawieniach.');}
+ try{const result=await mfLookup(nip);return {...result,warning:[result.warning,'GUS nieaktywny — brak klucza. Wykaz MF może zwracać samo imię i nazwisko. Sprawdź pełną nazwę działalności i uzupełnij ją ręcznie.'].filter(Boolean).join(' ')};}catch(error){throw Error(error.message+' Aby korzystać z rejestru REGON, dodaj klucz GUS w Ustawieniach.');}
 }

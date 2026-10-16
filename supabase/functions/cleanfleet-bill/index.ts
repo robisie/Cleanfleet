@@ -4,7 +4,7 @@ import {lookupCompany} from './registry.js';
 import {stageInvoiceSeed,investmentInvoiceSeed} from '../../../app/robisie/billing.js';
 import {createClient} from 'npm:@supabase/supabase-js@2.57.4';
 import {createStateCodec,hash} from '../cleanfleet-ksef/core.js';
-import {normalize,party,invoiceXml,SELLER,today,validBank} from './invoice.js';
+import {normalize,party,invoiceXml,SELLER,today,validBank,correctionSeed} from './invoice.js';
 import {ksefApi,authenticate,openSession,invoiceStatus,KsefError} from './ksef.js';
 const secret=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const db=createClient(Deno.env.get('SUPABASE_URL')!,secret,{auth:{persistSession:false,autoRefreshToken:false}});
@@ -15,6 +15,7 @@ const archive=createArchiveService({authorizeKsef:authKsef,secret,api});
 const origins=['https://cleanfleet.pl','https://www.cleanfleet.pl'];
 function checked(r:any){if(r.error)throw Error(r.error.code==='23505'?'Ten NIP lub numer już istnieje.':r.error.message);return r.data;}
 async function invoice(id:string){if(!/^[0-9a-f-]{36}$/i.test(id||''))throw Error('Nieprawidłowy identyfikator.');const row=checked(await db.from('bill_invoices').select('*').eq('id',id).single());if(!row)throw Error('Nie znaleziono faktury.');return row;}
+async function canonicalCorrection(payload:any){if(!payload?.correction)return payload;const parent=await invoice(payload.correction.originalId),seed=correctionSeed(parent);return {...payload,source:seed.source,correction:{...seed.correction,mode:payload.correction.mode,reason:payload.correction.reason}};}
 async function authKsef(userId:string){
  const saved=checked(await db.from('cf_ksef_credentials').select('nip,ciphertext').eq('user_id',userId).eq('environment','production').maybeSingle());
  if(!saved||saved.nip!==SELLER.nip)throw Error('Brak zapisanej konfiguracji KSeF dla Twojego konta. Zapisz token w CleanFleet → Dokumenty księgowe → KSeF.');
@@ -87,12 +88,21 @@ Deno.serve(async req=>{
    else result=await db.from('bill_parties').insert({payload}).select().single();
    const row=checked(result);if(!row)throw Error('Kontrahent został zmieniony. Odśwież listę.');return json(row);
   }
+  if(body.action==='start-correction'){
+   const parent=await invoice(body.id),payload=correctionSeed(parent);
+   const find=()=>db.from('bill_invoices').select('*').eq('payload->correction->>originalId',parent.id).neq('status','rejected').maybeSingle();
+   const existing=checked(await find());if(existing)return json(existing);
+   const created=await db.from('bill_invoices').insert({id:crypto.randomUUID(),creator_id:userId,payload}).select().single();
+   if(created.error?.code==='23505'){const concurrent=checked(await find());if(concurrent)return json(concurrent);}return json(checked(created));
+  }
   if(body.action==='save-draft'){
    // Partial drafts are allowed. Full validation happens before any number is allocated.
    if(!body.payload||typeof body.payload!=='object'||Array.isArray(body.payload))throw Error('Nieprawidłowy szkic.');
    if(!/^[0-9a-f-]{36}$/i.test(body.id||''))throw Error('Nieprawidłowy identyfikator szkicu.');
    if(body.payload.source?.app==='robisie'&&body.payload.source?.stageId){const origin=checked(await db.from('rs_projects').select('id,payload,contract_number').eq('id',body.payload.source.id).eq('owner_id',userId).single());stageInvoiceSeed(origin,body.payload.source.stageId);}
-   const existing=checked(await db.from('bill_invoices').select('id,status,revision').eq('id',body.id).maybeSingle());
+   body.payload=await canonicalCorrection(body.payload);
+   const existing=checked(await db.from('bill_invoices').select('id,status,revision,payload').eq('id',body.id).maybeSingle());
+   if(existing?.payload?.correction&&existing.payload.correction.originalId!==body.payload.correction?.originalId)throw Error('Nie można zmienić powiązania zapisanej korekty.');
    if(existing){if(existing.status!=='draft')throw Error('Wystawiona faktura jest zablokowana.');const row=checked(await db.from('bill_invoices').update({payload:body.payload,revision:body.revision+1,updated_at:new Date().toISOString()}).eq('id',body.id).eq('status','draft').eq('revision',body.revision).select().maybeSingle());if(!row)throw Error('Szkic zmienił się na innym urządzeniu. Odśwież przed zapisem.');return json(row);}
    if(body.revision!==0)throw Error('Nie znaleziono pierwotnego szkicu. Odśwież dane.');
    return json(checked(await db.from('bill_invoices').insert({id:body.id,creator_id:userId,payload:body.payload}).select().single()));
@@ -102,7 +112,7 @@ Deno.serve(async req=>{
   if(body.action==='send'){
    let row=await invoice(body.id);
    if(!['draft','issued'].includes(row.status))return json(row);
-   const payload=normalize(row.payload);
+   const payload=normalize(await canonicalCorrection(row.payload));
    if(payload.issueDate!==today())throw Error('Dla wysyłki online ustaw dzisiejszą datę wystawienia.');
    const auth=await authKsef(userId);
    if(row.status==='draft'){
@@ -111,7 +121,7 @@ Deno.serve(async req=>{
    }
    if(row.status!=='issued')return json(row);
    const attempt=crypto.randomUUID();
-   const lock=checked(await db.from('bill_invoices').update({status:'sending',send_attempt:attempt,ksef_session:null,ksef_reference:null,updated_at:new Date().toISOString()}).eq('id',row.id).eq('status','issued').select().maybeSingle());
+   const lock=checked(await db.from('bill_invoices').update({payload,status:'sending',send_attempt:attempt,ksef_session:null,ksef_reference:null,updated_at:new Date().toISOString()}).eq('id',row.id).eq('status','issued').select().maybeSingle());
    if(!lock)return json(await invoice(row.id));
    row=lock;let postStarted=false,session:string|null=null;
    try{

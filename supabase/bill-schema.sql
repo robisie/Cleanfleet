@@ -65,3 +65,7 @@ end;
 $$;
 revoke all on function public.bill_update_settings(jsonb) from public,anon,authenticated;
 grant execute on function public.bill_update_settings(jsonb) to service_role;
+
+-- One active correction per parent; successive corrections form an explicit chain.
+create unique index bill_one_active_correction on public.bill_invoices ((payload->'correction'->>'originalId'))
+where payload->'correction'->>'originalId' is not null and status <> 'rejected';

@@ -16,7 +16,7 @@ export function mountTiles(grid,userId){
  const tiles=[...grid.children],ids=tiles.map(tile=>tile.dataset.tile),touchEvents='ontouchstart' in window;
  let device=deviceClass(innerWidth),layout={},drag=null,target=null,ghost=null,marker=null,pending=null,holdTimer=null,blockClickUntil=0;
  const storageKey=()=>`robisie-pack-tiles-v2:${userId}:${device}`;
- const render=()=>{const cols=gridColumns(innerWidth);for(const tile of tiles){const slot=layout[tile.dataset.tile];tile.style.gridColumn=String(slot%cols+1);tile.style.gridRow=String(Math.floor(slot/cols)+1);}grid.style.gridTemplateColumns=`repeat(${cols},minmax(0,1fr))`;};
+ const render=()=>{const cols=gridColumns(innerWidth);for(const tile of tiles){const slot=layout[tile.dataset.tile];tile.style.gridColumn=String(slot%cols+1);tile.style.gridRow=String(Math.floor(slot/cols)+1);}grid.style.gridTemplateColumns=`repeat(${cols},minmax(0,1fr))`;grid.style.gridTemplateRows=`repeat(${Math.max(5,Math.floor(Math.max(...Object.values(layout))/cols)+1)},${getComputedStyle(grid).gridAutoRows})`;};
  const apply=()=>{let saved;try{saved=JSON.parse(localStorage.getItem(storageKey()));if(!saved){const order=normalizedOrder(JSON.parse(localStorage.getItem(`robisie-pack-tiles-v1:${userId}:${device}`)),ids);saved=Object.fromEntries(order.map((id,i)=>[id,i]));}}catch{}layout=normalizedLayout(saved,ids);render();};
  const save=()=>{try{localStorage.setItem(storageKey(),JSON.stringify(layout));}catch{}};
  function move(tile,slot){layout=placeTile(layout,tile.dataset.tile,slot);render();save();}
@@ -38,7 +38,7 @@ export function mountTiles(grid,userId){
   // Safari can cancel a touch when its target is moved in the DOM. Keep it in
   // place for the entire gesture; only a visual clone follows the finger.
   if(tile.cloneNode&&tile.getBoundingClientRect){const rect=tile.getBoundingClientRect();ghost=tile.cloneNode(true);ghost.removeAttribute('data-tile');ghost.setAttribute('aria-hidden','true');ghost.classList.add('tile-ghost');ghost.style.width=rect.width+'px';ghost.style.height=rect.height+'px';ghost.offsetX=point.clientX-rect.left;ghost.offsetY=point.clientY-rect.top;document.body.append(ghost);}
-  const cols=gridColumns(innerWidth),rows=Math.floor(Math.max(...Object.values(layout))/cols)+2,style=getComputedStyle(grid);
+  const cols=gridColumns(innerWidth),rows=Math.max(5,Math.floor(Math.max(...Object.values(layout))/cols)+2),style=getComputedStyle(grid);
   grid.style.minHeight=`${rows*parseFloat(style.gridAutoRows)+(rows-1)*(parseFloat(style.rowGap)||0)}px`;
   marker=document.createElement('div');marker.className='tile-slot';marker.setAttribute('aria-hidden','true');grid.append(marker);
   drag.classList.add('dragging');grid.classList?.add('reordering');aim(point);

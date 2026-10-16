@@ -20,3 +20,6 @@ Use explicit non-passive Touch Events for iPad, with immediate dragging from a h
 
 ### v1.1.2 — free grid placement
 Tiles now store explicit cell positions, including empty cells, per account and device class. Drop on an occupied cell swaps those two tiles; all other positions remain fixed. Dragging exposes one extra row and a cell preview. Previous v1 tile order migrates automatically. Touch targets stay mounted until release; cancel/outside drops do not save. Arrow up/down moves one complete row. Breakpoints use 2/3/6 columns.
+
+### v1.1.3 — five rows and Pack branding
+Reserve at least five grid rows, retaining longer saved layouts. Use the supplied Pack logo in navigation/login and its symbol for favicon and home-screen icons. App-specific CleanFleet/Robisię logos remain scoped to their tiles.

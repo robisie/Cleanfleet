@@ -1,4 +1,4 @@
-# Bill 1.0.7
+# Bill 1.0.8
 
 Admin-only invoicing at `/bill/`. Uses the existing CleanFleet Supabase login, with a separate browser session key. No signup and no direct browser access to billing tables. The server checks the current user and administrator role for every operation.
 
@@ -51,3 +51,6 @@ Accepted Bill invoices have a correction action. A new draft has a dedicated imm
 Corrections use the existing shared A/month counter and standard explicit issue/send confirmation; draft creation allocates no number and sends nothing. A service-only unique index permits one non-rejected correction per parent. Reopening the parent returns its existing correction; successive corrections are created from the accepted correction and refer to the root and previous document. Server rebuilds references/before state on save/send. This supports corrections to accepted invoices stored in Bill; importing originals issued outside Bill for correction is not implemented.
 A reported missing trade name was traced to MF returning only the proprietor name while no GUS key was configured. No name was removed by PDF or XML generation. Source labels now explicitly distinguish MF-only from enabled GUS and warn about missing trade names. For enabled GUS, F/SilosID1 uses a full BIR12 CEIDG report name, checked against REGON; unavailable full report leaves a visible manual-name warning. The issued invoice and contractor names were not silently rewritten.
 Validation: data/increase/decrease/zero correction XML against the official FA3 XSD; immutable-reference, zero-delta, chaining and GUS full-name tests; correction HTML/PDF visual check. No live correction was issued or sent.
+
+## Correction prefix (1.0.8)
+New corrections receive KA[n]/MM/YYYY and ordinary invoices A[n]/MM/YYYY from the same monthly atomic counter. Existing issued numbers are not rewritten. Editor/confirmation previews use the same prefix.

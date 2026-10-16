@@ -45,7 +45,7 @@ begin
  v_period:=to_char(issue_date,'YYYY-MM');
  insert into public.bill_counters(period,last_number) values(v_period,1)
  on conflict(period) do update set last_number=bill_counters.last_number+1 returning last_number into n;
- update public.bill_invoices set number='A'||n||'/'||to_char(issue_date,'MM/YYYY'),status='issued',revision=revision+1,updated_at=now()
+ update public.bill_invoices set number=(case when r.payload->'correction'->>'originalId' is not null then 'KA' else 'A' end)||n||'/'||to_char(issue_date,'MM/YYYY'),status='issued',revision=revision+1,updated_at=now()
  where id=p_id returning * into r;
  return r;
 end $$;

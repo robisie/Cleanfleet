@@ -135,11 +135,18 @@ async function readPdf(file,password=''){
     return P.parsePages(pages);
   }finally{if(doc)await doc.destroy();else await task.destroy().catch(()=>{});}
 }
-function importOptions(batches){return batches.map((b,i)=>`<section class="import-source" data-batch="${i}"><b>${escape(b.name)}</b><p>${b.range?escape(b.range.from)+' – '+escape(b.range.to):'Nie rozpoznano zakresu wyciągu'} · ${(b.incomes||[]).length} wpływów</p><label class="checkline"><input type="checkbox" data-complete ${b.warnings.length||!b.range?'disabled':''}>Wyciąg zawiera wszystkie operacje z podanego okresu</label>${b.warnings.length?'<p class="error">Nie odczytano wszystkich kwot. Ten plik nie potwierdzi kompletności miesiąca.</p>':''}</section>`).join('');}
+function importProblems(batch){
+ const range=batch.range,problems=[...(batch.warnings||[])];
+ if(!range||!P.date(range.from)||!P.date(range.to)||range.from>range.to)problems.push('Nie rozpoznano poprawnego zakresu dat wyciągu.');
+ else for(const t of [...batch.transactions,...(batch.incomes||[])])if(t.date<range.from||t.date>range.to)problems.push(`Operacja ${t.date} (${t.recipient||'bez nazwy'}) jest poza zakresem ${range.from} – ${range.to}.`);
+ return problems;
+}
+function importOptions(batches){return batches.map((b,i)=>{const problems=importProblems(b);return `<section class="import-source" data-batch="${i}"><b>${escape(b.name)}</b><p>${b.range?escape(b.range.from)+' – '+escape(b.range.to):'Nie rozpoznano zakresu wyciągu'} · Wpływy: ${(b.incomes||[]).length}</p><label class="checkline"><input type="checkbox" data-complete ${problems.length?'disabled':''}>Wyciąg zawiera wszystkie operacje z podanego okresu</label>${problems.length?`<p class="error">Odczytane operacje można zapisać. Ten plik nie potwierdzi kompletności miesiąca.</p><details><summary>Sprawdź przyczynę (${problems.length})</summary><ul>${problems.map(p=>`<li>${escape(p)}</li>`).join('')}</ul></details>`:''}</section>`;}).join('');}
+
 function appendImport(next,batches,transactions){
   for(const section of $('modalBody').querySelectorAll('[data-batch]')){const b=batches[Number(section.dataset.batch)],complete=section.querySelector('[data-complete]').checked,from=b.range?.from||null,to=b.range?.to||null;
-    if(complete&&(b.warnings.length||!from||!to||[...b.transactions,...(b.incomes||[])].some(t=>t.date<from||t.date>to)))throw Error('Nie można potwierdzić pełnego zakresu wyciągu z błędami odczytu.');
-    const previous=next.imports.find(i=>i.hash===b.hash),item={id:previous?.id||id(),hash:b.hash,name:b.name,from,to,complete:complete||!!previous?.complete&&!b.warnings.length,incomeVersion:1,currency:b.currency||'PLN',unreadCount:b.warnings.length,importedAt:new Date().toISOString()};
+    const problems=importProblems(b);
+    const previous=next.imports.find(i=>i.hash===b.hash),item={id:previous?.id||id(),hash:b.hash,name:b.name,from,to,complete:!problems.length&&(complete||!!previous?.complete),incomeVersion:1,currency:b.currency||'PLN',unreadCount:b.warnings.length,importedAt:new Date().toISOString()};
     if(previous)Object.assign(previous,item);else next.imports.push(item);
   }
   for(const b of batches)next.transactions=P.mergeTransactions(next.transactions,P.tracked(transactions.filter(t=>t.sourceHash===b.hash),next.rules));
@@ -160,7 +167,7 @@ async function preview(files,password=''){
   }
   const matched=P.tracked(transactions,state.rules),unknown=P.tracked(unread,state.rules),incomeCount=batches.reduce((sum,b)=>sum+(b.incomes||[]).length,0);
   modal('Uzupełnij historię',`<p>Znaleziono ${incomeCount} wpływów na konto oraz ${matched.length} płatności dla kontrahentów z Twojej listy. Wpływy zostaną zapisane niezależnie od obserwowanej listy. Pozostałe płatności wychodzące zostaną pominięte.</p>${unknown.length?`<p class="error">${unknown.length} płatności z listy ma nierozpoznaną kwotę i nie zostanie zapisanych.</p>`:''}${importOptions(batches)}`,`<button id="saveImport" class="primary">Zapisz wpływy i historię płatności</button>`);
-  $('saveImport').onclick=()=>action(async()=>{const next=structuredClone(state),before=next.transactions.length,beforeIncome=(next.incomes||[]).length;appendImport(next,batches,transactions);await persist(next);if(epoch!==generation)return;close();notice(`Dodano ${(next.incomes||[]).length-beforeIncome} wpływów i ${next.transactions.length-before} płatności z listy. Powtórzenia pominięto.`);});
+  $('saveImport').onclick=()=>action(async()=>{const next=structuredClone(state),before=next.transactions.length,beforeIncome=(next.incomes||[]).length;appendImport(next,batches,transactions);await persist(next);if(epoch!==generation)return;close();notice(`Dodano ${(next.incomes||[]).length-beforeIncome} wpływów i ${next.transactions.length-before} płatności z listy. Powtórzenia pominięto.${next.imports.some(i=>batches.some(b=>b.hash===i.hash)&&!i.complete)?' Wyciągi bez potwierdzonej kompletności zapisano jako niepełne.':''}`);});
 }
 function mergeChoice(candidate){const similar=P.similarRules(candidate,state.rules);return similar.length?`<p>Podobny odbiorca jest już na Twojej liście. Scalenie zachowa nazwę i ustawienia istniejącej pozycji oraz dopisze rozpoznawanie tego odbiorcy.</p><label>Co zrobić z tą pozycją?<select data-merge><option value="">Dodaj jako osobną pozycję</option>${similar.map(r=>`<option value="${escape(r.id)}">Scal z: ${escape(r.name)}</option>`).join('')}</select></label>`:'';}
 function chooseCandidates(candidates,batches,transactions){

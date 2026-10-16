@@ -1,4 +1,4 @@
-# Moje finanse v1.2.0
+# Moje finanse v1.2.1
 
 The administrator dashboard has one Moje finanse tile. app/finances.js opens four tabs: earnings, payments, routes and cash. The private vault iframe at /app/priv/index.html?finance=1 uses the existing payment PIN/password (minimum six characters) as the shared UI gate. Direct legacy private URLs redirect to /app/?finances=1. Switching tabs preserves drafts and does not reload the main app.
 
@@ -37,3 +37,5 @@ Unified-window checks: node --test tests/private-payments*.cjs tests/private-pay
 Statement import now offers an optional PDF password alongside file selection. A batch may share that password; files with a different password prompt separately. The input is cleared before reading, plaintext files remain supported, and passwords are not included in imports, saved transactions or encrypted vault state.
 
 Bank income v1.2.0: the parser returns positive operation amounts separately from tracked outgoing payments, never account balances. All bank credits (including refunds and own-account transfers) are encrypted as `incomes` in the existing vault; no schema or RLS changes. The payments tab displays monthly/year totals per currency, full completed-month average, credit details and persistent exclusions. Full months with no credits count as zero; missing, partial, ongoing and legacy unparsed months are excluded from the average. Existing statements have to be uploaded again because earlier versions discarded credits and never retained PDFs. Income coverage requires a re-read (`incomeVersion:1`), matching account currency and explicit full-statement confirmation. File/range metadata alone cannot retroactively prove credit coverage. Re-imports preserve exclusions and real same-day repeats, deduplicate overlapping statements and keep watched-payment history intact. Backup/restore, PIN changes and lock cover credits too. Tests: `node --test tests/private-payments-income.test.cjs`.
+
+Import review v1.2.1: amount errors, missing ranges and operations outside the statement range are listed per file in expandable details. They disable full-period confirmation but do not block saving recognized operations in the batch. Invalid files cannot inherit an earlier full-period flag. They remain incomplete for averages and missing-payment checks until corrected.

@@ -24,13 +24,13 @@ test('leap-year full coverage joins intervals, exclusion changes average and unk
 function importContext(batches,complete=true){
  const sections=batches.map((_,i)=>({dataset:{batch:String(i)},querySelector:()=>({checked:complete})}));let id=0;
  const c=vm.createContext({P,id:()=>String(++id),$:()=>({querySelectorAll:()=>sections})});
- vm.runInContext(ui.slice(ui.indexOf('function appendImport('),ui.indexOf('\nasync function preview(')),c);return c;
+ vm.runInContext(ui.slice(ui.indexOf('function importProblems('),ui.indexOf('\nasync function preview(')),c);return c;
 }
 test('imports keep all credits without rules, deduplicate overlapping PDFs and retain manual exclusions on re-import',()=>{
  const batches=[{hash:'a',name:'a.pdf',currency:'PLN',range:{from:'2026-01-01',to:'2026-01-31'},warnings:[],transactions:[],incomes:[credit,{...credit,id:'i2'}]},{hash:'b',name:'b.pdf',currency:'PLN',range:{from:'2026-01-01',to:'2026-01-31'},warnings:[],transactions:[],incomes:[credit]}];
  const s={rules:[],transactions:[],imports:[{hash:'a',complete:true}],incomes:[]},c=importContext(batches);c.appendImport(s,batches,[]);assert.equal(s.incomes.length,2);assert.equal(s.imports.length,2);assert.equal(s.imports[0].incomeVersion,1);s.incomes[0].excluded=true;c.appendImport(s,batches,[]);assert.equal(s.incomes.length,2);assert.equal(s.incomes[0].excluded,true);assert.equal(s.transactions.length,0);
 });
-test('income outside range prevents full-month confirmation',()=>{const b={hash:'a',range:{from:'2026-02-01',to:'2026-02-28'},warnings:[],transactions:[],incomes:[credit]},c=importContext([b]);assert.throws(()=>c.appendImport({imports:[]},[b],[]),/pełnego zakresu/);});
+test('out-of-range credit saves safely without full-month confirmation',()=>{const b={hash:'a',range:{from:'2026-02-01',to:'2026-02-28'},warnings:[],transactions:[],incomes:[credit]},c=importContext([b]),s={imports:[],incomes:[],transactions:[],rules:[]};c.appendImport(s,[b],[]);assert.equal(s.imports[0].complete,false);assert.equal(s.incomes.length,1);assert.match(c.importProblems(b)[0],/2026-01-10.*2026-02-01/);});
 test('legacy vaults migrate safely; income and exclusions survive encryption, backup, and PIN change',async()=>{
  const {validateCash}=await import('../app/priv/cash.js'),v=await import('../app/priv/vault.js');
  const c=vm.createContext({P,validateCash});vm.runInContext(ui.slice(ui.indexOf('function validate(s)'),ui.indexOf('\nfunction notice(')),c);
@@ -50,4 +50,12 @@ test('income section renders months and exclusions save immediately through exis
 test('same-file income backfill does not duplicate existing watched outgoing payments',()=>{
  const expense={...credit,id:'e1',recipient:'ZUS',sourceHash:'a'},rule={id:'r1',recipient:'ZUS',currency:'PLN'},b={hash:'a',name:'a.pdf',range:{from:'2026-01-01',to:'2026-01-31'},warnings:[],transactions:[expense],incomes:[credit]};
  const s={rules:[rule],transactions:[expense],imports:[{hash:'a',complete:true}],incomes:[]},c=importContext([b]);c.appendImport(s,[b],[expense]);c.appendImport(s,[b],[expense]);assert.equal(s.transactions.length,1);assert.equal(s.incomes.length,1);assert.equal(s.imports.length,1);
+});
+
+test('one problematic statement never blocks a mixed batch or inherits false completeness',()=>{
+ const good={hash:'good',name:'good.pdf',range:{from:'2026-01-01',to:'2026-01-31'},warnings:[],transactions:[],incomes:[credit]},bad={...good,hash:'bad',warnings:['Nie rozpoznano kwoty operacji z 2026-01-12'],incomes:[{...credit,amount:20000}]};
+ const c=importContext([good,bad]),state={rules:[],transactions:[],imports:[{hash:'bad',complete:true}],incomes:[]};c.appendImport(state,[good,bad],[]);assert.equal(state.incomes.length,2);assert.equal(state.imports.find(i=>i.hash==='good').complete,true);assert.equal(state.imports.find(i=>i.hash==='bad').complete,false);assert.equal(P.incomeSummary({imports:state.imports.filter(i=>i.hash==='bad'),incomes:state.incomes},2026,'PLN','2026-10-16').fullMonths,0);
+});
+test('preview explains date and unread problems and only disables invalid completeness checkboxes',()=>{
+ const good={name:'good',range:{from:'2026-01-01',to:'2026-01-31'},warnings:[],transactions:[],incomes:[credit]},bad={...good,name:'bad',range:{from:'2026-02-01',to:'2026-02-28'}},c=importContext([good,bad]);c.escape=s=>s;const html=c.importOptions([good,bad]);assert.equal((html.match(/data-complete disabled/g)||[]).length,1);assert.match(html,/Operacja 2026-01-10/);assert.match(html,/Odczytane operacje można zapisać/);
 });

@@ -11,6 +11,6 @@ test('billing gates access, escapes contractor text, and shares monthly numberin
  m.namespace.testView('edit',row);assert.match(node('#app').innerHTML,/A3\/10\/2026/);assert.match(node('#app').innerHTML,/value="robisie" selected/);assert.equal(m.namespace.nextNumber('2026-11-01'),'A1/11/2026');
  assert.equal(m.namespace.partyFromValues(new Map([['buyerKind','person'],['buyerName','Jan'],['buyerNip','5260250995']]),'buyer').nip,'');assert.match(node('#app').innerHTML,/Osoba prywatna/);assert.match(node('#app').innerHTML,/data-company-only style="display:contents" hidden/);row.payload.buyer.kind='company';row.payload.buyer.nip='5260250995';
  row.payload.brand='cleanfleet';m.namespace.testView('edit',row);assert.match(node('#app').innerHTML,/A3\/10\/2026/);assert.match(node('#app').innerHTML,/value="cleanfleet" selected/);
- assert.match(node('#app').innerHTML,/Pełna nazwa firmy/);assert.match(node('#app').innerHTML,/Pobierz po NIP — MF/);
+ assert.match(node('#app').innerHTML,/Pełna nazwa firmy/);assert.match(node('#app').innerHTML,/Pobierz dane po NIP/);
  row.status='accepted';row.number='A3/10/2026';m.namespace.testView('detail',row);assert.ok(!node('#app').innerHTML.includes('data-action="edit"'));assert.ok(!node('#app').innerHTML.includes('data-action="issue"'));assert.match(node('#app').innerHTML,/Pobierz UPO/);
 });

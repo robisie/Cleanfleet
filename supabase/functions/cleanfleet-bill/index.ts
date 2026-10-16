@@ -1,3 +1,4 @@
+import {gus,lookupWithFallback} from './gus.js';
 import {lookupCompany} from './registry.js';
 import {stageInvoiceSeed,investmentInvoiceSeed} from '../../../app/robisie/billing.js';
 import {createClient} from 'npm:@supabase/supabase-js@2.57.4';
@@ -7,6 +8,8 @@ import {ksefApi,authenticate,openSession,invoiceStatus,KsefError} from './ksef.j
 const secret=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const db=createClient(Deno.env.get('SUPABASE_URL')!,secret,{auth:{persistSession:false,autoRefreshToken:false}});
 const credentials=createStateCodec(secret,'saved-credentials-v1'),codec=createStateCodec(secret,'bill-ksef-v1'),api=ksefApi();
+const gusCodec=createStateCodec(secret,'bill-gus-config-v1');
+async function savedGusKey(){const row=checked(await db.from('bill_settings').select('payload').single());return row?.payload?.gusKeyCiphertext?(await gusCodec.open(row.payload.gusKeyCiphertext,SELLER.nip,'gus-config')).key:'';}
 const origins=['https://cleanfleet.pl','https://www.cleanfleet.pl'];
 function checked(r:any){if(r.error)throw Error(r.error.code==='23505'?'Ten NIP lub numer już istnieje.':r.error.message);return r.data;}
 async function invoice(id:string){if(!/^[0-9a-f-]{36}$/i.test(id||''))throw Error('Nieprawidłowy identyfikator.');const row=checked(await db.from('bill_invoices').select('*').eq('id',id).single());if(!row)throw Error('Nie znaleziono faktury.');return row;}
@@ -33,7 +36,14 @@ Deno.serve(async req=>{
   if(role.error||role.data?.role!=='admin')return json({error:'Dostęp tylko dla administratora.'},403);
   const raw=await req.text();if(raw.length>300000)return json({error:'Żądanie jest za duże.'},413);
   const body=JSON.parse(raw);
-  if(body.action==='lookup-nip')return json(await lookupCompany(body.nip));
+  if(body.action==='lookup-nip')return json(await lookupWithFallback(body.nip,await savedGusKey(),{mfLookup:lookupCompany}));
+  if(body.action==='gus-save-key'){
+   const key=String(body.key||'').trim();if(!/^[a-zA-Z0-9]{20}$/.test(key)||key==='abcde12345abcde12345')throw Error('Podaj własny 20-znakowy klucz produkcyjny GUS.');
+   await gus.check(key);const gusKeyCiphertext=await gusCodec.seal({key,userId:SELLER.nip,scope:'gus-config',expires:Number.MAX_SAFE_INTEGER});
+   checked(await db.rpc('bill_update_settings',{p_fields:{gusKeyCiphertext}}));return json({ok:true});
+  }
+  if(body.action==='gus-check'){const key=await savedGusKey();if(!key)throw Error('Najpierw zapisz klucz produkcyjny GUS.');await gus.check(key);return json({message:'Połączenie z GUS działa. Klucz produkcyjny został zaakceptowany.'});}
+  if(body.action==='gus-remove-key'){checked(await db.rpc('bill_update_settings',{p_fields:{gusKeyCiphertext:null}}));return json({ok:true});}
   if(body.action==='bootstrap'){
    const [invoices,parties,settings,counters,config,projects,companies,billing]=await Promise.all([
     db.from('bill_invoices').select('id,number,payload,revision,status,ksef_number,ksef_session,ksef_reference,ksef_message,created_at,updated_at').order('created_at',{ascending:false}).limit(1000),
@@ -41,7 +51,7 @@ Deno.serve(async req=>{
     db.from('cf_ksef_credentials').select('nip').eq('user_id',userId).eq('environment','production').maybeSingle(),
     db.from('rs_projects').select('id,contract_number,name:payload->>name').eq('owner_id',userId).order('created_at',{ascending:false}).limit(250),
     db.from('companies').select('id,name,nip,address').eq('active',true),db.from('billing_companies').select('id,company_id,name,tax_id,address,currency').eq('active',true)]);
-   return json({invoices:checked(invoices),parties:checked(parties),settings:checked(settings)?.payload||{},counters:checked(counters),ksefConfigured:checked(config)?.nip===SELLER.nip,sources:{projects:checked(projects).map((r:any)=>({id:r.id,name:r.name,number:r.contract_number})),companies:checked(companies),billing:checked(billing)}});
+   return json({invoices:checked(invoices),parties:checked(parties),settings:{bank:checked(settings)?.payload?.bank||'',gusConfigured:!!checked(settings)?.payload?.gusKeyCiphertext},counters:checked(counters),ksefConfigured:checked(config)?.nip===SELLER.nip,sources:{projects:checked(projects).map((r:any)=>({id:r.id,name:r.name,number:r.contract_number})),companies:checked(companies),billing:checked(billing)}});
   }
   if(body.action==='source'){
    let buyer:any={},description='',source={app:body.app,id:body.id},currency='PLN';
@@ -66,7 +76,7 @@ Deno.serve(async req=>{
    return json(checked(await query));
   }
   if(body.action==='save-settings'){
-   const bank=String(body.bank||'').replace(/\s/g,'');if(bank&&!validBank(bank))throw Error('Podaj poprawny numer rachunku (26 cyfr z sumą kontrolną).');checked(await db.from('bill_settings').update({payload:{bank}}).eq('id',true));return json({ok:true});
+   const bank=String(body.bank||'').replace(/\s/g,'');if(bank&&!validBank(bank))throw Error('Podaj poprawny numer rachunku (26 cyfr z sumą kontrolną).');checked(await db.rpc('bill_update_settings',{p_fields:{bank}}));return json({ok:true});
   }
   if(body.action==='save-party'){
    const payload=party(body.payload);let result;

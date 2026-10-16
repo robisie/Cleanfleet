@@ -1,4 +1,4 @@
-# Bill 1.0.3
+# Bill 1.0.4
 
 Admin-only invoicing at `/bill/`. Uses the existing CleanFleet Supabase login, with a separate browser session key. No signup and no direct browser access to billing tables. The server checks the current user and administrator role for every operation.
 
@@ -32,3 +32,7 @@ Po wybraniu inwestycji Robisię każda pozycja szkicu ma wybór aktualnych kwot:
 The invoice buyer, optional recipient and contractor book explicitly distinguish a private person from a company. Legacy records infer the kind from their NIP. A company requires a valid Polish NIP; a private person uses `BrakID` in FA(3). Email and phone are optional, with optional REGON/KRS for companies. These extra details are retained in the contractor book and invoice payload; the invoice presentation contains standard invoicing identity.
 
 The admin-only `lookup-nip` action fetches the official MF VAT register at `https://wykazpodatnikowvat.mf.gov.pl/api/search/nip/{nip}?date={YYYY-MM-DD}` (the production address effective 15 October 2026). It does not use or claim to use GUS/BIR. Only invoicing identity is returned, with no PESEL, representatives or bank accounts. Successful responses are cached for six hours per NIP and Polish date in each isolate, with a 200-entry bound. Unavailable or absent records preserve manual entry. Lookup does not save a contractor or issue an invoice.
+
+## GUS / REGON (1.0.4)
+Production BIR1 lookup uses an administrator-provided GUS production key (Settings). Key is verified by login, encrypted with a dedicated codec and stored only in service-role-only bill_settings. Bootstrap returns only bank and gusConfigured. Settings patches are atomic and cannot erase the other setting. No test credentials are accepted in production. GUS is attempted first, MF is a fallback; returned source and fallback warning are shown. No registry result is automatically saved or issued as an invoice.
+GUS access is free but requires a key from https://api.stat.gov.pl/Home/RegonApi?lang=pl. KSeF credentials do not grant GUS access. No production lookup without the user's key has been verified.

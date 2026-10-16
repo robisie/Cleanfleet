@@ -51,3 +51,17 @@ begin
 end $$;
 revoke all on function public.bill_issue(uuid,integer) from public,anon,authenticated;
 grant execute on function public.bill_issue(uuid,integer) to service_role;
+
+-- Atomically patch service-only settings; bank saves preserve encrypted registry credentials.
+create or replace function public.bill_update_settings(p_fields jsonb)
+returns jsonb language plpgsql security invoker set search_path = '' as $$
+declare result jsonb;
+begin
+ if jsonb_typeof(p_fields) is distinct from 'object' or exists (select 1 from jsonb_object_keys(p_fields) k where k not in ('bank','gusKeyCiphertext')) then raise exception 'Invalid settings patch'; end if;
+ update public.bill_settings set payload = payload || p_fields where id = true returning payload into result;
+ if not found then raise exception 'Missing Bill settings'; end if;
+ return result;
+end;
+$$;
+revoke all on function public.bill_update_settings(jsonb) from public,anon,authenticated;
+grant execute on function public.bill_update_settings(jsonb) to service_role;

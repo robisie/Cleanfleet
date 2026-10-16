@@ -1,5 +1,5 @@
 import {client,administrator,modules,applications} from './auth.js?v=110';
-import {mountTiles} from './tiles.js?v=111';
+import {mountTiles} from './tiles.js?v=112';
 const $=id=>document.getElementById(id),db=client();let user=null,epoch=0,current='',frame=null,disposeTiles=null;
 function clearModule(){epoch++;frame?.remove();frame=null;current='';$('frameHost').replaceChildren();$('workspace').hidden=true;$('dashboard').hidden=false;$('closeModule').hidden=true;$('moduleTitle').textContent='';document.querySelectorAll('[data-module]').forEach(b=>b.classList.remove('selected'));document.querySelectorAll('[data-home]').forEach(b=>b.classList.add('selected'));}
 function gate(message='Zaloguj się kontem administratora.'){user=null;disposeTiles?.();disposeTiles=null;clearModule();$('panel').hidden=true;$('login').hidden=false;$('loginForm').hidden=false;$('loginInfo').textContent=message;$('userEmail').textContent='';}

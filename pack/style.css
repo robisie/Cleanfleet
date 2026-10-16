@@ -10,3 +10,8 @@ body:has(#panel:not([hidden])){padding-top:calc(68px + env(safe-area-inset-top))
 @media(max-width:500px){.identity img{width:72px;height:34px}.identity strong{font-size:18px;padding-left:7px}.topbar{gap:7px}.top-actions button{font-size:12px;padding:8px}#closeModule{font-size:11px;padding:8px}.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.tile-open,.app-tile .tile-open{height:148px}.tile-open p{font-size:11px}.tile-handle{font-size:21px;padding:7px}.intro{font-size:12px}.top-actions{gap:0}h1{font-size:25px}}
 /* iPad: keep the touch target mounted, use a floating visual and a drop marker. */
 .tile-open,.tile-handle{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}.tile.dragging{pointer-events:auto;opacity:.35}.tile.drop-target{outline:3px solid var(--green);outline-offset:2px;background:#e1ece5}.tile-ghost{position:fixed!important;top:0!important;left:0!important;margin:0!important;z-index:10000;pointer-events:none!important;opacity:.9;box-shadow:0 12px 35px #18312940;transition:none!important}.tile-ghost *{pointer-events:none!important}.app-logo{pointer-events:none}.reordering{user-select:none;-webkit-user-select:none}
+
+/* Explicit slots preserve empty cells rather than compacting tile order. */
+.tiles{grid-auto-rows:162px;position:relative;align-items:stretch}.tiles .tile-open{height:100%}.tile-slot{border:2px dashed var(--green);border-radius:16px;background:#275c4815;pointer-events:none;z-index:2}.tiles.reordering{background-image:radial-gradient(#275c4840 1px,transparent 1px);background-size:12px 12px}.tiles .tile{z-index:1}
+@media(max-width:1099px){.tiles{grid-auto-rows:152px}}
+@media(max-width:599px){.tiles{grid-auto-rows:150px}}

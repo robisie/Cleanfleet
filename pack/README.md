@@ -17,3 +17,6 @@ Finances now use account-based access, with the same owner/admin RLS and optimis
 
 ### v1.1.1 — iPad tile gestures
 Use explicit non-passive Touch Events for iPad, with immediate dragging from a handle or a 350 ms hold on the whole tile. Keep the touched DOM element mounted; move a visual clone and highlight the drop target, then change DOM order only on release. Document-level move/end handlers do not depend on pointer capture. Normal taps/scrolling remain available before a hold activates; cancellation does not commit and the synthetic click after a drag is blocked.
+
+### v1.1.2 — free grid placement
+Tiles now store explicit cell positions, including empty cells, per account and device class. Drop on an occupied cell swaps those two tiles; all other positions remain fixed. Dragging exposes one extra row and a cell preview. Previous v1 tile order migrates automatically. Touch targets stay mounted until release; cancel/outside drops do not save. Arrow up/down moves one complete row. Breakpoints use 2/3/6 columns.

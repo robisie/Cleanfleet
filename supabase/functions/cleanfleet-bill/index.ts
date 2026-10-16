@@ -1,3 +1,4 @@
+import {lookupCompany} from './registry.js';
 import {stageInvoiceSeed,investmentInvoiceSeed} from '../../../app/robisie/billing.js';
 import {createClient} from 'npm:@supabase/supabase-js@2.57.4';
 import {createStateCodec,hash} from '../cleanfleet-ksef/core.js';
@@ -32,6 +33,7 @@ Deno.serve(async req=>{
   if(role.error||role.data?.role!=='admin')return json({error:'Dostęp tylko dla administratora.'},403);
   const raw=await req.text();if(raw.length>300000)return json({error:'Żądanie jest za duże.'},413);
   const body=JSON.parse(raw);
+  if(body.action==='lookup-nip')return json(await lookupCompany(body.nip));
   if(body.action==='bootstrap'){
    const [invoices,parties,settings,counters,config,projects,companies,billing]=await Promise.all([
     db.from('bill_invoices').select('id,number,payload,revision,status,ksef_number,ksef_session,ksef_reference,ksef_message,created_at,updated_at').order('created_at',{ascending:false}).limit(1000),
@@ -48,7 +50,7 @@ Deno.serve(async req=>{
     return json(body.stageId?stageInvoiceSeed(project,String(body.stageId)):investmentInvoiceSeed(project));
    }else if(body.app==='cleanfleet'||body.app==='billing'){
     const billing=body.app==='billing',company=checked(await db.from(billing?'billing_companies':'companies').select('*').eq('id',body.id).single());
-    buyer={name:company.name,nip:(billing?company.tax_id:company.nip)||'',address:company.address||'',city:''};description='Czyszczenie wnętrz pojazdów';currency=billing&&company.currency==='EUR'?'EUR':'PLN';
+    buyer={kind:'company',name:company.name,nip:(billing?company.tax_id:company.nip)||'',address:company.address||'',city:''};description='Czyszczenie wnętrz pojazdów';currency=billing&&company.currency==='EUR'?'EUR':'PLN';
    }else throw Error('Nieprawidłowe źródło danych.');
    const match=buyer.address.match(/^(.*?)[,\n ]+(\d{2}-\d{3}\s+.+)$/s);if(match){buyer.address=match[1].trim();buyer.city=match[2].trim();}
    return json({buyer,description,currency,source});

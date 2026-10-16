@@ -5,3 +5,5 @@
 [hidden]{display:none!important}
 
 @media(max-width:760px){.line-grid>.field:nth-child(3){grid-column:2}.line-grid>.field:nth-child(4){grid-column:3}.savebar .actions>.primary{grid-column:1/-1}}
+
+.wide{grid-column:1/-1}.registry-action{display:flex;flex-direction:column;justify-content:flex-end;gap:6px}.registry-action button{min-height:46px;width:100%}.registry-action>span{font-size:14px;color:#505b69}

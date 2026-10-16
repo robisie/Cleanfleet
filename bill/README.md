@@ -1,4 +1,4 @@
-# Bill 1.0.2
+# Bill 1.0.3
 
 Admin-only invoicing at `/bill/`. Uses the existing CleanFleet Supabase login, with a separate browser session key. No signup and no direct browser access to billing tables. The server checks the current user and administrator role for every operation.
 
@@ -26,3 +26,9 @@ QA PDFs for both logos rendered to single A4 pages and visually inspected. Brows
 Robisię stage links use `?new=1&brand=robisie&source=<project UUID>&stage=<stage ID>`. The authenticated source action verifies project ownership, reads the stage from the database and prepares its exact agreed-offer share, description and buyer. Existing draft/issued documents are reopened rather than starting another from the same link. The source stage ID survives invoice validation. Robisię refreshes the stage's invoice link on returning to its tab; invoicing never marks it paid. Deployment must include `app/robisie/billing.js` and `app/robisie/core.js` as relative dependencies alongside the existing function files.
 
 Po wybraniu inwestycji Robisię każda pozycja szkicu ma wybór aktualnych kwot: wykonane prace, pozostała należność za prace, saldo z materiałami, całe zlecenie oraz etapy z aktywnej oferty. Wybór ustawia ilość 1 i opis; kwoty pozostają edytowalne. Odświeżenie propozycji nie zmienia szkicu. Propozycje są w PLN, zerowe i ujemne salda pozostają niedostępne. Nie uwzględniają innych wystawionych faktur — stan wynika z rozliczeń inwestycji.
+
+## Counterparties (1.0.3)
+
+The invoice buyer, optional recipient and contractor book explicitly distinguish a private person from a company. Legacy records infer the kind from their NIP. A company requires a valid Polish NIP; a private person uses `BrakID` in FA(3). Email and phone are optional, with optional REGON/KRS for companies. These extra details are retained in the contractor book and invoice payload; the invoice presentation contains standard invoicing identity.
+
+The admin-only `lookup-nip` action fetches the official MF VAT register at `https://wykazpodatnikowvat.mf.gov.pl/api/search/nip/{nip}?date={YYYY-MM-DD}` (the production address effective 15 October 2026). It does not use or claim to use GUS/BIR. Only invoicing identity is returned, with no PESEL, representatives or bank accounts. Successful responses are cached for six hours per NIP and Polish date in each isolate, with a 200-entry bound. Unavailable or absent records preserve manual entry. Lookup does not save a contractor or issue an invoice.

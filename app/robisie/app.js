@@ -1,7 +1,7 @@
-import * as Auto from './autosave.js?v=1.0.47';
-import * as C from './core.js?v=1.0.47';
-import * as API from './api.js?v=1.0.47';
-import * as PDF from './pdf.js?v=1.0.47';
+import * as Auto from './autosave.js?v=1.0.48';
+import * as C from './core.js?v=1.0.48';
+import * as API from './api.js?v=1.0.48';
+import * as PDF from './pdf.js?v=1.0.48';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',shopFilter=null,projectFilter='',projectSearch='',summarySort={key:'category',direction:1},mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set(),stageInvoiceCache=new Map();
@@ -235,7 +235,7 @@ async function save({normalize=true,renderUI=true,feedback=true}={}){
   const previous=before?.payload;
   if(previous&&previous.activeOfferVersion===data.activeOfferVersion&&!(previous.works.length===0&&data.acceptedOffers.length>previous.acceptedOffers.length)){const normalize=rows=>rows.map(({done,...rest})=>rest);data.changes.push(...C.changeRecord(normalize(previous.works),normalize(data.works)));}
   if(previous&&Auto.samePayload(previous,data)){projectDirty=false;drafts.remove('project:'+current.id);updateSaveState();return;}
-  const result=await API.saveProject(current,Auto.withUndo(data,previous)),row=Array.isArray(result)?result[0]:result;
+  const result=await API.saveProject({...current,payload:previous||{}},Auto.withUndo(data,previous)),row=Array.isArray(result)?result[0]:result;
   all=all.map(item=>item.id===row.id?structuredClone(row):item);
   if(selected?.id===row.id){const editedMeanwhile=!Auto.samePayload(selected.payload,submitted);if(editedMeanwhile){selected.revision=row.revision;selected.payload=Auto.mergeEdits(row.payload,submitted,selected.payload);projectDirty=true;keepDraft('project');scheduleSave();}else{selected=structuredClone(row);projectDirty=false;drafts.remove('project:'+row.id);}}
   saveError='';updateSaveState();if(renderUI&&!projectDirty)render();if(feedback)toast('Zapisano automatycznie.');

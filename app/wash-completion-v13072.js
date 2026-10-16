@@ -39,6 +39,21 @@
     }catch(_){}
     console.info(message);
   }
+  function parseDuration(value){
+    const text=String(value||'').trim().replace(',','.');
+    if(!text)return null;
+    if(/^\d+:\d{2}$/.test(text)){
+      const [h,m]=text.split(':').map(Number);
+      return m<60 ? h+m/60 : NaN;
+    }
+    return /^\d+(\.\d+)?$/.test(text) ? Number(text) : NaN;
+  }
+  function hoursLabel(hours){
+    if(hours==null||!Number.isFinite(hours)||hours<=0)return '—';
+    const seconds=Math.round(hours*3600);
+    const h=Math.floor(seconds/3600),m=Math.floor(seconds%3600/60),s=seconds%60;
+    return [h?`${h} godz.`:'',m?`${m} min`:'',s?`${s} s`:''].filter(Boolean).join(' ');
+  }
   function currentRole(){
     const role=document.body?.getAttribute('data-cf-role')||'';
     if(role) return role;
@@ -69,6 +84,9 @@
       .cf-completion-grid .field{margin:0;min-width:0}
       .cf-completion-grid .field input,
       .cf-completion-grid .field textarea{box-sizing:border-box}
+      .cf-completion-grid input,.cf-completion-grid select{font-size:16px!important;max-width:100%;min-width:0}
+      .cf-completion-grid [hidden]{display:none!important}
+      #cfWashCompletionOverlay{z-index:17000}
       #cfCompleteDate{
         width:calc(100% - 32px)!important;
         max-width:calc(100% - 32px)!important;
@@ -89,7 +107,7 @@
         border-radius:8px!important;
         background:#fff!important;
         color:var(--ink,#16150f)!important;
-        font-size:13px!important;
+        font-size:16px!important;
         line-height:1.1!important;
       }
       .cf-completion-span-2{grid-column:1/-1}
@@ -245,21 +263,31 @@
     });
   }
 
-  async function openCompletion(id){
+  async function openCompletion(target,onSaved){
     if(opening)return;
+    if(!canComplete()){toast('Brak uprawnień do zakończenia prania.');return;}
+    const ids=[...new Set((Array.isArray(target)?target:[target]).map(String))];
+    if(!ids.length)return;
     opening=true;
     injectStyles();
     try{
       if(typeof cfSupabase==='undefined')throw new Error('Brak połączenia z bazą.');
-      const [{data:row,error:rowError},catalog]=await Promise.all([
+      const [{data:rows,error:rowError},catalog]=await Promise.all([
         cfSupabase.from('wash_records')
-          .select('id,company_id,plate,type,brand,notes,wash_date,wash_start_time,wash_end_time,performed_by,cost,approved,work_items,completion_notes')
-          .eq('id',id).maybeSingle(),
+          .select('id,company_id,plate,type,brand,notes,wash_date,duration_hours,wash_start_time,wash_end_time,performed_by,cost,currency,approved,paid,work_items,completion_notes')
+          .in('id',ids),
         fetchCatalog(true)
       ]);
       if(rowError)throw rowError;
-      if(!row)throw new Error('Nie znaleziono wpisu.');
-      if(row.approved){return;}
+      if(!rows||rows.length!==ids.length)throw new Error('Nie znaleziono wszystkich zaznaczonych wpisów.');
+      const pending=rows.filter(r=>!r.approved&&!r.paid);
+      if(!pending.length){toast('Zaznaczone wpisy są już wykonane.');return;}
+      if(new Set(pending.map(r=>r.company_id)).size!==1)throw new Error('Wybierz wpisy jednej firmy.');
+      if(new Set(pending.map(r=>r.currency||'PLN')).size!==1)throw new Error('Wybierz wpisy w tej samej walucie.');
+      const bulk=pending.length>1;
+      const row=pending[0];
+      const completionIds=pending.map(r=>r.id);
+      const currency=row.currency||'PLN';
 
       const root=document.getElementById('modalRoot')||document.body;
       const existing=document.getElementById('cfWashCompletionOverlay');
@@ -282,14 +310,18 @@
       overlay.innerHTML=`<div class="sheet cf-completion-sheet">
         <button class="close" data-close type="button">&times;</button>
         <div class="cf-completion-head">
-          <h2>Zakończ pranie</h2>
-          <span class="cf-completion-plate">${esc(row.plate||'')}</span>
+          <h2>${bulk?'Zakończ prania':'Zakończ pranie'}</h2>
+          <span class="cf-completion-plate">${bulk?`Liczba aut: ${pending.length}`:esc(row.plate||'')}</span>
+          ${bulk?`<p>${pending.map(r=>esc(r.plate)).join(', ')}</p><p>Data, wykonawca, zakres prac i kwota dotyczą każdego auta. Łączny czas zostanie podzielony równo.</p>`:''}
+          ${pending.length<rows.length?'<p>Wpisy już wykonane lub opłacone zostały pominięte.</p>':''}
         </div>
         <div class="cf-completion-grid">
           <label class="field"><span>Data prania</span><input id="cfCompleteDate" type="date" value="${esc(row.wash_date||todayLocal())}"></label>
           <label class="field"><span>Kto wykonał</span><input id="cfCompletePerformer" type="text" list="cfCompletePerformerList" value="${esc(row.performed_by||'')}" placeholder="Imię / osoba"><datalist id="cfCompletePerformerList">${performerValues.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></label>
-          <label class="field"><span>Godzina od</span><input id="cfCompleteStart" type="time" value="${esc(row.wash_start_time?String(row.wash_start_time).slice(0,5):'')}"></label>
-          <label class="field"><span>Godzina do</span><input id="cfCompleteEnd" type="time" value="${esc(row.wash_end_time?String(row.wash_end_time).slice(0,5):'')}"></label>
+          <label class="field cf-completion-span-2"><span>${bulk?'Łączny czas wszystkich aut':'Czas prania'} (opcjonalnie)</span><select id="cfCompleteTimeMode"><option value="range">Godziny od–do</option><option value="duration" ${!bulk&&row.duration_hours!=null&&!(row.wash_start_time&&row.wash_end_time)?'selected':''}>Wpisz czas trwania</option><option value="none">Bez czasu</option></select></label>
+          <label class="field" data-time-range><span>Godzina od</span><input id="cfCompleteStart" type="time" value="${esc(!bulk&&row.wash_start_time?String(row.wash_start_time).slice(0,5):'')}"></label>
+          <label class="field" data-time-range><span>Godzina do</span><input id="cfCompleteEnd" type="time" value="${esc(!bulk&&row.wash_end_time?String(row.wash_end_time).slice(0,5):'')}"></label>
+          <label class="field cf-completion-span-2" data-time-duration hidden><span>Czas trwania w godzinach</span><input id="cfCompleteManualDuration" type="text" inputmode="decimal" placeholder="np. 1:30 lub 1,5" value="${!bulk&&row.duration_hours!=null?esc(row.duration_hours):''}"><small>Możesz wpisać 1:30 lub 1,5 — oba oznaczają 1 godz. 30 min.</small></label>
           <div class="cf-completion-duration cf-completion-span-2"><span>Czas prania</span><strong id="cfCompleteDuration">—</strong></div>
         </div>
 
@@ -319,13 +351,15 @@
       </div>`;
       root.appendChild(overlay);
 
-      const close=()=>overlay.remove();
+      let saving=false;
+      const close=()=>{if(!saving)overlay.remove();};
       overlay.querySelectorAll('[data-close]').forEach(x=>x.addEventListener('click',close));
       overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
 
       const servicesEl=overlay.querySelector('#cfCompleteServices');
       const costEl=overlay.querySelector('#cfCompleteCost');
       const costHint=overlay.querySelector('#cfCompleteCostHint');
+      costEl.previousElementSibling.textContent=`Kwota ${bulk?'za jedno auto ':''}(${currency})`;
       let catalogRows=catalog;
       let manualTouched=false;
 
@@ -369,11 +403,20 @@
         }));
       };
 
+      const timeMode=overlay.querySelector('#cfCompleteTimeMode');
+      const manualDuration=overlay.querySelector('#cfCompleteManualDuration');
+      const totalHours=()=>{
+        if(timeMode.value==='none')return null;
+        if(timeMode.value==='duration')return parseDuration(manualDuration.value);
+        const mins=durationMinutes(overlay.querySelector('#cfCompleteStart').value,overlay.querySelector('#cfCompleteEnd').value);
+        return mins==null?null:mins/60;
+      };
       const syncDuration=()=>{
-        overlay.querySelector('#cfCompleteDuration').textContent=durationLabel(
-          overlay.querySelector('#cfCompleteStart').value,
-          overlay.querySelector('#cfCompleteEnd').value
-        );
+        overlay.querySelectorAll('[data-time-range]').forEach(el=>{el.hidden=timeMode.value!=='range';});
+        overlay.querySelector('[data-time-duration]').hidden=timeMode.value!=='duration';
+        const hours=totalHours();
+        overlay.querySelector('#cfCompleteDuration').textContent=hours==null?'Bez czasu':
+          (bulk?`${hoursLabel(hours)} łącznie · ${hoursLabel(hours/pending.length)} / auto`:hoursLabel(hours));
       };
       const syncCostHint=()=>{
         const total=selectedTotal();
@@ -392,6 +435,8 @@
       syncCostHint();
       overlay.querySelector('#cfCompleteStart')?.addEventListener('input',syncDuration);
       overlay.querySelector('#cfCompleteEnd')?.addEventListener('input',syncDuration);
+      timeMode.addEventListener('change',()=>{syncDuration();clearFormError();});
+      manualDuration.addEventListener('input',syncDuration);
       costEl?.addEventListener('input',()=>{manualTouched=true;syncCostHint();});
       overlay.querySelector('#cfCompleteRecalc')?.addEventListener('click',()=>{
         manualTouched=false;
@@ -431,10 +476,12 @@
       }));
 
       overlay.querySelector('#cfCompleteSave')?.addEventListener('click',async()=>{
+        if(saving)return;
         const saveBtn=overlay.querySelector('#cfCompleteSave');
         const washDate=overlay.querySelector('#cfCompleteDate').value;
-        const start=overlay.querySelector('#cfCompleteStart').value;
-        const end=overlay.querySelector('#cfCompleteEnd').value;
+        const start=timeMode.value==='range'?overlay.querySelector('#cfCompleteStart').value:'';
+        const end=timeMode.value==='range'?overlay.querySelector('#cfCompleteEnd').value:'';
+        const hours=totalHours();
         const performer=overlay.querySelector('#cfCompletePerformer').value.trim();
         const serviceIds=selectedIds();
         const cost=Number(String(costEl.value||'').replace(',','.'));
@@ -446,21 +493,22 @@
         const endEl=overlay.querySelector('#cfCompleteEnd');
         const performerEl=overlay.querySelector('#cfCompletePerformer');
         if(!washDate){showFormError('Podaj datę prania.',dateEl);return;}
-        if(!start){showFormError('Podaj godzinę rozpoczęcia prania.',startEl);return;}
-        if(!end){showFormError('Podaj godzinę zakończenia prania.',endEl);return;}
-        if(durationMinutes(start,end)===null||durationMinutes(start,end)<=0){showFormError('Sprawdź godzinę rozpoczęcia i zakończenia prania.',endEl);return;}
+        if((start&&!end)||(!start&&end)){showFormError('Uzupełnij obie godziny albo pozostaw obie puste.',start?endEl:startEl);return;}
+        if(hours!==null&&(!Number.isFinite(hours)||hours<=0||hours>168)){showFormError('Podaj czas większy od zera, maksymalnie 168 godz.',timeMode.value==='duration'?manualDuration:endEl);return;}
         if(!performer){showFormError('Podaj, kto wykonał pranie.',performerEl);return;}
         if(!serviceIds.length){showFormError('Zaznacz co najmniej jeden zakres wykonanych prac.',servicesEl);return;}
         if(!Number.isFinite(cost)||cost<0){showFormError('Podaj poprawną kwotę.',costEl);return;}
 
         saveBtn.disabled=true;
+        saving=true;
         saveBtn.textContent='Zapisuję…';
         try{
-          const {data,error}=await cfSupabase.rpc('cf_complete_wash_record',{
-            p_wash_record_id:id,
+          const {data,error}=await cfSupabase.rpc('cf_complete_wash_records',{
+            p_wash_record_ids:completionIds,
             p_wash_date:washDate,
-            p_start_time:start,
-            p_end_time:end,
+            p_start_time:start||null,
+            p_end_time:end||null,
+            p_duration_hours:timeMode.value==='duration'?hours:null,
             p_performed_by:performer,
             p_cost:Math.round(cost*100)/100,
             p_service_ids:serviceIds,
@@ -470,12 +518,13 @@
 
           // Dopiero po potwierdzonym zapisie w Supabase aktualizujemy stan na ekranie.
           // Dzięki temu przy błędzie zapisu checkbox nie może pokazać fałszywego "Wykonane".
-          try{
+          for(const id of completionIds)try{
             window.cfApplyCompletedWashLocal?.({
               id,
               washDate,
-              start,
-              end,
+              start:bulk?'':start,
+              end:bulk?'':end,
+              durationHours:data?.duration_hours_per_vehicle??null,
               performer,
               cost:Math.round(cost*100)/100,
               notes
@@ -484,7 +533,9 @@
             console.warn('CleanFleet local completion refresh:',localError);
           }
 
+          saving=false;
           close();
+          try{onSaved?.();}catch(callbackError){console.warn('CleanFleet selection refresh:',callbackError);}
 
           try{
             if(typeof addOptionIfNew==='function')addOptionIfNew('kto_wykonal',performer);
@@ -511,10 +562,11 @@
             }
           }catch(_){}
 
-          toast(`Pranie zakończone · ${durationLabel(start,end)} · ${money(cost)}`);
+          toast(`${bulk?`Zakończono prania: ${pending.length}`:'Pranie zakończone'} · ${hours==null?'bez czasu':hoursLabel(hours)} · ${cost.toFixed(2)} ${currency}${bulk?' / auto':''}`);
         }catch(err){
           console.error('CleanFleet complete wash:',err);
           showFormError(err?.message||'Nie udało się zakończyć prania.');
+          saving=false;
           saveBtn.disabled=false;
           saveBtn.textContent='Zapisz i oznacz jako wykonane';
         }

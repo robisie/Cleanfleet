@@ -8,7 +8,7 @@
   function monthShift(month,offset){const [y,m]=month.split('-').map(Number);const d=new Date(Date.UTC(y,m-1+Number(offset),1));return d.toISOString().slice(0,7);}
   function rowsFromItems(items){const rows=[];for(const item of items.filter(x=>x.str?.trim()).sort((a,b)=>b.transform[5]-a.transform[5]||a.transform[4]-b.transform[4])){let row=rows.find(r=>Math.abs(r.y-item.transform[5])<2.5);if(!row){row={y:item.transform[5],items:[]};rows.push(row);}row.items.push({text:item.str,x:item.transform[4]});}return rows.sort((a,b)=>b.y-a.y).map(r=>({text:r.items.sort((a,b)=>a.x-b.x).map(i=>i.text).join(' '),items:r.items}));}
   function parsePages(pages){
-    const result=[],warnings=[],unread=[];let range=null,block=null,columns=null;
+    const result=[],incomes=[],warnings=[],unread=[],unreadIncomes=[];let range=null,block=null,columns=null;
     const raw=pages.map(p=>p.map(r=>r.text??r).join('\n')).join('\n');
     const rangeMatch=raw.match(new RegExp('(?:okres|zakres|za okres|od)\\s*[:]?\\s*('+dateToken+')\\s*(?:do|[-–])\\s*('+dateToken+')','i'));
     if(rangeMatch&&date(rangeMatch[1])&&date(rangeMatch[2]))range={from:date(rangeMatch[1]),to:date(rangeMatch[2])};
@@ -22,9 +22,9 @@
     const flush=()=>{
       if(!block)return;const joined=block.lines.join(' '),description=block.description.map(clean).filter(Boolean);
       // A card's transaction/booking date is part of the same operation, not a second payment.
-      const labelled=description.find(t=>/^(?:ODBIORCA|NAZWA ODBIORCY|DANE ODBIORCY|DATA TRANSAKCJI)\s*:/i.test(t));
-      let recipient=labelled?.replace(/^(?:ODBIORCA|NAZWA ODBIORCY|DANE ODBIORCY|DATA TRANSAKCJI)\s*:\s*/i,'').trim();
-      if(!recipient){const pos=description.findIndex(t=>/^(?:ODBIORCA|NAZWA ODBIORCY|DANE ODBIORCY)\s*:?$/i.test(t));if(pos>=0)recipient=description[pos+1];}
+      const labelled=description.find(t=>/^(?:ODBIORCA|NAZWA ODBIORCY|DANE ODBIORCY|NADAWCA|ZLECENIODAWCA|DANE NADAWCY|DATA TRANSAKCJI)\s*:/i.test(t));
+      let recipient=labelled?.replace(/^(?:ODBIORCA|NAZWA ODBIORCY|DANE ODBIORCY|NADAWCA|ZLECENIODAWCA|DANE NADAWCY|DATA TRANSAKCJI)\s*:\s*/i,'').trim();
+      if(!recipient){const pos=description.findIndex(t=>/^(?:ODBIORCA|NAZWA ODBIORCY|DANE ODBIORCY|NADAWCA|ZLECENIODAWCA|DANE NADAWCY)\s*:?$/i.test(t));if(pos>=0)recipient=description[pos+1];}
       recipient ||= description.find(t=>!operation.test(t)&&! /^(?:SALDO|TYTUŁ|DATA|NR |NUMER |RACHUNEK|PLN$|EUR$)/i.test(t)) || description.join(' ') || 'Odbiorca nierozpoznany';
       const titled=description.findIndex(t=>/^TYTUŁ\s*:/i.test(t));
       const title=titled>=0?description.slice(titled).join(' ').replace(/^TYTUŁ\s*:\s*/i,''):description.join(' ').replace(/DATA TRANSAKCJI\s*:\s*/gi,'');
@@ -32,8 +32,8 @@
       if(isCard)recipient=recipient.replace(/\s*\/\s*księgowania\s*$/i,'').replace(/\s+\d{4}\s*$/,'').trim();
       const account=(joined.match(/(?:PL\s*)?(?:\d[\s-]*){26}/)||[])[0]?.replace(/\D/g,'')||'';
       const value=block.value;
-      if(value!=null&&value<0){const account=(joined.match(/(?:PL\s*)?(?:\d[\s-]*){26}/)||[])[0]?.replace(/\D/g,'')||'';result.push({date:block.date,recipient,title,account,amount:Math.abs(value),currency:block.currency||currency,sourcePage:block.page,raw:joined});}
-      else if(value==null&&!/PRZELEW[^\n]*PRZYCHODZĄCY|^WPŁYW/i.test(description[0]||'')){const reason=`Nie rozpoznano kwoty operacji z ${block.date} (strona ${block.page}).`;warnings.push(reason);unread.push({date:block.date,recipient,title,account,currency:block.currency||currency,amount:null,sourcePage:block.page,raw:joined,reason});}
+      if(value!=null&&value!==0){const target=value>0?incomes:result;target.push({date:block.date,recipient,title,account,amount:Math.abs(value),currency:block.currency||currency,sourcePage:block.page,raw:joined});}
+      else if(value==null){const reason=`Nie rozpoznano kwoty operacji z ${block.date} (strona ${block.page}).`;warnings.push(reason);const target=/PRZYCHODZĄCY|^WPŁYW/i.test(description[0]||'')?unreadIncomes:unread;target.push({date:block.date,recipient,title,account,currency:block.currency||currency,amount:null,sourcePage:block.page,raw:joined,reason});}
       block=null;
     };
     for(let page=0;page<pages.length;page++){
@@ -73,8 +73,8 @@
       // Keep a transaction open across a page break; its continuation may hold the recipient/title.
     }
     flush();
-    if(!result.length&&!unread.length)throw new Error('Nie rozpoznano operacji. Użyj tekstowego PDF historii operacji z mBanku. Skan ani samo potwierdzenie przelewu nie są obsługiwane.');
-    return {transactions:result,range,warnings,unread};
+    if(!result.length&&!incomes.length&&!unread.length&&!unreadIncomes.length)throw new Error('Nie rozpoznano operacji. Użyj tekstowego PDF historii operacji z mBanku. Skan ani samo potwierdzenie przelewu nie są obsługiwane.');
+    return {transactions:result,incomes,range,warnings,unread,unreadIncomes,currency};
   }
   function matches(rule,t){if(rule.currency!==t.currency)return false;const accounts=[rule.account,...(rule.accounts||[])].filter(Boolean);const identity=accounts.length&&t.account?accounts.includes(t.account):[rule.recipient,...(rule.aliases||[])].some(n=>contractorKey(n)&&contractorKey(n)===contractorKey(t.recipient));return !!identity&&(!rule.phrase||normalize(t.title).includes(normalize(rule.phrase)));}
   function allocation(state,t){if(t.assignment==='__ignore__')return null;if(t.assignment){const rule=state.rules.find(r=>r.id===t.assignment);return rule?{rule,month:t.month||monthShift(t.date.slice(0,7),rule.offset)}:null;}const rules=state.rules.filter(r=>matches(r,t));return rules.length===1?{rule:rules[0],month:t.month||monthShift(t.date.slice(0,7),rules[0].offset)}:null;}
@@ -115,5 +115,18 @@
   const signature=t=>[t.date,t.account,normalize(t.recipient),normalize(t.title),t.amount,t.currency].join('|');
   // Keep real repeated payments, while re-importing an overlapping statement adds no copies.
   function mergeTransactions(existing,incoming){const counts=new Map();for(const t of existing){const s=signature(t);counts.set(s,(counts.get(s)||0)+1);}const seen=new Map(),added=[];for(const t of incoming){const s=signature(t),n=(seen.get(s)||0)+1;seen.set(s,n);if(n>(counts.get(s)||0))added.push(t);}return [...existing,...added];}
-  return {normalize,contractorKey,similarRules,linkContractor,mergeRules,dueDate,schedule,date,cents,monthShift,rowsFromItems,parsePages,matches,allocation,covered,status,candidates,tracked,signature,mergeTransactions};
+  function incomeSummary(state,year,currency,today){
+    const imports=state.imports.filter(i=>i.incomeVersion===1&&i.currency===currency);
+    const incomes=(state.incomes||[]).filter(t=>t.currency===currency&&t.date.startsWith(year+'-'));
+    const months=Array.from({length:12},(_,i)=>{
+      const month=year+'-'+String(i+1).padStart(2,'0'),from=month+'-01',to=month+'-'+String(new Date(Date.UTC(Number(year),i+1,0)).getUTCDate()).padStart(2,'0');
+      const rows=incomes.filter(t=>t.date.startsWith(month)),included=rows.filter(t=>!t.excluded),total=included.reduce((sum,t)=>sum+t.amount,0);
+      const complete=covered(imports,from,to),finished=to<today;
+      const hasData=rows.length>0||imports.some(i=>i.from&&i.to&&i.from<=to&&i.to>=from);
+      return {month,total,complete,finished,hasData,count:included.length,excluded:rows.length-included.length};
+    });
+    const full=months.filter(m=>m.complete&&m.finished);
+    return {months,total:months.reduce((sum,m)=>sum+m.total,0),average:full.length?Math.round(full.reduce((sum,m)=>sum+m.total,0)/full.length):null,fullMonths:full.length};
+  }
+  return {incomeSummary,normalize,contractorKey,similarRules,linkContractor,mergeRules,dueDate,schedule,date,cents,monthShift,rowsFromItems,parsePages,matches,allocation,covered,status,candidates,tracked,signature,mergeTransactions};
 });

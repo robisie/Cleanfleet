@@ -1,4 +1,4 @@
-import {stageInvoiceSeed} from '../../../app/robisie/billing.js';
+import {stageInvoiceSeed,investmentInvoiceSeed} from '../../../app/robisie/billing.js';
 import {createClient} from 'npm:@supabase/supabase-js@2.57.4';
 import {createStateCodec,hash} from '../cleanfleet-ksef/core.js';
 import {normalize,party,invoiceXml,SELLER,today,validBank} from './invoice.js';
@@ -45,8 +45,7 @@ Deno.serve(async req=>{
    let buyer:any={},description='',source={app:body.app,id:body.id},currency='PLN';
    if(body.app==='robisie'){
     const project=checked(await db.from('rs_projects').select('id,contract_number,payload').eq('id',body.id).eq('owner_id',userId).single());
-    if(body.stageId)return json(stageInvoiceSeed(project,String(body.stageId)));
-    buyer={name:project.payload.investor||'',nip:'',address:project.payload.investorAddress||'',city:''};description='Usługi remontowe — '+project.payload.name+' · '+project.contract_number;
+    return json(body.stageId?stageInvoiceSeed(project,String(body.stageId)):investmentInvoiceSeed(project));
    }else if(body.app==='cleanfleet'||body.app==='billing'){
     const billing=body.app==='billing',company=checked(await db.from(billing?'billing_companies':'companies').select('*').eq('id',body.id).single());
     buyer={name:company.name,nip:(billing?company.tax_id:company.nip)||'',address:company.address||'',city:''};description='Czyszczenie wnętrz pojazdów';currency=billing&&company.currency==='EUR'?'EUR':'PLN';

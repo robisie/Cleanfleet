@@ -1,4 +1,4 @@
-# Bill 1.0.1
+# Bill 1.0.2
 
 Admin-only invoicing at `/bill/`. Uses the existing CleanFleet Supabase login, with a separate browser session key. No signup and no direct browser access to billing tables. The server checks the current user and administrator role for every operation.
 
@@ -24,3 +24,5 @@ QA PDFs for both logos rendered to single A4 pages and visually inspected. Brows
 
 
 Robisię stage links use `?new=1&brand=robisie&source=<project UUID>&stage=<stage ID>`. The authenticated source action verifies project ownership, reads the stage from the database and prepares its exact agreed-offer share, description and buyer. Existing draft/issued documents are reopened rather than starting another from the same link. The source stage ID survives invoice validation. Robisię refreshes the stage's invoice link on returning to its tab; invoicing never marks it paid. Deployment must include `app/robisie/billing.js` and `app/robisie/core.js` as relative dependencies alongside the existing function files.
+
+Po wybraniu inwestycji Robisię każda pozycja szkicu ma wybór aktualnych kwot: wykonane prace, pozostała należność za prace, saldo z materiałami, całe zlecenie oraz etapy z aktywnej oferty. Wybór ustawia ilość 1 i opis; kwoty pozostają edytowalne. Odświeżenie propozycji nie zmienia szkicu. Propozycje są w PLN, zerowe i ujemne salda pozostają niedostępne. Nie uwzględniają innych wystawionych faktur — stan wynika z rozliczeń inwestycji.

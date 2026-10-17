@@ -1,4 +1,4 @@
-# Bill 1.0.12
+# Bill 1.0.13
 
 Admin-only invoicing at `/bill/`. Uses the existing CleanFleet Supabase login, with a separate browser session key. No signup and no direct browser access to billing tables. The server checks the current user and administrator role for every operation.
 
@@ -73,3 +73,6 @@ CleanFleet 1.56.9: explicit `includeUnassigned` opt-in permits legacy null-billi
 
 ## Separate issue and send (1.0.12)
 All invoice types (both brands, ordinary sales, linked CleanFleet invoices and corrections) are issued locally first, without KSeF authentication or requests. The service-only `bill_issue_prepared` RPC freezes the server-normalized/canonical payload and allocates the monthly number in one locked transaction. Repeat requests return the same issued row. PDF/print is then available with the actual invoice number and unconfirmed KSeF label. A separate “Wyślij do KSeF” button and confirmation send the issued record; `send` rejects drafts before KSeF authentication or any numbering RPC. No UI action combines issue and send. Existing same-day online submission checks and uncertainty reconciliation stay in place. Apply `bill-issue-prepared.sql` and redeploy the Edge function. Validation includes backend/client separation tests, invoice/crypto regressions and a rolled-back service-role transaction (no real document or KSeF call).
+
+## Immediate return (1.0.13)
+Returning from invoice detail/editor (including the sidebar invoice link) renders the existing list immediately, without bootstrap requests, a save operation or the blocking work indicator. Explicit writes/status checks still refresh after completion. Successful draft saves immediately replace/insert their row in the list cache, so returning shows saved edits and new drafts. Unsaved-edit discard confirmation remains.

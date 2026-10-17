@@ -1,0 +1,12 @@
+import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {readFile} from 'node:fs/promises';import * as C from '../bill/core.js';
+test('back from details makes no request or loader; saved draft is current and dirty cancel stays in editor',async()=>{
+ const calls=[],nodes=new Map();let confirms=0,answer=false,renders=0;
+ const node=s=>{if(s==='#invoice-form')return null;if(!nodes.has(s))nodes.set(s,{innerHTML:'',textContent:'',style:{},classList:{add(){},remove(){}}});return nodes.get(s);};
+ const context=vm.createContext({console,crypto,structuredClone,URL,URLSearchParams,location:{search:''},setTimeout:()=>0,clearTimeout(){},window:{addEventListener(){},confirm(){confirms++;return answer;}},document:{querySelector:node,querySelectorAll:()=>[],addEventListener(){},body:{insertAdjacentHTML(){throw Error('Unexpected blocking loader');}}}});
+ const source=await readFile(new URL('../bill/app.js',import.meta.url),'utf8');const m=new vm.SourceTextModule(source+`\nrender=()=>onRender();export function setup(row,changed=false){data={invoices:[],parties:[],settings:{},counters:[]};selected=row;editor=row;view=changed?'edit':'detail';dirty=changed;}export function state(){return {view,dirty,rows:data.invoices};}export {backToInvoices,save};`,{context});context.onRender=()=>renders++;
+ await m.link(spec=>{const values=spec.includes('./core')?C:spec.includes('./api')?{restoreSession:()=>null,call:async body=>{calls.push(body.action);assert.equal(body.action,'save-draft');return {id:body.id,revision:2,status:'draft',payload:body.payload};}}:{preview(){}};return new vm.SyntheticModule(Object.keys(values),function(){for(const [k,v]of Object.entries(values))this.setExport(k,v);},{context});});await m.evaluate();
+ const n=m.namespace,row={id:'draft',revision:1,status:'draft',payload:C.newInvoice()};n.setup(row);assert.equal(await n.backToInvoices(),true);assert.equal(n.state().view,'invoices');assert.deepEqual(calls,[]);assert.equal(confirms,0);assert.equal(renders,1);
+ n.setup(row,true);assert.equal(await n.backToInvoices(),false);assert.equal(n.state().view,'edit');assert.equal(n.state().dirty,true);assert.deepEqual(calls,[]);
+ await n.save();assert.equal(n.state().dirty,false);await n.backToInvoices();assert.equal(n.state().rows[0].revision,2);assert.deepEqual(calls,['save-draft']);assert.equal(confirms,1);
+ n.setup(row,true);answer=true;await n.backToInvoices();assert.equal(n.state().view,'invoices');assert.equal(n.state().dirty,false);assert.deepEqual(calls,['save-draft']);
+});

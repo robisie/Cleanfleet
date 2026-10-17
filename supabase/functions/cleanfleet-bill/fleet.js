@@ -8,6 +8,7 @@ export function fleetParty(company,billing){
 export function fleetOptions(input={}){return {layout:'vehicle-lines',includeUnassigned:input.includeUnassigned===true};}
 export function guardFleetPayload(payload,attachment){
  if(!attachment)return payload;
+ if(payload.lines?.some(l=>Number(String(l.discount||0).replace(',','.'))!==0))throw Error('Kwoty aut nie mogą mieć dodatkowych rabatów ani wyrównań.');
  const cents=attachment.snapshot.reduce((s,r)=>s+Math.round(Number(r.cost)*100),0),cur=attachment.snapshot[0].currency;
  if(attachment.options?.layout==='vehicle-lines'){
   if(payload.correction||payload.currency!==cur||payload.lines?.length!==attachment.snapshot.length||payload.lines.some((l,i)=>Number(l.qty)!==1||Math.round(Number(String(l.price).replace(',','.'))*100)!==Math.round(Number(attachment.snapshot[i].cost)*100)||!String(l.name).endsWith(' — '+attachment.snapshot[i].plate)||!String(l.name).slice(0,-(' — '+attachment.snapshot[i].plate).length).trim()))throw Error('Każda pozycja musi zawierać tablicę i cenę właściwego auta, z ilością 1.');

@@ -60,6 +60,7 @@ begin
  select * into a from public.bill_fleet_attachments where invoice_id=new.id for update;
  if not found then return new; end if;
  if a.cf_invoice_id is not null then return new; end if;
+ if exists(select 1 from jsonb_array_elements(new.payload->'lines') l where coalesce((l->>'discount')::numeric,0)<>0) then raise exception 'Kwoty aut nie mogą mieć dodatkowych rabatów ani wyrównań.';end if;
  select sum(round((x->>'cost')::numeric*100)),min(x->>'currency') into cents,cur from jsonb_array_elements(a.snapshot) x;
  if new.payload->'source'->>'fleetId' is distinct from new.id::text or new.payload->'source'->>'id' is distinct from a.company_id::text or new.payload->>'currency' is distinct from cur then raise exception 'Nieprawidłowe powiązanie lub waluta aut.';end if;
  if a.options->>'layout'='vehicle-lines' then

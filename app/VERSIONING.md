@@ -162,3 +162,5 @@ CleanFleet v1.56.2 / Robisię Pack v1.1.1: przeciąganie dotykiem na iPadzie prz
 CleanFleet v1.56.3: PDF z Podsumowania miesiąca zawiera dane z podglądu: miesiąc, wykonawcę, wybrane typy, kafelki liczby prań i typów, wartość, do zapłaty oraz tabelę Typ / Tablica / Data prania / Kwota / Rozliczone i sumy pod tabelą. Układ pionowy A4; bez wykresów i rozszerzonych danych źródłowych. Pozostałe generatory raportów bez zmian.
 
 CleanFleet v1.56.4: kafelki typów w PDF podsumowania miesiąca liczone wyłącznie z wpisów po aktywnych filtrach; wybrany BUS nie dodaje kafelka SOLÓWKA. Widok ekranowy i pozostałe raporty bez zmian.
+
+CleanFleet v1.56.5: przedawnienie zleconych wpisów bez ustalonego terminu po 48 godzinach od utworzenia zamiast 7 dni. Aktualizacja reguły w aplikacji, triggerze i zadaniu cron; wcześniejsze znaczniki przedawnienia zachowane w historii.

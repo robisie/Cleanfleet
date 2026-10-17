@@ -1,17 +1,17 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
 const html=fs.readFileSync(require('node:path').join(__dirname,'../app/index.html'),'utf8');
-const now=Date.parse('2026-10-09T12:00:00Z'),week=7*86400000;
+const now=Date.parse('2026-10-09T12:00:00Z'),expiryDelay=48*60*60*1000;
 class Clock extends Date{static now(){return now;}}
 const ctx=vm.createContext({Date:Clock,fmtDate:x=>x,daysSinceLastWashForRecord:()=>null});
 vm.runInContext(html.slice(html.indexOf('  function scheduleUndatedEligible'),html.indexOf('  function recordFleetBadge')),ctx);
-const base={zlecone:true,created_at:now-week,schedule_status:''};
-test('expires exactly at seven elapsed days, independent of description or timezone',()=>{
- assert.equal(ctx.scheduleIsUndatedExpired({...base,created_at:now-week+1}),false);
- assert.equal(ctx.scheduleNeedsDate({...base,created_at:now-week+1}),true);
+const base={zlecone:true,created_at:now-expiryDelay,schedule_status:''};
+test('expires exactly at 48 elapsed hours, independent of description or timezone',()=>{
+ assert.equal(ctx.scheduleIsUndatedExpired({...base,created_at:now-expiryDelay+1}),false);
+ assert.equal(ctx.scheduleNeedsDate({...base,created_at:now-expiryDelay+1}),true);
  assert.equal(ctx.scheduleIsUndatedExpired(base),true);
  assert.equal(ctx.scheduleUndatedExpiryAt(base),now);
  assert.equal(ctx.scheduleIsUndatedExpired({...base,uwagi:'Edytowany opis'}),true);
- assert.equal(ctx.scheduleIsUndatedExpired({...base,created_at:'2026-10-02T14:00:00+02:00'}),true);
+ assert.equal(ctx.scheduleIsUndatedExpired({...base,created_at:'2026-10-07T14:00:00+02:00'}),true);
  assert.equal(ctx.scheduleStatusLabel(base),'PRZEDAWNIONY');
  assert.equal(ctx.scheduleNeedsDate(base),false);
 });

@@ -45,8 +45,8 @@ Deno.serve(async req=>{
   const body=JSON.parse(raw);
   if(String(body.action||'').startsWith('ksef-')){const result=await archive(body,userId);return result instanceof Uint8Array?new Response(result,{headers:{...headers,'Content-Type':'application/octet-stream'}}):json(result);}
   if(body.action==='fleet-create'){
-   if(!/^[0-9a-f-]{36}$/i.test(body.id||'')||!Array.isArray(body.recordIds)||body.recordIds.length>250||!Number.isSafeInteger(body.expectedCents)||body.expectedCents<=0)throw Error('Nieprawidłowy wybór aut.');
-   const description=String(body.description||'').trim();if(!description||description.length>512)throw Error('Wpisz nazwę usługi (do 512 znaków).');
+   if(!/^[0-9a-f-]{36}$/i.test(body.id||'')||!Array.isArray(body.recordIds)||body.recordIds.length>200||!Number.isSafeInteger(body.expectedCents)||body.expectedCents<=0)throw Error('Nieprawidłowy wybór aut.');
+   const description=String(body.description||'').trim();if(!description||description.length>400)throw Error('Wpisz nazwę usługi (do 400 znaków).');
    const company=checked(await db.from('companies').select('*').eq('id',body.companyId).eq('active',true).single());
    const billing=body.billingCompanyId?checked(await db.from('billing_companies').select('*').eq('id',body.billingCompanyId).eq('company_id',body.companyId).eq('active',true).single()):null;
    const settings=checked(await db.from('bill_settings').select('payload').single());
@@ -55,7 +55,7 @@ Deno.serve(async req=>{
   }
   if(body.action==='fleet-list'){
    const rows=checked(await db.from('bill_invoices').select('id,number,status,payload,created_at').eq('payload->source->>app','cleanfleet').eq('payload->source->>id',body.companyId).order('created_at',{ascending:false}).limit(100));
-   return json(rows.filter((r:any)=>r.payload.source?.fleetId===r.id).map((r:any)=>({id:r.id,number:r.number,status:r.status,description:r.payload.lines?.[0]?.name})));
+   return json(rows.filter((r:any)=>r.payload.source?.fleetId===r.id).map((r:any)=>({id:r.id,number:r.number,status:r.status,description:r.payload.source?.fleetLayout==='vehicle-lines'?String(r.payload.lines?.[0]?.name||'').replace(/ — [^—]+$/,''):r.payload.lines?.[0]?.name})));
   }
   if(body.action==='fleet-attachment'){
    const a=body.cfInvoiceId?checked(await db.from('bill_fleet_attachments').select('*').eq('cf_invoice_id',body.cfInvoiceId).maybeSingle()):await fleetAttachment(body.id);

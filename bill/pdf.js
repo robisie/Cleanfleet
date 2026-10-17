@@ -1,4 +1,4 @@
-import * as C from './core.js?v=1.0.13';
+import * as C from './core.js?v=1.0.14';
 const e=C.esc;
 function party(p){return `<strong>${e(p.name)}</strong><p>${e(p.address)}<br>${e(p.city)}</p>${p.nip?`<p>${C.partyCountry(p)==='DE'?'VAT UE':'NIP'}: ${e(p.nip)}</p>`:''}`;}
 async function qrMarkup(row){if(row.status!=='accepted'||!row.xml||!row.ksef_number)return '';

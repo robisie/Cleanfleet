@@ -172,3 +172,5 @@ CleanFleet v1.56.7 / Bill 1.0.11: wystawianie faktury z wybranych aut w generato
 CleanFleet v1.56.8: wybór pojazdów i przejście do Bill niezależne od bibliotek PDF; widoczny postęp i błędy, komunikaty ponad modalami. Wielowierszowa nazwa pozycji na fakturze, osobna lista podpowiedzi i czytelny opis na telefonie.
 
 CleanFleet v1.56.9: jawna opcja uwzględniania wpisów bez przypisanej spółki w fakturze Bill. Tylko ten sam miesiąc, wykonawca, firma i waluta; inne spółki nadal odfiltrowane. Komunikat wskazuje liczbę nieprzypisanych wpisów. Wykaz zachowuje oryginalne przypisania, a rozliczenie ma świadomie wybranego nabywcę.
+
+CleanFleet v1.56.10 / Bill 1.0.14: faktura z wybranych aut ma osobną pozycję dla każdego wpisu: opis usługi + tablica, ilość 1 i cena prania. Suma i każda cena są kontrolowane względem bazy. Nowy tryb nie tworzy ani nie udostępnia osobnego załącznika; wykaz jest w fakturze PDF i XML KSeF. Ustawienia kolumn i podsumowań załącznika są ukryte w trybie Bill. Zachowane osobne wystawienie i wysyłka, wybór nieprzypisanych aut oraz powiązanie rozliczenia z listą prań.

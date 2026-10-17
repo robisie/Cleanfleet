@@ -10,7 +10,7 @@ begin
  v_payload:=jsonb_build_object('issueDate',to_char(now() at time zone 'Europe/Warsaw','YYYY-MM-DD'),'lines','[{"name":"TEST"}]'::jsonb);
  select last_number into before_count from public.bill_counters where period=to_char(current_date,'YYYY-MM');
  r:=public.bill_create_fleet_draft(d,u,c,null,to_char(current_date,'YYYY-MM'),array[w1,w2],v_payload,'{"columns":["tablica","kwota"]}',20030);
- if r.number is not null or r.status<>'draft' or r.payload->'lines'->0->>'price'<>'200.30' then raise exception 'draft invariant';end if;
+ if r.number is not null or r.status<>'draft' or jsonb_array_length(r.payload->'lines')<>2 or (select sum((x->>'price')::numeric) from jsonb_array_elements(r.payload->'lines') x)<>200.30 then raise exception 'draft invariant';end if;
  if exists(select 1 from public.invoices where company_id=c) then raise exception 'draft created receivable';end if;
  r:=public.bill_create_fleet_draft(d,u,c,null,to_char(current_date,'YYYY-MM'),array[w1,w2],v_payload,'{}',20030);
  caught:=false;begin perform public.bill_create_fleet_draft(d2,u,c,null,to_char(current_date,'YYYY-MM'),array[w1],v_payload,'{}',15010);exception when raise_exception then caught:=true;end;if not caught then raise exception 'double reservation';end if;

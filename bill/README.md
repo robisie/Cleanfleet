@@ -1,4 +1,4 @@
-# Bill 1.0.13
+# Bill 1.0.14
 
 Admin-only invoicing at `/bill/`. Uses the existing CleanFleet Supabase login, with a separate browser session key. No signup and no direct browser access to billing tables. The server checks the current user and administrator role for every operation.
 
@@ -76,3 +76,6 @@ All invoice types (both brands, ordinary sales, linked CleanFleet invoices and c
 
 ## Immediate return (1.0.13)
 Returning from invoice detail/editor (including the sidebar invoice link) renders the existing list immediately, without bootstrap requests, a save operation or the blocking work indicator. Explicit writes/status checks still refresh after completion. Successful draft saves immediately replace/insert their row in the list cache, so returning shows saved edits and new drafts. Unsaved-edit discard confirmation remains.
+
+## One position per vehicle (1.0.14 / CleanFleet 1.56.10)
+New CleanFleet vehicle drafts always use `vehicle-lines` layout. The server builds each invoice line from one selected wash: service description + registration plate, qty 1, its individual saved cost. Each price and registration suffix (not merely the total) is validated on save and again inside the issue transaction. The original snapshot remains an internal billing association/reservation, not a generated PDF attachment. The attachment action returns `noAttachment` metadata for these rows and both UIs omit attachment controls; CleanFleet PDF actions lead to the Bill invoice. All vehicles are present in the invoice PDF/FA(3) XML. Existing separate issue and send actions remain. Existing legacy documents/attachments are not rewritten. Maximum 200 selected records matches Bill's validated line limit; service description limit is 400 to leave space for plate suffixes. Apply `bill-fleet-vehicle-lines.sql`, deploy Edge dependencies, then static clients. Tests cover per-line price/plate tampering, PDF HTML/XML content, no-attachment UI and rolled-back service-role issue.

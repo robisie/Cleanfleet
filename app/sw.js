@@ -1,5 +1,5 @@
 importScripts('/app/photo-zip-stream.js?v=20261010-15517');
-// CleanFleet v1.56.2 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
+// CleanFleet v1.56.3 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -102,7 +102,7 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text(); 
     // Keep the visible version in sync for pages served through this worker.
-    html = html.replace(/v1\.55\.(?:8|9|10|11|12|13|14|15|16)\b/g, 'v1.56.2');
+    html = html.replace(/v1\.55\.(?:8|9|10|11|12|13|14|15|16)\b/g, 'v1.56.3');
     html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13095');
 
     if (!html.includes('/app/glass-icons.css')) {

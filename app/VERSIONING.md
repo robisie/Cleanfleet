@@ -160,3 +160,5 @@ CleanFleet v1.56.1 / Robisię Pack v1.1.0: jeden stały pasek nawigacji, mniejsz
 CleanFleet v1.56.2 / Robisię Pack v1.1.1: przeciąganie dotykiem na iPadzie przez Touch Events i przytrzymanie kafelka. Oryginalny element nie zmienia miejsca w DOM podczas gestu; ruchomy podgląd i znacznik celu, zapis po puszczeniu palca. Obsługa ruchu na dokumencie, anulowania, blokady kliknięcia po przeciągnięciu i zwykłego przewijania przed przytrzymaniem.
 
 CleanFleet v1.56.3: PDF z Podsumowania miesiąca zawiera dane z podglądu: miesiąc, wykonawcę, wybrane typy, kafelki liczby prań i typów, wartość, do zapłaty oraz tabelę Typ / Tablica / Data prania / Kwota / Rozliczone i sumy pod tabelą. Układ pionowy A4; bez wykresów i rozszerzonych danych źródłowych. Pozostałe generatory raportów bez zmian.
+
+CleanFleet v1.56.4: kafelki typów w PDF podsumowania miesiąca liczone wyłącznie z wpisów po aktywnych filtrach; wybrany BUS nie dodaje kafelka SOLÓWKA. Widok ekranowy i pozostałe raporty bez zmian.

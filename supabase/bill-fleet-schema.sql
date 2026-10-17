@@ -35,7 +35,7 @@ begin
  if exists(select 1 from public.invoice_items where wash_record_id=any(p_ids)) or exists(select 1 from public.bill_fleet_items where wash_record_id=any(p_ids)) then raise exception 'Co najmniej jeden wpis ma już fakturę lub szkic w Bill. Otwórz istniejący dokument.'; end if;
  select count(*),count(distinct currency),min(currency),sum(round(cost*100)),jsonb_agg(to_jsonb(w) order by wash_date,id)
  into count_rows,currency_count,cur,cents,rows_json from public.wash_records w
- where id=any(p_ids) and company_id=p_company and billing_company_id is not distinct from p_billing
+ where id=any(p_ids) and company_id=p_company and (billing_company_id is not distinct from p_billing or (p_billing is not null and coalesce((p_options->>'includeUnassigned')::boolean,false) and billing_company_id is null))
  and approved and wash_date is not null and to_char(wash_date,'YYYY-MM')=p_period
  and lower(btrim(performed_by))='michał' and cost>=0 and currency in ('PLN','EUR');
  if count_rows<>cardinality(p_ids) then raise exception 'Lista aut zmieniła się. Wybierz zatwierdzone prania Michała z tej samej firmy, spółki i miesiąca.'; end if;
@@ -63,7 +63,7 @@ begin
  perform id from public.wash_records where id in (select wash_record_id from public.bill_fleet_items where invoice_id=new.id) order by id for update;
  if exists(select 1 from public.invoice_items where wash_record_id in (select wash_record_id from public.bill_fleet_items where invoice_id=new.id)) then raise exception 'Wybrane auto zostało już przypisane do innej faktury.'; end if;
  for snap in select * from jsonb_array_elements(a.snapshot) loop
-  if not exists(select 1 from public.wash_records w where w.id=(snap->>'id')::uuid and approved and lower(btrim(performed_by))='michał' and company_id=a.company_id and billing_company_id is not distinct from a.billing_company_id and cost=(snap->>'cost')::numeric and currency=cur and wash_date=(snap->>'wash_date')::date and plate=snap->>'plate') then raise exception 'Dane wybranych aut zmieniły się. Utwórz nowy szkic z aktualnych danych.'; end if;
+  if not exists(select 1 from public.wash_records w where w.id=(snap->>'id')::uuid and approved and lower(btrim(performed_by))='michał' and company_id=a.company_id and billing_company_id is not distinct from (snap->>'billing_company_id')::uuid and cost=(snap->>'cost')::numeric and currency=cur and wash_date=(snap->>'wash_date')::date and plate=snap->>'plate') then raise exception 'Dane wybranych aut zmieniły się. Utwórz nowy szkic z aktualnych danych.'; end if;
  end loop;
  insert into public.invoices(user_id,company_id,billing_company_id,invoice_number,invoice_date,period,amount,currency,status)
  values(new.creator_id,a.company_id,a.billing_company_id,new.number,(new.payload->>'issueDate')::date,a.period,cents/100.0,cur,'pending') returning id into linked;

@@ -11,7 +11,7 @@ test('fleet amount cannot diverge from frozen vehicles; source survives normaliz
  const a=attachment(),p=F.guardFleetPayload(payload(),a);assert.equal(p.source.fleetId,id);assert.equal(C.normalize(p).source.fleetId,id);assert.equal(C.total(p),20030);
  const xml=C.invoiceXml({number:'A9/10/2026',payload:p});assert.equal((xml.match(/<FaWiersz>/g)||[]).length,1);assert.ok(!xml.includes('TEST001'));assert.ok(!xml.includes('fleetId'));assert.ok(!xml.includes('Zalacznik'));
  for(const changed of [{...p,currency:'PLN'},{...p,lines:[{...p.lines[0],price:'200.31'}]},{...p,lines:[{...p.lines[0],qty:'2'}]},{...p,lines:[...p.lines,...p.lines]}])assert.throws(()=>F.guardFleetPayload(changed,a),/Kwota/);
- assert.equal(F.guardFleetPayload(p,null),p);assert.throws(()=>F.fleetOptions({columns:[]}),/kolumny/);
+ assert.equal(F.fleetOptions({columns:['tablica']}).includeUnassigned,false);assert.equal(F.fleetOptions({columns:['tablica'],includeUnassigned:true}).includeUnassigned,true);assert.equal(F.guardFleetPayload(p,null),p);assert.throws(()=>F.fleetOptions({columns:[]}),/kolumny/);
 });
 test('attachment view exposes only PDF fields and multipage PDF retains Polish glyphs, totals and rows',async()=>{
  const a=attachment(),view=F.fleetView(a,{id,number:'A9/10/2026',status:'issued',payload:payload()});assert.equal(view.rows[0].cost,150.1);assert.equal(view.rows[0].paid,false);assert.equal(view.rows[0].performed_by,undefined);
@@ -30,5 +30,14 @@ test('CleanFleet selection opens Bill with one server-checked sum and retains se
  context.cfPdfSelectionConfirmed=false;await context.generateMonthPdf();
  assert.deepEqual([...candidates.map(r=>r.id)],['one','two']);assert.equal(request,undefined);
  context.cfPdfSelectionConfirmed=true;await context.generateMonthPdf();assert.equal(request.expectedCents,20030);assert.deepEqual([...request.recordIds],['one','two']);assert.equal(request.description,'Czyszczenie wnętrz');assert.equal(request.options.service,true);assert.equal(context.location.href,'/bill/?invoice=saved&edit=1');assert.equal(nodes.pdfGenerateSelectedBtn.disabled,false);
+ // Legacy unassigned entries require explicit opt-in, and never pull another payer's rows.
+ records[0].billing_company_id=null;records[1].billing_company_id=null;
+ records.push({...records[0],id:'other-payer',billing_company_id:'different'});
+ records.push({...records[0],id:'other-currency',currency:'PLN'});
+ context.cfPdfSelectionConfirmed=false;candidates=null;request=undefined;
+ nodes.cfFleetIncludeUnassigned={checked:false};nodes.cfFleetUnassignedHint={textContent:''};
+ await context.generateMonthPdf();assert.equal(candidates,null);assert.equal(request,undefined);assert.match(nodes.cfFleetUnassignedHint.textContent,/Znaleziono 2 wpisów bez/);
+ nodes.cfFleetIncludeUnassigned.checked=true;await context.generateMonthPdf();assert.deepEqual([...candidates.map(r=>r.id)],['one','two']);
+ context.cfPdfSelectionConfirmed=true;await context.generateMonthPdf();assert.equal(request.options.includeUnassigned,true);assert.equal(request.expectedCents,20030);
  fail=true;context.location.href='';await context.generateMonthPdf();assert.equal(context.location.href,'');assert.equal(nodes.pdfVehicleSelectionOverlay.style.display,'');assert.equal(messages.at(-1),'Dane zmieniły się');assert.equal(context.cfFleetDraftId,'draft');
 });

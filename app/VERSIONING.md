@@ -170,3 +170,5 @@ CleanFleet v1.56.6: zaznaczanie przedawnionych wpisów w kategorii Termin upłyn
 CleanFleet v1.56.7 / Bill 1.0.11: wystawianie faktury z wybranych aut w generatorze załącznika. Jedna pozycja z edytowanym opisem i sumą z bazy; spółka rozliczeniowa uzupełnia nabywcę i walutę. Szkic w Bill z rezerwacją aut, atomowe wystawienie i powiązanie rozliczenia CleanFleet, osobna wysyłka do KSeF. Trwały wykaz aut i wspólny podgląd/pobieranie PDF w obu aplikacjach; załącznik pozostaje poza KSeF.
 
 CleanFleet v1.56.8: wybór pojazdów i przejście do Bill niezależne od bibliotek PDF; widoczny postęp i błędy, komunikaty ponad modalami. Wielowierszowa nazwa pozycji na fakturze, osobna lista podpowiedzi i czytelny opis na telefonie.
+
+CleanFleet v1.56.9: jawna opcja uwzględniania wpisów bez przypisanej spółki w fakturze Bill. Tylko ten sam miesiąc, wykonawca, firma i waluta; inne spółki nadal odfiltrowane. Komunikat wskazuje liczbę nieprzypisanych wpisów. Wykaz zachowuje oryginalne przypisania, a rozliczenie ma świadomie wybranego nabywcę.

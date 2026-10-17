@@ -8,7 +8,7 @@ export function fleetParty(company,billing){
 export function fleetOptions(input={}){
  const columns=['typ','tablica','data','kwota','rozliczone'].filter(k=>input.columns?.includes(k));
  if(!columns.length)throw Error('Wybierz kolumny załącznika.');
- return {columns,service:input.service===true,summary:['personal','heavy','bus'].filter(k=>input.summary?.includes(k))};
+ return {includeUnassigned:input.includeUnassigned===true,columns,service:input.service===true,summary:['personal','heavy','bus'].filter(k=>input.summary?.includes(k))};
 }
 export function guardFleetPayload(payload,attachment){
  if(!attachment)return payload;

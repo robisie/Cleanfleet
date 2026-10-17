@@ -1,10 +1,11 @@
+import {fleetParty,fleetOptions,guardFleetPayload,fleetView} from './fleet.js';
 import {createArchiveService,acceptedBillMetadata} from './archive.js';
 import {gus,lookupWithFallback} from './gus.js';
 import {lookupCompany} from './registry.js';
 import {stageInvoiceSeed,investmentInvoiceSeed} from '../../../app/robisie/billing.js';
 import {createClient} from 'npm:@supabase/supabase-js@2.57.4';
 import {createStateCodec,hash} from '../cleanfleet-ksef/core.js';
-import {normalize,party,invoiceXml,SELLER,today,validBank,correctionSeed} from './invoice.js';
+import {normalize,newInvoice,party,invoiceXml,SELLER,today,validBank,correctionSeed} from './invoice.js';
 import {ksefApi,authenticate,openSession,invoiceStatus,KsefError} from './ksef.js';
 const secret=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const db=createClient(Deno.env.get('SUPABASE_URL')!,secret,{auth:{persistSession:false,autoRefreshToken:false}});
@@ -16,6 +17,8 @@ const archive=createArchiveService({authorizeKsef:authKsef,secret,api,localSales
 const origins=['https://cleanfleet.pl','https://www.cleanfleet.pl'];
 function checked(r:any){if(r.error)throw Error(r.error.code==='23505'?'Ten NIP lub numer już istnieje.':r.error.message);return r.data;}
 async function invoice(id:string){if(!/^[0-9a-f-]{36}$/i.test(id||''))throw Error('Nieprawidłowy identyfikator.');const row=checked(await db.from('bill_invoices').select('*').eq('id',id).single());if(!row)throw Error('Nie znaleziono faktury.');return row;}
+async function fleetAttachment(id:string){return checked(await db.from('bill_fleet_attachments').select('*').eq('invoice_id',id).maybeSingle());}
+async function canonicalFleet(id:string,payload:any){return guardFleetPayload(payload,await fleetAttachment(id));}
 async function canonicalCorrection(payload:any){if(!payload?.correction)return payload;const parent=await invoice(payload.correction.originalId),seed=correctionSeed(parent);return {...payload,source:seed.source,correction:{...seed.correction,mode:payload.correction.mode,reason:payload.correction.reason}};}
 async function authKsef(userId:string){
  const saved=checked(await db.from('cf_ksef_credentials').select('nip,ciphertext').eq('user_id',userId).eq('environment','production').maybeSingle());
@@ -41,6 +44,30 @@ Deno.serve(async req=>{
   const raw=await req.text();if(raw.length>300000)return json({error:'Żądanie jest za duże.'},413);
   const body=JSON.parse(raw);
   if(String(body.action||'').startsWith('ksef-')){const result=await archive(body,userId);return result instanceof Uint8Array?new Response(result,{headers:{...headers,'Content-Type':'application/octet-stream'}}):json(result);}
+  if(body.action==='fleet-create'){
+   if(!/^[0-9a-f-]{36}$/i.test(body.id||'')||!Array.isArray(body.recordIds)||body.recordIds.length>250||!Number.isSafeInteger(body.expectedCents)||body.expectedCents<=0)throw Error('Nieprawidłowy wybór aut.');
+   const description=String(body.description||'').trim();if(!description||description.length>512)throw Error('Wpisz nazwę usługi (do 512 znaków).');
+   const company=checked(await db.from('companies').select('*').eq('id',body.companyId).eq('active',true).single());
+   const billing=body.billingCompanyId?checked(await db.from('billing_companies').select('*').eq('id',body.billingCompanyId).eq('company_id',body.companyId).eq('active',true).single()):null;
+   const settings=checked(await db.from('bill_settings').select('payload').single());
+   const payload={...newInvoice('cleanfleet'),buyer:fleetParty(company,billing),bank:settings?.payload?.bank||'',lines:[{name:description,unit:'szt.',qty:'1',price:'0.00'}]};
+   return json(checked(await db.rpc('bill_create_fleet_draft',{p_id:body.id,p_user:userId,p_company:body.companyId,p_billing:body.billingCompanyId||null,p_period:body.period,p_ids:body.recordIds,p_payload:payload,p_options:fleetOptions(body.options),p_expected:body.expectedCents})));
+  }
+  if(body.action==='fleet-list'){
+   const rows=checked(await db.from('bill_invoices').select('id,number,status,payload,created_at').eq('payload->source->>app','cleanfleet').eq('payload->source->>id',body.companyId).order('created_at',{ascending:false}).limit(100));
+   return json(rows.filter((r:any)=>r.payload.source?.fleetId===r.id).map((r:any)=>({id:r.id,number:r.number,status:r.status,description:r.payload.lines?.[0]?.name})));
+  }
+  if(body.action==='fleet-attachment'){
+   const a=body.cfInvoiceId?checked(await db.from('bill_fleet_attachments').select('*').eq('cf_invoice_id',body.cfInvoiceId).maybeSingle()):await fleetAttachment(body.id);
+   if(!a)return json(null);return json(fleetView(a,await invoice(a.invoice_id)));
+  }
+  if(body.action==='issue-only'){
+   let row=await invoice(body.id);if(row.status!=='draft')return json(row);
+   if(!await fleetAttachment(row.id))throw Error('Ta operacja jest dostępna dla faktur z aut CleanFleet.');
+   normalize(await canonicalFleet(row.id,row.payload));
+   row=checked(await db.rpc('bill_issue',{p_id:row.id,p_revision:body.revision}));
+   return json(row);
+  }
   if(body.action==='lookup-nip')return json(await lookupWithFallback(body.nip,await savedGusKey(),{mfLookup:lookupCompany}));
   if(body.action==='gus-save-key'){
    const key=String(body.key||'').trim();if(!/^[a-zA-Z0-9]{20}$/.test(key)||key==='abcde12345abcde12345')throw Error('Podaj własny 20-znakowy klucz produkcyjny GUS.');
@@ -101,7 +128,7 @@ Deno.serve(async req=>{
    if(!body.payload||typeof body.payload!=='object'||Array.isArray(body.payload))throw Error('Nieprawidłowy szkic.');
    if(!/^[0-9a-f-]{36}$/i.test(body.id||''))throw Error('Nieprawidłowy identyfikator szkicu.');
    if(body.payload.source?.app==='robisie'&&body.payload.source?.stageId){const origin=checked(await db.from('rs_projects').select('id,payload,contract_number').eq('id',body.payload.source.id).eq('owner_id',userId).single());stageInvoiceSeed(origin,body.payload.source.stageId);}
-   body.payload=await canonicalCorrection(body.payload);
+   body.payload=await canonicalFleet(body.id,await canonicalCorrection(body.payload));
    const existing=checked(await db.from('bill_invoices').select('id,status,revision,payload').eq('id',body.id).maybeSingle());
    if(existing?.payload?.correction&&existing.payload.correction.originalId!==body.payload.correction?.originalId)throw Error('Nie można zmienić powiązania zapisanej korekty.');
    if(existing){if(existing.status!=='draft')throw Error('Wystawiona faktura jest zablokowana.');const row=checked(await db.from('bill_invoices').update({payload:body.payload,revision:body.revision+1,updated_at:new Date().toISOString()}).eq('id',body.id).eq('status','draft').eq('revision',body.revision).select().maybeSingle());if(!row)throw Error('Szkic zmienił się na innym urządzeniu. Odśwież przed zapisem.');return json(row);}
@@ -113,7 +140,7 @@ Deno.serve(async req=>{
   if(body.action==='send'){
    let row=await invoice(body.id);
    if(!['draft','issued'].includes(row.status))return json(row);
-   const payload=normalize(await canonicalCorrection(row.payload));
+   const payload=normalize(await canonicalFleet(row.id,await canonicalCorrection(row.payload)));
    if(payload.issueDate!==today())throw Error('Dla wysyłki online ustaw dzisiejszą datę wystawienia.');
    const auth=await authKsef(userId);
    if(row.status==='draft'){

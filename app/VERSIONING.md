@@ -166,3 +166,5 @@ CleanFleet v1.56.4: kafelki typów w PDF podsumowania miesiąca liczone wyłącz
 CleanFleet v1.56.5: przedawnienie zleconych wpisów bez ustalonego terminu po 48 godzinach od utworzenia zamiast 7 dni. Aktualizacja reguły w aplikacji, triggerze i zadaniu cron; wcześniejsze znaczniki przedawnienia zachowane w historii.
 
 CleanFleet v1.56.6: zaznaczanie przedawnionych wpisów w kategorii Termin upłynął, w tym kopiowanie kilku tablic. Checkbox i zachowanie zaznaczenia takie jak dla pozostałych nieopłaconych wpisów; reguły przedawnienia i ukrywanie na głównej tablicy bez zmian.
+
+CleanFleet v1.56.7 / Bill 1.0.11: wystawianie faktury z wybranych aut w generatorze załącznika. Jedna pozycja z edytowanym opisem i sumą z bazy; spółka rozliczeniowa uzupełnia nabywcę i walutę. Szkic w Bill z rezerwacją aut, atomowe wystawienie i powiązanie rozliczenia CleanFleet, osobna wysyłka do KSeF. Trwały wykaz aut i wspólny podgląd/pobieranie PDF w obu aplikacjach; załącznik pozostaje poza KSeF.

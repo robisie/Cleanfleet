@@ -1,4 +1,4 @@
-import {createArchiveService} from './archive.js';
+import {createArchiveService,acceptedBillMetadata} from './archive.js';
 import {gus,lookupWithFallback} from './gus.js';
 import {lookupCompany} from './registry.js';
 import {stageInvoiceSeed,investmentInvoiceSeed} from '../../../app/robisie/billing.js';
@@ -11,7 +11,8 @@ const db=createClient(Deno.env.get('SUPABASE_URL')!,secret,{auth:{persistSession
 const credentials=createStateCodec(secret,'saved-credentials-v1'),codec=createStateCodec(secret,'bill-ksef-v1'),api=ksefApi();
 const gusCodec=createStateCodec(secret,'bill-gus-config-v1');
 async function savedGusKey(){const row=checked(await db.from('bill_settings').select('payload').single());return row?.payload?.gusKeyCiphertext?(await gusCodec.open(row.payload.gusKeyCiphertext,SELLER.nip,'gus-config')).key:'';}
-const archive=createArchiveService({authorizeKsef:authKsef,secret,api});
+async function acceptedSales(range:any){const rows=checked(await db.from('bill_invoices').select('id,number,status,ksef_number,payload,xml').eq('status','accepted').gte('payload->>issueDate',range.from).lte('payload->>issueDate',range.to).order('created_at',{ascending:false}).limit(1000));return (await Promise.all(rows.map(acceptedBillMetadata))).filter(Boolean);}
+const archive=createArchiveService({authorizeKsef:authKsef,secret,api,localSales:acceptedSales});
 const origins=['https://cleanfleet.pl','https://www.cleanfleet.pl'];
 function checked(r:any){if(r.error)throw Error(r.error.code==='23505'?'Ten NIP lub numer już istnieje.':r.error.message);return r.data;}
 async function invoice(id:string){if(!/^[0-9a-f-]{36}$/i.test(id||''))throw Error('Nieprawidłowy identyfikator.');const row=checked(await db.from('bill_invoices').select('*').eq('id',id).single());if(!row)throw Error('Nie znaleziono faktury.');return row;}

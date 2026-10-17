@@ -1,3 +1,4 @@
+import {invoiceAmount,SELLER} from './invoice.js';
 import {b64,hash,createStateCodec} from '../cleanfleet-ksef/core.js';
 export const validKsefNumber=value=>/^\d{10}-\d{8}-[a-f\d]{12}-[a-f\d]{2}$/i.test(value||'');
 export function archiveFilters(body){
@@ -9,7 +10,10 @@ export function archiveFilters(body){
  const dateType=body.dateType||'Issue';if(!['Issue','Invoicing','PermanentStorage'].includes(dateType))throw Error('Nieprawidłowy typ daty.');
  return {subjectType:body.kind==='sales'?'Subject1':'Subject2',dateRange:{dateType,from:new Date(midnight(start)).toISOString(),to:new Date(midnight(end+86400000)-1).toISOString()}};
 }
-export function createArchiveService({authorizeKsef,secret,api,fetchImpl=fetch,now=Date.now}){
+export async function acceptedBillMetadata(row){
+ if(row.status!=='accepted'||!validKsefNumber(row.ksef_number)||!row.xml||!row.number)return null;const p=row.payload;return {billId:row.id,source:'bill-accepted',ksefNumber:row.ksef_number,invoiceNumber:row.number,issueDate:p.issueDate,seller:{nip:SELLER.nip,name:SELLER.name},buyer:{name:p.buyer.name,identifier:{type:p.buyer.nip?(p.buyer.country==='DE'?'VatUe':'Nip'):'None',value:p.buyer.nip||''}},grossAmount:invoiceAmount(p)/100,currency:p.currency,invoiceType:p.correction?'Kor':'Vat',invoiceHash:await hash(new TextEncoder().encode(row.xml))};
+}
+export function createArchiveService({authorizeKsef,secret,api,fetchImpl=fetch,now=Date.now,localSales=async()=>[]}){
  const codec=createStateCodec(secret,'bill-ksef-archive-v1');
  async function access(body,userId){if(body.ticket){try{return await codec.open(body.ticket,userId,'browse');}catch{throw Error('Sesja odczytu KSeF wygasła. Odśwież listę faktur.');}}const auth=await authorizeKsef(userId);return {accessToken:auth.token,expires:Math.min(auth.expires||now()+10*60000,now()+10*60000),userId,scope:'browse'};}
  async function seal(state){return codec.seal(state);}
@@ -17,9 +21,12 @@ export function createArchiveService({authorizeKsef,secret,api,fetchImpl=fetch,n
   if(body.action==='ksef-list'){
    const filters=archiveFilters(body),page=body.page??0;if(!Number.isInteger(page)||page<0||page>39)throw Error('Nieprawidłowa strona wyników.');
    const sort=body.sort||'Desc';if(!['Asc','Desc'].includes(sort))throw Error('Nieprawidłowe sortowanie.');
-   const state=await access(body,userId),result=await api('/invoices/query/metadata?sortOrder='+sort+'&pageOffset='+page+'&pageSize=250',state.accessToken,filters);
+   const local=body.kind==='sales'&&filters.dateRange.dateType==='Issue'&&page===0?await localSales({from:body.from,to:body.to}):[];
+   let state,result;try{state=await access(body,userId);result=await api('/invoices/query/metadata?sortOrder='+sort+'&pageOffset='+page+'&pageSize=250',state.accessToken,filters);}catch(error){if(!local.length)throw error;return {invoices:local,hasMore:false,isTruncated:false,page:0,ticket:'',partial:true,warning:'Nie udało się odczytać listy z KSeF. Pokazano wyłącznie dokumenty wystawione w Bill z zapisanym potwierdzeniem przyjęcia w KSeF. Lista sprzedaży spoza Bill może być niepełna. '+error.message};}
+
    if(!Array.isArray(result?.invoices)||result.invoices.length>250)throw Error('Nieprawidłowa lista KSeF.');
-   return {invoices:result.invoices,hasMore:result.hasMore===true&&page<39,isTruncated:result.isTruncated===true||(page===39&&result.hasMore===true),page,ticket:await seal(state)};
+   const merged=new Map(local.map(row=>[row.ksefNumber,row]));for(const row of result.invoices)merged.set(row.ksefNumber,row);
+   return {invoices:[...merged.values()],hasMore:result.hasMore===true&&page<39,isTruncated:result.isTruncated===true||(page===39&&result.hasMore===true),page,ticket:await seal(state)};
   }
   if(body.action==='ksef-document'){
    if(!validKsefNumber(body.number))throw Error('Nieprawidłowy numer KSeF.');const state=await access(body,userId),bytes=await api('/invoices/ksef/'+encodeURIComponent(body.number),state.accessToken,undefined,'bytes');

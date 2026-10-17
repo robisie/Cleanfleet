@@ -36,3 +36,10 @@ test('failed refresh keeps the previously loaded list and selection, marks it st
 test('failed initial load does not claim an empty successful invoice list',async()=>{
  const {n,root}=await setup();n.setupTest(root,async()=>{throw Error('HTTP 503');});n.testState().state.loaded=false;await n.run(n.load);assert.match(root.innerHTML,/Lista nie została jeszcze pobrana/);assert.doesNotMatch(root.innerHTML,/Wczytano 0 faktur/);assert.equal(n.testState().state.loaded,false);
 });
+test('an accepted Bill-only correction can be included in PDF ZIP without waiting for KSeF export indexing',async()=>{
+ const {n,root,blobUrls}=await setup(),xml='<Faktura>saved accepted correction</Faktura>',r={...row(4),billId:'bill-correction',invoiceNumber:'KA4/10/2026',invoiceType:'Kor',grossAmount:0,invoiceHash:await D.digest(new TextEncoder().encode(xml))};const calls=[];
+ n.setupTest(root,async body=>{calls.push(body.action);assert.equal(body.action,'document');assert.equal(body.id,'bill-correction');return {status:'accepted',ksef_number:r.ksefNumber,xml};},[r]);assert.match(root.innerHTML,/Źródło: Bill/);assert.match(root.innerHTML,/Korekta/);await n.run(n.downloadSelected);assert.ok(n.testState().ready,n.testState().message);const zip=await Zip.loadAsync(await blobUrls.get(n.testState().ready.url).arrayBuffer());assert.ok(zip.file(r.ksefNumber+'.pdf'));assert.deepEqual(calls,['document']);
+});
+test('returning to KSeF refreshes a previously loaded sales list',async()=>{
+ const {n,root}=await setup();let requests=0;n.setupTest(root,async()=>{},[row(1)]);n.testState().state.kind='sales';n.mount(root,async()=>{requests++;return {invoices:[row(1),{...row(4),invoiceNumber:'KA4/10/2026',invoiceType:'Kor',grossAmount:0}],page:0,hasMore:false,ticket:'encrypted'};});await new Promise(resolve=>setImmediate(resolve));assert.equal(requests,1);assert.equal(n.testState().state.rows.length,2);assert.match(root.innerHTML,/KA4\/10\/2026/);
+});

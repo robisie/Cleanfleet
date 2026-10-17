@@ -1,7 +1,7 @@
-import * as KSEF from './ksef.js?v=1.0.9';
-import * as C from './core.js?v=1.0.9';
-import * as API from './api.js?v=1.0.9';
-import {preview} from './pdf.js?v=1.0.9';
+import * as KSEF from './ksef.js?v=1.0.10';
+import * as C from './core.js?v=1.0.10';
+import * as API from './api.js?v=1.0.10';
+import {preview} from './pdf.js?v=1.0.10';
 const $=s=>document.querySelector(s),e=C.esc;
 let searchTimer,searchGeneration=0;
 let investmentAmounts={id:null,options:[]};
@@ -63,7 +63,7 @@ function download(text,name,type){const url=URL.createObjectURL(new Blob([text],
 async function abandon(){if(!dirty)return true;return window.confirm('Szkic ma niezapisane zmiany. Opuścić formularz?');}
 document.addEventListener('click',event=>{const b=event.target.closest('[data-action]');if(!b||busy)return;const action=b.dataset.action;void (async()=>{try{
  if(action==='close-modal'){closeModal();return;}
- if(action==='nav'){if(!await abandon())return;dirty=false;if(view==='ksef')KSEF.unmount();view=b.dataset.view;render();return;}
+ if(action==='nav'){if(!await abandon())return;dirty=false;if(view==='ksef')KSEF.unmount();view=b.dataset.view;if(view==='invoices'){await work(async()=>{await refresh();render();});}else render();return;}
  if(action==='back'){if(!await abandon())return;dirty=false;await work(async()=>{await refresh();view='invoices';render();});return;}
  if(action==='new'){if(!await abandon())return;await work(beginNew);return;}
  if(action==='open'){selected=data.invoices.find(r=>r.id===b.dataset.id);view='detail';render();return;}

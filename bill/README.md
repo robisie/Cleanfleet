@@ -1,4 +1,4 @@
-# Bill 1.0.9
+# Bill 1.0.10
 
 Admin-only invoicing at `/bill/`. Uses the existing CleanFleet Supabase login, with a separate browser session key. No signup and no direct browser access to billing tables. The server checks the current user and administrator role for every operation.
 
@@ -58,3 +58,7 @@ New corrections receive KA[n]/MM/YYYY and ordinary invoices A[n]/MM/YYYY from th
 ## Temporary KSeF read failures (1.0.9)
 GET reads and POST invoice metadata queries retry network errors / HTTP 502,503,504 at most twice (three attempts total) with bounded backoff and short Retry-After support. Invoice submission, online session creation, auth token operations and export creation are never automatically repeated. 429 is returned with Retry-After without automatic retries. Read failures have operation-specific messages and retry metadata rather than invoice-send uncertainty text.
 A failed list refresh retains the previous rows and selection and explicitly marks them potentially stale. Initial failure says the list has not been loaded; it is not presented as a successful zero-invoice result. A dedicated retry button refreshes the list. No outage-wide availability assertion is made from a single 503: public production certificates/challenge returned 200 during investigation, while unauthenticated metadata correctly returned 401; authenticated production reads remain user-session dependent.
+
+## Accepted sales/corrections visibility (1.0.10)
+Entering the invoice list refreshes Bill records; entering KSeF refreshes metadata even if the tab had already loaded. For sales filtered by issue date, the first metadata page is supplemented with matching accepted Bill invoices (including zero-value corrections), using the saved original XML hash. Remote KSeF metadata wins when the same KSeF number appears; no duplicates are shown. Local rows have an explicit Bill/accepted-in-KSeF source label. No acceptance/acquisition timestamp is invented, so this supplement is not used for other date bases or purchases.
+If KSeF read fails and confirmed Bill sales are available, the response is explicitly partial and warns that sales outside Bill may be missing. PDF/ZIP for Bill-only rows use the authenticated immutable saved XML, verified by SHA-256 and matching accepted status/KSeF number, without waiting for a KSeF export. Other selected rows still use verified KSeF exports. Cancel/unmount guards prevent old operations from repopulating state after navigation/logout.

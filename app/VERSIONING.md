@@ -164,3 +164,5 @@ CleanFleet v1.56.3: PDF z Podsumowania miesiąca zawiera dane z podglądu: miesi
 CleanFleet v1.56.4: kafelki typów w PDF podsumowania miesiąca liczone wyłącznie z wpisów po aktywnych filtrach; wybrany BUS nie dodaje kafelka SOLÓWKA. Widok ekranowy i pozostałe raporty bez zmian.
 
 CleanFleet v1.56.5: przedawnienie zleconych wpisów bez ustalonego terminu po 48 godzinach od utworzenia zamiast 7 dni. Aktualizacja reguły w aplikacji, triggerze i zadaniu cron; wcześniejsze znaczniki przedawnienia zachowane w historii.
+
+CleanFleet v1.56.6: zaznaczanie przedawnionych wpisów w kategorii Termin upłynął, w tym kopiowanie kilku tablic. Checkbox i zachowanie zaznaczenia takie jak dla pozostałych nieopłaconych wpisów; reguły przedawnienia i ukrywanie na głównej tablicy bez zmian.

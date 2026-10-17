@@ -63,9 +63,8 @@ Deno.serve(async req=>{
   }
   if(body.action==='issue-only'){
    let row=await invoice(body.id);if(row.status!=='draft')return json(row);
-   if(!await fleetAttachment(row.id))throw Error('Ta operacja jest dostępna dla faktur z aut CleanFleet.');
-   normalize(await canonicalFleet(row.id,row.payload));
-   row=checked(await db.rpc('bill_issue',{p_id:row.id,p_revision:body.revision}));
+   const payload=normalize(await canonicalFleet(row.id,await canonicalCorrection(row.payload)));
+   row=checked(await db.rpc('bill_issue_prepared',{p_id:row.id,p_revision:body.revision,p_payload:payload}));
    return json(row);
   }
   if(body.action==='lookup-nip')return json(await lookupWithFallback(body.nip,await savedGusKey(),{mfLookup:lookupCompany}));
@@ -139,15 +138,11 @@ Deno.serve(async req=>{
   if(body.action==='check-ksef'){await authKsef(userId);return json({ok:true,message:'Połączenie z produkcyjnym KSeF działa. Uprawnienie do wysyłki zostanie również sprawdzone przez KSeF podczas wysyłania dokumentu.'});}
   if(body.action==='send'){
    let row=await invoice(body.id);
-   if(!['draft','issued'].includes(row.status))return json(row);
+   if(row.status==='draft')throw Error('Najpierw wystaw fakturę i sprawdź PDF. Wysyłka do KSeF jest osobną operacją.');
+   if(row.status!=='issued')return json(row);
    const payload=normalize(await canonicalFleet(row.id,await canonicalCorrection(row.payload)));
    if(payload.issueDate!==today())throw Error('Dla wysyłki online ustaw dzisiejszą datę wystawienia.');
    const auth=await authKsef(userId);
-   if(row.status==='draft'){
-    if(row.revision!==body.revision)throw Error('Szkic zmienił się. Odśwież dane.');
-    row=checked(await db.rpc('bill_issue',{p_id:row.id,p_revision:row.revision}));
-   }
-   if(row.status!=='issued')return json(row);
    const attempt=crypto.randomUUID();
    const lock=checked(await db.from('bill_invoices').update({payload,status:'sending',send_attempt:attempt,ksef_session:null,ksef_reference:null,updated_at:new Date().toISOString()}).eq('id',row.id).eq('status','issued').select().maybeSingle());
    if(!lock)return json(await invoice(row.id));

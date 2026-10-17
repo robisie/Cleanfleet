@@ -1,7 +1,7 @@
-import * as KSEF from './ksef.js?v=1.0.8';
-import * as C from './core.js?v=1.0.8';
-import * as API from './api.js?v=1.0.8';
-import {preview} from './pdf.js?v=1.0.8';
+import * as KSEF from './ksef.js?v=1.0.9';
+import * as C from './core.js?v=1.0.9';
+import * as API from './api.js?v=1.0.9';
+import {preview} from './pdf.js?v=1.0.9';
 const $=s=>document.querySelector(s),e=C.esc;
 let searchTimer,searchGeneration=0;
 let investmentAmounts={id:null,options:[]};

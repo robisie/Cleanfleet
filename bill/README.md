@@ -1,4 +1,4 @@
-# Bill 1.0.8
+# Bill 1.0.9
 
 Admin-only invoicing at `/bill/`. Uses the existing CleanFleet Supabase login, with a separate browser session key. No signup and no direct browser access to billing tables. The server checks the current user and administrator role for every operation.
 
@@ -54,3 +54,7 @@ Validation: data/increase/decrease/zero correction XML against the official FA3 
 
 ## Correction prefix (1.0.8)
 New corrections receive KA[n]/MM/YYYY and ordinary invoices A[n]/MM/YYYY from the same monthly atomic counter. Existing issued numbers are not rewritten. Editor/confirmation previews use the same prefix.
+
+## Temporary KSeF read failures (1.0.9)
+GET reads and POST invoice metadata queries retry network errors / HTTP 502,503,504 at most twice (three attempts total) with bounded backoff and short Retry-After support. Invoice submission, online session creation, auth token operations and export creation are never automatically repeated. 429 is returned with Retry-After without automatic retries. Read failures have operation-specific messages and retry metadata rather than invoice-send uncertainty text.
+A failed list refresh retains the previous rows and selection and explicitly marks them potentially stale. Initial failure says the list has not been loaded; it is not presented as a successful zero-invoice result. A dedicated retry button refreshes the list. No outage-wide availability assertion is made from a single 503: public production certificates/challenge returned 200 during investigation, while unauthenticated metadata correctly returned 401; authenticated production reads remain user-session dependent.

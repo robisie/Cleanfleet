@@ -15,7 +15,7 @@ async function request(path,options={},auth=true){
   const res=await fetch(URL+path,{...init,signal:controller.signal,headers:{apikey:KEY,'Content-Type':'application/json',...(auth&&session?.access_token?{Authorization:'Bearer '+session.access_token}:{}),...init.headers}});
   if(binary&&res.ok)return new Uint8Array(await res.arrayBuffer());
   const raw=await res.text();let data;try{data=raw?JSON.parse(raw):null;}catch{throw new Error('Nieprawidłowa odpowiedź serwera.');}
-  if(!res.ok){const error=new Error(data?.error||data?.message||data?.error_description||'Nie udało się zapisać danych.');error.code=data?.code;throw error;}
+  if(!res.ok){const error=new Error(data?.error||data?.message||data?.error_description||'Nie udało się zapisać danych.');error.code=data?.code;error.retryable=data?.retryable===true;error.retryAfter=data?.retryAfter||0;throw error;}
   return data;
  })(),new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();const error=new Error('Połączenie trwa zbyt długo. Odśwież listę, aby sprawdzić wynik operacji.');error.code='RS_NETWORK_TIMEOUT';reject(error);},timeoutMs);})]);}finally{clearTimeout(timer);externalSignal?.removeEventListener('abort',abort);}
 }

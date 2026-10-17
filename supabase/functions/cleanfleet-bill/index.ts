@@ -165,5 +165,5 @@ Deno.serve(async req=>{
    return json({xml});
   }
   return json({error:'Nieznana operacja.'},400);
- }catch(e){return json({error:String(e.message||'Nie udało się wykonać operacji.').slice(0,2000)},400);}
+ }catch(e){return json({error:String(e.message||'Nie udało się wykonać operacji.').slice(0,2000),retryable:e.retryable===true,retryAfter:e.retryAfter||0},[429,500,502,503,504].includes(e.status)?e.status:400);}
 });

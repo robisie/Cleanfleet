@@ -1,9 +1,21 @@
 import {b64,unb64,hash,certificateKey} from '../cleanfleet-ksef/core.js';
 export class KsefError extends Error{constructor(message,uncertain=false){super(message);this.uncertain=uncertain;}}
-export function ksefApi(fetchImpl=fetch){return async(path,token,body,raw=false)=>{
- let r;try{r=await fetchImpl('https://api.ksef.mf.gov.pl/v2'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(25000),redirect:'error'});}catch{throw new KsefError('Brak odpowiedzi KSeF. Sprawdź status wysyłki przed ponowieniem.',true);}
- if(r.status===429)throw new KsefError('KSeF ograniczył liczbę zapytań. Spróbuj ponownie za '+(Number(r.headers.get('Retry-After'))||60)+' s.');
- if(!r.ok){if(r.status===401||r.status===403)throw new KsefError('KSeF odrzucił dostęp. Sprawdź uprawnienia zapisane w tokenie (odczyt faktur wymaga InvoiceRead).');throw new KsefError('KSeF zwrócił HTTP '+r.status+'. Sprawdź status dokumentu.',r.status>=500);}
+export function ksefApi(fetchImpl=fetch,{pause=ms=>new Promise(r=>setTimeout(r,ms)),now=Date.now}={}){return async(path,token,body,raw=false)=>{
+ const readOnly=body===undefined||/^\/invoices\/query\/metadata(?:\?|$)/.test(path),sending=/^\/sessions\/online\/[^/]+\/invoices$/.test(path);
+ const operation=path.startsWith('/invoices/query/metadata')?'pobrać listy faktur':path.startsWith('/security/')?'pobrać certyfikatów KSeF':path.startsWith('/auth/')?'uwierzytelnić w KSeF':path.startsWith('/invoices/ksef/')?'pobrać faktury':'pobrać danych z KSeF';
+ const retrySeconds=value=>{if(!value)return 0;const seconds=Number(value);return Number.isFinite(seconds)&&seconds>=0?Math.ceil(seconds):Math.max(0,Math.ceil((Date.parse(value)-now())/1000))||0;};
+ let r;
+ for(let attempt=0;attempt<3;attempt++){
+  try{r=await fetchImpl('https://api.ksef.mf.gov.pl/v2'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(20000),redirect:'error'});}
+  catch{if(readOnly&&attempt<2){await pause(attempt===0?1000:2500);continue;}const error=new KsefError(sending?'Brak odpowiedzi KSeF. Sprawdź status wysyłki przed ponowieniem.':'Brak odpowiedzi KSeF. Nie udało się '+operation+'. Spróbuj ponownie później.',sending);error.retryable=readOnly;error.status=503;throw error;}
+  if(readOnly&&[502,503,504].includes(r.status)&&attempt<2){const retry=retrySeconds(r.headers.get('Retry-After'));if(retry>10)break;await r.body?.cancel().catch(()=>{});await pause(retry?retry*1000:attempt===0?1000:2500);continue;}break;
+ }
+ if(r.status===429){const retry=retrySeconds(r.headers.get('Retry-After'))||60,error=new KsefError('KSeF ograniczył liczbę zapytań. Spróbuj ponownie za '+retry+' s.');error.retryAfter=retry;error.status=429;error.retryable=readOnly;throw error;}
+ if(!r.ok){
+  if(r.status===401||r.status===403)throw new KsefError('KSeF odrzucił dostęp. Sprawdź uprawnienia zapisane w tokenie (odczyt faktur wymaga InvoiceRead).');
+  const temporary=[500,502,503,504].includes(r.status),error=new KsefError(sending?'KSeF zwrócił HTTP '+r.status+'. Sprawdź status dokumentu.':temporary?'KSeF jest chwilowo niedostępny (HTTP '+r.status+'). Nie udało się '+operation+'. Spróbuj ponownie później.':'KSeF zwrócił HTTP '+r.status+'. Nie udało się '+operation+'.',sending&&r.status>=500);
+  error.status=temporary?r.status:400;error.retryAfter=retrySeconds(r.headers.get('Retry-After'));error.retryable=readOnly&&temporary;throw error;
+ }
  if(raw==='bytes'){const reader=r.body.getReader(),chunks=[];let size=0;try{while(true){const {value,done}=await reader.read();if(done)break;size+=value.length;if(size>10*1024*1024)throw new KsefError('Faktura przekracza limit 10 MB.');chunks.push(value);}}finally{await reader.cancel().catch(()=>{});}const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}return bytes;}
  return raw?await r.text():r.status===204?null:await r.json();
 };}

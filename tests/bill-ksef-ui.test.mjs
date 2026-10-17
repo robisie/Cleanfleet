@@ -30,3 +30,9 @@ test('cancellation aborts pending request and never offers a partial ZIP',async(
  const {n,root}=await setup();n.setupTest(root,async(body,{signal})=>new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(new DOMException('Anulowano','AbortError')),{once:true})));
  const work=n.run(n.load);root.onclick({target:{closest:()=>({dataset:{kf:'cancel'}})},stopPropagation(){}});await work;assert.equal(n.testState().busy,false);assert.equal(n.testState().ready,null);assert.match(n.testState().message,/Anulowano/);
 });
+test('failed refresh keeps the previously loaded list and selection, marks it stale and offers retry',async()=>{
+ const {n,root}=await setup();n.setupTest(root,async()=>{const error=Error('KSeF jest chwilowo niedostępny (HTTP 503).');error.retryable=true;throw error;},[row(1)]);await n.run(n.load);assert.equal(n.testState().state.rows.length,1);assert.equal(n.testState().state.selected.size,1);assert.equal(n.testState().state.listError,true);assert.match(root.innerHTML,/Ponów pobieranie listy/);assert.match(root.innerHTML,/mogą być nieaktualne/);
+});
+test('failed initial load does not claim an empty successful invoice list',async()=>{
+ const {n,root}=await setup();n.setupTest(root,async()=>{throw Error('HTTP 503');});n.testState().state.loaded=false;await n.run(n.load);assert.match(root.innerHTML,/Lista nie została jeszcze pobrana/);assert.doesNotMatch(root.innerHTML,/Wczytano 0 faktur/);assert.equal(n.testState().state.loaded,false);
+});

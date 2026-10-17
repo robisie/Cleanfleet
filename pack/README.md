@@ -23,3 +23,6 @@ Tiles now store explicit cell positions, including empty cells, per account and 
 
 ### v1.1.3 — five rows and Pack branding
 Reserve at least five grid rows, retaining longer saved layouts. Use the supplied Pack logo in navigation/login and its symbol for favicon and home-screen icons. App-specific CleanFleet/Robisię logos remain scoped to their tiles.
+
+## v1.1.5 — full-width applications
+The open workspace fills the viewport below the fixed Pack navigation. Same-origin frames receive a Pack-only stylesheet that removes the main content width limits in CleanFleet, Robisię, Bill and the four migrated module surfaces. Standalone applications and secondary edit dialogs keep their existing layout. Reapplied after frame navigation; dashboard tiles retain their layout.

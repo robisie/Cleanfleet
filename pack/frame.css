@@ -1,0 +1,12 @@
+/* Loaded only inside an application opened by Robisię Pack. */
+html.robisie-pack-frame .wrap,
+html.robisie-pack-frame .shell{width:100%!important;max-width:none!important;box-sizing:border-box}
+/* Main module surfaces fill the frame; secondary forms keep their own sizing. */
+html.robisie-pack-frame #cfFinanceWindow,
+html.robisie-pack-frame #cfTaxesOverlay,
+html.robisie-pack-frame #cfWebsiteStatsOverlay,
+html.robisie-pack-frame #cfAccountingDocsOverlay{padding-left:0!important;padding-right:0!important}
+html.robisie-pack-frame #cfFinanceWindow>.cf-finance-shell,
+html.robisie-pack-frame #cfTaxesOverlay>.cf-taxes-sheet,
+html.robisie-pack-frame #cfWebsiteStatsOverlay>.cf-www-stats-sheet,
+html.robisie-pack-frame #cfAccountingDocsOverlay>.cf-accounting-docs-sheet{width:100%!important;max-width:none!important;margin-left:0!important;margin-right:0!important;box-sizing:border-box;border-radius:0!important}

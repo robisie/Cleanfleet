@@ -8,7 +8,7 @@ async function openModule(name,push=true){
  if(!Object.hasOwn(modules,name))return;if(current===name&&frame)return;
  try{if(!await verify())return;}catch(error){gate(error.message);return;}
  clearModule();document.querySelectorAll('[data-home]').forEach(b=>b.classList.remove('selected'));current=name;$('dashboard').hidden=true;$('workspace').hidden=false;$('closeModule').hidden=false;$('moduleTitle').textContent=modules[name];$('moduleError').textContent='';
- frame=document.createElement('iframe');frame.title=modules[name];frame.src='/pack/module.html?module='+name+'&v=110';frame.setAttribute('allow','clipboard-write; web-share');$('frameHost').append(frame);
+ frame=document.createElement('iframe');frame.title=modules[name];frame.src='/pack/module.html?module='+name+'&v=115';frame.onload=()=>fitFrame(frame);frame.setAttribute('allow','clipboard-write; web-share');$('frameHost').append(frame);
  document.querySelectorAll('[data-module]').forEach(b=>b.classList.toggle('selected',b.dataset.module===name));
  const url=new URL(location.href);url.searchParams.delete('application');url.searchParams.set('module',name);if(push)history.pushState(null,'',url);window.scrollTo({top:0,behavior:'auto'});
 }
@@ -16,8 +16,18 @@ async function openApplication(name,push=true){
  if(!Object.hasOwn(applications,name))return;try{if(!await verify())return;}catch(error){gate(error.message);return;}
  clearModule();current='app:'+name;$('dashboard').hidden=true;$('workspace').hidden=false;$('closeModule').hidden=false;$('moduleTitle').textContent=applications[name].name;$('moduleError').textContent='';
  frame=document.createElement('iframe');frame.title=applications[name].name;frame.src=applications[name].url;frame.setAttribute('allow','camera; microphone; geolocation; clipboard-write; web-share');
- frame.onload=()=>{try{frame.contentDocument.addEventListener('click',event=>{const a=event.target.closest('a[href]');if(a&&new URL(a.href,location.href).pathname==='/pack/'){event.preventDefault();home();}},true);}catch{}};
+ frame.onload=()=>fitFrame(frame);
  $('frameHost').append(frame);const url=new URL(location.href);url.searchParams.delete('module');url.searchParams.set('application',name);if(push)history.pushState(null,'',url);window.scrollTo({top:0,behavior:'auto'});
+}
+function fitFrame(target){
+ try{
+  const doc=target.contentDocument;if(!doc)return;
+  doc.documentElement.classList.add('robisie-pack-frame');
+  if(!doc.getElementById('robisiePackFrameStyle')){
+   const link=doc.createElement('link');link.id='robisiePackFrameStyle';link.rel='stylesheet';link.href='/pack/frame.css?v=115';doc.head.append(link);
+  }
+  doc.addEventListener('click',event=>{const a=event.target.closest('a[href]');if(a&&new URL(a.href,location.href).pathname==='/pack/'){event.preventDefault();home();}},true);
+ }catch(error){console.warn('Robisię Pack: nie udało się dopasować widoku aplikacji.',error);}
 }
 function home(){clearModule();history.replaceState(null,'','/pack/');}
 $('loginForm').onsubmit=async event=>{event.preventDefault();const button=$('signIn');button.disabled=true;$('loginError').textContent='';const password=$('password').value;$('password').value='';document.activeElement?.blur();try{const result=await db.auth.signInWithPassword({email:$('email').value.trim(),password});if(result.error)throw Error('Nieprawidłowy e-mail lub hasło.');if(await verify()){const module=new URL(location.href).searchParams.get('module');if(module)await openModule(module);else{const app=new URL(location.href).searchParams.get('application');if(app)await openApplication(app);}}}catch(error){gate();$('loginError').textContent=error.message;}finally{button.disabled=false;}};

@@ -18,3 +18,7 @@ body:has(#panel:not([hidden])){padding-top:calc(68px + env(safe-area-inset-top))
 
 .identity img{width:150px;height:54px}.login-card .brand{width:250px;max-width:100%;height:auto}.tiles .app-logo img,.tiles .app-logo svg{max-width:100%}
 @media(max-width:500px){.identity img{width:110px;height:40px}}
+
+/* Open applications use the full viewport; dashboard tile spacing stays independent. */
+main:has(>#workspace:not([hidden])){max-width:none;width:100%;padding:0}
+main>#workspace:not([hidden]){margin:0;width:100%;min-width:0}

@@ -44,3 +44,14 @@ test('CleanFleet keeps staff/companies/calendar/weather while Pack owns the four
 });
 
 test('each application opens inside Pack and the shared back button closes it in one action',async()=>{for(const name of Object.keys(applications)){const p=await panel({query:'?application='+name}),frame=p.ids.frameHost.children[0];assert.equal(frame.src,applications[name].url);assert.equal(p.ids.closeModule.hidden,false);p.ids.closeModule.onclick();assert.equal(frame.removed,true);assert.equal(p.ids.dashboard.hidden,false);assert.equal(p.ids.closeModule.hidden,true);}});
+
+test('applications and modules get the Pack width stylesheet after each document load',async()=>{
+ for(const query of ['?application=cleanfleet','?application=robisie','?application=bill','?module=taxes','?module=finances','?module=documents','?module=website']){
+  const p=await panel({query}),frame=p.ids.frameHost.children[0];
+  const freshDocument=()=>{const classes=new Set(),links=[];return {classes,links,documentElement:{classList:{add:value=>classes.add(value)}},getElementById:id=>links.find(link=>link.id===id),createElement:()=>({}),head:{append:link=>links.push(link)},addEventListener(){}};};
+  frame.contentDocument=freshDocument();frame.onload();assert(frame.contentDocument.classes.has('robisie-pack-frame'));assert.equal(frame.contentDocument.links[0].href,'/pack/frame.css?v=115');
+  frame.onload();assert.equal(frame.contentDocument.links.length,1);
+  frame.contentDocument=freshDocument();frame.onload();assert.equal(frame.contentDocument.links.length,1);
+  p.ids.closeModule.onclick();assert.equal(frame.removed,true);assert.equal(p.ids.dashboard.hidden,false);
+ }
+});

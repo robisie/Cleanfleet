@@ -8,7 +8,7 @@ async function openModule(name,push=true){
  if(!Object.hasOwn(modules,name))return;if(current===name&&frame)return;
  try{if(!await verify())return;}catch(error){gate(error.message);return;}
  clearModule();document.querySelectorAll('[data-home]').forEach(b=>b.classList.remove('selected'));current=name;$('dashboard').hidden=true;$('workspace').hidden=false;$('closeModule').hidden=false;$('moduleTitle').textContent=modules[name];$('moduleError').textContent='';
- frame=document.createElement('iframe');frame.title=modules[name];frame.src='/pack/module.html?module='+name+'&v=115';frame.onload=()=>fitFrame(frame);frame.setAttribute('allow','clipboard-write; web-share');$('frameHost').append(frame);
+ frame=document.createElement('iframe');frame.title=modules[name];frame.src='/pack/module.html?module='+name+'&v=116';frame.onload=()=>fitFrame(frame);frame.setAttribute('allow','clipboard-write; web-share');$('frameHost').append(frame);
  document.querySelectorAll('[data-module]').forEach(b=>b.classList.toggle('selected',b.dataset.module===name));
  const url=new URL(location.href);url.searchParams.delete('application');url.searchParams.set('module',name);if(push)history.pushState(null,'',url);window.scrollTo({top:0,behavior:'auto'});
 }
@@ -24,7 +24,7 @@ function fitFrame(target){
   const doc=target.contentDocument;if(!doc)return;
   doc.documentElement.classList.add('robisie-pack-frame');
   if(!doc.getElementById('robisiePackFrameStyle')){
-   const link=doc.createElement('link');link.id='robisiePackFrameStyle';link.rel='stylesheet';link.href='/pack/frame.css?v=115';doc.head.append(link);
+   const link=doc.createElement('link');link.id='robisiePackFrameStyle';link.rel='stylesheet';link.href='/pack/frame.css?v=116';doc.head.append(link);
   }
   doc.addEventListener('click',event=>{const a=event.target.closest('a[href]');if(a&&new URL(a.href,location.href).pathname==='/pack/'){event.preventDefault();home();}},true);
  }catch(error){console.warn('Robisię Pack: nie udało się dopasować widoku aplikacji.',error);}

@@ -1,6 +1,6 @@
 /* Loaded only inside an application opened by Robisię Pack. */
 html.robisie-pack-frame .wrap,
-html.robisie-pack-frame .shell{width:100%!important;max-width:none!important;box-sizing:border-box}
+html.robisie-pack-frame .shell{width:80%!important;max-width:80%!important;margin-left:auto!important;margin-right:auto!important;box-sizing:border-box}
 /* Main module surfaces fill the frame; secondary forms keep their own sizing. */
 html.robisie-pack-frame #cfFinanceWindow,
 html.robisie-pack-frame #cfTaxesOverlay,
@@ -10,3 +10,12 @@ html.robisie-pack-frame #cfFinanceWindow>.cf-finance-shell,
 html.robisie-pack-frame #cfTaxesOverlay>.cf-taxes-sheet,
 html.robisie-pack-frame #cfWebsiteStatsOverlay>.cf-www-stats-sheet,
 html.robisie-pack-frame #cfAccountingDocsOverlay>.cf-accounting-docs-sheet{width:100%!important;max-width:none!important;margin-left:0!important;margin-right:0!important;box-sizing:border-box;border-radius:0!important}
+
+/* Page backgrounds fill the frame; only working content is centered at 80%. */
+html.robisie-pack-frame #cfFinanceWindow>.cf-finance-shell>.cf-finance-tabs,
+html.robisie-pack-frame #cfFinanceWindow>.cf-finance-shell>.cf-finance-status,
+html.robisie-pack-frame #cfFinanceWindow>.cf-finance-shell>.cf-finance-content,
+html.robisie-pack-frame #cfAccountingDocsOverlay .cf-accounting-docs-head,
+html.robisie-pack-frame #cfAccountingDocsOverlay .cf-accounting-docs-body{width:80%!important;max-width:80%!important;margin-left:auto!important;margin-right:auto!important;min-width:0;box-sizing:border-box}
+html.robisie-pack-frame #cfTaxesOverlay>.cf-taxes-sheet,
+html.robisie-pack-frame #cfWebsiteStatsOverlay>.cf-www-stats-sheet{padding-left:10%!important;padding-right:10%!important}

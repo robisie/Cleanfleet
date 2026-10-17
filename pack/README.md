@@ -26,3 +26,6 @@ Reserve at least five grid rows, retaining longer saved layouts. Use the supplie
 
 ## v1.1.5 — full-width applications
 The open workspace fills the viewport below the fixed Pack navigation. Same-origin frames receive a Pack-only stylesheet that removes the main content width limits in CleanFleet, Robisię, Bill and the four migrated module surfaces. Standalone applications and secondary edit dialogs keep their existing layout. Reapplied after frame navigation; dashboard tiles retain their layout.
+
+## v1.1.6 — centered content at 80%
+Keep the workspace, iframe and module backgrounds at full window width. Center the application content at 80% width: CleanFleet containers, Robisię/Bill shells, finance tabs and body, accounting header/body, taxes and website statistics working areas. The Pack navigation and secondary dialogs retain their existing sizing.

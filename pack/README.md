@@ -32,3 +32,6 @@ Keep the workspace, iframe and module backgrounds at full window width. Center t
 
 ## v1.1.7 — income tab
 Moje finanse adds a dedicated “Wpływy” tab with monthly company-agreement salary classification, manual overrides and complete-month averages. Existing incoming statements remain in the encrypted private vault.
+
+## v1.1.8 — company income scope
+The general bank-income section in Moje finanse counts only m/mBiznes statements; personal E/eKonto data does not affect its totals, details or averages.

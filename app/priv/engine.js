@@ -115,6 +115,26 @@
   const signature=t=>[t.date,t.account,normalize(t.recipient),normalize(t.title),t.amount,t.currency].join('|');
   // Keep real repeated payments, while re-importing an overlapping statement adds no copies.
   function mergeTransactions(existing,incoming){const counts=new Map();for(const t of existing){const s=signature(t);counts.set(s,(counts.get(s)||0)+1);}const seen=new Map(),added=[];for(const t of incoming){const s=signature(t),n=(seen.get(s)||0)+1;seen.set(s,n);if(n>(counts.get(s)||0))added.push(t);}return [...existing,...added];}
+  // The source filename is the user's m/E statement designation. Unknown sources
+  // never establish company income or company statement coverage.
+  function statementKind(name){
+    const n=normalize(name);
+    if(/^(?:mbiznes\b|m\b)/.test(n))return 'business';
+    if(/^(?:ekonto\b|e\b)/.test(n))return 'personal';
+    return 'unknown';
+  }
+  function businessIncomeState(state){
+    const byHash=new Map(state.imports.filter(i=>i.hash).map(i=>[i.hash,i]));
+    const imports=state.imports.filter(i=>statementKind(i.name)==='business');
+    const incomes=(state.incomes||[]).filter(t=>{
+      const source=t.sourceHash&&byHash.get(t.sourceHash);
+      return statementKind(source?source.name:t.sourceName)==='business';
+    });
+    return {...state,imports,incomes};
+  }
+  function businessIncomeSummary(state,year,currency,today){
+    return incomeSummary(businessIncomeState(state),year,currency,today);
+  }
   // Salary classification is independent of exclusions in the general income total.
   function isSalary(t){
     if(typeof t.salary==='boolean')return t.salary;
@@ -137,5 +157,5 @@
     const full=months.filter(m=>m.complete&&m.finished);
     return {months,total:months.reduce((sum,m)=>sum+m.total,0),average:full.length?Math.round(full.reduce((sum,m)=>sum+m.total,0)/full.length):null,fullMonths:full.length};
   }
-  return {isSalary,salarySummary,incomeSummary,normalize,contractorKey,similarRules,linkContractor,mergeRules,dueDate,schedule,date,cents,monthShift,rowsFromItems,parsePages,matches,allocation,covered,status,candidates,tracked,signature,mergeTransactions};
+  return {statementKind,businessIncomeState,businessIncomeSummary,isSalary,salarySummary,incomeSummary,normalize,contractorKey,similarRules,linkContractor,mergeRules,dueDate,schedule,date,cents,monthShift,rowsFromItems,parsePages,matches,allocation,covered,status,candidates,tracked,signature,mergeTransactions};
 });

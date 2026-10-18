@@ -22,7 +22,7 @@ test('manual overrides survive duplicate statement merge and encrypted backup/ac
 test('salary selection saves immediately, auto clears override, failed persistence restores prior selection',async()=>{
  const source=fs.readFileSync('app/priv/ui.js','utf8');let saved,fail=false;
  const select={dataset:{salaryId:'s1'},value:'no'},els={modalBody:{querySelectorAll:s=>s==='[data-salary-id]'?[select]:[]}};
- const c=vm.createContext({state:{incomes:[credit]},P,$:id=>els[id],structuredClone,generation:1,key:{},money:n=>n,escape:s=>s,modal(){},action:fn=>fn(),persist:async s=>{if(fail)throw Error('conflict');saved=s;c.state=s;}});
+ const c=vm.createContext({state:{imports:[],incomes:[credit]},P,$:id=>els[id],structuredClone,generation:1,key:{},money:n=>n,escape:s=>s,modal(){},action:fn=>fn(),persist:async s=>{if(fail)throw Error('conflict');saved=s;c.state=s;}});
  vm.runInContext("let incomeCurrency='PLN';"+source.slice(source.indexOf('function showIncomeMonth('),source.indexOf('function showCash(')),c);
  c.showIncomeMonth('2026-01',true);await select.onchange();assert.equal(saved.incomes[0].salary,false);
  select.value='auto';await select.onchange();assert(!('salary' in saved.incomes[0]));

@@ -1,7 +1,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
 const P=require('../app/priv/engine.js'),ui=fs.readFileSync(require('node:path').join(__dirname,'../app/priv/ui.js'),'utf8');
-const credit={date:'2026-01-10',recipient:'Nadawca',title:'Zapłata',account:'',amount:10000,currency:'PLN',id:'i1'};
-const imp=(from,to,extra={})=>({from,to,complete:true,incomeVersion:1,currency:'PLN',...extra});
+const credit={date:'2026-01-10',recipient:'Nadawca',title:'Zapłata',account:'',amount:10000,currency:'PLN',id:'i1',sourceName:'mBiznes konto.pdf'};
+const imp=(from,to,extra={})=>({from,to,complete:true,incomeVersion:1,currency:'PLN',name:'mBiznes konto.pdf',...extra});
 test('credits are separate from debits, opening/closing balances and foreign description prices',()=>{
  const p=P.parsePages([['Okres: 01.01.2026 - 31.01.2026','Waluta rachunku PLN','Saldo początkowe 500,00','10.01.2026 PRZELEW PRZYCHODZĄCY +100,00 -50,00','NADAWCA: Firma testowa','TYTUŁ: Zapłata','11.01.2026 PRZELEW WYCHODZĄCY -20,00 -70,00','ODBIORCA: ZUS','12.01.2026 ZWROT +5,00 -65,00','NADAWCA: Sklep','Cena pierwotna 2,00 EUR','Saldo końcowe -65,00']]);
  assert.equal(p.incomes.length,2);assert.equal(p.incomes[0].amount,10000);assert.equal(p.incomes[0].recipient,'Firma testowa');assert.equal(p.incomes[0].title,'Zapłata');assert.equal(p.incomes[1].currency,'PLN');assert.equal(p.transactions.length,1);assert.equal(p.transactions[0].amount,2000);assert.equal(p.warnings.length,0);

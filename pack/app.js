@@ -8,7 +8,7 @@ async function openModule(name,push=true){
  if(!Object.hasOwn(modules,name))return;if(current===name&&frame)return;
  try{if(!await verify())return;}catch(error){gate(error.message);return;}
  clearModule();document.querySelectorAll('[data-home]').forEach(b=>b.classList.remove('selected'));current=name;$('dashboard').hidden=true;$('workspace').hidden=false;$('closeModule').hidden=false;$('moduleTitle').textContent=modules[name];$('moduleError').textContent='';
- frame=document.createElement('iframe');frame.title=modules[name];frame.src='/pack/module.html?module='+name+'&v=117';frame.onload=()=>fitFrame(frame);frame.setAttribute('allow','clipboard-write; web-share');$('frameHost').append(frame);
+ frame=document.createElement('iframe');frame.title=modules[name];frame.src='/pack/module.html?module='+name+'&v=118';frame.onload=()=>fitFrame(frame);frame.setAttribute('allow','clipboard-write; web-share');$('frameHost').append(frame);
  document.querySelectorAll('[data-module]').forEach(b=>b.classList.toggle('selected',b.dataset.module===name));
  const url=new URL(location.href);url.searchParams.delete('application');url.searchParams.set('module',name);if(push)history.pushState(null,'',url);window.scrollTo({top:0,behavior:'auto'});
 }

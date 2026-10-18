@@ -29,3 +29,7 @@ main>#workspace:not([hidden]){margin:0;width:100%;min-width:0}
 
 /* Panel stays left; the ordered application slots and module tabs dock right. */
 .workspace-tabs{overflow:visible;gap:8px}.workspace-tabs #homeTab{flex:none;align-self:stretch}.workspace-tabs #openTabs{display:flex;align-items:stretch;gap:5px;flex:0 1 auto;min-width:0;max-width:calc(100% - 76px);height:100%;margin-left:auto;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin}.workspace-tab{flex:0 0 auto}.workspace-tab.unopened{background:#f4f7f5;border-style:dashed}.workspace-tab.unopened .workspace-tab-select{color:#64766d}.workspace-tab.unopened .workspace-tab-select:hover{background:#e1ece5;color:#275c48}
+
+/* Supplied AppPACK mark keeps its original proportions in the compact header. */
+.identity img{width:54px;height:54px}.login-card .brand{width:210px;height:auto}
+@media(max-width:760px){.identity img{width:40px;height:40px}}

@@ -51,3 +51,6 @@ Panel stays on the left outside the horizontally scrollable tab group. The group
 
 ## v1.2.2 — preserve workspaces on document return
 Pack no longer destroys frames on pagehide. BFCache return retains the actual DOM/drafts and rechecks administrator access before revealing cached content. Finance account-mode and module lifecycle handlers likewise preserve cached views only for persisted page transitions; ordinary close/signout still clear data. Actual browser reloads restore the same-owner session tab list after an admin check. Session storage contains only version, owner UUID, tab kind/name and active tab key, never draft fields, financial data, passwords or tokens. Closed tabs are removed from the snapshot; signout/denial/account changes clear it. This restores tab availability after a reload; unsaved iframe fields survive BFCache, not a full browser reload.
+
+### v1.2.3 — AppPACK logo
+Use the supplied orange AppPACK logo in the header and login screen. Favicons, Apple touch and installation icons use its orange R symbol on white. New asset filenames and manifest/style versions refresh cached branding without changing application logos or workspace behavior.

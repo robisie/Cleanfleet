@@ -1,4 +1,4 @@
-# Robisię Pack v1.2.0
+# Robisię Pack v1.2.1
 
 Administrator portal at `/pack/`. It shares the existing same-origin Supabase session with CleanFleet, verifies the user with `auth.getUser` and requires `cf_is_admin()`. Employees continue to use `/app/` only. Independent application links lead to CleanFleet `/app/`, Robisię `/app/robisie/` and Bill `/bill/`; Robisię and Bill code/data are unchanged. Their existing login behavior is unchanged.
 
@@ -45,3 +45,6 @@ Open applications/modules have one independent iframe per destination. The tab b
 Reminders now use the existing renderer/actions in `reminders.js`, shared reminder form and due-date bucket fix, against the same `cf_reminders` table. Calendar retains the current calendar engine, weather, shared form, private filter, touch/DnD, edit and ageing enhancements in a Pack-hosted page with an administrator check before data loading. Existing CleanFleet calendar URL redirects to the Pack tab; old launch tiles and worker calendar injections are removed. CleanFleet continues to own companies, vehicles, washes and weather. No production reminder, schedule or financial data was modified or copied.
 
 Taxes and accounting documents fill the frame height with their own backgrounds; their existing working width rules remain in force. Checks: Pack unit/navigation/authorization tests; browser tests `pack-workspaces.browser.cjs`, `pack-migrated-modules.browser.cjs`, `pack-width.browser.cjs` and `finances-income.browser.cjs` use mocked accounts/data, including fake reminder writes, and phone/tablet/desktop layouts.
+
+## v1.2.1 — right-docked tabs and fixed application slots
+Panel stays on the left outside the horizontally scrollable tab group. The group is right-aligned and always starts with CleanFleet, Robisię and Bill in that order, independent of opening order. Closed application slots remain lightweight launch buttons without an iframe or close button; opening a slot creates one frame and closing it releases that frame while retaining its fixed slot. Module tabs follow the applications. Active-tab neighbour selection uses visual order. Layout checks cover right alignment, fixed order, empty slots and phone/tablet overflow without scrolling Panel away.

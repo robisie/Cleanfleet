@@ -2,15 +2,17 @@ import {client,administrator,modules,applications} from './auth.js?v=120';
 import {mountTiles} from './tiles.js?v=113';
 const $=id=>document.getElementById(id),db=client(),tabs=new Map();
 let user=null,epoch=0,current='',frame=null,disposeTiles=null;
+function orderedTabKeys(){return [...Object.keys(applications).map(name=>'app:'+name).filter(key=>tabs.has(key)),...[...tabs.keys()].filter(key=>!key.startsWith('app:'))];}
 function renderTabs(){
  const focusedKey=document.activeElement?.dataset?.tabKey;
  $('openTabs').replaceChildren();$('workspaceTabs').hidden=!user;
  $('homeTab').setAttribute('aria-selected',String(!current));$('homeTab').tabIndex=current?-1:0;
- for(const [key,tab] of tabs){
-  const item=document.createElement('div');item.className='workspace-tab'+(key===current?' active':'');item.setAttribute('role','presentation');
-  const button=document.createElement('button');button.type='button';button.className='workspace-tab-select';button.textContent=tab.title;button.title=tab.title;button.setAttribute('role','tab');button.setAttribute('aria-selected',String(key===current));button.setAttribute('aria-controls',tab.frame.id);button.tabIndex=key===current?0:-1;button.dataset.tabKey=key;button.onclick=()=>openTarget(tab.kind,tab.name);
+ const slots=[...Object.entries(applications).map(([name,app])=>['app:'+name,tabs.get('app:'+name)||{kind:'application',name,title:app.name,frame:null}]),...[...tabs.entries()].filter(([,tab])=>tab.kind==='module')];
+ for(const [key,tab] of slots){
+  const item=document.createElement('div');item.className='workspace-tab'+(key===current?' active':'')+(tab.frame?'':' unopened');item.dataset.kind=tab.kind;item.setAttribute('role','presentation');
+  const button=document.createElement('button');button.type='button';button.className='workspace-tab-select';button.textContent=tab.title;button.title=tab.title;button.setAttribute('role','tab');button.setAttribute('aria-selected',String(key===current));if(tab.frame)button.setAttribute('aria-controls',tab.frame.id);button.tabIndex=key===current?0:-1;button.dataset.tabKey=key;button.onclick=()=>openTarget(tab.kind,tab.name);
   const close=document.createElement('button');close.type='button';close.className='workspace-tab-close';close.textContent='×';close.setAttribute('aria-label','Zamknij zakładkę '+tab.title);close.onclick=()=>closeTab(key);
-  item.append(button,close);$('openTabs').append(item);
+  item.append(button);if(tab.frame)item.append(close);$('openTabs').append(item);
  }
  $('openTabs').querySelector('.workspace-tab.active')?.scrollIntoView?.({block:'nearest',inline:'nearest'});
  if(focusedKey)$('workspaceTabs').querySelector('[data-tab-key="'+focusedKey+'"]')?.focus();
@@ -47,7 +49,7 @@ async function openTarget(kind,name,push=true){
 }
 const openModule=(name,push=true)=>openTarget('module',name,push),openApplication=(name,push=true)=>openTarget('application',name,push);
 function closeTab(key){
- const tab=tabs.get(key);if(!tab)return;const keys=[...tabs.keys()],index=keys.indexOf(key);tab.frame.remove();tabs.delete(key);
+ const tab=tabs.get(key);if(!tab)return;const keys=orderedTabKeys(),index=keys.indexOf(key);tab.frame.remove();tabs.delete(key);
  if(current===key){const next=keys[index-1]||keys[index+1];if(next)activate(next);else home();}else renderTabs();
 }
 function fitFrame(target){
@@ -80,7 +82,7 @@ function home(push=true){
 $('loginForm').onsubmit=async event=>{event.preventDefault();const button=$('signIn');button.disabled=true;$('loginError').textContent='';const password=$('password').value;$('password').value='';document.activeElement?.blur();try{const result=await db.auth.signInWithPassword({email:$('email').value.trim(),password});if(result.error)throw Error('Nieprawidłowy e-mail lub hasło.');if(await verify()){const url=new URL(location.href);if(url.searchParams.get('module'))await openModule(url.searchParams.get('module'));else if(url.searchParams.get('application'))await openApplication(url.searchParams.get('application'));}}catch(error){gate();$('loginError').textContent=error.message;}finally{button.disabled=false;}};
 $('logout').onclick=async()=>{gate('Wylogowano.');const {error}=await db.auth.signOut();if(error)$('loginError').textContent='Nie udało się zakończyć sesji na serwerze. Spróbuj ponownie.';};
 document.querySelectorAll('[data-app]').forEach(b=>b.onclick=()=>openApplication(b.dataset.app));$('closeModule').onclick=()=>home();$('homeTab').onclick=()=>home();$('homeLogo').onclick=event=>{event.preventDefault();home();};document.querySelectorAll('[data-module]').forEach(b=>b.onclick=()=>openModule(b.dataset.module));
-$('workspaceTabs').onkeydown=event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||!event.target.matches('[role=tab]'))return;event.preventDefault();const items=[$('homeTab'),...$('workspaceTabs').querySelectorAll('[data-tab-key]')],index=items.indexOf(event.target),next=event.key==='Home'?0:event.key==='End'?items.length-1:(index+(event.key==='ArrowRight'?1:items.length-1))%items.length;const button=items[next],key=button.dataset.tabKey;if(key){activate(key);$('workspaceTabs').querySelector('[data-tab-key="'+key+'"]')?.focus();}else{home();$('homeTab').focus();}};
+$('workspaceTabs').onkeydown=event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||!event.target.matches('[role=tab]'))return;event.preventDefault();const items=[$('homeTab'),...$('workspaceTabs').querySelectorAll('[data-tab-key]')],index=items.indexOf(event.target),next=event.key==='Home'?0:event.key==='End'?items.length-1:(index+(event.key==='ArrowRight'?1:items.length-1))%items.length;const button=items[next],key=button.dataset.tabKey;if(key){const focus=()=>$('workspaceTabs').querySelector('[data-tab-key="'+key+'"]')?.focus();if(tabs.has(key)){activate(key);focus();}else void openApplication(key.slice(4)).then(focus);}else{home();$('homeTab').focus();}};
 window.addEventListener('message',event=>{
  if(event.origin!==location.origin||!user)return;const entry=[...tabs.entries()].find(([,t])=>event.source===t.frame.contentWindow);if(!entry)return;
  if(event.data?.type==='robisie-pack-close')closeTab(entry[0]);

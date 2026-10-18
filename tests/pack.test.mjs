@@ -8,11 +8,11 @@ test('Pack authorizes only a server-verified admin, never a stored role claim',a
  assert.equal((await administrator(db({id:'admin'},true))).id,'admin');assert.equal(await administrator(db({id:'admin'},true,new Error('expired'))),null);
 });
 function element(){return {hidden:false,value:'',textContent:'',innerHTML:'',dataset:{},children:[],classList:{add(){},remove(){},toggle(){}},append(...els){this.children.push(...els);},replaceChildren(){this.children=[];},setAttribute(){},remove(){this.removed=true;},contentWindow:{},querySelectorAll:()=>[],querySelector:()=>null};}
-async function panel({allowed=true,userExists=true,query=''}={}){
+async function panel({allowed=true,userExists=true,query='',storage}={}){
  const ids=Object.fromEntries(['login','panel','workspace','dashboard','frameHost','moduleTitle','moduleError','loginForm','loginInfo','loginError','userEmail','signIn','email','password','logout','closeModule','tiles','openTabs','workspaceTabs','homeTab','homeLogo'].map(k=>[k,element()])),events={};let authCallback;
  const db={auth:{getUser:async()=>({data:{user:userExists?{id:'u',email:'test@example.invalid'}:null}}),onAuthStateChange:fn=>authCallback=fn,signOut:async()=>({}),signInWithPassword:async()=>({})},rpc:async()=>({data:allowed})};
  const location={href:'https://cleanfleet.pl/pack/'+query,origin:'https://cleanfleet.pl'},window={addEventListener:(name,fn)=>events[name]=fn,scrollTo(){}};
- const c=vm.createContext({document:{getElementById:id=>ids[id],querySelectorAll:()=>[],createElement:()=>element(),addEventListener(){}},client:()=>db,administrator,modules,applications,mountTiles:()=>()=>{},location,URL,history:{replaceState(){},pushState(){}},window,console});
+ const c=vm.createContext({sessionStorage:storage,document:{getElementById:id=>ids[id],querySelectorAll:()=>[],createElement:()=>element(),addEventListener(){}},client:()=>db,administrator,modules,applications,mountTiles:()=>()=>{},location,URL,history:{replaceState(){},pushState(){}},window,console});
  await vm.runInContext('(async()=>{'+read('pack/app.js').replace(/^import .*\n/gm,'')+';window.testOpenModule=openModule;window.testOpenApplication=openApplication;window.testCloseTab=closeTab;window.testHome=home;})()',c);
  return {db,ids,events,signOut:()=>authCallback('SIGNED_OUT'),open:async name=>{await vm.runInContext('0',c);},c};
 }
@@ -68,4 +68,17 @@ test('a delayed administrator reply cannot reopen a tab after logout',async()=>{
  const p=await panel();let release;p.db.auth.getUser=()=>new Promise(resolve=>release=resolve);
  const opening=p.c.window.testOpenModule('reminders');p.signOut();release({data:{user:{id:'u'}}});await opening;
  assert.equal(p.ids.panel.hidden,true);assert.equal(p.ids.frameHost.children.length,0);
+});
+
+function workspaceStorage(saved){let value=saved?JSON.stringify(saved):null;return {getItem:()=>value,setItem:(_k,v)=>value=v,removeItem:()=>value=null};}
+test('reload restores only validated tabs for the same authenticated owner',async()=>{
+ const storage=workspaceStorage({version:1,userId:'u',active:'finances',tabs:[{kind:'application',name:'bill'},{kind:'module',name:'finances'},{kind:'module',name:'https://evil.invalid'},{kind:'other',name:'taxes'}]});
+ const p=await panel({storage});assert.equal(p.ids.frameHost.children.length,2);assert.equal(p.ids.frameHost.children[1].hidden,false);const snapshot=JSON.parse(storage.getItem());assert.deepEqual(Object.keys(snapshot.tabs[0]).sort(),['kind','name']);assert.equal(snapshot.tabs.length,2);
+ p.events.pagehide({persisted:true});assert.equal(p.ids.frameHost.children[0].removed,undefined);assert.equal(p.ids.frameHost.children[1].removed,undefined);
+ p.signOut();assert.equal(storage.getItem(),null);
+ const wrong=workspaceStorage({version:1,userId:'another-owner',tabs:[{kind:'module',name:'finances'}]});const q=await panel({storage:wrong});assert.equal(q.ids.frameHost.children.length,0);assert.equal(JSON.parse(wrong.getItem()).userId,'u');
+});
+test('cached return rechecks admin access before revealing old frames',async()=>{
+ const storage=workspaceStorage(),p=await panel({query:'?module=finances',storage}),old=p.ids.frameHost.children[0];p.events.pagehide({persisted:true});p.db.rpc=async()=>({data:false});
+ p.events.pageshow({persisted:true});assert.equal(p.ids.panel.hidden,true);await new Promise(resolve=>setImmediate(resolve));assert.equal(p.ids.panel.hidden,true);assert.equal(old.removed,true);assert.equal(storage.getItem(),null);
 });

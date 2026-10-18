@@ -12,3 +12,8 @@ test('actual legacy submit converts once, preserves history and opens through ac
  c=vm.createContext({$:id=>ids[id],envelope:legacy,loadEnvelope:async()=>{},keyFor,newSalt,newAccountKey,open,validate:s=>s,empty:()=>({}),persist,document:{activeElement:{blur(){}}},generation:0,financeNotify:type=>notified=type,render(){},activity(){},requestAnimationFrame:fn=>fn(),window:{scrollTo(){}}});
  vm.runInContext('let key,salt,state,accountSecret;'+handler,c);await ids.unlockForm.onsubmit({preventDefault(){}});assert.equal(ids.gateError.textContent,'');assert.deepEqual((await openAccount(saved)).state,state);assert.equal(ids.main.hidden,false);assert.equal(notified,'cf-finances-unlocked');
 });
+
+test('only a persisted account-mode Pack frame may retain finance keys for return',()=>{
+ const source=fs.readFileSync('app/priv/ui.js','utf8'),handler=source.match(/window\.addEventListener\('pagehide',event=>\{[\s\S]*?\}\);/)[0];
+ for(const [persisted,accountSecret,pack,expected] of [[true,'account',true,0],[false,'account',true,1],[true,null,true,1],[true,'account',false,1]]){let locked=0,callback;vm.runInNewContext(handler,{accountSecret,window:{addEventListener:(_name,fn)=>callback=fn},document:{documentElement:{classList:{contains:()=>pack}}},lock:()=>locked++});callback({persisted});assert.equal(locked,expected);}
+});

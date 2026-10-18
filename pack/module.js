@@ -13,7 +13,7 @@ function deny(message){live=false;observer?.disconnect();window.CFFinance?.close
 function load(src){return new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=resolve;script.onerror=()=>reject(Error('Nie udało się wczytać modułu. Odśwież Robisię Pack.'));document.head.append(script);});}
 const scripts={
  reminders:['/pack/reminders.js?v=120','/app/reminder-fix.js?v=120','/app/reminder-form-v1251.js?v=20261004-15415'],
- finances:['/app/vendor/xlsx-0.18.5.full.min.js','/app/period-picker.js?v=1532','/app/exchange-rate.js?v=1531','/pack/earnings.js?v=100','/app/dojazdy.js?v=20261007-1556','/app/finances.js?v=20261018-141'],
+ finances:['/app/vendor/xlsx-0.18.5.full.min.js','/app/period-picker.js?v=1532','/app/exchange-rate.js?v=1531','/pack/earnings.js?v=100','/app/dojazdy.js?v=20261007-1556','/app/finances.js?v=20261018-142'],
  taxes:['/app/taxes-v1310.js?v=20260918-6'],
  website:['/app/period-picker.js?v=1532','/pack/website-stats.js?v=100'],
  documents:['/app/vendor/jszip-3.10.1.min.js','/app/vendor/jspdf-2.5.1.umd.min.js','/app/vendor/jspdf-autotable-3.8.2.min.js','/app/mbank-mt940.js?v=20261002-1520','/app/pdf-unlock.js?v=20261006-15424','/app/mail-documents.js?v=20261006-15424','/app/ksef-preview.js?v=20261006-15427','/app/ksef-pdf.js?v=20261006-15425','/app/accounting-package.js?v=20261006-15423','/app/accounting-history.js?v=20261006-15425','/app/accounting-decisions.js?v=20261002-15123','/app/accounting-reconcile.js?v=20261002-15123','/app/accounting-documents-v1510.js?v=20261016-1560']
@@ -34,4 +34,6 @@ try{
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&live)administrator(window.cfSupabase).then(allowed=>{if(!allowed||allowed.id!==user.id)deny('Sesja została zakończona.');}).catch(error=>deny(error.message));});
 }catch(error){deny(error.message);}
 window.addEventListener('message',event=>{if(event.origin===location.origin&&event.source===parent&&event.data?.type==='robisie-pack-activated'&&live&&name==='reminders')window.cfRefreshPackReminders?.().catch(error=>window.showToast(error.message));});
-window.addEventListener('pagehide',()=>{live=false;observer?.disconnect();window.CFFinance?.lock();window.CFAccountingMail?.reset();});
+window.addEventListener('pagehide',event=>{if(event.persisted)return;live=false;observer?.disconnect();window.CFFinance?.lock();window.CFAccountingMail?.reset();});
+
+window.addEventListener('pageshow',event=>{if(event.persisted&&live){document.body.style.visibility='hidden';administrator(window.cfSupabase).then(allowed=>{if(!allowed||allowed.id!==user.id)deny('Sesja została zakończona.');}).catch(error=>deny(error.message)).finally(()=>{document.body.style.visibility='';});}});

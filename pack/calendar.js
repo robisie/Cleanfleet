@@ -10,4 +10,5 @@ try{
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&live)administrator(db).then(u=>{if(!u||u.id!==user.id)deny('Sesja została zakończona.');}).catch(e=>deny(e.message));});
 }catch(error){deny(error.message);}
 window.addEventListener('message',e=>{if(e.origin===location.origin&&e.source===parent&&e.data?.type==='robisie-pack-activated'&&live)document.getElementById('refresh')?.click();});
-window.addEventListener('pagehide',()=>{live=false;});
+window.addEventListener('pagehide',event=>{if(!event.persisted)live=false;});
+window.addEventListener('pageshow',event=>{if(event.persisted&&live){document.body.style.visibility='hidden';administrator(db).then(allowed=>{if(!allowed||allowed.id!==user.id)deny('Sesja została zakończona.');}).catch(error=>deny(error.message)).finally(()=>{document.body.style.visibility='';});}});

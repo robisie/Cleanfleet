@@ -1,4 +1,4 @@
-# Robisię Pack v1.2.1
+# Robisię Pack v1.2.2
 
 Administrator portal at `/pack/`. It shares the existing same-origin Supabase session with CleanFleet, verifies the user with `auth.getUser` and requires `cf_is_admin()`. Employees continue to use `/app/` only. Independent application links lead to CleanFleet `/app/`, Robisię `/app/robisie/` and Bill `/bill/`; Robisię and Bill code/data are unchanged. Their existing login behavior is unchanged.
 
@@ -48,3 +48,6 @@ Taxes and accounting documents fill the frame height with their own backgrounds;
 
 ## v1.2.1 — right-docked tabs and fixed application slots
 Panel stays on the left outside the horizontally scrollable tab group. The group is right-aligned and always starts with CleanFleet, Robisię and Bill in that order, independent of opening order. Closed application slots remain lightweight launch buttons without an iframe or close button; opening a slot creates one frame and closing it releases that frame while retaining its fixed slot. Module tabs follow the applications. Active-tab neighbour selection uses visual order. Layout checks cover right alignment, fixed order, empty slots and phone/tablet overflow without scrolling Panel away.
+
+## v1.2.2 — preserve workspaces on document return
+Pack no longer destroys frames on pagehide. BFCache return retains the actual DOM/drafts and rechecks administrator access before revealing cached content. Finance account-mode and module lifecycle handlers likewise preserve cached views only for persisted page transitions; ordinary close/signout still clear data. Actual browser reloads restore the same-owner session tab list after an admin check. Session storage contains only version, owner UUID, tab kind/name and active tab key, never draft fields, financial data, passwords or tokens. Closed tabs are removed from the snapshot; signout/denial/account changes clear it. This restores tab availability after a reload; unsaved iframe fields survive BFCache, not a full browser reload.

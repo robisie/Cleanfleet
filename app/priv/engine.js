@@ -115,6 +115,15 @@
   const signature=t=>[t.date,t.account,normalize(t.recipient),normalize(t.title),t.amount,t.currency].join('|');
   // Keep real repeated payments, while re-importing an overlapping statement adds no copies.
   function mergeTransactions(existing,incoming){const counts=new Map();for(const t of existing){const s=signature(t);counts.set(s,(counts.get(s)||0)+1);}const seen=new Map(),added=[];for(const t of incoming){const s=signature(t),n=(seen.get(s)||0)+1;seen.set(s,n);if(n>(counts.get(s)||0))added.push(t);}return [...existing,...added];}
+  // Salary classification is independent of exclusions in the general income total.
+  function isSalary(t){
+    if(typeof t.salary==='boolean')return t.salary;
+    const title=normalize(t.title);
+    return /\b(?:wynagrodz[a-z]*|wynagr|pensj[a-z]*)\b/.test(title)||/\bwyplata\b/.test(title);
+  }
+  function salarySummary(state,year,currency,today){
+    return incomeSummary({...state,incomes:(state.incomes||[]).map(t=>({...t,excluded:!isSalary(t)}))},year,currency,today);
+  }
   function incomeSummary(state,year,currency,today){
     const imports=state.imports.filter(i=>i.incomeVersion===1&&i.currency===currency);
     const incomes=(state.incomes||[]).filter(t=>t.currency===currency&&t.date.startsWith(year+'-'));
@@ -128,5 +137,5 @@
     const full=months.filter(m=>m.complete&&m.finished);
     return {months,total:months.reduce((sum,m)=>sum+m.total,0),average:full.length?Math.round(full.reduce((sum,m)=>sum+m.total,0)/full.length):null,fullMonths:full.length};
   }
-  return {incomeSummary,normalize,contractorKey,similarRules,linkContractor,mergeRules,dueDate,schedule,date,cents,monthShift,rowsFromItems,parsePages,matches,allocation,covered,status,candidates,tracked,signature,mergeTransactions};
+  return {isSalary,salarySummary,incomeSummary,normalize,contractorKey,similarRules,linkContractor,mergeRules,dueDate,schedule,date,cents,monthShift,rowsFromItems,parsePages,matches,allocation,covered,status,candidates,tracked,signature,mergeTransactions};
 });

@@ -41,10 +41,10 @@ test('legacy vaults migrate safely; income and exclusions survive encryption, ba
  assert.throws(()=>c.validate({...old,incomes:[{...credit,amount:-1}]}),/nieprawidłowe przelewy/);
 });
 test('income section renders months and exclusions save immediately through existing encrypted persistence',async()=>{
- const elements={year:{value:'2026'},incomeCurrency:{value:'PLN'},incomeUpload:{},incomeSummary:{innerHTML:'',querySelectorAll:()=>[]},modalBody:{querySelectorAll:()=>[box]}};
+ const elements={year:{value:'2026'},incomeCurrency:{value:'PLN'},incomeUpload:{},incomeSummary:{innerHTML:'',querySelectorAll:()=>[]},modalBody:{querySelectorAll:selector=>selector==='[data-income-id]'?[box]:[]}};
  const box={dataset:{incomeId:'i1'},checked:true,disabled:false};let saved,modalBody='',mode;
  const state={imports:[imp('2026-01-01','2026-01-31')],incomes:[credit]},c=vm.createContext({state,P,$:id=>elements[id],today:()=> '2026-10-16',monthNames:Array.from({length:12},(_,i)=>String(i+1)),escape:s=>s,money:n=>(n/100).toFixed(2),importInFlight:false,structuredClone,generation:1,key:{},choosePdf:m=>{mode=m;},modal:(_title,body)=>{modalBody=body;},action:fn=>fn(),persist:async next=>{saved=next;c.state=next;}});
- vm.runInContext(ui.slice(ui.indexOf("let incomeCurrency='PLN';"),ui.indexOf('function showCash(')),c);c.renderIncome();assert.match(elements.incomeSummary.innerHTML,/Wpływy na konto/);assert.match(elements.incomeSummary.innerHTML,/Średnia miesięczna · 1 pełnych/);assert.equal((elements.incomeSummary.innerHTML.match(/data-income-month=/g)||[]).length,12);
+ vm.runInContext(ui.slice(ui.indexOf("let incomeCurrency='PLN';"),ui.indexOf('function showCash(')),c);c.renderIncome();assert.match(elements.incomeSummary.innerHTML,/Wszystkie wpływy na konto/);assert.match(elements.incomeSummary.innerHTML,/Średnia miesięczna · 1 pełnych/);assert.equal((elements.incomeSummary.innerHTML.match(/data-income-month=/g)||[]).length,12);
  elements.incomeUpload.onclick();assert.equal(mode,'income');c.showIncomeMonth('2026-01');assert.match(modalBody,/Nadawca/);box.checked=false;await box.onchange();assert.equal(saved.incomes[0].excluded,true);assert.match(modalBody,/Suma uwzględniona: <strong>0.00/);
 });
 test('same-file income backfill does not duplicate existing watched outgoing payments',()=>{

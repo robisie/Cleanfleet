@@ -1,4 +1,4 @@
-# Moje finanse v1.2.1
+# Moje finanse v1.4.0
 
 The administrator dashboard has one Moje finanse tile. app/finances.js opens four tabs: earnings, payments, routes and cash. The private vault iframe at /app/priv/index.html?finance=1 uses the existing payment PIN/password (minimum six characters) as the shared UI gate. Direct legacy private URLs redirect to /app/?finances=1. Switching tabs preserves drafts and does not reload the main app.
 
@@ -41,3 +41,5 @@ Bank income v1.2.0: the parser returns positive operation amounts separately fro
 Import review v1.2.1: amount errors, missing ranges and operations outside the statement range are listed per file in expandable details. They disable full-period confirmation but do not block saving recognized operations in the batch. Invalid files cannot inherit an earlier full-period flag. They remain incomplete for averages and missing-payment checks until corrected.
 
 Account access v1.3.0: owner/admin Auth/RLS replaces the additional finance PIN. Existing vaults convert without changing rule, transaction, income, import or cash arrays. An `accountKey` alongside the envelope provides automatic opening; it is not an additional secret against an authorized database reader. PIN change controls and extra inactivity locks are removed. Legacy backup decryption remains available with the historical backup password.
+
+Income tab v1.4.0: separate fifth “Wpływy” tab, all existing credits moved out of payments. Salary section “Wynagrodzenie z umowy spółki” groups actual incoming booking dates by month, matches normalized titles (wynagrodz*, wynagr., pensj*, wypłata), and includes internal and BLIK credits. Automatic title matches are suggestions, not proof of the legal basis of a transfer. Each credit has an optional boolean salary override (Yes/No/Automatic), independent of the general total exclusion. Overrides persist in the existing encrypted vault and survive re-import, account reopening and backups. Monthly salary average uses the same per-currency, confirmed full completed-month coverage as all income, including zero salary months and excluding ongoing/partial/missing months. No schema migration or real bank data changes. Checks: private-payments-income and private-payments-salary unit tests; finances-income.browser.cjs uses mocked account/database and actual encryption across desktop/tablet/phone.

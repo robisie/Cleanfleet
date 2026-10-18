@@ -29,3 +29,6 @@ The open workspace fills the viewport below the fixed Pack navigation. Same-orig
 
 ## v1.1.6 — centered content at 80%
 Keep the workspace, iframe and module backgrounds at full window width. Center the application content at 80% width: CleanFleet containers, Robisię/Bill shells, finance tabs and body, accounting header/body, taxes and website statistics working areas. The Pack navigation and secondary dialogs retain their existing sizing.
+
+## v1.1.7 — income tab
+Moje finanse adds a dedicated “Wpływy” tab with monthly company-agreement salary classification, manual overrides and complete-month averages. Existing incoming statements remain in the encrypted private vault.

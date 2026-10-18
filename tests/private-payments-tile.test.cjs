@@ -1,6 +1,6 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const html=fs.readFileSync('app/index.html','utf8');
-const renderer=html.slice(html.indexOf('function cfRenderCompanyChooser(){'),html.indexOf('\nconst CF_REMINDER_CATEGORIES'));
+const renderer=html.slice(html.indexOf('function cfRenderCompanyChooser(){'),html.indexOf('\n// The reminder workspace'));
 for(const width of [390,820,1280])for(const hasCompanies of [false,true])for(const admin of [true,false]){
  test(`Pack entry replaces finance tile for admin at ${width}px, companies=${hasCompanies}`,()=>{
   const grid={innerHTML:'',querySelectorAll:()=>[]};const noop=()=>{};
@@ -8,7 +8,7 @@ for(const width of [390,820,1280])for(const hasCompanies of [false,true])for(con
   for(const name of ['cfShowGlobalEmployees','cfShowPurchases','cfShowEarningsGate','cfShowReminders','cfOpenWebsiteStatsPanel','cfShowBackupHub','cfShowStatistics','cfShowAdminReports','cfOpenAddCompany'])context[name]=noop;
   vm.runInNewContext(renderer+';cfRenderCompanyChooser();',context);
   assert.equal((grid.innerHTML.match(/id="cfCompanyFinancesCard"/g)||[]).length,0);
-  assert.ok(!grid.innerHTML.includes('cfCompanyPrivatePaymentsCard'));assert.ok(!grid.innerHTML.includes('cfCompanyDojazdyCard'));assert.ok(!grid.innerHTML.includes('cfCompanyEarningsCard'));
+  assert.ok(!grid.innerHTML.includes('cfCompanyRemindersCard'));assert.ok(!grid.innerHTML.includes('cfCompanyCalendarCard'));assert.ok(!grid.innerHTML.includes('cfCompanyPrivatePaymentsCard'));assert.ok(!grid.innerHTML.includes('cfCompanyDojazdyCard'));assert.ok(!grid.innerHTML.includes('cfCompanyEarningsCard'));
  });
 }
 test('iPhone saved grid gets new finance tile without overlapping existing tiles',()=>{

@@ -1,5 +1,5 @@
 importScripts('/app/photo-zip-stream.js?v=20261010-15517');
-// CleanFleet v1.56.10 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
+// CleanFleet v1.56.11 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -55,45 +55,8 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  if (url.pathname === '/app/calendar.html') {
-    event.respondWith((async () => {
-      const response = await fetch(req, { cache: 'no-store' });
-      const type = response.headers.get('content-type') || '';
-      if (!response.ok || !type.includes('text/html')) return response;
-      let html = await response.text();
+  if (url.pathname === '/app/calendar.html') { event.respondWith(fetch(req, {cache:'no-store'})); return; }
 
-      html = html.replace(/\/app\/calendar-engine\.js\?v=[^"']+/g, '/app/calendar-engine.js?v=20260917-4');
-
-      html = html.replace(
-        "if(c&&String(e.company_id||'')!==c)return false;",
-        "if(c==='__PRIVATE__'){if(e.kind!=='reminder'||e.company_id)return false;}else if(c&&String(e.company_id||'')!==c)return false;"
-      );
-      html = html.replace(
-        "$('companyFilter').innerHTML='<option value=\"\">Wszystkie firmy</option>'+data.companies.map",
-        "$('companyFilter').innerHTML='<option value=\"\">Wszystkie firmy</option><option value=\"__PRIVATE__\">Prywatne</option>'+data.companies.map"
-      );
-      html = html.replace(
-        "$('companyFilter').value=current&&data.companies.some(c=>String(c.id)===current)?current:'';",
-        "$('companyFilter').value=(current==='__PRIVATE__'||(current&&data.companies.some(c=>String(c.id)===current)))?current:'';"
-      );
-
-      html = html.replace(/<script src="\/app\/reminder-form-v1251\.js\?v=[^"]+"><\/script>/g, '');
-      html = html.replace(/<script src="\/app\/calendar-touch-v1251\.js\?v=[^"]+"><\/script>/g, '');
-      html = html.replace(/<script src="\/app\/calendar-reminder-edit-v1261\.js\?v=[^"]+"><\/script>/g, '');
-      html = html.replace(/<script src="\/app\/calendar-ageing-dnd-v1270\.js\?v=[^"]+"><\/script>/g, '');
-      const calendarScripts = '<script src="/app/reminder-form-v1251.js?v=20261004-15415"></script>\n' +
-        '<script src="/app/calendar-touch-v1251.js?v=20260917-3"></script>\n' +
-        '<script src="/app/calendar-reminder-edit-v1261.js?v=20260917-1"></script>\n' +
-        '<script src="/app/calendar-ageing-dnd-v1270.js?v=20260917-2"></script>';
-      if (html.includes('</body>')) html = html.replace('</body>', `${calendarScripts}\n</body>`);
-      else html += calendarScripts;
-      const headers = new Headers(response.headers);
-      headers.delete('content-length');
-      headers.set('cache-control', 'no-store, no-cache, must-revalidate');
-      return new Response(html, {status:response.status,statusText:response.statusText,headers});
-    })());
-    return;
-  }
 
   event.respondWith((async () => {
     const response = await fetch(req, { cache: 'no-store' });
@@ -102,7 +65,7 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text(); 
     // Keep the visible version in sync for pages served through this worker.
-    html = html.replace(/v1\.55\.(?:8|9|10|11|12|13|14|15|16)\b/g, 'v1.56.10');
+    html = html.replace(/v1\.55\.(?:8|9|10|11|12|13|14|15|16)\b/g, 'v1.56.11');
     html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13095');
 
     if (!html.includes('/app/glass-icons.css')) {
@@ -226,12 +189,8 @@ self.addEventListener('fetch', event => {
       '<script src="/app/photo-local-v1240.js?v=20261010-15517"></script>\n' +
       '<script src="/app/photo-local-ui-v1232.js?v=20260919-13032"></script>\n' +
       '<script src="/app/photo-camera-v1213.js?v=20261010-15517"></script>\n' +
-      '<script src="/app/calendar-v1203.js?v=20260917-2"></script>\n' +
       '<script src="/app/ui-v1209.js?v=20260915-3"></script>\n' +
-      '<script src="/app/calendar-add-v1215.js?v=20260915-2"></script>\n' +
-      '<script src="/app/calendar-weather-v1218.js?v=20260916-3"></script>\n' +
       '<script src="/app/reminder-form-v1251.js?v=20261004-15415"></script>\n' +
-      '<script src="/app/calendar-today-tile-v1262.js?v=20260917-5"></script>\n' +
       '<script src="/app/admin-dashboard-v1270.js?v=20260928-130133"></script>';
     if (html.includes('</body>')) html = html.replace('</body>', `${injectedScripts}\n</body>`);
     else html += injectedScripts;

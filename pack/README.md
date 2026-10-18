@@ -1,4 +1,4 @@
-# Robisię Pack v1.0.0
+# Robisię Pack v1.2.0
 
 Administrator portal at `/pack/`. It shares the existing same-origin Supabase session with CleanFleet, verifies the user with `auth.getUser` and requires `cf_is_admin()`. Employees continue to use `/app/` only. Independent application links lead to CleanFleet `/app/`, Robisię `/app/robisie/` and Bill `/bill/`; Robisię and Bill code/data are unchanged. Their existing login behavior is unchanged.
 
@@ -38,3 +38,10 @@ The general bank-income section in Moje finanse counts only m/mBiznes statements
 
 ## v1.1.9 — full-width surfaces, centered working content
 Pack-only screen styles keep background surfaces, header/navigation strips and module shells at 100% width, with working content centered in 80% of the viewport. Applies to CleanFleet, Robisię, Bill, finances (all five tabs including its nested private frame), taxes, accounting and website analytics. At phone widths up to 760px, safe 12px minimum gutters retain usable controls. Nested finance frames receive the same stylesheet on creation/navigation; the outer finance frame is no longer narrowed, avoiding cumulative 80% sizing. Standalone views, print and secondary dialogs retain their styles. Validation: Pack unit checks and pack-width.browser.cjs with actual styles, representative module structures and nested frame loading at phone/tablet/desktop widths; no live account data needed.
+
+## v1.2.0 — persistent session tabs and migrated planning
+Open applications/modules have one independent iframe per destination. The tab bar sits between the logo and account controls (a second scrollable row on phones). Panel/logo returns to the dashboard without destroying frames, drafts, scroll positions or background work. Reopening a tile activates its existing tab; × removes only that tab. Closing an active tab selects a neighbour. Browser navigation and keyboard tab navigation reuse open frames. Closing/reloading the browser starts a new session; no passwords or draft snapshots are written to new storage. Logout, owner changes and denied authorization clear every frame, including inactive tabs; late verification replies cannot reopen them. Sender validation accepts only known frame WindowProxies and the exact origin.
+
+Reminders now use the existing renderer/actions in `reminders.js`, shared reminder form and due-date bucket fix, against the same `cf_reminders` table. Calendar retains the current calendar engine, weather, shared form, private filter, touch/DnD, edit and ageing enhancements in a Pack-hosted page with an administrator check before data loading. Existing CleanFleet calendar URL redirects to the Pack tab; old launch tiles and worker calendar injections are removed. CleanFleet continues to own companies, vehicles, washes and weather. No production reminder, schedule or financial data was modified or copied.
+
+Taxes and accounting documents fill the frame height with their own backgrounds; their existing working width rules remain in force. Checks: Pack unit/navigation/authorization tests; browser tests `pack-workspaces.browser.cjs`, `pack-migrated-modules.browser.cjs`, `pack-width.browser.cjs` and `finances-income.browser.cjs` use mocked accounts/data, including fake reminder writes, and phone/tablet/desktop layouts.

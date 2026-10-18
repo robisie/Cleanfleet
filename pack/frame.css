@@ -37,6 +37,14 @@
  }
  html.robisie-pack-frame #cfTaxesOverlay>.cf-taxes-sheet,
  html.robisie-pack-frame #cfWebsiteStatsOverlay>.cf-www-stats-sheet{padding-inline:var(--pack-gutter)!important}
+
+ html.robisie-pack-frame #cfTaxesOverlay,
+ html.robisie-pack-frame #cfAccountingDocsOverlay,
+ html.robisie-pack-frame #cfRemindersOverlay{padding:0!important;align-items:stretch!important;background:#f4f7f5!important;min-height:100dvh}
+ html.robisie-pack-frame #cfTaxesOverlay>.cf-taxes-sheet,
+ html.robisie-pack-frame #cfAccountingDocsOverlay>.cf-accounting-docs-sheet,
+ html.robisie-pack-frame #cfRemindersOverlay>.cf-reminders-sheet{min-height:100dvh!important;max-height:none!important;margin:0!important;border:0!important;box-shadow:none!important}
+ html.robisie-pack-frame #cfRemindersOverlay>.cf-reminders-sheet{width:100%!important;max-width:none!important;padding-inline:var(--pack-gutter)!important;border-radius:0!important;box-sizing:border-box}
  /* Phones use safe touch-sized gutters instead of narrowing forms to 80%. */
  @media(max-width:760px){
   html.robisie-pack-frame{--pack-gutter:max(12px,env(safe-area-inset-left),env(safe-area-inset-right));--pack-content-width:calc(100% - 2 * var(--pack-gutter))}

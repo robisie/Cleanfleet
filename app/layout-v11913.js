@@ -77,14 +77,8 @@
   }
 
   function ensureCalendarFullLink(){
-    const tile=document.getElementById('cfCompanyCalendarCard');
-    if(!tile||tile.dataset.cfFullCalendar==='1')return;
-    tile.dataset.cfFullCalendar='1';
-    tile.onclick=e=>{
-      e?.preventDefault?.();
-      e?.stopPropagation?.();
-      location.href='/app/calendar.html';
-    };
+    document.getElementById('cfCompanyCalendarCard')?.remove();
+    document.getElementById('cfCalendarTile')?.remove();
   }
 
   function applyAdminMonthPerformerDefault(){

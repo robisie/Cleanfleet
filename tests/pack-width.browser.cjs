@@ -26,7 +26,8 @@ const fixtures={
   await page.setViewportSize({width,height:1000});
   for(const [name,f] of Object.entries(fixtures)){
    await page.locator('#target').evaluate((el,url)=>el.src=url,'/fixture/'+name);const frame=page.frameLocator('#target');await frame.locator('html.robisie-pack-frame').waitFor();await frame.locator('#robisiePackFrameStyle').evaluate(el=>new Promise(resolve=>{if(el.sheet)resolve();else el.onload=resolve;}));
-   const surface=await frame.locator(f.surface).boundingBox();assert(Math.abs(surface.width-width)<4,`${name} ${width}: full surface ${surface.width}`);
+   const surface=await frame.locator(f.surface).boundingBox();if(['taxes','documents'].includes(name)){const sheet=await frame.locator(name==='taxes'?'.cf-taxes-sheet':'.cf-accounting-docs-sheet').boundingBox();assert(Math.abs(sheet.y)<2&&sheet.height>=998,`${name}: full-height background ${JSON.stringify(sheet)}`);}
+   assert(Math.abs(surface.width-width)<4,`${name} ${width}: full surface ${surface.width}`);
    if(width>760||!f.box){const b=await frame.locator(f.working).evaluate(el=>{const b=el.getBoundingClientRect(),s=getComputedStyle(el);return {width:b.width-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight),x:b.x+parseFloat(s.paddingLeft)};});const expected=width>760?width*.8:width-24;assert(Math.abs(b.width-expected)<4,`${name} ${width}: content ${JSON.stringify(b)}`);assert(Math.abs(b.x-(width-expected)/2)<4,`${name}: centered`);}
    assert(await frame.locator('body').evaluate(el=>el.scrollWidth<=innerWidth+2),`${name} ${width}: no horizontal page overflow`);
    await page.screenshot({path:`/tmp/pack-width-${name}-${width}.png`});

@@ -8,6 +8,6 @@ export async function administrator(db){
  if(role.data!==true)throw Error('Robisię Pack jest dostępny tylko dla administratora. Pracownicy korzystają z CleanFleet.');
  return data.user;
 }
-export const modules=Object.freeze({finances:'Moje finanse',taxes:'ZUS i podatki',documents:'Dokumenty księgowe',website:'Statystyki WWW'});
+export const modules=Object.freeze({finances:'Moje finanse',taxes:'ZUS i podatki',documents:'Dokumenty księgowe',website:'Statystyki WWW',reminders:'Przypomnienia',calendar:'Kalendarz'});
 
 export const applications=Object.freeze({cleanfleet:{name:'CleanFleet',url:'/app/'},robisie:{name:'Robisię',url:'/app/robisie/'},bill:{name:'Bill',url:'/bill/'}});

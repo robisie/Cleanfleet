@@ -1,3 +1,4 @@
+import {scanWindow,warsawDay} from './schedule.mjs';
 
 import {createClient} from 'npm:@supabase/supabase-js@2.57.4';
 import {ImapFlow} from 'npm:imapflow@2.2.1';
@@ -114,7 +115,7 @@ async function inspectPdf(bytes:Uint8Array,filename:string,context:any){
   const raw=outputText(body).trim();let parsed:any=null;
   try{parsed=JSON.parse(raw);}catch{const m=raw.match(/\{[\s\S]*\}/);if(m)parsed=JSON.parse(m[0]);}
   if(!parsed||typeof parsed!=='object')throw new Error('Odczyt faktury nie zwrócił poprawnych danych.');
-  const amount=Number(parsed.amount);
+  const amount=parsed.amount==null||parsed.amount===''?NaN:Number(parsed.amount);
   return {
     is_invoice:parsed.is_invoice===true,
     matches_reminder:parsed.matches_reminder===true,
@@ -129,12 +130,9 @@ async function inspectPdf(bytes:Uint8Array,filename:string,context:any){
   };
 }
 async function scanReminder(r:any){
-  const now=new Date(),due=new Date(r.mail_anchor_due_at||r.due_at);
-  if(!Number.isFinite(due.getTime()))return {skipped:true};
-  const starts=new Date(due);starts.setUTCDate(starts.getUTCDate()-Number(r.mail_scan_days_before||2));
-  if(now<starts)return {skipped:true};
-  if(now.getTime()>due.getTime()+8*86400000)return {skipped:true};
-  if(r.mail_last_checked_at&&now.getTime()-new Date(r.mail_last_checked_at).getTime()<6*3600000)return {skipped:true};
+  const now=new Date(),window=scanWindow(r,now);
+  if(window==='expired')return {expired:true};
+  if(window!=='scan')return {skipped:true};
   const folder=clean(r.mail_folder,128),sender=norm(r.mail_sender),subjectNeedle=norm(r.mail_subject_contains),attachmentNeedle=norm(r.mail_attachment_contains);
   if(!folder||(!sender&&!subjectNeedle&&!attachmentNeedle))throw new Error('Uzupełnij folder i co najmniej jeden filtr faktury: nadawca, temat lub nazwa załącznika.');
   const cred=await db.from('cf_mail_credentials').select('ciphertext').eq('user_id',r.user_id).maybeSingle();
@@ -172,6 +170,7 @@ async function scanReminder(r:any){
       const bytes=await downloadPart(client,item.m.uid,item.p);
       const parsed=await inspectPdf(bytes,item.p.filename,{title:r.title,payee:r.payee||'',expected_due:localParts(r.mail_anchor_due_at||r.due_at).date,target_month:targetMonth,email_sender:item.sender,email_subject:item.subject,attachment:item.p.filename});
       if(!parsed.is_invoice)continue;
+      if(parsed.invoice_number){const used=await db.from('cf_reminders').select('id').eq('user_id',r.user_id).eq('mail_sender',r.mail_sender||'').eq('invoice_number',parsed.invoice_number).neq('id',r.id).limit(1);if(used.error)throw used.error;if(used.data?.length)continue;}
       if(!parsed.due_date||!parsed.due_date.startsWith(targetMonth+'-'))continue;
       const candidate={...parsed,source:{uid:item.m.uid,subject:item.subject,received:item.received,attachment:item.p.filename,sender:item.sender}};
       best=candidate;
@@ -202,7 +201,7 @@ async function scanReminder(r:any){
       const diff=new Date(oldDue).getTime()-new Date(r.custom_remind_at).getTime();
       patch.custom_remind_at=new Date(new Date(newDue).getTime()-diff).toISOString();
     }
-    const u=await db.from('cf_reminders').update(patch).eq('id',r.id).eq('user_id',r.user_id);if(u.error)throw u.error;
+    const u=await db.from('cf_reminders').update(patch).eq('id',r.id).eq('user_id',r.user_id).eq('due_at',r.due_at).eq('status',r.status).eq('mail_scan_status',r.mail_scan_status);if(u.error)throw u.error;
     return {found:true,applied:true};
   }finally{clearTimeout(timer);try{client.close();}catch{}}
 }
@@ -211,20 +210,24 @@ Deno.serve(async(req:Request)=>{
   if(req.method!=='POST')return json({error:'Method not allowed'},405);
   if(!CRON_SECRET||req.headers.get('x-cleanfleet-cron-secret')!==CRON_SECRET)return json({error:'Unauthorized'},401);
   let rows:any[]=[];
-  const q=await db.from('cf_reminders').select('id,user_id,title,payee,amount,invoice_number,due_at,start_at,end_at,remind_at,reminder_mode,custom_remind_at,status,recurrence,mail_invoice_enabled,mail_folder,mail_sender,mail_subject_contains,mail_attachment_contains,mail_scan_days_before,mail_scan_status,mail_last_checked_at,mail_anchor_due_at').eq('mail_invoice_enabled',true).in('status',['active','snoozed']).neq('mail_scan_status','applied').order('due_at',{ascending:true}).limit(60);
+  const q=await db.from('cf_reminders').select('id,user_id,title,payee,amount,invoice_number,due_at,start_at,end_at,remind_at,reminder_mode,custom_remind_at,status,recurrence,mail_invoice_enabled,mail_folder,mail_sender,mail_subject_contains,mail_attachment_contains,mail_scan_days_before,mail_scan_status,mail_last_checked_at,mail_anchor_due_at').eq('mail_invoice_enabled',true).in('status',['active','snoozed']).not('mail_scan_status','in','(applied,missing)').gte('due_at',new Date(Date.now()-32*86400000).toISOString()).order('mail_last_checked_at',{ascending:true,nullsFirst:true}).limit(60);
   if(q.error)return json({error:q.error.message},500);rows=q.data||[];
   const stats={checked:0,skipped:0,found:0,applied:0,review:0,waiting:0,errors:0};
   for(const r of rows){
     try{
       const result=await scanReminder(r);
       if(result.skipped){stats.skipped++;continue;}
+      if(result.expired){
+        if(r.mail_scan_status!=='needs_review'){const u=await db.from('cf_reminders').update({mail_scan_status:'missing',mail_last_error:'Brak faktury — kwota niepotwierdzona'}).eq('id',r.id).eq('user_id',r.user_id).eq('mail_scan_status',r.mail_scan_status);if(u.error)throw u.error;}
+        stats.skipped++;continue;
+      }
       stats.checked++;
       if(result.found)stats.found++;
       if(result.applied)stats.applied++;
       else if(result.review)stats.review++;
       else {
         stats.waiting++;
-        await db.from('cf_reminders').update({mail_scan_status:'waiting',mail_last_checked_at:new Date().toISOString(),mail_last_error:null}).eq('id',r.id).eq('user_id',r.user_id);
+        await db.from('cf_reminders').update({mail_scan_status:warsawDay(r.mail_anchor_due_at||r.due_at)===warsawDay()?'missing':'waiting',mail_last_checked_at:new Date().toISOString(),mail_last_error:warsawDay(r.mail_anchor_due_at||r.due_at)===warsawDay()?'Brak faktury — kwota niepotwierdzona':null}).eq('id',r.id).eq('user_id',r.user_id);
       }
     }catch(error){
       stats.errors++;

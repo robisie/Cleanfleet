@@ -204,7 +204,7 @@ async function cfShowReminders(){
         r.is_payment && r.amount!=null ? cfReminderMoney(r.amount) : '',
         r.payee||'',
         r.invoice_number ? `Faktura: ${r.invoice_number}` : '',
-        r.mail_invoice_enabled ? (({waiting:'Poczta: oczekiwanie na fakturę',applied:'Poczta: dane z faktury',needs_review:'Poczta: faktura do sprawdzenia',error:'Poczta: błąd sprawdzania'})[r.mail_scan_status]||'Poczta: automatyczny odczyt') : '',
+        r.mail_invoice_enabled ? (({waiting:'Poczta: oczekiwanie na fakturę',applied:'Poczta: dane z faktury',needs_review:'Poczta: faktura do sprawdzenia',error:'Poczta: błąd sprawdzania',missing:'Brak faktury — kwota niepotwierdzona'})[r.mail_scan_status]||'Poczta: automatyczny odczyt') : '',
         company ? cfCompanyDisplayName(company) : '',
         r.vehicle_plate||''
       ].filter(Boolean).join(' · ');

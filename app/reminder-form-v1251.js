@@ -68,7 +68,7 @@
     const mailEnabled=!!reminder?.mail_invoice_enabled;
     const mailCandidate=reminder?.mail_candidate&&typeof reminder.mail_candidate==='object'?reminder.mail_candidate:null;
     const initialStartIso=reminder?.start_at||reminder?.due_at||reminder?.remind_at||null;
-    const mailStateLabel=({off:'Wyłączone',waiting:'Oczekiwanie na fakturę',applied:'Dane pobrane z faktury',needs_review:'Faktura wymaga sprawdzenia',error:'Błąd sprawdzania poczty'})[reminder?.mail_scan_status||'off']||'Wyłączone';
+    const mailStateLabel=({off:'Wyłączone',waiting:'Oczekiwanie na fakturę',applied:'Dane pobrane z faktury',needs_review:'Faktura wymaga sprawdzenia',error:'Błąd sprawdzania poczty',missing:'Brak faktury — kwota niepotwierdzona'})[reminder?.mail_scan_status||'off']||'Wyłączone';
 
     const host=document.createElement('div');host.className='cf-rem-range-bg';host.id='cfReminderRangeOverlay';
     host.innerHTML=`<div class="cf-rem-range-sheet">
@@ -100,7 +100,7 @@
             <label class="cf-rem-range-field"><span>Nadawca (opcjonalnie)</span><input id="cfrMailSender" type="email" value="${esc(reminder?.mail_sender||'')}" placeholder="np. faktury@firma.pl"></label>
             <label class="cf-rem-range-field"><span>Temat zawiera (opcjonalnie)</span><input id="cfrMailSubject" value="${esc(reminder?.mail_subject_contains||'')}" placeholder="np. faktura"></label>
             <label class="cf-rem-range-field"><span>Nazwa załącznika zawiera (opcjonalnie)</span><input id="cfrMailAttachment" value="${esc(reminder?.mail_attachment_contains||'')}" placeholder="np. FV"></label>
-            <label class="cf-rem-range-field"><span>Zacznij sprawdzać ile dni wcześniej</span><input id="cfrMailDays" type="number" min="0" max="14" step="1" value="${Number.isFinite(Number(reminder?.mail_scan_days_before))?Number(reminder.mail_scan_days_before):2}"></label>
+            <p style="grid-column:1/-1">Poczta jest sprawdzana codziennie od początku miesiąca do dnia wymagalności włącznie. Po pobraniu faktury sprawdzanie tego przypomnienia kończy się.</p><input id="cfrMailDays" type="hidden" value="2">
           </div>
           <div id="cfrMailState" style="display:${mailEnabled?'block':'none'};margin-top:10px;padding:9px 10px;border-radius:9px;background:#f7f7f4;border:1px solid #e0e4e1;font-size:11px;line-height:1.45;color:#5d665f">Status: <strong>${esc(mailStateLabel)}</strong>${reminder?.mail_source_received_at?' · wiadomość '+esc(reminder.mail_source_received_at):''}${reminder?.mail_source_attachment?' · '+esc(reminder.mail_source_attachment):''}${reminder?.mail_last_error?'<br>'+esc(reminder.mail_last_error):''}</div>
           ${mailCandidate&&reminder?.mail_scan_status==='needs_review' ? '<div style="margin-top:10px;padding:10px;border-radius:10px;background:#fff8dc;border:1px solid #eadc98;font-size:12px;line-height:1.45"><strong>Odczyt do sprawdzenia</strong><br>Nr: '+esc(mailCandidate.invoice_number||'—')+' · Kwota: '+(mailCandidate.amount!=null?esc(String(mailCandidate.amount)+' '+String(mailCandidate.currency||'')):'—')+' · Termin: '+esc(mailCandidate.due_date||'—')+'<br><button class="cf-rem-range-btn" id="cfrMailApplyCandidate" type="button" style="margin-top:8px">Zastosuj te dane</button></div>' : ''}

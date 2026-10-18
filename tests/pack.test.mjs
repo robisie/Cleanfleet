@@ -49,7 +49,7 @@ test('applications and modules get the Pack width stylesheet after each document
  for(const query of ['?application=cleanfleet','?application=robisie','?application=bill','?module=taxes','?module=finances','?module=documents','?module=website']){
   const p=await panel({query}),frame=p.ids.frameHost.children[0];
   const freshDocument=()=>{const classes=new Set(),links=[];return {classes,links,documentElement:{classList:{add:value=>classes.add(value)}},getElementById:id=>links.find(link=>link.id===id),createElement:()=>({}),head:{append:link=>links.push(link)},addEventListener(){}};};
-  frame.contentDocument=freshDocument();frame.onload();assert(frame.contentDocument.classes.has('robisie-pack-frame'));assert.equal(frame.contentDocument.links[0].href,'/pack/frame.css?v=116');
+  frame.contentDocument=freshDocument();frame.onload();assert(frame.contentDocument.classes.has('robisie-pack-frame'));assert.equal(frame.contentDocument.links[0].href,'/pack/frame.css?v=119');
   frame.onload();assert.equal(frame.contentDocument.links.length,1);
   frame.contentDocument=freshDocument();frame.onload();assert.equal(frame.contentDocument.links.length,1);
   p.ids.closeModule.onclick();assert.equal(frame.removed,true);assert.equal(p.ids.dashboard.hidden,false);

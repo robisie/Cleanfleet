@@ -1,21 +1,47 @@
-/* Loaded only inside an application opened by Robisię Pack. */
-html.robisie-pack-frame .wrap,
-html.robisie-pack-frame .shell{width:80%!important;max-width:80%!important;margin-left:auto!important;margin-right:auto!important;box-sizing:border-box}
-/* Main module surfaces fill the frame; secondary forms keep their own sizing. */
-html.robisie-pack-frame #cfFinanceWindow,
-html.robisie-pack-frame #cfTaxesOverlay,
-html.robisie-pack-frame #cfWebsiteStatsOverlay,
-html.robisie-pack-frame #cfAccountingDocsOverlay{padding-left:0!important;padding-right:0!important}
-html.robisie-pack-frame #cfFinanceWindow>.cf-finance-shell,
-html.robisie-pack-frame #cfTaxesOverlay>.cf-taxes-sheet,
-html.robisie-pack-frame #cfWebsiteStatsOverlay>.cf-www-stats-sheet,
-html.robisie-pack-frame #cfAccountingDocsOverlay>.cf-accounting-docs-sheet{width:100%!important;max-width:none!important;margin-left:0!important;margin-right:0!important;box-sizing:border-box;border-radius:0!important}
-
-/* Page backgrounds fill the frame; only working content is centered at 80%. */
-html.robisie-pack-frame #cfFinanceWindow>.cf-finance-shell>.cf-finance-tabs,
-html.robisie-pack-frame #cfFinanceWindow>.cf-finance-shell>.cf-finance-status,
-html.robisie-pack-frame #cfFinanceWindow>.cf-finance-shell>.cf-finance-content,
-html.robisie-pack-frame #cfAccountingDocsOverlay .cf-accounting-docs-head,
-html.robisie-pack-frame #cfAccountingDocsOverlay .cf-accounting-docs-body{width:80%!important;max-width:80%!important;margin-left:auto!important;margin-right:auto!important;min-width:0;box-sizing:border-box}
-html.robisie-pack-frame #cfTaxesOverlay>.cf-taxes-sheet,
-html.robisie-pack-frame #cfWebsiteStatsOverlay>.cf-www-stats-sheet{padding-left:10%!important;padding-right:10%!important}
+/* Screen-only layout for applications opened in Pack; standalone and print stay local. */
+@media screen{
+ html.robisie-pack-frame{--pack-gutter:10vw;--pack-content-width:80vw}
+ /* CleanFleet content and the private finance frame share the same viewport inset. */
+ html.robisie-pack-frame body>.wrap,
+ html.robisie-pack-frame body>header>.wrap{
+  width:var(--pack-content-width)!important;max-width:none!important;margin-inline:auto!important;padding-inline:0!important;box-sizing:border-box;min-width:0
+ }
+ /* Robisię/Bill retain a full-width surface behind their navigation and working area. */
+ html.robisie-pack-frame #app>.topbar{width:100%!important;max-width:none!important;padding-inline:var(--pack-gutter)!important;box-sizing:border-box}
+ html.robisie-pack-frame #app>.shell{width:100%!important;max-width:none!important;margin-inline:0!important;padding-inline:var(--pack-gutter)!important;box-sizing:border-box;min-width:0}
+ html.robisie-pack-frame body>.bottom-bar{padding-inline:var(--pack-gutter)!important;box-sizing:border-box}
+ /* Module surfaces and coloured strips always extend to both edges. */
+ html.robisie-pack-frame #cfFinanceWindow,
+ html.robisie-pack-frame #cfTaxesOverlay,
+ html.robisie-pack-frame #cfWebsiteStatsOverlay,
+ html.robisie-pack-frame #cfAccountingDocsOverlay{padding-inline:0!important}
+ html.robisie-pack-frame #cfFinanceWindow>.cf-finance-shell,
+ html.robisie-pack-frame #cfTaxesOverlay>.cf-taxes-sheet,
+ html.robisie-pack-frame #cfWebsiteStatsOverlay>.cf-www-stats-sheet,
+ html.robisie-pack-frame #cfAccountingDocsOverlay>.cf-accounting-docs-sheet{
+  width:100%!important;max-width:none!important;margin-inline:0!important;box-sizing:border-box;border-radius:0!important
+ }
+ html.robisie-pack-frame #cfFinanceWindow .cf-finance-tabs,
+ html.robisie-pack-frame #cfFinanceWindow .cf-finance-status,
+ html.robisie-pack-frame #cfFinanceWindow .cf-finance-head{
+  width:100%!important;max-width:none!important;margin-inline:0!important;padding-inline:var(--pack-gutter)!important;box-sizing:border-box
+ }
+ html.robisie-pack-frame #cfFinanceWindow .cf-finance-content{width:100%!important;max-width:none!important;margin-inline:0!important;min-width:0}
+ html.robisie-pack-frame #cfFinanceEarnings>#cfEarningsOverlay{padding-inline:var(--pack-gutter)!important;box-sizing:border-box}
+ html.robisie-pack-frame #cfFinanceTrips #cfDojazdyOverlay{padding-inline:0!important}
+ html.robisie-pack-frame #cfFinanceTrips .cf-drive-sheet{width:100%!important;max-width:none!important;border-radius:0!important}
+ html.robisie-pack-frame #cfFinanceTrips .cf-drive-body{padding-inline:var(--pack-gutter)!important;box-sizing:border-box}
+ html.robisie-pack-frame #cfAccountingDocsOverlay .cf-accounting-docs-head,
+ html.robisie-pack-frame #cfAccountingDocsOverlay .cf-accounting-docs-body{
+  width:100%!important;max-width:none!important;margin-inline:0!important;padding-inline:var(--pack-gutter)!important;box-sizing:border-box;min-width:0
+ }
+ html.robisie-pack-frame #cfTaxesOverlay>.cf-taxes-sheet,
+ html.robisie-pack-frame #cfWebsiteStatsOverlay>.cf-www-stats-sheet{padding-inline:var(--pack-gutter)!important}
+ /* Phones use safe touch-sized gutters instead of narrowing forms to 80%. */
+ @media(max-width:760px){
+  html.robisie-pack-frame{--pack-gutter:max(12px,env(safe-area-inset-left),env(safe-area-inset-right));--pack-content-width:calc(100% - 2 * var(--pack-gutter))}
+  html.robisie-pack-frame #app>.shell{padding-inline:0!important}
+  html.robisie-pack-frame #app>.shell>main,
+  html.robisie-pack-frame #app>.shell>nav{padding-inline:var(--pack-gutter)!important}
+ }
+}

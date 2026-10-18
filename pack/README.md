@@ -35,3 +35,6 @@ Moje finanse adds a dedicated “Wpływy” tab with monthly company-agreement s
 
 ## v1.1.8 — company income scope
 The general bank-income section in Moje finanse counts only m/mBiznes statements; personal E/eKonto data does not affect its totals, details or averages.
+
+## v1.1.9 — full-width surfaces, centered working content
+Pack-only screen styles keep background surfaces, header/navigation strips and module shells at 100% width, with working content centered in 80% of the viewport. Applies to CleanFleet, Robisię, Bill, finances (all five tabs including its nested private frame), taxes, accounting and website analytics. At phone widths up to 760px, safe 12px minimum gutters retain usable controls. Nested finance frames receive the same stylesheet on creation/navigation; the outer finance frame is no longer narrowed, avoiding cumulative 80% sizing. Standalone views, print and secondary dialogs retain their styles. Validation: Pack unit checks and pack-width.browser.cjs with actual styles, representative module structures and nested frame loading at phone/tablet/desktop widths; no live account data needed.

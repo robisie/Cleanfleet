@@ -1,7 +1,7 @@
-import * as Auto from './autosave.js?v=1.0.48';
-import * as C from './core.js?v=1.0.48';
-import * as API from './api.js?v=1.0.48';
-import * as PDF from './pdf.js?v=1.0.48';
+import * as Auto from './autosave.js?v=1.0.49';
+import * as C from './core.js?v=1.0.49';
+import * as API from './api.js?v=1.0.49';
+import * as PDF from './pdf.js?v=1.0.49';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',shopFilter=null,projectFilter='',projectSearch='',summarySort={key:'category',direction:1},mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set(),stageInvoiceCache=new Map();
@@ -119,7 +119,7 @@ function purchaseShopFilters(){
 function purchasesView(){const t=C.purchaseTotals(p()),filters=purchaseShopFilters(),items=p().purchases.filter(x=>shopFilter===null||shopKey(x.shop)===shopFilter);return `<div class="metrics">${metric('Otrzymane zaliczki',money(t.advances))}${metric('Faktyczne wydatki',money(t.spent))}${metric('Koszt dla inwestora',money(t.charged))}${metric(t.balance>=0?'Do zwrotu inwestorowi':'Dopłata inwestora',money(Math.abs(t.balance)),'gold')}${metric('Faktycznie pozostało',money(t.actualBalance))}${metric('Różnica rozliczenia',money(t.difference))}${metric('Zakupy do rozliczenia z inwestorem',money(t.outstanding))}</div>${card(`<div class="toolbar"><h2>Zakupy materiałów</h2>${btn('purchase-add','Dodaj zakup','primary')}</div>${filters}<p class="muted purchase-filter-info" aria-live="polite">Pokazano ${items.length} z ${p().purchases.length} zakupów. Podsumowanie finansowe obejmuje całą inwestycję.</p>${table(['Data','Sklep','Zakup / dokument','Kwota zakupu','Koszt inwestora','Opłacono',''],items.map(x=>`<tr><td>${date(x.date)}</td><td>${esc(x.shop)}</td><td>${esc(x.description)}<br><span class="muted">${esc(x.invoice)}</span></td><td class="num">${money(x.amount)}</td><td class="num">${money(x.charge)}</td><td>${esc(C.purchasePaymentLabel(x))}</td><td>${btn('purchase-edit','Edytuj','',`data-id="${x.id}"`)}</td></tr>`).join(''))}<p class="muted" style="margin-top:16px">Kwoty opłacone przez inwestora przy zakupach automatycznie zwiększają otrzymane zaliczki. Dodatkowe zaliczki dodajesz w module „Etapy i płatności”. Koszt inwestora można ustalić niezależnie od kwoty zakupu.</p>`)} `;}
 function journalView(){return card(`<div class="toolbar"><h2>Wpisy dziennika</h2>${btn('journal-add','Dodaj wpis','primary')}</div>${p().journal.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(x=>`<div class="history"><div class="toolbar"><strong>${date(x.date)} · ${esc(x.roomId?roomName(x.roomId):'Cała inwestycja')}</strong>${btn('journal-edit','Edytuj','',`data-id="${x.id}"`)}</div><p style="white-space:pre-wrap">${esc(x.description)}</p><p class="muted">Potwierdzenie inwestora: ${x.investorConfirmed?'tak':'brak'} · wykonawcy: ${x.contractorConfirmed?'tak':'brak'}</p></div>`).join('')||'<div class="empty">Brak wpisów w dzienniku.</div>'}`);}
 function contractView(){const d=p();return card(`<div class="grid">${field('contractDate','Data umowy',d.contractDate,'date')}${field('contractPlace','Miejsce zawarcia umowy',d.contractPlace)}${field('paymentDays','Termin zapłaty faktury (dni)',d.paymentDays,'number','min="0"')}${field('materialAdvance','Uzgodniona zaliczka na materiały (zł)',d.materialAdvance,'number','min="0" step="0.01"')}${field('terminationPercent','Uzgodniona kara za rozwiązanie (%)',d.terminationPercent,'number','min="0" max="100"')}</div><div class="actions" style="margin-bottom:20px">${btn('contract-edit','Edytuj pełną treść umowy')}${btn('contract-generate','Wstaw treść z aktualnych danych')}</div><div class="contract-preview"><pre class="document">${esc(PDF.contractParts(d.contractText||C.contractTemplate(selected,config.payload)).text)}</pre><div class="contract-preview-signatures"><span>${esc(PDF.contractParts(d.contractText||C.contractTemplate(selected,config.payload)).contractor)}<br>Data i podpis Wykonawcy</span><span>${esc(PDF.contractParts(d.contractText||C.contractTemplate(selected,config.payload)).investor)}<br>Data i podpis Inwestora</span></div></div><p class="muted">Po edycji pełnej treści zmiany danych nie nadpisują jej automatycznie. „Wstaw treść z aktualnych danych” przygotowuje nowy tekst.</p>`);}
-function handoverView(){const d=p(),h=d.handover;return card(`<div class="grid">${input('handover.date','Data odbioru',h.date,'date','data-handover="date"')}${input('handover.receiver','Odbiorca (jeśli inny niż inwestor)',h.receiver,'text','data-handover="receiver"')}</div><label class="inline-check"><input type="checkbox" data-handover="accepted" ${h.accepted?'checked':''}> Prace zaakceptowane przez inwestora</label><div style="margin-top:16px">${text('handover.notes','Uwagi do wykonanych prac',h.notes,'data-handover="notes"')}</div><p class="muted">Dokument ${esc(C.attachment(selected,'PZO'))} zawiera dane inwestycji, zakres wykonanych prac i miejsce na podpisy.</p>${btn('finish','Oznacz inwestycję jako zakończoną','primary')}`);}
+function handoverView(){const d=p(),h=d.handover;return card(`<div class="grid">${input('handover.date','Data odbioru',h.date,'date','data-handover="date"')}${input('handover.receiver','Odbiorca (jeśli inny niż inwestor)',h.receiver,'text','data-handover="receiver"')}</div><label class="inline-check"><input type="checkbox" data-handover="accepted" ${h.accepted?'checked':''}> Prace zaakceptowane przez inwestora</label><div style="margin-top:16px">${text('handover.notes','Uwagi do wykonanych prac',h.notes,'data-handover="notes"')}</div><p class="muted">Dokument ${esc(C.attachment(selected,'PZO'))} zawiera dane inwestycji, zakres wykonanych prac i miejsce na podpisy.</p><p class="muted">Zakończenie doda do Moich zarobków pełną kwotę końcową: <strong>${money(C.finalWorkAmount(d))}</strong>, z nazwą inwestycji i datą odbioru. Ponowne zakończenie zaktualizuje ten sam wpis.</p>${btn('finish',d.status==='zakonczona'?'Aktualizuj kwotę w Moich zarobkach':'Zakończ i dodaj do Moich zarobków','primary')}`);}
 const defaultUnits=['m²','mb','szt.','godz.','kpl','m','m³'];
 const customUnitValue='__robisie_custom_unit__';
 const cleanUnit=value=>String(value||'').trim().replace(/\s+/g,' ');
@@ -306,7 +306,23 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
  if(a==='change-accept'){const change=p().changes.find(x=>x.id===id);change.accepted=true;change.acceptedDate=C.today();markDirty();await save();return;}
  if(a==='contract-edit'){modal('Treść umowy',text('body','Treść',p().contractText||C.contractTemplate(selected,config.payload),'style="min-height:50vh"'),fd=>{p().contractText=fd.get('body');markDirty();});return;}
  if(a==='contract-generate'){if(p().contractText&&!confirm('Zastąpić edytowaną treść umowy tekstem z aktualnych danych?'))return;p().contractText=C.contractTemplate(selected,config.payload);markDirty();await flushChanges({normalize:false});render();return;}
- if(a==='finish'){if(!p().handover.date)throw new Error('Uzupełnij datę odbioru.');if(!p().handover.accepted)throw new Error('Prace muszą być zaakceptowane przed zakończeniem inwestycji.');p().status='zakonczona';markDirty();await save();return;}
+ if(a==='finish'){
+  if(!p().handover.date)throw new Error('Uzupełnij datę odbioru.');
+  if(!p().handover.accepted)throw new Error('Prace muszą być zaakceptowane przed zakończeniem inwestycji.');
+  b.disabled=true;
+  await writes.run(async()=>{
+   const current=structuredClone(selected),amount=C.finalWorkAmount(current.payload);
+   if(!Number.isFinite(amount)||amount<0)throw new Error('Kwota końcowa inwestycji musi być nieujemna.');
+   const result=await API.finishProject(current,amount),row=Array.isArray(result)?result[0]:result;
+   all=all.map(item=>item.id===row.id?structuredClone(row):item);
+   if(selected?.id===row.id){
+    const editedMeanwhile=!Auto.samePayload(selected.payload,current.payload);
+    if(editedMeanwhile){selected.revision=row.revision;selected.payload=Auto.mergeEdits(row.payload,current.payload,selected.payload);projectDirty=true;keepDraft('project');scheduleSave();}
+    else{selected=structuredClone(row);projectDirty=false;drafts.remove('project:'+row.id);}
+   }
+   saveError='';updateSaveState();render();toast('Zakończono inwestycję. Kwota '+money(amount)+' jest w Moich zarobkach.');
+  });return;
+ }
  if(a==='pdf-all'||a==='pdf-none'){for(const checkbox of $('#dialog').querySelectorAll('input[name="pdfModule"]'))checkbox.checked=a==='pdf-all';return;}
  if(a==='print'){await flushChanges();pdfDialog();return;}if(a==='offer-print'){await flushChanges();printDoc('offer',p().acceptedOffers.find(x=>x.version===Number(b.dataset.version)));return;}
  }catch(err){if(dirty)saveFailed(err);else toast(err.message);}finally{if(b.isConnected)b.disabled=false;}});

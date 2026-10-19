@@ -1,5 +1,5 @@
-export const VERSION='1.0.49';
-export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['rooms','Pomieszczenia i pomiary'],['offer','Oferta wstępna'],['contract','Umowa'],['works','Kalkulacja końcowa'],['summary','Zestawienie prac'],['payments','Etapy i płatności'],['purchases','Zakupy i materiały'],['journal','Dziennik prac'],['handover','Odbiór inwestycji']];
+export const VERSION='1.0.50';
+export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['contract','Umowa'],['rooms','Pomieszczenia'],['offer','Oferta wstępna'],['works','Kalkulacja końcowa'],['payments','Etapy i płatności'],['journal','Dziennik prac'],['handover','Odbiór inwestycji'],['summary','Zestawienie prac'],['purchases','Zakupy i materiały']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
 export function number(v){const n=Number(String(v??'').replace(',','.'));return Number.isFinite(n)?n:0;}
@@ -41,9 +41,11 @@ export const calculationBasis=(lines,discount)=>JSON.stringify([number(discount)
 export function workTotals(lines,discount=0,settlement){const raw=lines.reduce((s,l)=>s+calculationValue(l),0),factor=1-number(discount)/100,doneRaw=lines.filter(l=>l.done).reduce((s,l)=>s+calculationValue(l),0),sourceAmountApplied=settlement&&Number.isFinite(settlement.amount)&&settlement.amount>=0&&settlement.basis===calculationBasis(lines,discount);return {before:round(raw),after:round(sourceAmountApplied?settlement.amount:(lines.some(l=>l.calculationPrecision==='source')?raw:round(raw))*factor),done:round(sourceAmountApplied?(raw?settlement.amount*doneRaw/raw:0):doneRaw*factor),hours:lines.reduce((s,l)=>s+number(l.hours),0),days:lines.reduce((s,l)=>s+number(l.days),0),...(sourceAmountApplied?{sourceAmountApplied:true}:{})};}
 
 // Legacy imports already have material receipts; explicit paidAmount uses investor settlement semantics.
+export const invoicePurchasePaid=item=>round(Object.values(item.invoicePayments||{}).reduce((s,n)=>s+number(n),0));
 export function purchasePayment(item){
  const explicit=item.paidAmount!=null,amount=Math.max(0,number(item.amount)),charge=Math.max(0,number(item.charge)),limit=explicit?charge:amount;
- const paid=item.paid?(explicit?Math.min(limit,Math.max(0,number(item.paidAmount))):amount):0;
+ const basePaid=item.paid?(explicit?Math.min(limit,Math.max(0,number(item.paidAmount))):amount):0;
+ const paid=Math.min(limit,basePaid+invoicePurchasePaid(item));
  const ratio=limit?paid/limit:(item.paid&&!explicit?1:0);
  return {paid,charged:explicit?charge:charge*ratio,remaining:round(limit-paid),state:ratio>=1?'full':paid>0?'partial':'unpaid'};
 }
@@ -52,7 +54,8 @@ export function purchasePaymentLabel(item){
  return `${payment.state==='full'?'Opłacono w całości':payment.state==='partial'?'Częściowo opłacony':'Nieopłacony'}: ${money(payment.paid)} · Pozostało: ${money(payment.remaining)}`;
 }
 export function effectiveReceipts(p){
- return [...(p.receipts||[]),...(p.purchases||[]).filter(item=>item.paidAmount!=null&&purchasePayment(item).paid>0).map(item=>({id:'purchase-payment:'+item.id,purchaseId:item.id,date:item.date,kind:'materials',stageId:'',amount:purchasePayment(item).paid,note:`Rozliczenie zakupu: ${item.shop||''} — ${item.description||''}`}))];
+ const invoiceReceipts=(p.invoiceSettlements||[]).flatMap(r=>(r.allocations||[]).filter(a=>a.paid>0).map(a=>({id:'invoice:'+r.id+':'+a.key,invoiceId:r.id,date:r.date,kind:a.kind==='purchase'?'materials':'work',stageId:a.kind==='stage'?a.id:'',amount:a.paid,note:'Wpłata z faktury '+r.number})));
+ return [...(p.receipts||[]),...invoiceReceipts,...(p.purchases||[]).filter(item=>item.paidAmount!=null&&purchasePayment({...item,invoicePayments:{}}).paid>0).map(item=>({id:'purchase-payment:'+item.id,purchaseId:item.id,date:item.date,kind:'materials',stageId:'',amount:purchasePayment({...item,invoicePayments:{}}).paid,note:`Rozliczenie zakupu: ${item.shop||''} — ${item.description||''}`}))];
 }
 export function purchaseTotals(p){
  const items=p.purchases||[],payments=items.map(purchasePayment);
@@ -92,7 +95,7 @@ export function totals(p){
  const offer=workTotals(p.offer||[],p.discount,p.sourceCalculation?.offer),works=workTotals(p.works||[],p.workDiscount??p.discount,p.sourceCalculation?.works),materials=purchaseTotals(p);
  const accepted=activeOffer(p);
  const agreed=accepted?acceptedAmount(accepted):offer.after,workCredit=round(p.workCredit);
- const paid=round((p.receipts||[]).filter(x=>x.kind!=='materials').reduce((s,x)=>s+number(x.amount),0));
+ const paid=round(effectiveReceipts(p).filter(x=>x.kind!=='materials').reduce((s,x)=>s+number(x.amount),0));
  return {offer,works,materials,agreed,paid,workCredit,remaining:round(p.calculationPrecision==='source'?((works.sourceAmountApplied?works.done:(p.works||[]).filter(l=>l.done).reduce((s,l)=>s+calculationValue(l),0)*(1-number(p.workDiscount??p.discount)/100))+(p.purchases||[]).reduce((s,x)=>s+purchasePayment(x).charged,0)-effectiveReceipts(p).reduce((s,x)=>s+number(x.amount),0)-workCredit):works.done+materials.charged-paid-materials.advances-workCredit),workRemaining:round(works.done-paid-workCredit),change:round(works.after-agreed)};
 }
 export function aggregate(lines){const map=new Map();for(const l of lines){if(l.included===false)continue;const key=l.serviceId+'|'+l.name+'|'+l.unit;const row=map.get(key)||{name:l.name,category:l.category,unit:l.unit,qty:0,value:0};row.qty+=number(l.qty);row.value=round(row.value+lineValue(l));map.set(key,row);}return [...map.values()].sort((a,b)=>a.category.localeCompare(b.category,'pl')||a.name.localeCompare(b.name,'pl'));}

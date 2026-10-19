@@ -33,3 +33,12 @@ main>#workspace:not([hidden]){margin:0;width:100%;min-width:0}
 /* Supplied AppPACK mark keeps its original proportions in the compact header. */
 .identity img{width:54px;height:54px}.login-card .brand{width:210px;height:auto}
 @media(max-width:760px){.identity img{width:40px;height:40px}}
+
+/* Full logo above the form in portrait; beside it on landscape tablets/desktops. */
+.login-card{width:calc(100% - 32px);margin:calc(6vh + env(safe-area-inset-top)) auto;display:grid;grid-template-columns:minmax(0,1fr);gap:24px}
+.login-card .brand{width:210px;max-width:100%;height:auto;margin:0 auto}
+.login-content{min-width:0}
+@media (min-width:761px) and (orientation:landscape){
+ .login-card{max-width:900px;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:clamp(32px,5vw,64px);padding:clamp(30px,4vw,48px)}
+ .login-card .brand{width:100%;max-width:320px}
+}

@@ -68,8 +68,9 @@ function fitFrame(target){
  try{
   const doc=target.contentDocument;if(!doc)return;
   doc.documentElement.classList.add('robisie-pack-frame');
+  doc.documentElement.classList.toggle('pack-robisie-wide',doc.location.pathname.startsWith('/app/robisie/'));
   if(!doc.getElementById('robisiePackFrameStyle')){
-   const link=doc.createElement('link');link.id='robisiePackFrameStyle';link.rel='stylesheet';link.href='/pack/frame.css?v=120';doc.head.append(link);
+   const link=doc.createElement('link');link.id='robisiePackFrameStyle';link.rel='stylesheet';link.href='/pack/frame.css?v=124';doc.head.append(link);
   }
   // Finance has its own same-origin private frame. Fit it once it exists and
   // after each navigation, without shrinking the outer content a second time.

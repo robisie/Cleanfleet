@@ -1,6 +1,9 @@
 /* Screen-only layout for applications opened in Pack; standalone and print stay local. */
 @media screen{
  html.robisie-pack-frame{--pack-gutter:10vw;--pack-content-width:80vw}
+ @media(min-width:761px){
+  html.robisie-pack-frame.pack-robisie-wide{--pack-gutter:5vw;--pack-content-width:90vw}
+ }
  /* CleanFleet content and the private finance frame share the same viewport inset. */
  html.robisie-pack-frame body>.wrap,
  html.robisie-pack-frame body>header>.wrap{

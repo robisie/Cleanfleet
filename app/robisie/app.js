@@ -1,8 +1,8 @@
-import * as BI from './invoices.js?v=1.0.52';
-import * as Auto from './autosave.js?v=1.0.52';
-import * as C from './core.js?v=1.0.52';
-import * as API from './api.js?v=1.0.52';
-import * as PDF from './pdf.js?v=1.0.52';
+import * as BI from './invoices.js?v=1.0.53';
+import * as Auto from './autosave.js?v=1.0.53';
+import * as C from './core.js?v=1.0.53';
+import * as API from './api.js?v=1.0.53';
+import * as PDF from './pdf.js?v=1.0.53';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',shopFilter=null,projectFilter='',projectSearch='',summarySort={key:'category',direction:1},mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set(),stageInvoiceCache=new Map();
@@ -114,10 +114,14 @@ async function invoiceDialog(id){
  await loadStageInvoices();const row=(stageInvoiceCache.get(selected.id)||[]).find(r=>r.id===id);
  if(!row)throw Error('Nie znaleziono faktury. Odśwież listę.');
  const record=(p().invoiceSettlements||[]).find(r=>r.id===id),base=BI.withoutInvoice(p(),id),targets=BI.targets(base);
- modal('Rozliczenie faktury '+esc(row.number),`<p>Kwota faktury: <strong>${money(BI.amount(row))}</strong>. W kolumnie „Otrzymano” wpisz łączną kwotę dotychczasowej wpłaty na daną należność.</p>${input('invoiceDate','Data wpływu',record?.date||C.today(),'date','required')}<div class="actions"><button type="button" id="invoice-materials">Przypisz pozostałe materiały</button><button type="button" id="invoice-full-paid">Otrzymano całą przypisaną kwotę</button></div>${table(['Należność','Pozostało','Kwota z faktury','Otrzymano'],targets.map((t,i)=>{const a=record?.allocations.find(a=>a.key===t.key);return `<tr><td>${esc(t.label)}</td><td>${money(t.remaining)}</td><td>${input('assign-'+i,'Przypisz',a?.amount||0,'number','min="0" step="0.01"')}</td><td>${input('received-'+i,'Wpłata',a?.paid||0,'number','min="0" step="0.01"')}</td></tr>`;}).join(''))}<p class="muted">Kwota przypisana może obejmować kilka należności. Przy częściowej wpłacie wskaż, które z nich opłacono. Wyzerowanie kwot cofa wyłącznie rozliczenie tej faktury.</p>`,fd=>{
+ const allocationRows=targets.map((t,i)=>{const a=record?.allocations.find(a=>a.key===t.key);return {target:t,html:`<tr><td>${esc(t.kind==='purchase'?t.label.replace(/^Materiały: /,''):t.label)}</td><td class="num">${money(t.remaining)}</td><td>${input('assign-'+i,'Przypisz',a?.amount||0,'number','min="0" step="0.01"')}</td><td>${input('received-'+i,'Wpłata',a?.paid||0,'number','min="0" step="0.01"')}</td></tr>`};});
+ const allocationTable=rows=>table(['Należność','Pozostało','Kwota z faktury','Otrzymano'],rows.map(r=>r.html).join(''));
+ const materials=allocationRows.filter(r=>r.target.kind==='purchase'),stages=allocationRows.filter(r=>r.target.kind==='stage'),wholeWork=allocationRows.filter(r=>r.target.kind==='work');
+ const sections=`<section class="invoice-allocation-section allocation-materials" aria-labelledby="allocation-materials-title"><div class="toolbar"><h3 id="allocation-materials-title">Materiały</h3><button type="button" id="invoice-materials">Przypisz pozostałe materiały</button></div>${allocationTable(materials)}</section><section class="invoice-allocation-section allocation-work" aria-labelledby="allocation-work-title"><h3 id="allocation-work-title">Robocizna</h3><p class="muted small">Rozliczenie etapów prac</p>${allocationTable(stages)}<div class="allocation-whole-work"><h4>Rozliczenie całości robocizny</h4><p class="muted small">Pozostała kwota za wszystkie prace — zamiast przypisania jej do poszczególnych etapów.</p>${allocationTable(wholeWork)}</div></section>`;
+ modal('Rozliczenie faktury '+esc(row.number),`<p>Kwota faktury: <strong>${money(BI.amount(row))}</strong>. W kolumnie „Otrzymano” wpisz łączną kwotę dotychczasowej wpłaty na daną należność.</p>${input('invoiceDate','Data wpływu',record?.date||C.today(),'date','required')}<div class="actions"><button type="button" id="invoice-full-paid">Otrzymano całą przypisaną kwotę</button></div>${sections}<p class="muted">Kwota przypisana może obejmować kilka należności. Przy częściowej wpłacie wskaż, które z nich opłacono. Wyzerowanie kwot cofa wyłącznie rozliczenie tej faktury.</p>`,fd=>{
   const next=BI.apply(p(),row,targets.map((t,i)=>({key:t.key,amount:C.number(fd.get('assign-'+i)),paid:C.number(fd.get('received-'+i))})),fd.get('invoiceDate'));
   selected.payload=next;markDirty();
- });
+ },null,'scroll-modal invoice-allocation-modal');
  $('#invoice-materials').onclick=()=>{let room=Math.max(0,BI.amount(row)-targets.reduce((s,t,i)=>s+(t.kind==='purchase'?0:C.number($('#f-assign-'+i).value)),0));targets.forEach((t,i)=>{if(t.kind==='purchase'){const value=Math.min(room,t.remaining);$('#f-assign-'+i).value=C.round(value);room=C.round(room-value);}});};
  $('#invoice-full-paid').onclick=()=>{targets.forEach((t,i)=>{$('#f-received-'+i).value=$('#f-assign-'+i).value;});};
 }

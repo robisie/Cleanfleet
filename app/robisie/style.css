@@ -55,3 +55,12 @@ dialog.scroll-modal>form{display:flex;flex-direction:column;flex:1 1 auto;min-he
 @media(max-width:720px){.topbar>.row:first-child{flex:1;min-width:0}.topbar-actions{display:contents}.topbar-actions .logout{order:2}.topbar-actions .quick-receipt{order:3;flex:1;min-width:140px}.topbar-actions #save-state{order:4;flex:1;min-width:140px;font-size:12px}}
 
 .topbar-actions>a.button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 14px;border:1px solid #d9dfe6;border-radius:10px;background:white;text-decoration:none;white-space:nowrap}
+
+/* Distinct material and labour blocks in invoice allocation. */
+dialog.invoice-allocation-modal{width:min(1040px,calc(100vw - 32px));max-width:calc(100vw - 32px)}
+.invoice-allocation-section{margin-top:24px;border:1px solid #dfe5eb;border-radius:14px;padding:18px;background:#fff}
+.invoice-allocation-section h3{margin:0;font-size:21px}.invoice-allocation-section .toolbar{margin-bottom:14px}.invoice-allocation-section>.small{margin:6px 0 14px}
+.allocation-materials{border-top:5px solid #a8b51b;background:#fcfdf4}.allocation-work{border-top:5px solid #697b8b;background:#f7f9fb}
+.invoice-allocation-section th:first-child{width:44%}.invoice-allocation-section th:nth-child(2){width:16%}.invoice-allocation-section th:nth-child(n+3){width:20%}
+.allocation-whole-work{margin-top:22px;padding-top:18px;border-top:2px solid #dfe5eb}.allocation-whole-work h4{margin:0 0 6px;font-size:17px}
+@media(max-width:720px){.invoice-allocation-section{padding:12px}.invoice-allocation-section h3{font-size:19px}}

@@ -1,5 +1,5 @@
-import * as C from './core.js?v=1.0.52';
-import {paginateContract} from './pdf-layout.js?v=1.0.52';
+import * as C from './core.js?v=1.0.53';
+import {paginateContract} from './pdf-layout.js?v=1.0.53';
 
 export const MODULES=[
  ['data','Dane inwestora i wykaz dokumentów'],['contract','Umowa'],

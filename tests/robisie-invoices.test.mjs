@@ -1,5 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+test('receipt edits and deletion preserve other inflows, detach blocked allocations only by explicit choice',()=>{
+ const p=C.newProject('Test','Test');
+ p.receipts=[{id:'advance',amount:1000,kind:'materials',date:'2026-10-12',note:'Zaliczka'},{id:'other',amount:200,kind:'materials'}];
+ p.purchases=[{id:'p',amount:1200,charge:1200,paid:false,paidAmount:0,receiptPayments:{advance:900,other:100}}];
+ p.invoiceSettlements=[{id:'fv',number:'FV',total:1500,allocations:[],existingReceipts:[{id:'advance',amount:1000,kind:'materials'},{id:'other',amount:200,kind:'materials'}]}];
+ const before=structuredClone(p),edited=I.changeReceipt(p,'advance',{...p.receipts[0],note:'Nowy opis',amount:1100});
+ assert.equal(edited.purchases[0].receiptPayments.advance,900);assert.equal(I.paid(edited.invoiceSettlements[0]),1300);assert.deepEqual(p,before);
+ assert.throws(()=>I.changeReceipt(p,'advance',{...p.receipts[0],amount:500}),{code:'RS_RECEIPT_LINKS'});
+ const reduced=I.changeReceipt(p,'advance',{...p.receipts[0],amount:500},{detach:true});
+ assert.equal(C.purchaseTotals(reduced).advances,700);assert.deepEqual(reduced.purchases[0].receiptPayments,{other:100});assert.equal(I.paid(reduced.invoiceSettlements[0]),200);
+ assert.throws(()=>I.changeReceipt(p,'advance',null),{code:'RS_RECEIPT_LINKS'});
+ const deleted=I.changeReceipt(p,'advance',null,{detach:true});assert.equal(deleted.receipts.length,1);assert.equal(C.purchaseTotals(deleted).advances,200);assert.equal(C.purchaseTotals(deleted).balance,-1000);assert.equal(C.purchasePayment(deleted.purchases[0]).paid,100);assert.equal(deleted.purchases[0].amount,1200);assert.deepEqual(p,before);
+ assert.throws(()=>I.changeReceipt(p,'missing',null),/Nie znaleziono/);
+});
 import * as C from '../app/robisie/core.js';
 import * as I from '../app/robisie/invoices.js';
 const invoice=(id='fv',total='2000.00')=>({id,number:'A1',status:'issued',payload:{currency:'PLN',lines:[{qty:'1',price:total}],source:{app:'robisie',id:'p'}}});

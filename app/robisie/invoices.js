@@ -1,4 +1,4 @@
-import * as C from './core.js?v=1.0.60';
+import * as C from './core.js?v=1.0.61';
 import {invoiceAmount} from '../../bill/core.js?v=1.0.15';
 export const amount=row=>invoiceAmount(row.payload)/100;
 export const linkedPaid=record=>C.round((record?.existingReceipts||[]).reduce((s,r)=>s+C.number(r.amount),0));
@@ -65,6 +65,19 @@ export function refreshReceiptLinks(project){
   if(assigned(record)>record.total+.001)throw Error('Zmiana wpłaty przekracza kwotę faktury '+record.number+'. Najpierw zmień jej powiązania.');
  }
  return project;
+}
+// Editing a receipt must never leave purchase allocations referring to missing money.
+// Detaching is an explicit UI choice; unrelated receipts and invoice allocations stay intact.
+export function changeReceipt(project,id,replacement,{detach=false}={}){
+ if(!(project.receipts||[]).some(r=>r.id===id))throw Error('Nie znaleziono wpłaty. Odśwież inwestycję.');
+ if(replacement&&(!Number.isFinite(replacement.amount)||replacement.amount<=0||!['work','materials'].includes(replacement.kind)))throw Error('Podaj prawidłową kwotę i cel wpłaty.');
+ const next=structuredClone(project);
+ next.receipts=replacement?next.receipts.map(r=>r.id===id?{...replacement,id}:r):next.receipts.filter(r=>r.id!==id);
+ if(detach){
+  for(const item of next.purchases||[])if(item.receiptPayments){delete item.receiptPayments[id];if(!Object.keys(item.receiptPayments).length)delete item.receiptPayments;}
+  for(const record of next.invoiceSettlements||[])record.existingReceipts=(record.existingReceipts||[]).filter(r=>r.id!==id);
+ }
+ try{return refreshReceiptLinks(next);}catch(error){error.code='RS_RECEIPT_LINKS';throw error;}
 }
 export function apply(project,row,allocations,date,existingIds=[]){
  if(row.originKind==='purchases'||row.referenceOnly)throw Error('Ten dokument nie jest fakturą sprzedażową do rozliczenia w PLN.');

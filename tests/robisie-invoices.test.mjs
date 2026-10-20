@@ -61,3 +61,41 @@ test('receipt edits update linked invoice amounts and cannot exceed it or delete
  linked.receipts[0].amount=800;assert.throws(()=>I.refreshReceiptLinks(linked));
  linked.receipts=[];assert.throws(()=>I.refreshReceiptLinks(linked));
 });
+
+test('detach purchase preserves investor money, sales invoice attribution and original purchase document',()=>{
+ let p=project();p.purchases[0].sourceKsefNumber='purchase-ksef';
+ p=I.apply(p,invoice(),[{key:'purchase:m',amount:700,paid:300},{key:'stage:s1',amount:500,paid:100}],'2026-10-20',['purchase-payment:m']);
+ const snapshot=structuredClone(p),before=C.purchaseTotals(p),beforePaid=I.paid(p.invoiceSettlements[0]);
+ const next=I.detachPurchase(p,'m');
+ assert.deepEqual(p,snapshot);assert.equal(next.purchases[0].sourceKsefNumber,'purchase-ksef');
+ assert.equal(C.purchasePayment(next.purchases[0]).paid,0);assert.equal(C.invoicePurchasePaid(next.purchases[0]),0);
+ assert.equal(C.purchaseTotals(next).advances,before.advances);assert.equal(C.purchaseTotals(next).balance,before.balance);
+ assert.equal(I.paid(next.invoiceSettlements[0]),beforePaid);assert.equal(C.totals(next).paid,100);
+ assert.equal(I.purchaseLinks(next,'m').length,0);assert.equal(next.invoiceSettlements[0].allocations.length,2);
+ assert.equal(next.invoiceSettlements[0].existingReceipts.length,1);
+ assert.equal(C.effectiveReceipts(next).filter(r=>r.invoiceId==='fv'&&r.kind==='materials').reduce((s,r)=>s+r.amount,0),500);
+ assert.deepEqual(I.detachPurchase(next,'m'),next);
+ const reassigned=I.apply(next,invoice(),[{key:'purchase:m',amount:300,paid:300},{key:'stage:s1',amount:500,paid:100}],'2026-10-20',next.invoiceSettlements[0].existingReceipts.map(r=>r.id));
+ assert.equal(C.purchaseTotals(reassigned).advances,500);assert.equal(C.purchasePayment(reassigned.purchases[0]).paid,300);assert.equal(I.paid(reassigned.invoiceSettlements[0]),beforePaid);
+ next.purchases=[];assert.equal(C.purchaseTotals(next).advances,500);assert.doesNotThrow(()=>I.refreshReceiptLinks(next));
+});
+test('detach preserves manual payment dates and every invoice, releases unpaid plans, rejects inconsistent ledger',()=>{
+ let p=project();p.purchases[0].date='2026-10-01';
+ p=apply(p,[{key:'purchase:m',amount:300,paid:100}]);p=apply(p,[{key:'purchase:m',amount:200,paid:0}],'second');
+ const next=I.detachPurchase(p,'m');
+ assert.equal(C.purchaseTotals(next).advances,300);assert.equal(I.paid(next.invoiceSettlements[0]),100);assert.equal(I.assigned(next.invoiceSettlements[1]),0);
+ assert.equal(next.receipts.find(r=>!C.effectiveReceipts(next).find(x=>x.id===r.id).invoiceId).date,'2026-10-01');
+ const bad=structuredClone(p);bad.purchases[0].invoicePayments.fv=90;
+ assert.throws(()=>I.detachPurchase(bad,'m'),/nie zgadzają/);assert.equal(bad.purchases[0].paidAmount,200);
+});
+test('sales invoice can receive a general material advance without a purchase or labour',()=>{
+ const p=C.newProject('Future materials','Investor');
+ const next=I.apply(p,invoice('advance','1000.00'),[{key:'materials:advance',amount:1000,paid:400}],'2026-10-20');
+ assert.equal(C.purchaseTotals(next).advances,400);assert.equal(C.purchaseTotals(next).spent,0);assert.equal(C.totals(next).paid,0);
+ assert.equal(C.purchaseTotals(next).balance,400);assert.equal(next.purchases.length,0);
+ assert.equal(C.receiptRows(next)[0].kindLabel,'Zaliczka na materiały');
+ const again=I.apply(next,invoice('advance','1000.00'),[{key:'materials:advance',amount:1000,paid:600}],'2026-10-20');
+ assert.equal(C.purchaseTotals(again).advances,600);assert.equal(again.invoiceSettlements.length,1);
+ assert.equal(C.purchaseTotals(I.apply(again,invoice('advance','1000.00'),[],'2026-10-20')).advances,0);
+ assert.throws(()=>I.apply(p,invoice('advance','100.00'),[{key:'materials:advance',amount:101,paid:101}],'2026-10-20'));
+});

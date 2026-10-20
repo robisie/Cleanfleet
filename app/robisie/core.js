@@ -1,4 +1,4 @@
-export const VERSION='1.0.56';
+export const VERSION='1.0.57';
 export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['contract','Umowa'],['rooms','Pomieszczenia'],['offer','Oferta wstępna'],['works','Kalkulacja końcowa'],['payments','Etapy i płatności'],['journal','Dziennik prac'],['handover','Odbiór inwestycji'],['summary','Zestawienie prac'],['purchases','Zakupy i materiały']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -51,10 +51,10 @@ export function purchasePayment(item){
 }
 export function purchasePaymentLabel(item){
  const payment=purchasePayment(item);
- return `${payment.state==='full'?'Opłacono w całości':payment.state==='partial'?'Częściowo opłacony':'Nieopłacony'}: ${money(payment.paid)} · Pozostało: ${money(payment.remaining)}`;
+ return `${payment.state==='full'?'Rozliczono z inwestorem w całości':payment.state==='partial'?'Częściowo rozliczono z inwestorem':'Nierozliczony z inwestorem'}: ${money(payment.paid)} · Pozostało: ${money(payment.remaining)}`;
 }
 export function effectiveReceipts(p){
- const invoiceReceipts=(p.invoiceSettlements||[]).flatMap(r=>(r.allocations||[]).filter(a=>a.paid>0).map(a=>({id:'invoice:'+r.id+':'+a.key,invoiceId:r.id,date:r.date,kind:a.kind==='purchase'?'materials':'work',stageId:a.kind==='stage'?a.id:'',amount:a.paid,note:'Wpłata z faktury '+r.number})));
+ const invoiceReceipts=(p.invoiceSettlements||[]).flatMap(r=>(r.allocations||[]).filter(a=>a.paid>0).map(a=>({id:'invoice:'+r.id+':'+a.key,invoiceId:r.id,date:r.date,kind:['purchase','materials'].includes(a.kind)?'materials':'work',stageId:a.kind==='stage'?a.id:'',amount:a.paid,note:'Wpłata z faktury '+r.number})));
  const receipts=[...(p.receipts||[]),...invoiceReceipts,...(p.purchases||[]).filter(item=>item.paidAmount!=null&&purchasePayment({...item,invoicePayments:{}}).paid>0).map(item=>({id:'purchase-payment:'+item.id,purchaseId:item.id,date:item.date,kind:'materials',stageId:'',amount:purchasePayment({...item,invoicePayments:{}}).paid,note:`Rozliczenie zakupu: ${item.shop||''} — ${item.description||''}`}))];
  return receipts.map(receipt=>{if(receipt.invoiceId)return receipt;const invoice=(p.invoiceSettlements||[]).find(r=>(r.existingReceipts||[]).some(x=>x.id===receipt.id));return invoice?{...receipt,invoiceId:invoice.id,note:`Wpłata z faktury ${invoice.number} — wcześniej odnotowana${receipt.note?': '+receipt.note:''}`}:receipt;});
 }

@@ -1,5 +1,5 @@
-import * as C from './core.js?v=1.0.56';
-import {paginateContract} from './pdf-layout.js?v=1.0.56';
+import * as C from './core.js?v=1.0.57';
+import {paginateContract} from './pdf-layout.js?v=1.0.57';
 
 export const MODULES=[
  ['data','Dane inwestora i wykaz dokumentów'],['contract','Umowa'],
@@ -26,7 +26,7 @@ function linesTable(p,lines,done=false){
  return [...groups].filter(([,items])=>items.length).map(([id,items])=>`<h3>${esc(roomName(p,id))}</h3>${table(['Praca','Jedn.','Ilość','Cena (zł)','Wartość (zł)',...(done?['Wykonano']:[])],items.map(l=>row([l.name,l.unit||'—',q(l.qty),money(l.price),money(C.lineValue(l)),...(done?[l.done?'Tak':'Nie']:[])])),done?'lines lines-done':'lines')}`).join('')||'<p class="empty">Brak prac z dodatnią ilością w wybranym zakresie.</p>';
 }
 function purchasesTable(items){
- const heads=['Data','Sklep','Opis zakupu','Dokument','Zakup (zł)','Koszt inwestora (zł)','Opłacono'];
+ const heads=['Data','Sklep','Opis zakupu','Dokument','Zakup (zł)','Koszt inwestora (zł)','Rozliczono z inwestorem'];
  const columns=['purchase-date','purchase-shop','purchase-description','purchase-document','purchase-money','purchase-money','purchase-payment'];
  return `<table class="purchases-table"><colgroup>${[10.5,12,23.5,14,11,11,18].map(width=>`<col style="width:${width}%">`).join('')}</colgroup><thead><tr>${heads.map((label,i)=>`<th class="${columns[i]}">${esc(label)}</th>`).join('')}</tr></thead><tbody>${items.length?items.map(item=>{
   const payment=C.purchasePayment(item),label=payment.state==='full'?'Opłacono w całości':payment.state==='partial'?'Opłacono częściowo':'Nie opłacono';

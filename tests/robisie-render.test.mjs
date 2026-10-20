@@ -217,10 +217,10 @@ test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów
  await node('#modal-form').onsubmit({preventDefault(){},target:{serviceId:chosen.id,roomId:'r',name:chosen.name,unit:'panel',qty:'1',price:'40',days:'0',hours:'0',note:''}});
  assert.equal(savedSettings.length,1);
 
- module.namespace.testPurchaseDialog();assert.ok(node('#dialog').innerHTML.includes('list="shop-suggestions"'));assert.ok(node('#dialog').innerHTML.includes('<option value="Test">'));
+ module.namespace.testPurchaseDialog();assert.match(node('#dialog').innerHTML,/id="purchase-paid" name="paid" > /);assert.ok(node('#dialog').innerHTML.includes('list="shop-suggestions"'));assert.ok(node('#dialog').innerHTML.includes('<option value="Test">'));
  await node('#modal-form').onsubmit({preventDefault(){},target:{date:'2026-10-09',shop:' Nowy Sklep ',amount:'10',charge:'12',description:'Testowy zakup',invoice:'',paid:'on',paidAmount:'4'}});
  assert.equal(module.namespace.testPayload().purchases.at(-1).paidAmount,4);
- assert.ok(module.namespace.testPurchases().includes('Częściowo opłacony'));
+ assert.ok(module.namespace.testPurchases().includes('Częściowo rozliczono z inwestorem'));
  node('#purchase-paid').checked=false;node('#purchase-paid').onchange();assert.equal(node('#purchase-payment').hidden,true);assert.equal(node('#f-paidAmount').disabled,true);
  node('#purchase-paid').checked=true;node('#purchase-paid').onchange();assert.equal(node('#purchase-payment').hidden,false);assert.equal(node('#f-paidAmount').disabled,false);
  const countBefore=module.namespace.testPayload().purchases.length,settingsBefore=savedSettings.length;
@@ -304,6 +304,21 @@ test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów
  assert.ok(confirmation.includes(row.contract_number)&&confirmation.includes(row.payload.name));
  confirmDelete=true;deleteFails=true;await assert.rejects(module.namespace.testDelete('p'),/Brak połączenia/);assert.equal(module.namespace.testProjects().length,1);
  deleteFails=false;await module.namespace.testDelete('p');assert.equal(module.namespace.testProjects().length,0);assert.equal(deletions.at(-1).revision,1);
+ const receivedInvoice={id:'sales',number:'A10/10/2026',status:'issued',payload:{currency:'PLN',lines:[{qty:'1',price:'100.00'}]}};
+ const settledRow=structuredClone(row);settledRow.payload.purchases[0].paidAmount=20;
+ settledRow.payload=BI.apply(settledRow.payload,receivedInvoice,[{key:'purchase:x',amount:80,paid:30}],'2026-10-20');
+ module.namespace.testRender(settledRow,structuredClone(shared));
+ const invoiceView=module.namespace.testStageInvoices([receivedInvoice,{id:'cost',number:'COST-01',status:'issued',originKind:'purchases',ksef_number:'cost-source',payload:{currency:'PLN',lines:[{qty:'1',price:'100.00'}]}}]);
+ assert.ok(invoiceView.includes('Faktury sprzedażowe i wpłaty inwestora'));
+ assert.ok(invoiceView.indexOf('COST-01')>invoiceView.indexOf('Dokumenty zakupowe z KSeF'));
+ await listeners.get('click')({target:{closest:()=>({dataset:{action:'invoice-allocate',id:'sales'},isConnected:true})}});
+ assert.ok(node('#dialog').innerHTML.includes('Zaliczka na przyszłe zakupy'));
+ await listeners.get('click')({target:{closest:()=>({dataset:{action:'purchase-edit',id:'x'},isConnected:true})}});
+ assert.ok(node('#dialog').innerHTML.includes('Powiązane faktury sprzedażowe: A10/10/2026'));
+ confirmDelete=false;await node('#purchase-detach').onclick();assert.equal(C.purchasePayment(module.namespace.testPayload().purchases[0]).paid,50);
+ confirmDelete=true;await node('#purchase-detach').onclick();
+ const detached=module.namespace.testPayload();assert.equal(C.purchaseTotals(detached).advances,50);assert.equal(C.purchasePayment(detached.purchases[0]).paid,0);
+ assert.equal(BI.paid(detached.invoiceSettlements[0]),30);assert.equal(BI.purchaseLinks(detached,'x').length,0);assert.equal(module.namespace.testDirty(),false);
  const ksefRow=structuredClone(row);ksefRow.payload.purchases[0].sourceKsefNumber='source-number';
  ksefFixture={document:{grossAmount:150,referenceOnly:false,selectedIndices:[1],payload:{currency:'PLN'}},items:[{index:1,name:'Farba inwestycji',quantity:1,unit:'szt.',vat:'23',gross:100},{index:2,name:'Pozycja wcześniej wykluczona',quantity:1,unit:'szt.',vat:'23',gross:50}]};
  module.namespace.testRender(ksefRow,structuredClone(shared));

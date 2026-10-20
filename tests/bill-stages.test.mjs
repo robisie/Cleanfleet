@@ -28,6 +28,8 @@ test('investment choices use completed work, receipts, credits, material advance
  const p=project();p.payload.works=[{qty:2,price:100,done:true},{qty:3,price:100,done:false}];p.payload.workDiscount=10;p.payload.workCredit=15.25;p.payload.receipts=[{kind:'work',amount:30},{kind:'materials',amount:20}];p.payload.purchases=[{amount:80,charge:100,paid:true,paidAmount:40}];
  const before=structuredClone(p),seed=Bridge.investmentInvoiceSeed(p),choices=Object.fromEntries(seed.amountOptions.map(o=>[o.id,o.amount]));
  assert.equal(choices.completed,'180.00');assert.equal(choices['work-remaining'],'134.75');assert.equal(choices.remaining,'174.75');assert.equal(choices.whole,'450.00');assert.equal(choices['stage:stage'],'2665.28');assert.equal(seed.lines,undefined);assert.deepEqual(p,before);
+ p.payload.invoiceSettlements=[{id:'paid-invoice',date:'2026-10-20',allocations:[{key:'materials:advance',kind:'materials',amount:100,paid:100},{key:'work:all',kind:'work',amount:50,paid:50}]}];
+ const received=Object.fromEntries(Bridge.investmentInvoiceSeed(p).amountOptions.map(o=>[o.id,o.amount]));assert.equal(received['work-remaining'],'84.75');assert.equal(received.remaining,'24.75');delete p.payload.invoiceSettlements;
  p.payload.receipts.push({kind:'work',amount:1000});assert.equal(Bridge.investmentInvoiceSeed(p).amountOptions.find(o=>o.id==='work-remaining').amount,'-865.25');
  const empty=project();empty.payload.works=[];assert.equal(Bridge.investmentInvoiceSeed(empty).amountOptions.find(o=>o.id==='whole').amount,'6663.19');assert.equal(Bridge.investmentInvoiceSeed(empty).amountOptions.find(o=>o.id==='completed').amount,'0.00');
 });

@@ -48,6 +48,14 @@ test('an earlier receipt linked to a sales invoice is still counted once when as
  const next=apply(p,'full',[{source:'advance',id:'old',amount:1000,date}]);
  assert.equal(C.purchaseTotals(next).advances,1000);assert.equal(I.paid(next.invoiceSettlements[0]),1000);assert.equal(C.effectiveReceipts(next).length,1);
  assert.equal(C.effectiveReceipts(next)[0].invoiceId,'fv');assert.equal(C.purchasePayment(next.purchases[0]).paid,1000);
+ const byInvoice=apply(p,'full',[{source:'invoice',id:'fv',amount:1000,date}]);
+ assert.equal(C.purchaseTotals(byInvoice).advances,1000);assert.equal(C.purchasePayment(byInvoice.purchases[0]).paid,1000);assert.equal(byInvoice.purchases[0].invoicePayments,undefined);
+ assert.equal(P.rows(byInvoice,byInvoice.purchases[0])[0].source,'invoice');assert.equal(P.rows(byInvoice,byInvoice.purchases[0])[0].amount,1000);
+ assert.equal(C.purchaseTotals(apply(byInvoice,'full',P.rows(byInvoice,byInvoice.purchases[0]))).advances,1000);
+ const partial=apply(p,'partial',[{source:'invoice',id:'fv',amount:900,date}]);partial.purchases.push({id:'second',amount:100,charge:100,paid:false,paidAmount:0});
+ const second=P.apply(partial,partial.purchases[1],{state:'full',rows:[{source:'invoice',id:'fv',amount:100,date}]},[invoice()]);
+ assert.equal(C.purchaseTotals(second).advances,1000);assert.equal(second.purchases[1].receiptPayments.old,100);assert.equal(second.purchases[1].invoicePayments,undefined);
+
 });
 test('unchanged legacy and modern sources remain unchanged during a description or KSeF edit',()=>{
  const p=project();p.purchases[0]={id:'m',date,amount:100,charge:120,paid:true};

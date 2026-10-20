@@ -1,12 +1,16 @@
-import * as C from './core.js?v=1.0.59';
-import * as I from './invoices.js?v=1.0.59';
+import * as C from './core.js?v=1.0.60';
+import * as I from './invoices.js?v=1.0.60';
 
 export const eligible=row=>!!row?.number&&row.status!=='draft'&&row.originKind!=='purchases'&&!row.referenceOnly&&!row.payload?.correction&&row.payload?.currency==='PLN';
 export function rows(project,item){
  const result=[];
  if(item.paidAmount!=null&&item.paid&&C.number(item.paidAmount)>0)result.push({source:'cash',amount:C.number(item.paidAmount),date:item.paidDate||item.date||C.today()});
  for(const record of project.invoiceSettlements||[])for(const a of record.allocations||[])if(a.kind==='purchase'&&a.id===item.id)result.push({source:'invoice',id:record.id,amount:C.number(a.paid),assigned:C.number(a.amount),date:a.date||record.date});
- for(const [id,amount] of Object.entries(item.receiptPayments||{}))result.push({source:'advance',id,amount,date:project.receipts?.find(r=>r.id===id)?.date});
+ for(const [id,amount] of Object.entries(item.receiptPayments||{})){
+  const receipt=project.receipts?.find(r=>r.id===id),invoice=(project.invoiceSettlements||[]).find(r=>(r.existingReceipts||[]).some(x=>x.id===id));
+  if(invoice){let row=result.find(r=>r.source==='invoice'&&r.id===invoice.id);if(!row){row={source:'invoice',id:invoice.id,amount:0,date:receipt?.date||invoice.date};result.push(row);}row.amount=C.round(row.amount+C.number(amount));}
+  else result.push({source:'advance',id,amount,date:receipt?.date});
+ }
  if(item.paidAmount==null&&!result.length&&item.paid)result.push({source:'legacy',amount:C.purchasePayment(item).paid,date:item.date});
  return result;
 }
@@ -55,7 +59,15 @@ export function apply(project,candidate,choice,invoices){
   if(row&&!eligible(source))throw Error('Wybierz fakturę sprzedażową tej inwestycji w PLN.');
   let record=p.invoiceSettlements.find(r=>r.id===id);
   if(!record){record={id,number:source.number,total:I.amount(source),date:row.date,allocations:[],existingReceipts:[]};p.invoiceSettlements.push(record);}
-  const previous=(record.allocations||[]).find(a=>a.kind==='purchase'&&a.id===item.id),before=C.number(previous?.paid),desired=C.round(row?.amount||0);
+  const previous=(record.allocations||[]).find(a=>a.kind==='purchase'&&a.id===item.id),before=C.number(previous?.paid);let desired=C.round(row?.amount||0);
+  // A recorded advance linked to this invoice is already an inflow. Allocate it,
+  // rather than creating another invoice payment for the same money.
+  for(const link of record.existingReceipts||[]){
+   const receipt=(p.receipts||[]).find(r=>r.id===link.id&&r.kind==='materials');if(!receipt||desired<=0)continue;
+   const used=p.purchases.filter(x=>x.id!==item.id).reduce((s,x)=>s+C.number(x.receiptPayments?.[receipt.id]),0)+C.number(item.receiptPayments?.[receipt.id]);
+   const reused=Math.min(desired,Math.max(0,C.round(C.number(receipt.amount)-used)));
+   if(reused>0){item.receiptPayments={...item.receiptPayments,[receipt.id]:C.round(C.number(item.receiptPayments?.[receipt.id])+reused)};desired=C.round(desired-reused);}
+  }
   record.allocations=(record.allocations||[]).filter(a=>a.kind!=='purchase'||a.id!==item.id);
   let pool=record.allocations.find(a=>a.key==='materials:advance'),delta=C.round(desired-before);
   if(delta<0){if(!pool){pool={key:'materials:advance',kind:'materials',id:'advance',label:'Zaliczka na materiały',amount:0,paid:0,date:previous?.date||record.date};record.allocations.push(pool);}pool.amount=C.round(C.number(pool.amount)-delta);pool.paid=C.round(C.number(pool.paid)-delta);}

@@ -92,3 +92,15 @@ test('Bill deep links activate one Pack tab and keep exact invoice and stage par
  const messages=[];bill.contentWindow.postMessage=(data,origin)=>messages.push({data,origin});
  send('https://cleanfleet.pl/bill/?invoice=invoice-2');assert.equal(p.ids.frameHost.children.length,2);assert.equal(messages.at(-1).data.type,'robisie-pack-navigate');assert.equal(messages.at(-1).data.url,'https://cleanfleet.pl/bill/?invoice=invoice-2');
 });
+
+
+test('tab indicators distinguish closed, active and background apps through switching, Panel and close',async()=>{
+ const p=await panel({query:'?application=robisie'});
+ const tab=name=>p.ids.openTabs.children.find(x=>x.children[0].dataset.tabKey==='app:'+name);
+ const status=name=>tab(name).children[0].children[1].textContent;
+ assert.equal(status('robisie'),'Aktywna');assert.equal(tab('robisie').dataset.state,'active');assert.equal(status('bill'),'Zamknięta');assert.equal(tab('bill').children.length,1);
+ await p.c.window.testOpenApplication('bill');assert.equal(status('bill'),'Aktywna');assert.equal(status('robisie'),'W tle');assert.equal(tab('robisie').dataset.state,'background');
+ p.ids.homeTab.onclick();assert.equal(status('robisie'),'W tle');assert.equal(status('bill'),'W tle');
+ p.c.window.testCloseTab('app:bill');assert.equal(status('bill'),'Zamknięta');assert.equal(status('robisie'),'W tle');assert.equal(tab('bill').children.length,1);
+ await p.c.window.testOpenApplication('bill');assert.equal(status('bill'),'Aktywna');p.c.window.testCloseTab('app:bill');assert.equal(status('robisie'),'Aktywna');assert.equal(status('bill'),'Zamknięta');
+});

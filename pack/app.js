@@ -19,7 +19,10 @@ function renderTabs(){
  const slots=[...Object.entries(applications).map(([name,app])=>['app:'+name,tabs.get('app:'+name)||{kind:'application',name,title:app.name,frame:null}]),...[...tabs.entries()].filter(([,tab])=>tab.kind==='module')];
  for(const [key,tab] of slots){
   const item=document.createElement('div');item.className='workspace-tab'+(key===current?' active':'')+(tab.frame?'':' unopened');item.dataset.kind=tab.kind;item.setAttribute('role','presentation');
-  const button=document.createElement('button');button.type='button';button.className='workspace-tab-select';button.textContent=tab.title;button.title=tab.title;button.setAttribute('role','tab');button.setAttribute('aria-selected',String(key===current));if(tab.frame)button.setAttribute('aria-controls',tab.frame.id);button.tabIndex=key===current?0:-1;button.dataset.tabKey=key;button.onclick=()=>openTarget(tab.kind,tab.name);
+  const state=tab.frame?(key===current?'active':'background'):'closed',status=state==='active'?'Aktywna':state==='background'?'W tle':'Zamknięta';item.dataset.state=state;
+  const button=document.createElement('button');button.type='button';button.className='workspace-tab-select';button.title=tab.title+' — '+status;button.setAttribute('aria-label',button.title);
+  const name=document.createElement('span');name.className='workspace-tab-name';name.textContent=tab.title;
+  const marker=document.createElement('small');marker.className='workspace-tab-status';marker.textContent=status;marker.setAttribute('aria-hidden','true');button.append(name,marker);button.setAttribute('role','tab');button.setAttribute('aria-selected',String(key===current));if(tab.frame)button.setAttribute('aria-controls',tab.frame.id);button.tabIndex=key===current?0:-1;button.dataset.tabKey=key;button.onclick=()=>openTarget(tab.kind,tab.name);
   const close=document.createElement('button');close.type='button';close.className='workspace-tab-close';close.textContent='×';close.setAttribute('aria-label','Zamknij zakładkę '+tab.title);close.onclick=()=>closeTab(key);
   item.append(button);if(tab.frame)item.append(close);$('openTabs').append(item);
  }

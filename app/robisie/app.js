@@ -1,13 +1,13 @@
-import * as PurchaseSettlement from './purchase-settlement.js?v=1.0.63';
-import * as PurchaseSettlementForm from './purchase-settlement-form.js?v=1.0.63';
-import * as PurchasePayments from './purchase-payments.js?v=1.0.63';
-import * as PurchasePaymentForm from './purchase-payment-form.js?v=1.0.63';
-import * as PurchaseItems from './purchase-items.js?v=1.0.63';
-import * as BI from './invoices.js?v=1.0.63';
-import * as Auto from './autosave.js?v=1.0.63';
-import * as C from './core.js?v=1.0.63';
-import * as API from './api.js?v=1.0.63';
-import * as PDF from './pdf.js?v=1.0.63';
+import * as PurchaseSettlement from './purchase-settlement.js?v=1.0.64';
+import * as PurchaseSettlementForm from './purchase-settlement-form.js?v=1.0.64';
+import * as PurchasePayments from './purchase-payments.js?v=1.0.64';
+import * as PurchasePaymentForm from './purchase-payment-form.js?v=1.0.64';
+import * as PurchaseItems from './purchase-items.js?v=1.0.64';
+import * as BI from './invoices.js?v=1.0.64';
+import * as Auto from './autosave.js?v=1.0.64';
+import * as C from './core.js?v=1.0.64';
+import * as API from './api.js?v=1.0.64';
+import * as PDF from './pdf.js?v=1.0.64';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',shopFilter=null,projectFilter='',projectSearch='',summarySort={key:'category',direction:1},mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set(),stageInvoiceCache=new Map();
@@ -123,8 +123,18 @@ function summaryView(){const d=p(),areas=d.rooms.map(C.roomArea),t=C.totals(d),h
 function invoiceList(){
  const documents=(stageInvoiceCache.get(selected.id)||[]).filter(r=>r.number&&r.status!=='draft'),rows=documents.filter(r=>r.originKind!=='purchases'),purchases=documents.filter(r=>r.originKind==='purchases');
  const documentAmount=row=>esc((row.grossAmount??BI.amount(row)).toLocaleString('pl-PL',{style:'currency',currency:row.payload.currency||'PLN'}));
- const sales=card(`<div class="toolbar"><h2>Faktury sprzedażowe i wpłaty inwestora</h2><a class="button" href="/bill/?ksef=1" target="_blank" rel="noopener">Przypisz z KSeF</a>${btn('invoices-refresh','Odśwież faktury')}<a class="button" href="/bill/?new=1&brand=robisie&source=${encodeURIComponent(selected.id)}" target="_blank" rel="noopener">Wystaw fakturę</a></div><p class="muted">Faktury sprzedażowe rozliczają pieniądze od inwestora: materiały, zaliczki na przyszłe zakupy i robociznę. Rozliczenie zwiększają wyłącznie faktycznie otrzymane kwoty. Wcześniej odnotowaną wpłatę powiąż z fakturą, aby nie dodać jej drugi raz.</p>${table(['Faktura','Kwota','Przypisano','Otrzymano',''],rows.map(row=>{const record=(p().invoiceSettlements||[]).find(r=>r.id===row.id);return `<tr><td><a href="${invoiceHref(row)}" target="_blank" rel="noopener">${esc(row.number)}</a>${row.externalKsef?'<br>Sprzedażowa z KSeF':''}${row.referenceOnly?'<br>Dokument do osobnego rozliczenia':''}${row.payload.correction?'<br>Korekta':''}</td><td>${documentAmount(row)}</td><td>${money(BI.assigned(record))}</td><td>${money(BI.paid(record))}</td><td>${!row.referenceOnly&&!row.payload.correction&&row.payload.currency==='PLN'?btn('invoice-allocate','Powiąż / zapisz wpływ','',`data-id="${esc(row.id)}"`):''}</td></tr>`;}).join(''))}${!rows.length?'<p class="muted">Brak faktur sprzedażowych powiązanych z tą inwestycją.</p>':''}`);
+ const sales=card(`<div class="toolbar"><h2>Faktury sprzedażowe i wpłaty inwestora</h2><a class="button" href="/bill/?ksef=1" target="_blank" rel="noopener">Przypisz z KSeF</a>${btn('invoices-refresh','Odśwież faktury')}<a class="button" href="/bill/?new=1&brand=robisie&source=${encodeURIComponent(selected.id)}" target="_blank" rel="noopener">Wystaw fakturę</a></div><p class="muted">Faktury sprzedażowe rozliczają pieniądze od inwestora: materiały, zaliczki na przyszłe zakupy i robociznę. Rozliczenie zwiększają wyłącznie faktycznie otrzymane kwoty. Wcześniej odnotowaną wpłatę powiąż z fakturą, aby nie dodać jej drugi raz.</p>${table(['Faktura','Kwota','Przypisano','Otrzymano',''],rows.map(row=>{const record=(p().invoiceSettlements||[]).find(r=>r.id===row.id);return `<tr><td><a href="${invoiceHref(row)}" target="_blank" rel="noopener">${esc(row.number)}</a>${row.externalKsef?'<br>Sprzedażowa z KSeF':''}${row.referenceOnly?'<br>Dokument do osobnego rozliczenia':''}${row.payload.correction?'<br>Korekta':''}</td><td>${documentAmount(row)}</td><td>${money(BI.assigned(record))}</td><td>${money(BI.paid(record))}</td><td>${!row.referenceOnly&&!row.payload.correction&&row.payload.currency==='PLN'?`<div class="actions">${btn('invoice-paid',BI.paid(record)>=BI.amount(row)?'Zapłacona ✓':'Zapłacona','primary',`data-id="${esc(row.id)}" ${BI.paid(record)>=BI.amount(row)?'disabled':''}`)}${btn('invoice-allocate','Rozliczenie','',`data-id="${esc(row.id)}"`)}</div>`:''}</td></tr>`;}).join(''))}${!rows.length?'<p class="muted">Brak faktur sprzedażowych powiązanych z tą inwestycją.</p>':''}`);
  return sales+(purchases.length?card(`<h2>Dokumenty zakupowe z KSeF — koszty materiałów</h2><p class="muted">Te dokumenty zapisują zakupy. Ich przypisanie nie zwiększa zaliczek od inwestora. Pozycje i koszt inwestycji edytujesz w „Zakupach i materiałach”.</p>${table(['Faktura zakupowa','Kwota dokumentu',''],purchases.map(row=>{const purchase=p().purchases.find(x=>x.sourceKsefNumber===row.ksef_number);return `<tr><td><a href="${invoiceHref(row)}" target="_blank" rel="noopener">${esc(row.number)}</a>${row.referenceOnly?'<br>Dokument do osobnego rozliczenia':''}</td><td>${documentAmount(row)}</td><td>${purchase?btn('purchase-edit','Edytuj zakup','',`data-id="${esc(purchase.id)}"`):''}</td></tr>`;}).join(''))}`):'');
+}
+async function invoicePaidDialog(id){
+ await loadStageInvoices();const row=(stageInvoiceCache.get(selected.id)||[]).find(r=>r.id===id);if(!row)throw Error('Nie znaleziono faktury. Odśwież listę.');
+ const baseline=structuredClone(selected),record=(p().invoiceSettlements||[]).find(r=>r.id===id),remaining=Math.max(0,C.round(BI.amount(row)-BI.paid(record))),earlier=C.effectiveReceipts(p()).filter(r=>!r.invoiceId&&C.number(r.amount)>0);
+ if(!remaining){toast('Ta faktura jest już zapłacona w całości.');return;}
+ modal('Zapłacona — '+esc(row.number),`<p>Do potwierdzenia pozostało: <strong>${money(remaining)}</strong>.</p>${input('paidAmount','Otrzymana kwota (zł)',remaining,'number','min="0" step="0.01" required')}${input('paidDate','Data wpływu',C.today(),'date','required')}<label class="field">Wpłata na<select name="paidKind"><option value="materials">Materiały — do rozliczenia zakupów</option><option value="work">Robocizna</option></select></label>${earlier.length?`<details><summary>Ta wpłata jest już zapisana jako zaliczka?</summary><p class="muted">Zaznacz ją tutaj. Kwota nowej wpłaty zmniejszy się automatycznie.</p>${earlier.map(r=>`<label class="inline-check"><input type="checkbox" name="paidReceipt" value="${esc(r.id)}">${money(r.amount)} · ${date(r.date)} · ${esc(r.note||'Wpłata')}</label>`).join('')}</details>`:''}`,fd=>{
+  if(selected.id!==baseline.id||selected.revision!==baseline.revision)throw Error('Inwestycja zmieniła się. Otwórz potwierdzenie ponownie.');
+  selected.payload=BI.markPaid(baseline.payload,row,{amount:C.number(fd.get('paidAmount')),date:fd.get('paidDate'),kind:fd.get('paidKind'),receiptIds:fd.getAll('paidReceipt')});markDirty();
+ },null,'scroll-modal','Potwierdź wpłatę');
+ for(const checkbox of $('#dialog').querySelectorAll('input[name="paidReceipt"]'))checkbox.onchange=()=>{const ids=new Set(new FormData($('#modal-form')).getAll('paidReceipt'));$('#f-paidAmount').value=Math.max(0,C.round(remaining-earlier.filter(r=>ids.has(r.id)).reduce((sum,r)=>sum+C.number(r.amount),0)));};
 }
 async function invoiceDialog(id){
  await loadStageInvoices();const row=(stageInvoiceCache.get(selected.id)||[]).find(r=>r.id===id);
@@ -399,6 +409,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
  if(a==='line-add'||a==='line-edit'){lineDialog(b.dataset.kind,id);return;}
  if(a==='use-area'){const room=p().rooms.find(r=>r.id===$('#f-roomId').value);if(!room){toast('Wybierz pomieszczenie.');return;}$('#f-qty').value=C.roomArea(room)[b.dataset.area];if(isNumericInput($('#f-qty')))commitNumericInput($('#f-qty'));chooseServiceUnit(b.dataset.area==='perimeter'?'mb':'m²');return;}
  if(a==='invoices-refresh'){await loadStageInvoices();return;}
+ if(a==='invoice-paid'){b.disabled=true;await invoicePaidDialog(id);return;}
  if(a==='invoice-allocate'){await invoiceDialog(id);return;}
  if(a==='settle-all'){settleAllDialog();return;}
  if(a==='receipt-add'||a==='receipt-edit'){receiptDialog(id);return;}

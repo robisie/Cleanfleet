@@ -1,5 +1,5 @@
-import * as C from './core.js?v=1.0.63';
-import * as P from './purchase-payments.js?v=1.0.63';
+import * as C from './core.js?v=1.0.64';
+import * as P from './purchase-payments.js?v=1.0.64';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const markup=`<section class="purchase-settlement"><h3>Rozliczenie zakupu z inwestorem</h3><p class="muted">Wybierz status oraz źródło pieniędzy otrzymanych od inwestora. Faktura zakupowa zapisuje koszt materiałów. <a href="/bill/?ksef=1" target="_blank" rel="noopener">Przypisz kolejną fakturę sprzedażową w Bill</a> — potem otwórz ten zakup ponownie.</p><label class="field">Status<select id="purchase-payment-state"><option value="unpaid">Nieopłacone</option><option value="partial">Opłacono częściowo</option><option value="full">Opłacono w całości</option></select></label><div id="purchase-payment-rows"></div><button type="button" id="purchase-payment-add">Dodaj źródło rozliczenia</button><p id="purchase-payment-total" class="notice" aria-live="polite"></p><p id="purchase-payment-error" class="error" role="alert"></p><p class="muted small">Gotówka oznacza nową, faktycznie otrzymaną wpłatę. Kwotę zapisaną wcześniej wybierz jako „Wcześniejsza zaliczka”. Przy fakturze wpisujesz łączny otrzymany wpływ przypisany do tego zakupu. Usunięcie źródła odłącza wpłatę od zakupu i pozostawia ją jako zaliczkę.</p></section>`;
 export function mount(root,project,item,invoices,getCharge){

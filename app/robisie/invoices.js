@@ -1,9 +1,38 @@
-import * as C from './core.js?v=1.0.63';
+import * as C from './core.js?v=1.0.64';
 import {invoiceAmount} from '../../bill/core.js?v=1.0.15';
 export const amount=row=>invoiceAmount(row.payload)/100;
 export const linkedPaid=record=>C.round((record?.existingReceipts||[]).reduce((s,r)=>s+C.number(r.amount),0));
 export const paid=record=>C.round((record?.allocations||[]).reduce((s,a)=>s+C.number(a.paid),0)+linkedPaid(record));
 export const assigned=record=>C.round((record?.allocations||[]).reduce((s,a)=>s+C.number(a.amount),0)+linkedPaid(record));
+// A quick payment records actual money once. Planned allocations are replaced
+// with dated receipts, so previous payment dates and purchase sources survive.
+export function markPaid(project,row,{amount:received,date,kind='materials',receiptIds=[]}){
+ if(!row?.number||row.status==='draft'||row.originKind==='purchases'||row.referenceOnly||row.payload?.correction||row.payload?.currency!=='PLN')throw Error('Wybierz wystawioną fakturę sprzedażową w PLN.');
+ const value=Number(received),total=amount(row);if(!Number.isFinite(value)||value<0||!['materials','work'].includes(kind))throw Error('Podaj prawidłową kwotę i cel wpłaty.');
+ if(value>0&&!/^\d{4}-\d{2}-\d{2}$/.test(date||''))throw Error('Podaj datę wpływu.');
+ if(new Set(receiptIds).size!==receiptIds.length)throw Error('Zaliczka została wybrana więcej niż raz.');
+ const next=structuredClone(project);next.receipts||=[];next.invoiceSettlements||=[];
+ let record=next.invoiceSettlements.find(r=>r.id===row.id);
+ if(!record){record={id:row.id,number:row.number,total,date,allocations:[],existingReceipts:[]};next.invoiceSettlements.push(record);}
+ record.total=total;record.existingReceipts||=[];record.allocations||=[];
+ const available=C.effectiveReceipts(next).filter(r=>!r.invoiceId),selected=receiptIds.map(id=>{const r=available.find(r=>r.id===id);if(!r)throw Error('Wpłata nie istnieje lub jest już powiązana z fakturą.');return r;});
+ const incoming=C.round(value+selected.reduce((s,r)=>s+C.number(r.amount),0));
+ if(C.round(paid(record)+incoming)>total)throw Error('Wpłaty przekraczają kwotę faktury. Zmniejsz nową wpłatę lub wybór zaliczek.');
+ if(!incoming){if(paid(record)>=total)return structuredClone(project);throw Error('Wpisz otrzymaną kwotę lub wybierz wcześniej zapisaną wpłatę.');}
+ const makeRoom=n=>{let release=Math.max(0,C.round(assigned(record)+n-total));for(const a of record.allocations){const take=Math.min(release,Math.max(0,C.round(a.amount-a.paid)));a.amount=C.round(a.amount-take);release=C.round(release-take);}if(release>0)throw Error('Brak wolnej kwoty faktury.');};
+ const link=r=>{makeRoom(r.amount);record.existingReceipts.push({id:r.id,amount:C.round(r.amount),date:r.date||'',kind:r.kind});};
+ for(const receipt of selected)link(receipt);
+ let left=C.round(value);
+ const add=(n,purpose,stageId='',purchase)=>{const receipt={id:C.uid(),date,kind:purpose,stageId,amount:n,note:'Wpłata z faktury '+row.number};next.receipts.push(receipt);link(receipt);if(purchase){if(purchase.paidAmount==null){purchase.paidAmount=0;purchase.paid=false;}purchase.receiptPayments={...purchase.receiptPayments,[receipt.id]:n};}};
+ for(const a of record.allocations){
+  if(!left)break;const purchase=a.kind==='purchase'?next.purchases?.find(p=>p.id===a.id):null;
+  const room=a.kind==='purchase'?(purchase?C.purchasePayment(purchase).remaining:0):left;
+  const take=C.round(Math.min(left,Math.max(0,C.round(a.amount-a.paid)),room));if(!take)continue;
+  a.amount=C.round(a.amount-take);add(take,['purchase','materials'].includes(a.kind)?'materials':'work',a.kind==='stage'?a.id:'',purchase);left=C.round(left-take);
+ }
+ if(left)add(left,kind);
+ return refreshReceiptLinks(next);
+}
 export function withoutInvoice(project,id){
  const p=structuredClone(project);p.invoiceSettlements=(p.invoiceSettlements||[]).filter(r=>r.id!==id);
  for(const item of p.purchases||[]){if(item.invoicePayments){delete item.invoicePayments[id];if(!Object.keys(item.invoicePayments).length)delete item.invoicePayments;}}

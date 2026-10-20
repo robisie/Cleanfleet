@@ -13,12 +13,12 @@ const source=await fs.readFile(new URL('../app/robisie/app.js',import.meta.url),
 async function open(db){
  const nodes=new Map(),events=new Map(),timers=[];let accept=true;
  const node=key=>{if(!nodes.has(key))nodes.set(key,{innerHTML:'',textContent:'',style:{},dataset:{},open:false,isConnected:true,querySelector:node,querySelectorAll:()=>[],focus(){},showModal(){this.open=true;},close(){this.open=false;},classList:{toggle(){}}});return nodes.get(key);};
- const api={stageInvoices:async()=>[],project:async()=>structuredClone(db),restoreSession:()=>null,getSession:()=>({user:{id:'test'}}),saveProject:async(row,payload)=>{
+ const api={stageInvoices:async()=>structuredClone(db.documents||[]),project:async()=>structuredClone(db),restoreSession:()=>null,getSession:()=>({user:{id:'test'}}),saveProject:async(row,payload)=>{
   assert.equal(row.revision,db.revision);const patch=changedFields(row.payload,payload),stored=structuredClone(db.payload);
   for(const key of patch.p_remove_keys)delete stored[key];Object.assign(stored,structuredClone(patch.p_fields));stored._undo=structuredClone(payload._undo);assert.deepEqual(stored,payload);
   db.payload=stored;db.revision++;return structuredClone(db);
  }};
- const context=vm.createContext({console,crypto,structuredClone,URL,FormData:class extends Map{constructor(fields){super(Object.entries(fields));}},setTimeout(fn,ms){const timer=setTimeout(fn,ms);timers.push(timer);return timer;},clearTimeout,confirm:()=>accept,fetch:async()=>({ok:true,json:async()=>[]}),window:{location:{href:'https://test.local/app/robisie/'},scrollY:0,scrollTo(){},addEventListener(){}},document:{body:{style:{}},documentElement:{style:{}},querySelector:node,querySelectorAll:()=>[],addEventListener(type,fn){events.set(type,fn);}}});
+ const context=vm.createContext({console,crypto,structuredClone,URL,FormData:class extends Map{constructor(fields){super(Object.entries(fields));}getAll(key){const value=this.get(key);return Array.isArray(value)?value:value?[value]:[];}},setTimeout(fn,ms){const timer=setTimeout(fn,ms);timers.push(timer);return timer;},clearTimeout,confirm:()=>accept,fetch:async()=>({ok:true,json:async()=>[]}),window:{location:{href:'https://test.local/app/robisie/'},scrollY:0,scrollTo(){},addEventListener(){}},document:{body:{style:{}},documentElement:{style:{}},querySelector:node,querySelectorAll:()=>[],addEventListener(type,fn){events.set(type,fn);}}});
  const mod=new vm.SourceTextModule(source+`\nexport {receiptDialog};export const data=()=>selected;export function setup(row){all=[structuredClone(row)];selected=structuredClone(row);config={revision:1,payload:{catalog:[],company:{}}};configBaseline=structuredClone(config);view='payments';projectDirty=settingsDirty=dirty=false;render();}`,{context});
  await mod.link(spec=>{const values=spec.includes('purchase-settlement-form')?PurchaseSettlementForm:spec.includes('purchase-settlement')?PurchaseSettlement:spec.includes('invoices')?BI:spec.includes('autosave')?Auto:spec.includes('core')?C:spec.includes('pdf')?PDF:api;return new vm.SyntheticModule(Object.keys(values),function(){for(const [key,value]of Object.entries(values))this.setExport(key,value);},{context});});
  await mod.evaluate();await new Promise(resolve=>setImmediate(resolve));mod.namespace.setup(db);
@@ -62,4 +62,14 @@ test('bulk purchase settlement opens preview, commits once and persists allocati
   await ui.submit({});assert.equal(db.revision,2);assert.equal(db.payload.purchases[0].receiptPayments.a,1000);assert.equal(C.purchaseTotals(db.payload).advances,1000);assert.equal(db.payload.receipts.length,1);
  }finally{ui.close();}
  const reopened=await open(db);try{assert.equal(reopened.app.data().payload.purchases[0].receiptPayments.a,1000);assert.equal(C.purchasePayment(reopened.app.data().payload.purchases[0]).remaining,3725.65);}finally{reopened.close();}
+});
+
+test('invoice list paid button opens a short dialog, saves once and retains the paid status after reopening',async()=>{
+ const db=fixture();db.payload.receipts=[];db.documents=[{id:'fv',number:'A1',status:'issued',payload:{currency:'PLN',lines:[{qty:'1',price:'1900'}]}}];const ui=await open(db);try{
+  await ui.click('invoices-refresh');assert.match(ui.node('#app').innerHTML,/data-action="invoice-paid"/);
+  await ui.click('invoice-paid','fv');assert.match(ui.node('#dialog').innerHTML,/Otrzymana kwota/);assert.doesNotMatch(ui.node('#dialog').innerHTML,/Kwota z faktury/);
+  await ui.submit({paidAmount:'1900',paidDate:'2026-10-21',paidKind:'materials'});assert.equal(db.revision,2);assert.equal(BI.paid(db.payload.invoiceSettlements[0]),1900);assert.equal(C.purchaseTotals(db.payload).advances,1900);assert.match(ui.node('#app').innerHTML,/Zapłacona ✓/);
+  await ui.click('invoice-paid','fv');assert.equal(db.revision,2);assert.equal(db.payload.receipts.length,1);
+ }finally{ui.close();}
+ const reopened=await open(db);try{await reopened.click('invoices-refresh');assert.match(reopened.node('#app').innerHTML,/Zapłacona ✓/);assert.equal(C.purchaseTotals(reopened.app.data().payload).advances,1900);}finally{reopened.close();}
 });

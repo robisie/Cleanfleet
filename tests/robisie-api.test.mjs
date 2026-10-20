@@ -50,3 +50,7 @@ test('combined KSeF item and payment save uses the settlement transaction',async
  await a.savePurchaseSettlement({id:'p',revision:2},payload,{ksef_number:'number',document:{selectedIndices:[1,3]}},[2],'<Faktura/>');
  assert.ok(url.endsWith('/rs_save_purchase_ksef_settlement'));assert.deepEqual(body.p_payload,payload);assert.deepEqual(body.p_expected_indices,[1,3]);
 });
+
+test('purchase source recovery reads only purchase invoices assigned to the current investment',async()=>{
+ let url;const a=await api(async u=>{url=u;return response([]);});await a.purchaseKsefLinks('project-id');assert.ok(url.includes('rs_ksef_links?select=*'));assert.ok(url.includes('kind=eq.purchases'));assert.ok(url.includes('project_id=eq.project-id'));
+});

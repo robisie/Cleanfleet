@@ -1,13 +1,13 @@
-import * as PurchaseSettlement from './purchase-settlement.js?v=1.0.64';
-import * as PurchaseSettlementForm from './purchase-settlement-form.js?v=1.0.64';
-import * as PurchasePayments from './purchase-payments.js?v=1.0.64';
-import * as PurchasePaymentForm from './purchase-payment-form.js?v=1.0.64';
-import * as PurchaseItems from './purchase-items.js?v=1.0.64';
-import * as BI from './invoices.js?v=1.0.64';
-import * as Auto from './autosave.js?v=1.0.64';
-import * as C from './core.js?v=1.0.64';
-import * as API from './api.js?v=1.0.64';
-import * as PDF from './pdf.js?v=1.0.64';
+import * as PurchaseSettlement from './purchase-settlement.js?v=1.0.65';
+import * as PurchaseSettlementForm from './purchase-settlement-form.js?v=1.0.65';
+import * as PurchasePayments from './purchase-payments.js?v=1.0.65';
+import * as PurchasePaymentForm from './purchase-payment-form.js?v=1.0.65';
+import * as PurchaseItems from './purchase-items.js?v=1.0.65';
+import * as BI from './invoices.js?v=1.0.65';
+import * as Auto from './autosave.js?v=1.0.65';
+import * as C from './core.js?v=1.0.65';
+import * as API from './api.js?v=1.0.65';
+import * as PDF from './pdf.js?v=1.0.65';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',shopFilter=null,projectFilter='',projectSearch='',summarySort={key:'category',direction:1},mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set(),stageInvoiceCache=new Map();
@@ -286,8 +286,14 @@ async function settlePurchasesDialog(){
 }
 async function purchaseDialog(id){
  if(purchaseDialogLoading)return;purchaseDialogLoading=true;try{
- const x=p().purchases.find(x=>x.id===id)||{id:C.uid(),date:C.today(),shop:'',description:'',invoice:'',amount:0,charge:0,paid:false,paidAmount:0};
- const projectId=selected.id,revision=selected.revision;let ksef=null,loadError='';
+ let x=p().purchases.find(x=>x.id===id)||{id:C.uid(),date:C.today(),shop:'',description:'',invoice:'',amount:0,charge:0,paid:false,paidAmount:0};
+ const projectId=selected.id;let revision=selected.revision,ksef=null,loadError='';
+ if(id&&!x.sourceKsefNumber&&x.invoice&&x.supplierNip&&API.purchaseKsefLinks){
+  const links=await API.purchaseKsefLinks(projectId);
+  if(selected?.id!==projectId||selected.revision!==revision||dirty||writes.pending)throw Error('Widok inwestycji zmienił się. Otwórz zakup ponownie.');
+  const recovered=PurchaseItems.restoreSource(p(),id,links,projectId);
+  if(recovered){selected.payload=recovered;markDirty();await flushChanges({normalize:false});if(selected?.id!==projectId||dirty)throw Error('Widok inwestycji zmienił się. Otwórz zakup ponownie.');x=p().purchases.find(p=>p.id===id);revision=selected.revision;}
+ }
  if(x.sourceKsefNumber){
   if(busy)return;busy=true;toast('Wczytywanie pozycji faktury…');
   try{

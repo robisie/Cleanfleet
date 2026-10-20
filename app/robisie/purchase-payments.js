@@ -1,5 +1,5 @@
-import * as C from './core.js?v=1.0.64';
-import * as I from './invoices.js?v=1.0.64';
+import * as C from './core.js?v=1.0.65';
+import * as I from './invoices.js?v=1.0.65';
 
 export const eligible=row=>!!row?.number&&row.status!=='draft'&&row.originKind!=='purchases'&&!row.referenceOnly&&!row.payload?.correction&&row.payload?.currency==='PLN';
 export function rows(project,item){

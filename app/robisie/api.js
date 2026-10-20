@@ -54,6 +54,7 @@ export async function stageInvoices(id){
 export const project=id=>request('/rest/v1/rs_projects?select=*&id=eq.'+encodeURIComponent(id)).then(rows=>rows[0]);
 
 export const purchaseKsefLink=(number,id)=>request('/rest/v1/rs_ksef_links?select=*&ksef_number=eq.'+encodeURIComponent(number)+'&project_id=eq.'+encodeURIComponent(id)).then(rows=>{if(!rows[0])throw Error('Nie znaleziono przypisanej faktury. Odśwież inwestycję.');return rows[0];});
+export const purchaseKsefLinks=id=>request('/rest/v1/rs_ksef_links?select=*&kind=eq.purchases&project_id=eq.'+encodeURIComponent(id));
 export async function purchaseKsefXml(number){
  const result=await request('/functions/v1/cleanfleet-bill',{method:'POST',body:JSON.stringify({action:'ksef-document',number}),timeoutMs:90000});
  const bytes=Uint8Array.from(atob(result.content),c=>c.charCodeAt(0));

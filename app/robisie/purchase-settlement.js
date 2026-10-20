@@ -1,6 +1,6 @@
-import * as C from './core.js?v=1.0.64';
-import * as I from './invoices.js?v=1.0.64';
-import {eligible} from './purchase-payments.js?v=1.0.64';
+import * as C from './core.js?v=1.0.65';
+import * as I from './invoices.js?v=1.0.65';
+import {eligible} from './purchase-payments.js?v=1.0.65';
 const cents=value=>Math.round(C.number(value)*100);
 const oldest=(a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.id).localeCompare(String(b.id));
 export const purchases=project=>(project.purchases||[]).filter(p=>cents(C.purchasePayment(p).remaining)>0).slice().sort(oldest);

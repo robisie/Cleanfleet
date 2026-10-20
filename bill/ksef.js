@@ -1,5 +1,6 @@
-import {esc,today} from './core.js?v=1.0.20';
-import {monthDates,counterparty,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.20';
+import {selectedAmount,duplicatePurchases} from './purchase-import.js?v=1.0.21';
+import {esc,today} from './core.js?v=1.0.21';
+import {monthDates,counterparty,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.21';
 const e=esc;
 let integration={},assignments=[];
 function initial(){const month=today().slice(0,7);return {month,...monthDates(month),kind:'purchases',dateType:'Issue',sort:'Desc',q:'',rows:[],selected:new Set(),loaded:false,hasMore:false,isTruncated:false,page:0,ticket:'',ticketAt:0,query:null,listError:false,partial:false,partialWarning:''};}
@@ -60,13 +61,19 @@ async function assignInvestment(number,signal){
  const details=state.kind==='purchases'&&integration.preview?await integration.preview({xml}):null;check(signal);
  const choice=await chooseInvestment(row,signal,details,existing);if(!choice)return;
  const project=typeof choice==='string'?choice:choice.project,indices=typeof choice==='string'?null:choice.indices;
+ let replacement=null,projectRevision=null;
+ if(state.kind==='purchases'&&!existing&&details?.currency==='PLN'&&details.gross>=0&&integration.findPurchases){
+  const current=await integration.findPurchases(project);check(signal);projectRevision=current.revision;
+  const matches=duplicatePurchases(current.payload.purchases||[],selectedAmount(details,indices));
+  if(matches.length){const decision=await chooseDuplicate(matches,signal);if(decision===null)return;replacement=decision||null;}
+ }
  let billId=row.billId||null;
  if(billId){const original=await api({action:'document',id:billId},{signal});if(original.payload.source?.app==='robisie'&&original.payload.source.id!==project)throw Error('Faktura w Bill jest już powiązana z inną inwestycją.');}
  progress('Przypisywanie faktury do inwestycji…');
- const result=await integration.assign({project,number,kind:state.kind,xml,billId,indices,previous:existing});
+ const result=await integration.assign({project,number,kind:state.kind,xml,billId,indices,previous:existing,replacement,projectRevision});
  assignments=await integration.loadLinks();
  if(state.kind==='purchases'&&!result.document?.referenceOnly)state.purchaseTarget={project,number};
- progress(result.document?.referenceOnly?'Powiązano dokument. Korekta lub waluta obca wymaga osobnego rozliczenia — nie zmieniono kwot w PLN.':state.kind==='purchases'?(existing?'Zaktualizowano przypisanie i pozycje zakupu. Odśwież inwestycję w Robisię.':'Dodano zakup z danymi i pozycjami faktury. Odśwież inwestycję w Robisię.'):'Faktura jest dostępna w Etapach i płatnościach inwestycji.');
+ progress(result.document?.referenceOnly?'Powiązano dokument. Korekta lub waluta obca wymaga osobnego rozliczenia — nie zmieniono kwot w PLN.':state.kind==='purchases'?(existing?'Zaktualizowano przypisanie i pozycje zakupu. Odśwież inwestycję w Robisię.':replacement?'Uzupełniono istniejący zakup fakturą. Zachowano jego rozliczenia. Odśwież inwestycję w Robisię.':'Dodano zakup z danymi i pozycjami faktury. Odśwież inwestycję w Robisię.'):'Faktura jest dostępna w Etapach i płatnościach inwestycji.');
 }
 function chooseInvestment(row,signal,details=null,existing=null){return new Promise(resolve=>{
  const money=value=>new Intl.NumberFormat('pl-PL',{style:'currency',currency:row.currency}).format(value),items=details?.items||[];
@@ -78,4 +85,12 @@ function chooseInvestment(row,signal,details=null,existing=null){return new Prom
  for(const button of dialog.querySelectorAll('[data-lines]'))button.onclick=()=>{for(const box of boxes)box.checked=button.dataset.lines==='all';update();};
  const finish=value=>{signal.removeEventListener('abort',cancel);dialog.close();dialog.remove();resolve(value);},cancel=()=>finish(null);
  dialog.querySelector('[data-cancel]').onclick=cancel;dialog.oncancel=event=>{event.preventDefault();cancel();};dialog.querySelector('form').onsubmit=event=>{event.preventDefault();if(dialog.querySelector('[type="submit"]').disabled)return;finish({project:new FormData(event.target).get('project'),indices:details?.canSelect?selected():null});};signal.addEventListener('abort',cancel,{once:true});document.body.append(dialog);dialog.showModal();update();
+});}
+
+function chooseDuplicate(matches,signal){return new Promise(resolve=>{
+ const dialog=document.createElement('dialog');dialog.className='scroll-modal';
+ dialog.innerHTML=`<form><header><h2>Czy to ten sam zakup?</h2></header><div class="modal-body"><p>W inwestycji są już zakupy o takiej samej kwocie jak wybrane pozycje faktury. Wskaż wpis do zastąpienia albo dodaj fakturę jako osobny zakup.</p><label class="field">Zastąp wpis<select name="replacement" required><option value="">Wybierz…</option><option value="separate">To inny zakup — dodaj osobno</option>${matches.map(x=>`<option value="${e(x.id)}" ${x.sourceKsefNumber?'disabled':''}>${e(x.date)} · ${e(x.shop)} · ${e(x.description)}${x.sourceKsefNumber?' (ma już fakturę KSeF)':''}</option>`).join('')}</select></label><p class="muted">Zastąpienie aktualizuje dokument i pozycje. Zapisany koszt inwestora, wpłaty i rozliczenia pozostaną zachowane. Koszt nie zostanie dodany drugi raz.</p></div><footer><button type="button" data-cancel>Anuluj</button><button class="primary" type="submit">Zatwierdź</button></footer></form>`;
+ const finish=value=>{signal.removeEventListener('abort',cancel);dialog.close();dialog.remove();resolve(value);},cancel=()=>finish(null);
+ dialog.querySelector('[data-cancel]').onclick=cancel;dialog.oncancel=event=>{event.preventDefault();cancel();};dialog.querySelector('form').onsubmit=event=>{event.preventDefault();const id=new FormData(event.target).get('replacement');if(id)finish(id==='separate'?'':id);};
+ signal.addEventListener('abort',cancel,{once:true});document.body.append(dialog);dialog.showModal();
 });}

@@ -1,4 +1,4 @@
-import * as C from './core.js?v=1.0.65';
+import * as C from './core.js?v=1.0.66';
 import {invoiceAmount} from '../../bill/core.js?v=1.0.15';
 export const amount=row=>invoiceAmount(row.payload)/100;
 export const linkedPaid=record=>C.round((record?.existingReceipts||[]).reduce((s,r)=>s+C.number(r.amount),0));

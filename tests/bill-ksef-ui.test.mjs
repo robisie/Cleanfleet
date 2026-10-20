@@ -5,14 +5,15 @@ import {readFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import * as C from '../bill/core.js';
 import * as D from '../bill/ksef-data.js';
+import * as Import from '../bill/purchase-import.js';
 const Zip=createRequire(import.meta.url)('../app/vendor/jszip-3.10.1.min.js');
 async function setup(){
  const nodes=new Map(),blobUrls=new Map(),node=key=>{if(!nodes.has(key))nodes.set(key,{textContent:'',value:'',innerHTML:'',dataset:{}});return nodes.get(key);};
  const root={innerHTML:'',querySelector:node,querySelectorAll:()=>[]};let count=0;
  const context=vm.createContext({console,crypto,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,Blob,File,Map,Set,AbortController,DOMException,atob,btoa,setTimeout,clearTimeout,URL:{createObjectURL:blob=>{const key='blob:'+(count++);blobUrls.set(key,blob);return key;},revokeObjectURL:key=>blobUrls.delete(key)},window:{JSZip:Zip,CFKsefRenderer:{generateInvoice:async()=>new Blob(['%PDF-1.7 fixture'])}},DOMParser:class{parseFromString(){return {doctype:null,documentElement:{localName:'Faktura'},getElementsByTagName:()=>[]};}},document:{}});
  const code=await readFile(new URL('../bill/ksef.js',import.meta.url),'utf8');
- const m=new vm.SourceTextModule(code+`\nexport function setupTest(node,call,rows=[]){root=node;api=call;state=initial();state.loaded=true;state.rows=rows;state.query={kind:state.kind,from:state.from,to:state.to,dateType:state.dateType,sort:'Desc'};state.selected=new Set(rows.map(r=>r.ksefNumber));draw();}export {run,load,downloadSelected};export async function testAssignment(options,project,number,known=[]){integration=options;assignments=known;chooseInvestment=async()=>project;await run(signal=>assignInvestment(number,signal));return message;}export function testState(){return {state,ready,message,busy:!!controller};}`,{context});
- await m.link(spec=>{const values=spec.includes('ksef-data')?D:C;return new vm.SyntheticModule(Object.keys(values),function(){for(const[k,v]of Object.entries(values))this.setExport(k,v);},{context});});await m.evaluate();return {n:m.namespace,root,blobUrls,node};
+ const m=new vm.SourceTextModule(code+`\nexport function setupTest(node,call,rows=[]){root=node;api=call;state=initial();state.loaded=true;state.rows=rows;state.query={kind:state.kind,from:state.from,to:state.to,dateType:state.dateType,sort:'Desc'};state.selected=new Set(rows.map(r=>r.ksefNumber));draw();}export {run,load,downloadSelected};export async function testAssignment(options,project,number,known=[],duplicateChoice){if(duplicateChoice!==undefined)chooseDuplicate=async()=>duplicateChoice;integration=options;assignments=known;chooseInvestment=async()=>project;await run(signal=>assignInvestment(number,signal));return message;}export function testState(){return {state,ready,message,busy:!!controller};}`,{context});
+ await m.link(spec=>{const values=spec.includes('purchase-import')?Import:spec.includes('ksef-data')?D:C;return new vm.SyntheticModule(Object.keys(values),function(){for(const[k,v]of Object.entries(values))this.setExport(k,v);},{context});});await m.evaluate();return {n:m.namespace,root,blobUrls,node};
 }
 const number=i=>'6351861297-20261016-123456789ABC-'+String(i).padStart(2,'0');
 const row=i=>({ksefNumber:number(i),invoiceNumber:'FV/'+i,issueDate:'2026-10-16',seller:{nip:'6351861297',name:'<img src=x onerror=alert(1)>'},buyer:{name:'Nabywca'},grossAmount:100,currency:'PLN'});
@@ -64,4 +65,14 @@ test('existing purchase assignments reopen selection and carry the previous stat
  n.setupTest(root,async()=>({content:Buffer.from(bytes).toString('base64')}),[entry]);
  await n.testAssignment({projects:[{id:'old-project',name:'Test'}],preview:async()=>({canSelect:true,items:[]}),loadLinks:async()=>[known],assign:async args=>{saved.push(args);return {document:{}};}},{project:'old-project',indices:[2]},entry.ksefNumber,[known]);
  assert.equal(saved.length,1);assert.equal(saved[0].previous.project_id,'old-project');assert.deepEqual(Array.from(saved[0].previous.selected_indices),[1,3]);assert.deepEqual(Array.from(saved[0].indices),[2]);assert.match(root.innerHTML,/Edytuj przypisanie/);
+});
+
+test('matching selected amount requires reviewed replacement or explicit separate purchase, cancellation writes nothing',async()=>{
+ for(const decision of ['existing-purchase','',null]){
+  const {n,root}=await setup(),bytes=new TextEncoder().encode('<Faktura>rows</Faktura>'),entry={...row(8),currency:'PLN',grossAmount:150,invoiceHash:await D.digest(bytes)},calls=[];
+  n.setupTest(root,async()=>({content:Buffer.from(bytes).toString('base64')}),[entry]);
+  const options={projects:[{id:'p',name:'Test'}],preview:async()=>({currency:'PLN',gross:150,canSelect:true,items:[{index:1,gross:100},{index:2,gross:50}]}),findPurchases:async()=>({revision:42,payload:{purchases:[{id:'existing-purchase',amount:100}]}}),loadLinks:async()=>[],assign:async args=>{calls.push(args);return {document:{}};}};
+  await n.testAssignment(options,{project:'p',indices:[1]},entry.ksefNumber,[],decision);
+  assert.equal(calls.length,decision===null?0:1);if(calls.length){assert.equal(calls[0].replacement,decision||null);assert.equal(calls[0].projectRevision,42);}
+ }
 });

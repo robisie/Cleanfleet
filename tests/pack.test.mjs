@@ -48,8 +48,8 @@ test('each application opens inside Pack and the Panel button preserves its fram
 test('applications and modules get the Pack width stylesheet after each document load',async()=>{
  for(const query of ['?application=cleanfleet','?application=robisie','?application=bill','?module=taxes','?module=finances','?module=documents','?module=website']){
   const p=await panel({query}),frame=p.ids.frameHost.children[0];
-  const freshDocument=()=>{const classes=new Set(),links=[];return {classes,links,documentElement:{classList:{add:value=>classes.add(value)}},getElementById:id=>links.find(link=>link.id===id),createElement:()=>({}),head:{append:link=>links.push(link)},addEventListener(){}};};
-  frame.contentDocument=freshDocument();frame.onload();assert(frame.contentDocument.classes.has('robisie-pack-frame'));assert.equal(frame.contentDocument.links[0].href,'/pack/frame.css?v=120');
+  const freshDocument=()=>{const classes=new Set(),links=[];return {classes,links,location:{pathname:'/app/'},documentElement:{classList:{add:value=>classes.add(value),toggle(){}}},getElementById:id=>links.find(link=>link.id===id),createElement:()=>({}),head:{append:link=>links.push(link)},addEventListener(){}};};
+  frame.contentDocument=freshDocument();frame.onload();assert(frame.contentDocument.classes.has('robisie-pack-frame'));assert.equal(frame.contentDocument.links[0].href,'/pack/frame.css?v=124');
   frame.onload();assert.equal(frame.contentDocument.links.length,1);
   frame.contentDocument=freshDocument();frame.onload();assert.equal(frame.contentDocument.links.length,1);
   p.ids.homeTab.onclick();assert.equal(frame.removed,undefined);assert.equal(frame.hidden,true);assert.equal(p.ids.dashboard.hidden,false);
@@ -81,4 +81,14 @@ test('reload restores only validated tabs for the same authenticated owner',asyn
 test('cached return rechecks admin access before revealing old frames',async()=>{
  const storage=workspaceStorage(),p=await panel({query:'?module=finances',storage}),old=p.ids.frameHost.children[0];p.events.pagehide({persisted:true});p.db.rpc=async()=>({data:false});
  p.events.pageshow({persisted:true});assert.equal(p.ids.panel.hidden,true);await new Promise(resolve=>setImmediate(resolve));assert.equal(p.ids.panel.hidden,true);assert.equal(old.removed,true);assert.equal(storage.getItem(),null);
+});
+
+test('Bill deep links activate one Pack tab and keep exact invoice and stage parameters',async()=>{
+ const p=await panel({query:'?application=robisie'}),source=p.ids.frameHost.children[0];
+ const send=url=>p.events.message({origin:'https://cleanfleet.pl',source:source.contentWindow,data:{type:'robisie-pack-open-url',url}});
+ send('https://evil.invalid/bill/?invoice=x');assert.equal(p.ids.frameHost.children.length,1);
+ send('https://cleanfleet.pl/bill/?new=1&brand=robisie&source=p&stage=stage-1');
+ assert.equal(p.ids.frameHost.children.length,2);const bill=p.ids.frameHost.children[1];assert.equal(bill.src,'https://cleanfleet.pl/bill/?new=1&brand=robisie&source=p&stage=stage-1');assert.equal(bill.hidden,false);
+ const messages=[];bill.contentWindow.postMessage=(data,origin)=>messages.push({data,origin});
+ send('https://cleanfleet.pl/bill/?invoice=invoice-2');assert.equal(p.ids.frameHost.children.length,2);assert.equal(messages.at(-1).data.type,'robisie-pack-navigate');assert.equal(messages.at(-1).data.url,'https://cleanfleet.pl/bill/?invoice=invoice-2');
 });

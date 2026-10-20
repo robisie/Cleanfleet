@@ -1,4 +1,4 @@
-import * as C from './core.js?v=1.0.20';
+import * as C from './core.js?v=1.0.21';
 const e=C.esc;
 function party(p){return `<strong>${e(p.name)}</strong><p>${e(p.address)}<br>${e(p.city)}</p>${p.nip?`<p>${C.partyCountry(p)==='DE'?'VAT UE':'NIP'}: ${e(p.nip)}</p>`:''}`;}
 async function qrMarkup(row){if(row.status!=='accepted'||!row.xml||!row.ksef_number)return '';
@@ -24,7 +24,10 @@ export async function documentHtml(row){
 }
 export async function preview(row){
  if(!row.payload.lines?.length)throw Error('Dodaj pozycję faktury.');
- const html=await documentHtml(row),blob=new Blob([html],{type:'text/html'}),url=URL.createObjectURL(blob);
+ return previewHtml(await documentHtml(row));
+}
+export async function previewHtml(html){
+ const blob=new Blob([html],{type:'text/html'}),url=URL.createObjectURL(blob);
  const overlay=document.createElement('div');overlay.style.cssText='position:fixed;inset:0;z-index:200;background:#edf0f2;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)';
  const bar=document.createElement('div');bar.style.cssText='padding:12px 16px;background:#fff;display:flex;gap:12px;justify-content:space-between;border-bottom:1px solid #ddd;flex:none;flex-wrap:wrap';
  const close=document.createElement('button');close.textContent='× Zamknij';close.setAttribute('aria-label','Zamknij podgląd faktury');const print=document.createElement('button');print.className='primary';print.textContent='Drukuj / zapisz PDF';print.disabled=true;

@@ -83,9 +83,14 @@ function fitFrame(target){
    doc.robisiePackLayoutBound=true;
    const Observer=doc.defaultView?.MutationObserver;
    if(Observer)new Observer(fitChildren).observe(doc.documentElement,{childList:true,subtree:true});
-   doc.addEventListener('click',event=>{const a=event.target.closest('a[href]');if(a&&new URL(a.href,location.href).pathname==='/pack/'){event.preventDefault();home();}},true);
+   doc.addEventListener('click',event=>{const a=event.target.closest('a[href]');if(!a||a.hasAttribute('download')||event.button>0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;const url=new URL(a.href,doc.location.href);if(url.origin!==location.origin)return;if(url.pathname==='/pack/'){event.preventDefault();home();}else if((url.pathname==='/bill/'||url.pathname==='/bill/index.html')&&a.dataset.action!=='stage-invoice'){event.preventDefault();event.stopImmediatePropagation();void openBillLink(url);}},true);
   }
  }catch(error){console.warn('Robisię Pack: nie udało się dopasować widoku aplikacji.',error);}
+}
+async function openBillLink(url){
+ const existing=tabs.get('app:bill');
+ if(!existing){const key=ensureTab('application','bill');tabs.get(key).frame.src=url.href;activate(key);return;}
+ activate('app:bill');existing.frame.contentWindow?.postMessage({type:'robisie-pack-navigate',url:url.href},location.origin);
 }
 function home(push=true){
  current='';frame=null;for(const tab of tabs.values())tab.frame.hidden=true;
@@ -98,6 +103,7 @@ document.querySelectorAll('[data-app]').forEach(b=>b.onclick=()=>openApplication
 $('workspaceTabs').onkeydown=event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||!event.target.matches('[role=tab]'))return;event.preventDefault();const items=[$('homeTab'),...$('workspaceTabs').querySelectorAll('[data-tab-key]')],index=items.indexOf(event.target),next=event.key==='Home'?0:event.key==='End'?items.length-1:(index+(event.key==='ArrowRight'?1:items.length-1))%items.length;const button=items[next],key=button.dataset.tabKey;if(key){const focus=()=>$('workspaceTabs').querySelector('[data-tab-key="'+key+'"]')?.focus();if(tabs.has(key)){activate(key);focus();}else void openApplication(key.slice(4)).then(focus);}else{home();$('homeTab').focus();}};
 window.addEventListener('message',event=>{
  if(event.origin!==location.origin||!user||leaving)return;const entry=[...tabs.entries()].find(([,t])=>event.source===t.frame.contentWindow);if(!entry)return;
+ if(event.data?.type==='robisie-pack-open-url'){try{const url=new URL(event.data.url,location.href);if(url.origin===location.origin&&['/bill/','/bill/index.html'].includes(url.pathname))void openBillLink(url);}catch{}}
  if(event.data?.type==='robisie-pack-close')closeTab(entry[0]);
  if(event.data?.type==='robisie-pack-home')home();
  if(event.data?.type==='robisie-pack-open'&&Object.hasOwn(modules,event.data.module))openModule(event.data.module);

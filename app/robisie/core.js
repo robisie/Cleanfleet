@@ -1,4 +1,4 @@
-export const VERSION='1.0.65';
+export const VERSION='1.0.66';
 export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['contract','Umowa'],['rooms','Pomieszczenia'],['offer','Oferta wstępna'],['works','Kalkulacja końcowa'],['payments','Etapy i płatności'],['journal','Dziennik prac'],['handover','Odbiór inwestycji'],['summary','Zestawienie prac'],['purchases','Zakupy i materiały']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -203,4 +203,12 @@ export function savedTrip(data,id=uid()){
 }
 export function tripLineData(trip){
  return {name:'Dojazd — '+trip.name,unit:'szt.',price:round(trip.cost),travelBasis:structuredClone(trip)};
+}
+
+// The purchase document threshold is a workflow reminder, independent of settlement.
+export const purchaseNeedsInvoice=item=>number(item.amount)>450&&!item.sourceKsefNumber&&item.documentType!=='invoice';
+export function roomWorkAmount(project,roomId){
+ const all=project.works||[],rows=all.filter(l=>(l.roomId||'')===roomId),full=workTotals(all,project.workDiscount??project.discount,project.sourceCalculation?.works);
+ if(full.sourceAmountApplied){const raw=all.reduce((s,l)=>s+calculationValue(l),0);return round(raw?full.after*rows.reduce((s,l)=>s+calculationValue(l),0)/raw:0);}
+ return workTotals(rows,project.workDiscount??project.discount).after;
 }

@@ -47,10 +47,8 @@ body:has(#login:not([hidden])){min-height:100vh;min-height:100dvh;display:flex;f
 body:has(#login:not([hidden])) .login-card{flex:none;width:100%;margin:auto}
 
 /* Tab state is separate from the currently selected view. */
-.workspace-tab .workspace-tab-select{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding-top:5px;padding-bottom:5px;text-align:left}
+.workspace-tab .workspace-tab-select{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:7px;text-align:left}
 .workspace-tab-name{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.workspace-tab-status{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:500;line-height:1.2;color:#256343;white-space:nowrap}
+.workspace-tab-status{display:inline-flex;align-items:center;flex:none}
 .workspace-tab-status::before{content:"";display:block;flex:none;width:7px;height:7px;border-radius:50%;background:#2f8b57;border:1px solid #256343}
-.workspace-tab[data-state="active"] .workspace-tab-status{font-weight:750}
-.workspace-tab[data-state="closed"] .workspace-tab-status{color:#64766d}
 .workspace-tab[data-state="closed"] .workspace-tab-status::before{background:transparent;border-color:#83938a}

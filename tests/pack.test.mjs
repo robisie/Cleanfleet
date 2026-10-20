@@ -97,7 +97,7 @@ test('Bill deep links activate one Pack tab and keep exact invoice and stage par
 test('tab indicators distinguish closed, active and background apps through switching, Panel and close',async()=>{
  const p=await panel({query:'?application=robisie'});
  const tab=name=>p.ids.openTabs.children.find(x=>x.children[0].dataset.tabKey==='app:'+name);
- const status=name=>tab(name).children[0].children[1].textContent;
+ const status=name=>{const button=tab(name).children[0];assert.equal(button.children[1].textContent,'');return button.title.split(' — ')[1];};
  assert.equal(status('robisie'),'Aktywna');assert.equal(tab('robisie').dataset.state,'active');assert.equal(status('bill'),'Zamknięta');assert.equal(tab('bill').children.length,1);
  await p.c.window.testOpenApplication('bill');assert.equal(status('bill'),'Aktywna');assert.equal(status('robisie'),'W tle');assert.equal(tab('robisie').dataset.state,'background');
  p.ids.homeTab.onclick();assert.equal(status('robisie'),'W tle');assert.equal(status('bill'),'W tle');

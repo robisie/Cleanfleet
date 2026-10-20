@@ -1,8 +1,8 @@
-import * as BI from './invoices.js?v=1.0.54';
-import * as Auto from './autosave.js?v=1.0.54';
-import * as C from './core.js?v=1.0.54';
-import * as API from './api.js?v=1.0.54';
-import * as PDF from './pdf.js?v=1.0.54';
+import * as BI from './invoices.js?v=1.0.55';
+import * as Auto from './autosave.js?v=1.0.55';
+import * as C from './core.js?v=1.0.55';
+import * as API from './api.js?v=1.0.55';
+import * as PDF from './pdf.js?v=1.0.55';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',shopFilter=null,projectFilter='',projectSearch='',summarySort={key:'category',direction:1},mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set(),stageInvoiceCache=new Map();
@@ -361,4 +361,12 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
 start();
 
-window.addEventListener('focus',()=>{if(selected&&view==='payments')void loadStageInvoices();});
+async function refreshLinkedInvestment(){
+ if(!selected||dirty||writes.pending||$('#dialog')?.open)return;
+ if(view==='payments'){await loadStageInvoices();return;}
+ if(!API.project)return;
+ const id=selected.id,revision=selected.revision;
+ try{const latest=await API.project(id);if(latest&&selected?.id===id&&selected.revision===revision&&!dirty&&!writes.pending&&!$('#dialog')?.open&&latest.revision!==revision){selected=structuredClone(latest);all=all.map(row=>row.id===id?structuredClone(latest):row);updateSaveState();render();}}catch{}
+}
+window.addEventListener('focus',()=>{void refreshLinkedInvestment();});
+window.addEventListener('message',event=>{if(event.origin===location.origin&&event.source===window.parent&&event.data?.type==='robisie-pack-activated')void refreshLinkedInvestment();});

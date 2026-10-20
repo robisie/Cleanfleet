@@ -1,8 +1,8 @@
-import * as KSEF from './ksef.js?v=1.0.15';
-import * as C from './core.js?v=1.0.15';
-import * as API from './api.js?v=1.0.15';
-import {preview} from './pdf.js?v=1.0.15';
-async function fleetPreview(row){const a=await API.call({action:'fleet-attachment',id:row.id});const {previewFleet}=await import('./fleet-pdf.js?v=1.0.15');await previewFleet(a);}
+import * as KSEF from './ksef.js?v=1.0.16';
+import * as C from './core.js?v=1.0.16';
+import * as API from './api.js?v=1.0.16';
+import {preview} from './pdf.js?v=1.0.16';
+async function fleetPreview(row){const a=await API.call({action:'fleet-attachment',id:row.id});const {previewFleet}=await import('./fleet-pdf.js?v=1.0.16');await previewFleet(a);}
 const isFleetLines=r=>isFleet(r)&&r.payload.source.fleetLayout==='vehicle-lines';
 const isFleet=r=>r?.payload?.source?.fleetId===r?.id&&!r?.payload?.correction;
 const $=s=>document.querySelector(s),e=C.esc;
@@ -22,7 +22,7 @@ function render(){
  const title=view==='edit'?(editor?.payload?.correction?'Nowa korekta':'Nowa faktura'):view==='detail'?(selected.number||'Szkic faktury'):view==='parties'?'Kontrahenci':view==='ksef'?'KSeF':view==='settings'?'Ustawienia':'Faktury';
  $('#app').innerHTML=`<header class="topbar"><div><div class="brand">Bill<span>.</span></div><small>Robisię-Fer · CleanFleet & Robisię</small></div><div class="row"><span class="muted small">${C.VERSION}</span>${button('logout','Wyloguj')}</div></header><div class="shell"><nav>${[['invoices','Faktury'],['parties','Kontrahenci'],['ksef','KSeF'],['settings','Ustawienia']].map(([v,l])=>button('nav',l,view===v?'active':'',`data-view="${v}"`)).join('')}<div class="links"><a href="/app/">CleanFleet ↗</a><a href="/app/robisie/">Robisię ↗</a></div></nav><main><div class="toolbar"><div><h1>${e(title)}</h1><p class="muted">${view==='edit'?'Wspólne dane i numeracja. Logo wybierasz osobno.':view==='invoices'?'Sprzedaż obu marek w jednym miejscu.':view==='detail'?e(brandName(selected.payload.brand)):''}</p></div><div class="actions">${view==='invoices'?button('new','+ Wystaw fakturę','primary'):view==='parties'?button('new-party','+ Dodaj kontrahenta','primary'):['edit','detail'].includes(view)?button('back','← Wróć do faktur'):''}</div></div><p id="page-error" class="error" role="alert"></p>${view==='invoices'?list():view==='parties'?parties():view==='ksef'?KSEF.view():view==='settings'?settings():view==='edit'?edit():detail()}</main></div>`;
  if(view==='edit'){syncCorrectionControls();if(editor.payload.source?.invoiceMode==='detailed'){const cur=document.querySelector('[name=currency]');if(cur)cur.disabled=true;}if(isFleet(editor)){for(const node of document.querySelectorAll('[name=currency],#source-select'))node.disabled=true;}}
- if(view==='ksef')KSEF.mount($('#ksef-panel'),API.call);
+ if(view==='ksef')KSEF.mount($('#ksef-panel'),API.call,{projects:data.sources?.projects||[],assign:API.assignKsef,loadLinks:API.ksefAssignments});
 }
 function scheduleSearch(){clearTimeout(searchTimer);const generation=++searchGeneration;searchTimer=setTimeout(async()=>{try{const rows=await API.call({action:'search',...filters});if(generation===searchGeneration&&view==='invoices'){$('#invoice-results').innerHTML=invoiceRows(rows);for(const r of rows){const i=data.invoices.findIndex(x=>x.id===r.id);if(i<0)data.invoices.push(r);else data.invoices[i]=r;}}}catch(err){toast(err.message);}},350);}
 function filtered(){return data.invoices.filter(r=>{const p=r.payload,q=filters.q.toLocaleLowerCase('pl');return(!filters.month||p.issueDate?.startsWith(filters.month))&&(!filters.brand||p.brand===filters.brand)&&(!filters.status||r.status===filters.status)&&(!q||[r.number,r.ksef_number,p.buyer?.name,p.buyer?.nip,p.recipient?.name,...(p.lines||[]).map(l=>l.name)].join(' ').toLocaleLowerCase('pl').includes(q));});}
@@ -118,6 +118,6 @@ document.addEventListener('change',event=>{const target=event.target;if(target.i
 });
 window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
 export async function verificationUrl(row){const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(row.xml))),hash=btoa(Array.from(digest,b=>String.fromCharCode(b)).join('')).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');return 'https://qr.ksef.mf.gov.pl/invoice/'+C.SELLER.nip+'/'+row.payload.issueDate.split('-').reverse().join('-')+'/'+hash;}
-async function openRequested(){const id=new URLSearchParams(location.search).get('invoice');if(id){selected=await API.call({action:'document',id});if(selected.status==='draft'&&new URLSearchParams(location.search).get('edit')==='1'){editor=structuredClone(selected);view='edit';dirty=false;}else view='detail';render();}else if(new URLSearchParams(location.search).get('new')==='1')await beginNew();else{view='invoices';render();}}
+async function openRequested(){const params=new URLSearchParams(location.search);if(params.get('ksef')){KSEF.focusInvoice(params.get('ksef'),params.get('month'),params.get('kind')||(params.get('ksef')==='1'?'purchases':'sales'));view='ksef';render();return;}const id=new URLSearchParams(location.search).get('invoice');if(id){selected=await API.call({action:'document',id});if(selected.status==='draft'&&new URLSearchParams(location.search).get('edit')==='1'){editor=structuredClone(selected);view='edit';dirty=false;}else view='detail';render();}else if(new URLSearchParams(location.search).get('new')==='1')await beginNew();else{view='invoices';render();}}
 async function start(){if(!API.restoreSession()){login();return;}await work(async()=>{try{await refresh();await openRequested();}catch(err){login(err.message);}});}
 void start();

@@ -11,7 +11,7 @@ async function setup(){
  const root={innerHTML:'',querySelector:node,querySelectorAll:()=>[]};let count=0;
  const context=vm.createContext({console,crypto,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,Blob,File,Map,Set,AbortController,DOMException,atob,btoa,setTimeout,clearTimeout,URL:{createObjectURL:blob=>{const key='blob:'+(count++);blobUrls.set(key,blob);return key;},revokeObjectURL:key=>blobUrls.delete(key)},window:{JSZip:Zip,CFKsefRenderer:{generateInvoice:async()=>new Blob(['%PDF-1.7 fixture'])}},DOMParser:class{parseFromString(){return {doctype:null,documentElement:{localName:'Faktura'},getElementsByTagName:()=>[]};}},document:{}});
  const code=await readFile(new URL('../bill/ksef.js',import.meta.url),'utf8');
- const m=new vm.SourceTextModule(code+`\nexport function setupTest(node,call,rows=[]){root=node;api=call;state=initial();state.loaded=true;state.rows=rows;state.query={kind:state.kind,from:state.from,to:state.to,dateType:state.dateType,sort:'Desc'};state.selected=new Set(rows.map(r=>r.ksefNumber));draw();}export {run,load,downloadSelected};export function testState(){return {state,ready,message,busy:!!controller};}`,{context});
+ const m=new vm.SourceTextModule(code+`\nexport function setupTest(node,call,rows=[]){root=node;api=call;state=initial();state.loaded=true;state.rows=rows;state.query={kind:state.kind,from:state.from,to:state.to,dateType:state.dateType,sort:'Desc'};state.selected=new Set(rows.map(r=>r.ksefNumber));draw();}export {run,load,downloadSelected};export async function testAssignment(options,project,number){integration=options;chooseInvestment=async()=>project;await run(signal=>assignInvestment(number,signal));return message;}export function testState(){return {state,ready,message,busy:!!controller};}`,{context});
  await m.link(spec=>{const values=spec.includes('ksef-data')?D:C;return new vm.SyntheticModule(Object.keys(values),function(){for(const[k,v]of Object.entries(values))this.setExport(k,v);},{context});});await m.evaluate();return {n:m.namespace,root,blobUrls,node};
 }
 const number=i=>'6351861297-20261016-123456789ABC-'+String(i).padStart(2,'0');
@@ -42,4 +42,13 @@ test('an accepted Bill-only correction can be included in PDF ZIP without waitin
 });
 test('returning to KSeF refreshes a previously loaded sales list',async()=>{
  const {n,root}=await setup();let requests=0;n.setupTest(root,async()=>{},[row(1)]);n.testState().state.kind='sales';n.mount(root,async()=>{requests++;return {invoices:[row(1),{...row(4),invoiceNumber:'KA4/10/2026',invoiceType:'Kor',grossAmount:0}],page:0,hasMore:false,ticket:'encrypted'};});await new Promise(resolve=>setImmediate(resolve));assert.equal(requests,1);assert.equal(n.testState().state.rows.length,2);assert.match(root.innerHTML,/KA4\/10\/2026/);
+});
+
+test('KSeF assignment verifies XML hash before persisting and refuses a conflicting Bill investment',async()=>{
+ const {n,root}=await setup(),bytes=new TextEncoder().encode('<Faktura>test</Faktura>'),entry={...row(7),invoiceHash:await D.digest(bytes)},saved=[];
+ const options={projects:[{id:'project',name:'Test'}],loadLinks:async()=>[],assign:async args=>{saved.push(args);return {document:{}};}};
+ n.setupTest(root,async()=>({content:Buffer.from(bytes).toString('base64')}),[entry]);
+ await n.testAssignment(options,'project',entry.ksefNumber);assert.equal(saved.length,1);assert.equal(saved[0].xml,'<Faktura>test</Faktura>');assert.equal(saved[0].project,'project');
+ const bad={...row(8),invoiceHash:entry.invoiceHash};n.setupTest(root,async()=>({content:Buffer.from('changed').toString('base64')}),[bad]);await n.testAssignment(options,'project',bad.ksefNumber);assert.equal(saved.length,1);
+ n.setupTest(root,async()=>({payload:{source:{app:'robisie',id:'other'}}}),[{...row(9),billId:'bill'}]);await n.testAssignment(options,'project',row(9).ksefNumber);assert.equal(saved.length,1);
 });

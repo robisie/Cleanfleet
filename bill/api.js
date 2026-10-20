@@ -23,3 +23,6 @@ export async function login(email,password){const s=await request('/auth/v1/toke
 export function logout(){session=null;localStorage.removeItem(SESSION_KEY);}
 
 export const call=(body,options={})=>request("/functions/v1/cleanfleet-bill",{method:"POST",body:JSON.stringify(body),timeoutMs:90000,...options});
+
+export const ksefAssignments=()=>request('/rest/v1/rs_ksef_links?select=ksef_number,project_id,kind');
+export const assignKsef=({project,number,kind,xml,billId})=>request('/rest/v1/rpc/rs_assign_ksef',{method:'POST',body:JSON.stringify({p_project:project,p_number:number,p_kind:kind,p_xml:xml,p_bill_id:billId||null}),timeoutMs:30000});

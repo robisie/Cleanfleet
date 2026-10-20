@@ -1,4 +1,4 @@
-import * as C from './core.js?v=1.0.50';
+import * as C from './core.js?v=1.0.51';
 import {invoiceAmount} from '../../bill/core.js?v=1.0.15';
 export const amount=row=>invoiceAmount(row.payload)/100;
 export const paid=record=>C.round((record?.allocations||[]).reduce((s,a)=>s+C.number(a.paid),0));
@@ -15,6 +15,7 @@ export function targets(p){
  {key:'work:all',kind:'work',id:'all',label:'Rozliczenie całości prac',remaining}];
 }
 export function apply(project,row,allocations,date){
+ if(row.originKind==='purchases'||row.referenceOnly)throw Error('Ten dokument nie jest fakturą sprzedażową do rozliczenia w PLN.');
  if(!row.number||row.status==='draft'||row.payload.correction)throw Error('Rozliczenie wymaga wystawionej faktury podstawowej.');
  if(row.payload.currency!=='PLN')throw Error('Rozliczenie inwestycji wymaga faktury w PLN.');
  if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw Error('Podaj datę wpływu.');

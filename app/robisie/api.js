@@ -46,4 +46,9 @@ export const deleteProject=project=>rpc('rs_delete_project',{p_id:project.id,p_r
 // The server commits the completion and its unique earnings entry together.
 export const finishProject=(project,amount)=>rpc('rs_finish_project_with_earnings',{p_id:project.id,p_revision:project.revision,p_amount:amount});
 
-export const stageInvoices=id=>request('/functions/v1/cleanfleet-bill',{method:'POST',body:JSON.stringify({action:'search',sourceApp:'robisie',sourceId:id})});
+export async function stageInvoices(id){
+ const [bill,linked]=await Promise.all([request('/functions/v1/cleanfleet-bill',{method:'POST',body:JSON.stringify({action:'search',sourceApp:'robisie',sourceId:id})}),request('/rest/v1/rs_ksef_links?select=document&project_id=eq.'+encodeURIComponent(id))]);
+ const rows=[...bill];for(const entry of linked){const row=entry.document;if(!rows.some(x=>x.id===row.id||(x.ksef_number&&x.ksef_number===row.ksef_number)))rows.push(row);}return rows;
+}
+
+export const project=id=>request('/rest/v1/rs_projects?select=*&id=eq.'+encodeURIComponent(id)).then(rows=>rows[0]);

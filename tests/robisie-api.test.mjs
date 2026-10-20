@@ -29,3 +29,8 @@ test('timeout frees the request; unmatched server state is never accepted as sav
 test('concurrent requests share one token refresh',async()=>{
  let refresh=0;const a=await api(async(u)=>{if(u.includes('/auth/')){refresh++;await new Promise(resolve=>setTimeout(resolve,10));return response({access_token:'new',expires_in:3600});}return response([]);},{access_token:'old',refresh_token:'refresh',expires_at:1});await Promise.all([a.projects(),a.settings()]);assert.equal(refresh,1);
 });
+test('investment invoice list merges external KSeF documents without duplicating Bill invoices',async()=>{
+ const existing={id:'bill',ksef_number:'K1'},external={id:'external',ksef_number:'K2',originKind:'sales'},purchase={id:'purchase',ksef_number:'K3',originKind:'purchases'};
+ const a=await api(async u=>response(u.includes('rs_ksef_links')?[{document:{id:'duplicate',ksef_number:'K1'}},{document:external},{document:purchase}]:[existing]));
+ const rows=await a.stageInvoices('project');assert.deepEqual(Array.from(rows,r=>r.id),['bill','external','purchase']);
+});

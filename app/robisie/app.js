@@ -1,8 +1,9 @@
-import * as BI from './invoices.js?v=1.0.55';
-import * as Auto from './autosave.js?v=1.0.55';
-import * as C from './core.js?v=1.0.55';
-import * as API from './api.js?v=1.0.55';
-import * as PDF from './pdf.js?v=1.0.55';
+import * as PurchaseItems from './purchase-items.js?v=1.0.56';
+import * as BI from './invoices.js?v=1.0.56';
+import * as Auto from './autosave.js?v=1.0.56';
+import * as C from './core.js?v=1.0.56';
+import * as API from './api.js?v=1.0.56';
+import * as PDF from './pdf.js?v=1.0.56';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',shopFilter=null,projectFilter='',projectSearch='',summarySort={key:'category',direction:1},mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set(),stageInvoiceCache=new Map();
@@ -224,25 +225,55 @@ function tripDialog(id){const projectId=selected.id,initial=(p().trips||[]).find
 async function removeTrip(id){const trip=(p().trips||[]).find(item=>item.id===id);if(!trip||!confirm(`Usunąć trasę „${trip.name}”? Ceny dojazdów zapisanych w ofertach pozostaną bez zmian.`))return;p().trips=p().trips.filter(item=>item.id!==id);markDirty();await flushChanges({normalize:false});render();}
 function shopSuggestions(){const shops=new Map();for(const value of [...(config.payload.shops||[]),...all.flatMap(row=>(row.payload.purchases||[]).map(item=>item.shop)),...(p()?.purchases||[]).map(item=>item.shop)]){const name=shopName(value);if(name&&!shops.has(shopKey(name)))shops.set(shopKey(name),name);}return [...shops.values()].sort((a,b)=>a.localeCompare(b,'pl'));}
 async function rememberShop(value){const name=shopName(value);if(!name)throw new Error('Wpisz nazwę sklepu.');const shops=shopSuggestions();if(!(configBaseline.payload.shops||[]).some(shop=>shopKey(shop)===shopKey(name))){const payload=structuredClone(configBaseline.payload);payload.shops=[...new Map([...shops,name].map(shop=>[shopKey(shop),shop])).values()];await persistCatalog(payload);}return name;}
-function purchaseDialog(id){
+async function purchaseDialog(id){
  const x=p().purchases.find(x=>x.id===id)||{id:C.uid(),date:C.today(),shop:'',description:'',invoice:'',amount:0,charge:0,paid:true};
+ const projectId=selected.id,revision=selected.revision;let ksef=null,loadError='';
+ if(x.sourceKsefNumber){
+  if(busy)return;busy=true;toast('Wczytywanie pozycji faktury…');
+  try{
+   const link=await API.purchaseKsefLink(x.sourceKsefNumber,projectId);let preview=PurchaseItems.cachedPreview(link),xml=null;
+   if(!preview){xml=await API.purchaseKsefXml(x.sourceKsefNumber);preview=await API.purchaseKsefPreview(xml);if(C.round(preview.gross)!==C.round(link.document.grossAmount)||preview.currency!==link.document.payload.currency)throw Error('Dane faktury nie zgadzają się z wcześniejszym importem.');}
+   ksef={link,preview,xml};
+  }catch(error){loadError='Nie udało się wczytać pełnej listy pozycji: '+error.message;}
+  finally{busy=false;}
+  if(selected?.id!==projectId||selected.revision!==revision||$('#dialog').open)throw Error('Widok inwestycji zmienił się. Otwórz zakup ponownie.');
+ }
+ const originalIndices=ksef?(ksef.link.document.selectedIndices||ksef.preview.items.map(item=>item.index)):[];
+ const itemBlock=ksef?`<section class="purchase-invoice-items"><h3>Pozycje faktury z KSeF</h3><p class="muted">Zaznacz pozycje wliczane do kosztu tej inwestycji. Ten sam wybór będzie widoczny w Bill.</p>${ksef.preview.warning?`<p class="notice">${esc(ksef.preview.warning)}</p>`:''}${ksef.preview.canSelect?'<div class="actions"><button type="button" id="purchase-items-all">Zaznacz wszystkie</button><button type="button" id="purchase-items-none">Odznacz wszystkie</button></div>':''}${table(['Wlicz','Pozycja','Ilość','VAT','Brutto'],ksef.preview.items.map(item=>`<tr><td><input type="checkbox" name="ksef-item" value="${item.index}" aria-label="Wlicz ${esc(item.name||'pozycję')}" ${originalIndices.includes(item.index)?'checked':''} ${!ksef.preview.canSelect?'disabled':''}></td><td>${esc(item.name||'Pozycja '+item.index)}</td><td>${esc(item.quantity??'—')} ${esc(item.unit||'')}</td><td>${esc(item.vat||'—')}</td><td class="num">${item.gross==null?'—':money(item.gross)}</td></tr>`).join(''))}<p id="purchase-items-total" class="notice" aria-live="polite"></p><p id="purchase-items-error" class="error" role="alert"></p></section>`:loadError?`<p class="notice error">${esc(loadError)}. Możesz edytować zapisane dane zakupu; wybór pozycji wymaga ponownego wczytania faktury.</p>`:'';
  const payment=C.purchasePayment(x);let automaticPaidAmount=!id||payment.state==='full';
- modal(id?'Edytuj zakup':'Nowy zakup',`<div class="grid">${input('date','Data',x.date,'date','required')}${input('shop','Sklep',x.shop,'text','required list="shop-suggestions" autocomplete="off"')+`<datalist id="shop-suggestions">${shopSuggestions().map(shop=>`<option value="${esc(shop)}"></option>`).join('')}</datalist>`}${input('amount','Rzeczywista kwota zakupu (zł)',x.amount,'number','min="0" step="0.01" required')}${input('charge','Koszt przypisany inwestorowi (zł)',x.charge,'number','min="0" step="0.01" required')}${input('invoice','Numer faktury / paragonu',x.invoice)}</div>${text('description','Opis zakupu',x.description,'required')}<label class="inline-check"><input type="checkbox" id="purchase-paid" name="paid" ${payment.paid>0?'checked':''}> Zakup opłacony</label><button type="button" id="purchase-pay-full">Opłacono w całości</button><div id="purchase-payment" ${payment.paid>0?'':'hidden'}>${input('paidAmount','Kwota opłacona przez inwestora (zł)',x.paidAmount==null&&x.paid?x.charge:payment.paid,'number',`min="0" step="0.01" required ${payment.paid>0?'':'disabled'}`)}<p class="muted">Ta kwota automatycznie zwiększy otrzymane zaliczki na materiały. Nie dodawaj tej samej wpłaty ponownie w „Etapy i płatności”.</p></div>`,async fd=>{
+ modal(id?'Edytuj zakup':'Nowy zakup',`<div class="grid">${input('date','Data',x.date,'date','required')}${input('shop','Sklep',x.shop,'text','required list="shop-suggestions" autocomplete="off"')+`<datalist id="shop-suggestions">${shopSuggestions().map(shop=>`<option value="${esc(shop)}"></option>`).join('')}</datalist>`}${input('amount','Rzeczywista kwota zakupu (zł)',x.amount,'number','min="0" step="0.01" required')}${input('charge','Koszt przypisany inwestorowi (zł)',x.charge,'number','min="0" step="0.01" required')}${input('invoice','Numer faktury / paragonu',x.invoice)}</div>${itemBlock}${ksef?'<details><summary>Opis zaznaczonych pozycji</summary>'+text('description','Opis zakupu',x.description,'required readonly')+'</details>':text('description','Opis zakupu',x.description,'required')}<label class="inline-check"><input type="checkbox" id="purchase-paid" name="paid" ${payment.paid>0?'checked':''}> Zakup opłacony</label><button type="button" id="purchase-pay-full">Opłacono w całości</button><div id="purchase-payment" ${payment.paid>0?'':'hidden'}>${input('paidAmount','Kwota opłacona przez inwestora (zł)',x.paidAmount==null&&x.paid?x.charge:payment.paid,'number',`min="0" step="0.01" required ${payment.paid>0?'':'disabled'}`)}<p class="muted">Ta kwota automatycznie zwiększy otrzymane zaliczki na materiały. Nie dodawaj tej samej wpłaty ponownie w „Etapy i płatności”.</p></div>`,async fd=>{
   const amount=C.number(fd.get('amount')),charge=C.number(fd.get('charge')),paid=fd.has('paid'),paidAmount=paid?C.number(fd.get('paidAmount')):0;
   if(paidAmount<0||paidAmount>charge)throw new Error('Opłacona kwota musi mieścić się między 0 a kosztem przypisanym inwestorowi.');
   const linkedPaid=C.invoicePurchasePaid(x);if(paidAmount<linkedPaid)throw Error('Kwota jest niższa niż wpływy przypisane z faktur. Najpierw zmień rozliczenie w sekcji Faktury.');
   const shop=await rememberShop(fd.get('shop'));
-  const item={...x,...Object.fromEntries(fd),shop,amount,charge:C.number(fd.get('charge')),paid,paidAmount:C.round(paidAmount-linkedPaid)};
+  const entered=Object.fromEntries(fd);delete entered['ksef-item'];
+  const selection=ksef?PurchaseItems.itemSelection(ksef.preview,ksef.preview.canSelect?fd.getAll('ksef-item').map(Number):originalIndices):null;
+  const changed=selection&&JSON.stringify(selection.indices)!==JSON.stringify([...originalIndices].sort((a,b)=>a-b));
+  const item={...x,...entered,shop,amount,charge:C.number(fd.get('charge')),paid,paidAmount:C.round(paidAmount-linkedPaid)};
   // Preserve zero-value historical adjustments that carry an investor cost.
   if(id&&!linkedPaid&&x.paidAmount==null&&paid===x.paid&&paidAmount===(x.paid?C.number(x.charge):0))delete item.paidAmount;
-  const next=structuredClone(p());if(id)next.purchases=next.purchases.map(r=>r.id===id?item:r);else next.purchases.push(item);selected.payload=BI.refreshReceiptLinks(next);markDirty();
- },id?()=>{if((p().invoiceSettlements||[]).some(r=>r.allocations.some(a=>a.kind==='purchase'&&a.id===id)||(r.existingReceipts||[]).some(x=>x.id==='purchase-payment:'+id)))throw Error('Najpierw usuń powiązanie zakupu z fakturą.');p().purchases=p().purchases.filter(r=>r.id!==id);}:null);
+  if(changed){item.amount=selection.total;item.description=selection.description||x.description;item.invoiceItems=selection.items;item.selectedKsefRows=selection.indices;item.invoiceGrossAmount=ksef.preview.gross;}
+  const next=structuredClone(p());if(id)next.purchases=next.purchases.map(r=>r.id===id?item:r);else next.purchases.push(item);BI.refreshReceiptLinks(next);
+  if(changed){
+   if(!ksef.xml)ksef.xml=await API.purchaseKsefXml(x.sourceKsefNumber);
+   await writes.run(async()=>{const result=await API.savePurchaseKsef(selected,next,ksef.link,selection.indices,ksef.xml),row=Array.isArray(result)?result[0]:result;selected=structuredClone(row);all=all.map(r=>r.id===row.id?structuredClone(row):r);projectDirty=false;saveError='';drafts.remove('project:'+row.id);updateSaveState();});
+  }else{selected.payload=next;markDirty();}
+ },id?()=>{if((p().invoiceSettlements||[]).some(r=>r.allocations.some(a=>a.kind==='purchase'&&a.id===id)||(r.existingReceipts||[]).some(x=>x.id==='purchase-payment:'+id)))throw Error('Najpierw usuń powiązanie zakupu z fakturą.');p().purchases=p().purchases.filter(r=>r.id!==id);}:null,ksef?'scroll-modal purchase-items-modal':'');
  $('#purchase-pay-full').onclick=()=>{automaticPaidAmount=true;$('#purchase-paid').checked=true;$('#purchase-payment').hidden=false;$('#f-paidAmount').disabled=false;$('#f-paidAmount').value=$('#f-charge').value;};
  $('#purchase-paid').onchange=()=>{const checked=$('#purchase-paid').checked;$('#purchase-payment').hidden=!checked;$('#f-paidAmount').disabled=!checked;};
  $('#f-paidAmount').oninput=()=>{automaticPaidAmount=false;};
  $('#f-charge').oninput=()=>{if(automaticPaidAmount)$('#f-paidAmount').value=$('#f-charge').value;};
  $('#f-amount').oninput=()=>{if(!id){$('#f-charge').value=$('#f-amount').value;if(isNumericInput($('#f-charge')))commitNumericInput($('#f-charge'));}if(automaticPaidAmount&&!id)$('#f-paidAmount').value=$('#f-charge').value;};
+ if(ksef){
+  $('#f-amount').readOnly=true;
+  const boxes=[...$('#dialog').querySelectorAll('input[name="ksef-item"]')];
+  const update=(change=false)=>{try{const choice=PurchaseItems.itemSelection(ksef.preview,ksef.preview.canSelect?boxes.filter(box=>box.checked).map(box=>Number(box.value)):originalIndices);$('#purchase-items-total').textContent=`Wliczone do inwestycji: ${money(choice.total)} · ${choice.indices.length} z ${ksef.preview.items.length} pozycji · cała faktura: ${money(ksef.preview.gross)}`;$('#purchase-items-error').textContent='';$('#modal-form').querySelector('[type="submit"]').disabled=false;if(change){automaticPaidAmount=false;$('#f-amount').value=choice.total;$('#f-charge').value=choice.total;$('#f-description').value=choice.description||x.description;}}catch(error){$('#purchase-items-error').textContent=error.message;$('#modal-form').querySelector('[type="submit"]').disabled=true;}};
+  for(const box of boxes)box.onchange=()=>update(true);
+  for(const [button,checked] of [['purchase-items-all',true],['purchase-items-none',false]])if($('#'+button))$('#'+button).onclick=()=>{for(const box of boxes)box.checked=checked;update(true);};
+  update();
+ }
 }
+
 function stageDialog(id){const x=p().stages.find(x=>x.id===id)||{id:C.uid(),name:'',percent:0,description:'',due:'',invoice:''};modal(id?'Edytuj etap':'Nowy etap',input('name','Nazwa',x.name,'text','required')+`<div class="grid">${input('percent','Udział (%)',x.percent,'number','min="0" max="100" step="0.01" required')}${input('due','Termin płatności',x.due,'date')}${input('invoice','Numer / data faktury',x.invoice)}</div>`+text('description','Zakres etapu',x.description),fd=>{const item={...x,...Object.fromEntries(fd),percent:C.number(fd.get('percent'))};if(id)p().stages=p().stages.map(r=>r.id===id?item:r);else p().stages.push(item);markDirty();},id?()=>{if(C.effectiveReceipts(p()).some(r=>r.stageId===id)||(p().invoiceSettlements||[]).some(r=>r.allocations.some(a=>a.kind==='stage'&&a.id===id)))throw new Error('Najpierw zmień przypisanie wpłat tego etapu.');p().stages=p().stages.filter(r=>r.id!==id);}:null);}
 function journalDialog(id){const x=p().journal.find(x=>x.id===id)||{id:C.uid(),date:C.today(),roomId:'',description:'',investorConfirmed:false,contractorConfirmed:false};modal(id?'Edytuj wpis':'Nowy wpis dziennika',input('date','Data',x.date,'date','required')+`<div class="field"><label>Pomieszczenie</label><select name="roomId"><option value="">Cała inwestycja</option>${p().rooms.map(r=>`<option value="${r.id}" ${r.id===x.roomId?'selected':''}>${esc(r.name)}</option>`).join('')}</select></div>`+text('description','Opis prac / ustaleń',x.description,'required')+`<label class="inline-check"><input type="checkbox" name="investorConfirmed" ${x.investorConfirmed?'checked':''}> Potwierdzone przez inwestora</label><label class="inline-check"><input type="checkbox" name="contractorConfirmed" ${x.contractorConfirmed?'checked':''}> Potwierdzone przez wykonawcę</label>`,fd=>{const item={...x,...Object.fromEntries(fd),investorConfirmed:fd.has('investorConfirmed'),contractorConfirmed:fd.has('contractorConfirmed')};if(id)p().journal=p().journal.map(r=>r.id===id?item:r);else p().journal.push(item);markDirty();},id?()=>p().journal=p().journal.filter(r=>r.id!==id):null);}
 async function rememberService(line){const key=C.serviceKey(line),existing=config.payload.catalog.find(item=>C.serviceKey(item)===key||(!item.unit&&C.serviceKey({...line,unit:''})===C.serviceKey(item)));if(existing){line.serviceId=existing.id;return;}const item={id:C.uid(),name:String(line.name).trim(),category:line.category,unit:line.unit,base:C.round(line.price/(1+currentMarkup()/100))};const payload=structuredClone(config.payload);payload.catalog.push(item);await persistCatalog(payload);line.serviceId=item.id;}
@@ -322,7 +353,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
  if(a==='settle-all'){settleAllDialog();return;}
  if(a==='receipt-add'||a==='receipt-edit'){receiptDialog(id);return;}
  if(a==='purchase-shop'){shopFilter=b.dataset.all==='true'?null:b.dataset.shop;render();return;}
- if(a==='purchase-add'||a==='purchase-edit'){purchaseDialog(id);return;}
+ if(a==='purchase-add'||a==='purchase-edit'){b.disabled=true;await purchaseDialog(id);return;}
  if(a==='stage-add'||a==='stage-edit'){stageDialog(id);return;}
  if(a==='journal-add'||a==='journal-edit'){journalDialog(id);return;}
  if(a==='catalog-correct'){catalogCorrectionDialog();return;}

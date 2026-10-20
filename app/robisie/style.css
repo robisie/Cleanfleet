@@ -64,3 +64,7 @@ dialog.invoice-allocation-modal{width:min(1040px,calc(100vw - 32px));max-width:c
 .invoice-allocation-section th:first-child{width:44%}.invoice-allocation-section th:nth-child(2){width:16%}.invoice-allocation-section th:nth-child(n+3){width:20%}
 .allocation-whole-work{margin-top:22px;padding-top:18px;border-top:2px solid #dfe5eb}.allocation-whole-work h4{margin:0 0 6px;font-size:17px}
 @media(max-width:720px){.invoice-allocation-section{padding:12px}.invoice-allocation-section h3{font-size:19px}}
+
+dialog.purchase-items-modal{width:min(1060px,calc(100vw - 32px));max-width:calc(100vw - 32px)}
+.purchase-invoice-items{margin:20px 0;padding:18px;border:1px solid #dce1a7;border-top:5px solid #a8b51b;border-radius:12px;background:#fcfdf4}.purchase-invoice-items h3{margin:0 0 10px;font-size:20px}.purchase-invoice-items input[type=checkbox]{width:22px;height:22px;accent-color:#929c17}.purchase-invoice-items th:nth-child(2){width:52%}.purchase-invoice-items td{white-space:normal}.purchase-invoice-items .num{white-space:nowrap}.purchase-invoice-items .actions{margin-bottom:14px}
+@media(max-width:720px){.purchase-invoice-items{padding:10px}}

@@ -34,3 +34,13 @@ test('investment invoice list merges external KSeF documents without duplicating
  const a=await api(async u=>response(u.includes('rs_ksef_links')?[{document:{id:'duplicate',ksef_number:'K1'}},{document:external},{document:purchase}]:[existing]));
  const rows=await a.stageInvoices('project');assert.deepEqual(Array.from(rows,r=>r.id),['bill','external','purchase']);
 });
+test('purchase form sends selection, form snapshot and revision together',async()=>{
+ let body,url;const payload={purchases:[{id:'item',amount:54,selectedKsefRows:[2]}]},a=await api(async(u,o)=>{url=u;body=JSON.parse(o.body);return response({id:'p',revision:4,payload});});
+ await a.savePurchaseKsef({id:'p',revision:2},payload,{ksef_number:'number',document:{selectedIndices:[1,3]}},[2],'<Faktura/>');
+ assert.ok(url.endsWith('/rs_save_purchase_ksef_form'));assert.equal(body.p_revision,2);assert.deepEqual(body.p_indices,[2]);assert.deepEqual(body.p_expected_indices,[1,3]);assert.deepEqual(body.p_payload,payload);
+});
+test('lost purchase form response is confirmed with a read, without repeating the write',async()=>{
+ const payload={purchases:[{id:'item',amount:54,selectedKsefRows:[2]}]},calls=[];
+ const a=await api(async(u,o)=>{calls.push(o.method||'GET');if(o.method==='POST')throw new TypeError('Disconnected');return response([{id:'p',revision:4,payload}]);});
+ const row=await a.savePurchaseKsef({id:'p',revision:2},payload,{ksef_number:'number',document:{selectedIndices:[1]}},[2],'<Faktura/>');assert.equal(row.revision,4);assert.deepEqual(calls,['POST','GET']);
+});

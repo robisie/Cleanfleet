@@ -1,5 +1,5 @@
-import {esc,today} from './core.js?v=1.0.18';
-import {monthDates,counterparty,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.18';
+import {esc,today} from './core.js?v=1.0.19';
+import {monthDates,counterparty,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.19';
 const e=esc;
 let integration={},assignments=[];
 function initial(){const month=today().slice(0,7);return {month,...monthDates(month),kind:'purchases',dateType:'Issue',sort:'Desc',q:'',rows:[],selected:new Set(),loaded:false,hasMore:false,isTruncated:false,page:0,ticket:'',ticketAt:0,query:null,listError:false,partial:false,partialWarning:''};}
@@ -52,6 +52,7 @@ export function focusInvoice(number,month,kind='sales'){state=initial();state.q=
 async function assignInvestment(number,signal){
  const row=state.rows.find(r=>r.ksefNumber===number);if(!row)throw Error('Odśwież listę faktur.');
  if(!integration.projects?.length)throw Error('Najpierw utwórz inwestycję w Robisię.');
+ if(integration.loadLinks)assignments=await integration.loadLinks();check(signal);
  const existing=assignments.find(x=>x.ksef_number===number);
  if(existing&&state.kind!=='purchases'){const project=integration.projects.find(x=>x.id===existing.project_id);progress('Faktura jest już przypisana: '+(project?.name||'inwestycja Robisię')+'.');return;}
  const bytes=await singleBytes(row,signal);check(signal);

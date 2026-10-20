@@ -1,8 +1,8 @@
-import * as KSEF from './ksef.js?v=1.0.18';
-import * as C from './core.js?v=1.0.18';
-import * as API from './api.js?v=1.0.18';
-import {preview} from './pdf.js?v=1.0.18';
-async function fleetPreview(row){const a=await API.call({action:'fleet-attachment',id:row.id});const {previewFleet}=await import('./fleet-pdf.js?v=1.0.18');await previewFleet(a);}
+import * as KSEF from './ksef.js?v=1.0.19';
+import * as C from './core.js?v=1.0.19';
+import * as API from './api.js?v=1.0.19';
+import {preview} from './pdf.js?v=1.0.19';
+async function fleetPreview(row){const a=await API.call({action:'fleet-attachment',id:row.id});const {previewFleet}=await import('./fleet-pdf.js?v=1.0.19');await previewFleet(a);}
 const isFleetLines=r=>isFleet(r)&&r.payload.source.fleetLayout==='vehicle-lines';
 const isFleet=r=>r?.payload?.source?.fleetId===r?.id&&!r?.payload?.correction;
 const $=s=>document.querySelector(s),e=C.esc;

@@ -1,5 +1,5 @@
-import {esc,today} from './core.js?v=1.0.16';
-import {monthDates,counterparty,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.16';
+import {esc,today} from './core.js?v=1.0.17';
+import {monthDates,counterparty,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.17';
 const e=esc;
 let integration={},assignments=[];
 function initial(){const month=today().slice(0,7);return {month,...monthDates(month),kind:'purchases',dateType:'Issue',sort:'Desc',q:'',rows:[],selected:new Set(),loaded:false,hasMore:false,isTruncated:false,page:0,ticket:'',ticketAt:0,query:null,listError:false,partial:false,partialWarning:''};}
@@ -54,18 +54,26 @@ async function assignInvestment(number,signal){
  if(!integration.projects?.length)throw Error('Najpierw utwórz inwestycję w Robisię.');
  const existing=assignments.find(x=>x.ksef_number===number);
  if(existing){const project=integration.projects.find(x=>x.id===existing.project_id);progress('Faktura jest już przypisana: '+(project?.name||'inwestycja Robisię')+'.');return;}
- const project=await chooseInvestment(row,signal);if(!project)return;
- let billId=row.billId||null;
- if(billId){const original=await api({action:'document',id:billId},{signal});if(original.payload.source?.app==='robisie'&&original.payload.source.id!==project)throw Error('Faktura w Bill jest już powiązana z inną inwestycją.');}
  const bytes=await singleBytes(row,signal);check(signal);
  const xml=new TextDecoder(bytes[0]===255&&bytes[1]===254?'utf-16le':bytes[0]===254&&bytes[1]===255?'utf-16be':'utf-8',{fatal:true}).decode(bytes);
+ const details=state.kind==='purchases'&&integration.preview?await integration.preview({xml}):null;check(signal);
+ const choice=await chooseInvestment(row,signal,details);if(!choice)return;
+ const project=typeof choice==='string'?choice:choice.project,indices=typeof choice==='string'?null:choice.indices;
+ let billId=row.billId||null;
+ if(billId){const original=await api({action:'document',id:billId},{signal});if(original.payload.source?.app==='robisie'&&original.payload.source.id!==project)throw Error('Faktura w Bill jest już powiązana z inną inwestycją.');}
  progress('Przypisywanie faktury do inwestycji…');
- const result=await integration.assign({project,number,kind:state.kind,xml,billId});
+ const result=await integration.assign({project,number,kind:state.kind,xml,billId,indices});
  assignments=await integration.loadLinks();
  progress(result.document?.referenceOnly?'Powiązano dokument. Korekta lub waluta obca wymaga osobnego rozliczenia — nie zmieniono kwot w PLN.':state.kind==='purchases'?'Dodano zakup z danymi i pozycjami faktury. Odśwież inwestycję w Robisię.':'Faktura jest dostępna w Etapach i płatnościach inwestycji.');
 }
-function chooseInvestment(row,signal){return new Promise(resolve=>{
- const dialog=document.createElement('dialog');dialog.className='scroll-modal';dialog.innerHTML=`<form><header><h2>Przypisz fakturę do inwestycji</h2></header><div class="modal-body"><p><strong>${e(row.invoiceNumber)}</strong> · ${e(row.grossAmount)} ${e(row.currency)}</p><label class="field">Inwestycja<select name="project" required><option value="">Wybierz…</option>${integration.projects.map(p=>`<option value="${e(p.id)}">${e(p.name)} · ${e(p.number)}</option>`).join('')}</select></label><p class="muted">${state.kind==='purchases'?'Powstanie jeden zakup na kwotę brutto faktury, z opisem wszystkich jej pozycji. Sam import nie oznacza otrzymania zwrotu od inwestora.':'Faktura będzie dostępna do powiązania z należnościami i wpływami w inwestycji.'} Korekty i waluty obce są zapisywane jako dokumenty do osobnego rozliczenia.</p></div><footer><button type="button" data-cancel>Anuluj</button><button type="submit" class="primary">Przypisz</button></footer></form>`;
+function chooseInvestment(row,signal,details=null){return new Promise(resolve=>{
+ const money=value=>new Intl.NumberFormat('pl-PL',{style:'currency',currency:row.currency}).format(value),items=details?.items||[];
+ const selection=details?`<section class="kf-purchase-selection"><h3>Pozycje faktury zakupowej</h3><p class="muted">Zaznacz pozycje, które wliczasz do tej inwestycji. Powstanie jeden zakup z wybranymi pozycjami i ich sumą brutto.</p>${details.warning?`<p class="notice">${e(details.warning)}</p>`:''}${details.canSelect?'<div class="actions"><button type="button" data-lines="all">Zaznacz wszystkie</button><button type="button" data-lines="none">Odznacz wszystkie</button></div>':''}<div class="kf-purchase-items">${items.map(item=>`<label class="kf-purchase-item"><input type="checkbox" name="purchaseLine" value="${item.index}" checked ${!details.canSelect?'disabled':''}><span><strong>${e(item.name||'Pozycja '+item.index)}</strong><small>${e(item.quantity??'—')} ${e(item.unit||'')} · VAT ${e(item.vat||'—')}${item.net!=null?' · netto '+e(money(item.net)):''}</small></span><strong>${item.gross==null?'Brak kwoty pozycji':e(money(item.gross))}</strong></label>`).join('')||'<p class="muted">Dokument nie zawiera szczegółowych pozycji.</p>'}</div><p class="kf-purchase-total" aria-live="polite"></p><p class="error" data-selection-error role="alert"></p></section>`:'';
+ const dialog=document.createElement('dialog');dialog.className='scroll-modal kf-assignment-modal';dialog.innerHTML=`<form><header><h2>Przypisz fakturę do inwestycji</h2></header><div class="modal-body"><p><strong>${e(row.invoiceNumber)}</strong> · ${e(money(row.grossAmount))}</p><label class="field">Inwestycja<select name="project" required><option value="">Wybierz…</option>${integration.projects.map(p=>`<option value="${e(p.id)}">${e(p.name)} · ${e(p.number)}</option>`).join('')}</select></label>${selection}<p class="muted">${state.kind==='purchases'?'Sam import nie oznacza otrzymania zwrotu od inwestora.':'Faktura będzie dostępna do powiązania z należnościami i wpływami w inwestycji.'} Korekty i waluty obce są zapisywane jako dokumenty do osobnego rozliczenia.</p></div><footer><button type="button" data-cancel>Anuluj</button><button type="submit" class="primary">Przypisz</button></footer></form>`;
+ const boxes=[...dialog.querySelectorAll('input[name="purchaseLine"]')],selected=()=>boxes.filter(x=>x.checked).map(x=>Number(x.value));
+ const update=()=>{if(!details)return;const ids=selected(),sum=ids.length===items.length||!details.canSelect?details.gross:items.filter(x=>ids.includes(x.index)).reduce((n,x)=>n+Math.round(Number(x.gross)*100),0)/100,invalid=details.canSelect&&(!ids.length||sum<0||sum>details.gross+.001);dialog.querySelector('.kf-purchase-total').textContent=`Do inwestycji: ${money(sum)} · ${ids.length} z ${items.length} pozycji`;dialog.querySelector('[type="submit"]').disabled=invalid;dialog.querySelector('[data-selection-error]').textContent=invalid?(!ids.length?'Zaznacz przynajmniej jedną pozycję.':'Suma pozycji musi mieścić się w kwocie faktury. Uwzględnij pozycje korygujące.') : '';};
+ for(const box of boxes)box.onchange=update;
+ for(const button of dialog.querySelectorAll('[data-lines]'))button.onclick=()=>{for(const box of boxes)box.checked=button.dataset.lines==='all';update();};
  const finish=value=>{signal.removeEventListener('abort',cancel);dialog.close();dialog.remove();resolve(value);},cancel=()=>finish(null);
- dialog.querySelector('[data-cancel]').onclick=cancel;dialog.oncancel=event=>{event.preventDefault();cancel();};dialog.querySelector('form').onsubmit=event=>{event.preventDefault();finish(new FormData(event.target).get('project'));};signal.addEventListener('abort',cancel,{once:true});document.body.append(dialog);dialog.showModal();
+ dialog.querySelector('[data-cancel]').onclick=cancel;dialog.oncancel=event=>{event.preventDefault();cancel();};dialog.querySelector('form').onsubmit=event=>{event.preventDefault();if(dialog.querySelector('[type="submit"]').disabled)return;finish({project:new FormData(event.target).get('project'),indices:details?.canSelect?selected():null});};signal.addEventListener('abort',cancel,{once:true});document.body.append(dialog);dialog.showModal();update();
 });}

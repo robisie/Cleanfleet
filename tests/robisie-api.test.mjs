@@ -44,3 +44,9 @@ test('lost purchase form response is confirmed with a read, without repeating th
  const a=await api(async(u,o)=>{calls.push(o.method||'GET');if(o.method==='POST')throw new TypeError('Disconnected');return response([{id:'p',revision:4,payload}]);});
  const row=await a.savePurchaseKsef({id:'p',revision:2},payload,{ksef_number:'number',document:{selectedIndices:[1]}},[2],'<Faktura/>');assert.equal(row.revision,4);assert.deepEqual(calls,['POST','GET']);
 });
+test('combined KSeF item and payment save uses the settlement transaction',async()=>{
+ let url,body;const payload={purchases:[{id:'item',amount:54,paidAmount:10,invoicePayments:{sales:20},receiptPayments:{advance:24}}]};
+ const a=await api(async(u,o)=>{url=u;body=JSON.parse(o.body);return response({id:'p',revision:4,payload});});
+ await a.savePurchaseSettlement({id:'p',revision:2},payload,{ksef_number:'number',document:{selectedIndices:[1,3]}},[2],'<Faktura/>');
+ assert.ok(url.endsWith('/rs_save_purchase_ksef_settlement'));assert.deepEqual(body.p_payload,payload);assert.deepEqual(body.p_expected_indices,[1,3]);
+});

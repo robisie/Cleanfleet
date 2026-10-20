@@ -56,7 +56,7 @@ test('purchase assignment previews verified XML and forwards only chosen row ind
  const {n,root}=await setup(),bytes=new TextEncoder().encode('<Faktura>rows</Faktura>'),entry={...row(10),invoiceHash:await D.digest(bytes)},calls=[];
  n.setupTest(root,async()=>({content:Buffer.from(bytes).toString('base64')}),[entry]);
  const options={projects:[{id:'p',name:'Test'}],preview:async({xml})=>{assert.equal(xml,'<Faktura>rows</Faktura>');calls.push('preview');return {items:[{index:1},{index:2},{index:3}],canSelect:true};},loadLinks:async()=>[],assign:async args=>{calls.push('assign');assert.equal(args.project,'p');assert.deepEqual(Array.from(args.indices),[1,3]);return {document:{}};}};
- await n.testAssignment(options,{project:'p',indices:[1,3]},entry.ksefNumber);assert.deepEqual(calls,['preview','assign']);
+ await n.testAssignment(options,{project:'p',indices:[1,3]},entry.ksefNumber);assert.deepEqual(calls,['preview','assign']);assert.ok(root.innerHTML.includes('Rozlicz zakup w Robisię'));assert.ok(root.innerHTML.includes('purchaseKsef='+entry.ksefNumber));
 });
 
 test('existing purchase assignments reopen selection and carry the previous state into edit',async()=>{

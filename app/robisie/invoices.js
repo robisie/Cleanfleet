@@ -1,4 +1,4 @@
-import * as C from './core.js?v=1.0.58';
+import * as C from './core.js?v=1.0.59';
 import {invoiceAmount} from '../../bill/core.js?v=1.0.15';
 export const amount=row=>invoiceAmount(row.payload)/100;
 export const linkedPaid=record=>C.round((record?.existingReceipts||[]).reduce((s,r)=>s+C.number(r.amount),0));
@@ -30,7 +30,7 @@ export function detachPurchase(project,id){
    else record.allocations.push({key:'materials:advance',kind:'materials',id:'advance',label:'Zaliczka na materiały — bez przypisania do zakupu',remaining:Number.MAX_SAFE_INTEGER,amount:received,paid:received});
   }
  }
- delete item.invoicePayments;
+ delete item.invoicePayments;delete item.receiptPayments;
  // Legacy imports use separate material receipts rather than paidAmount.
  if(item.paidAmount!=null||allocations.length){item.paid=false;item.paidAmount=0;}
  return refreshReceiptLinks(p);
@@ -43,7 +43,18 @@ export function targets(p){
  {key:'work:all',kind:'work',id:'all',label:'Rozliczenie całości prac',remaining}];
 }
 export const availableReceipts=(project,invoiceId)=>C.effectiveReceipts(withoutInvoice(project,invoiceId)).filter(r=>!r.invoiceId&&C.number(r.amount)>0);
+export function validateReceiptAllocations(project){
+ const used=new Map();
+ for(const item of project.purchases||[])for(const [id,value] of Object.entries(item.receiptPayments||{})){
+  const receipt=(project.receipts||[]).find(r=>r.id===id),amount=Number(value);
+  if(!receipt||receipt.kind!=='materials'||!Number.isFinite(amount)||amount<0)throw Error('Nieprawidłowe rozliczenie wcześniejszej zaliczki.');
+  used.set(id,C.round((used.get(id)||0)+amount));
+  if(used.get(id)>C.number(receipt.amount)+.001)throw Error('Kwota rozliczeń zakupów przekracza wcześniejszą zaliczkę.');
+ }
+ return project;
+}
 export function refreshReceiptLinks(project){
+ validateReceiptAllocations(project);
  const receipts=C.effectiveReceipts(project);
  for(const record of project.invoiceSettlements||[]){
   record.existingReceipts=(record.existingReceipts||[]).map(link=>{
@@ -72,7 +83,7 @@ export function apply(project,row,allocations,date,existingIds=[]){
   if(!target||seen.has(a.key)||!Number.isFinite(value)||!Number.isFinite(received)||value<0||received<0||received>value)throw Error('Sprawdź przypisane kwoty i wpłaty.');
   seen.add(a.key);
   if(C.round(received)>target.remaining+.001)throw Error('Wpłata przekracza pozostałą należność: '+target.label);
-  return {...target,amount:C.round(value),paid:C.round(received)};
+  const previous=(project.invoiceSettlements||[]).find(r=>r.id===row.id)?.allocations?.find(x=>x.key===a.key);return {...target,amount:C.round(value),paid:C.round(received),...(a.date||previous?.date?{date:a.date||previous.date}:{})};
  }).filter(a=>a.amount>0||a.paid>0);
  if(assigned({allocations:list,existingReceipts})>amount(row)+.001)throw Error('Suma przypisanych kwot przekracza kwotę faktury.');
  const workPaid=list.filter(a=>a.kind==='stage'||a.kind==='work').reduce((s,a)=>s+a.paid,0);

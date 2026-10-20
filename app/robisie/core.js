@@ -1,4 +1,4 @@
-export const VERSION='1.0.58';
+export const VERSION='1.0.59';
 export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['contract','Umowa'],['rooms','Pomieszczenia'],['offer','Oferta wstępna'],['works','Kalkulacja końcowa'],['payments','Etapy i płatności'],['journal','Dziennik prac'],['handover','Odbiór inwestycji'],['summary','Zestawienie prac'],['purchases','Zakupy i materiały']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -42,10 +42,11 @@ export function workTotals(lines,discount=0,settlement){const raw=lines.reduce((
 
 // Legacy imports already have material receipts; explicit paidAmount uses investor settlement semantics.
 export const invoicePurchasePaid=item=>round(Object.values(item.invoicePayments||{}).reduce((s,n)=>s+number(n),0));
+export const receiptPurchasePaid=item=>round(Object.values(item.receiptPayments||{}).reduce((s,n)=>s+number(n),0));
 export function purchasePayment(item){
- const explicit=item.paidAmount!=null,amount=Math.max(0,number(item.amount)),charge=Math.max(0,number(item.charge)),limit=explicit?charge:amount;
+ const explicit=item.paidAmount!=null||item.receiptPayments!=null,amount=Math.max(0,number(item.amount)),charge=Math.max(0,number(item.charge)),limit=explicit?charge:amount;
  const basePaid=item.paid?(explicit?Math.min(limit,Math.max(0,number(item.paidAmount))):amount):0;
- const paid=Math.min(limit,basePaid+invoicePurchasePaid(item));
+ const paid=Math.min(limit,basePaid+invoicePurchasePaid(item)+receiptPurchasePaid(item));
  const ratio=limit?paid/limit:(item.paid&&!explicit?1:0);
  return {paid,charged:explicit?charge:charge*ratio,remaining:round(limit-paid),state:ratio>=1?'full':paid>0?'partial':'unpaid'};
 }
@@ -54,8 +55,8 @@ export function purchasePaymentLabel(item){
  return `${payment.state==='full'?'Rozliczono z inwestorem w całości':payment.state==='partial'?'Częściowo rozliczono z inwestorem':'Nierozliczony z inwestorem'}: ${money(payment.paid)} · Pozostało: ${money(payment.remaining)}`;
 }
 export function effectiveReceipts(p){
- const invoiceReceipts=(p.invoiceSettlements||[]).flatMap(r=>(r.allocations||[]).filter(a=>a.paid>0).map(a=>({id:'invoice:'+r.id+':'+a.key,invoiceId:r.id,date:r.date,kind:['purchase','materials'].includes(a.kind)?'materials':'work',stageId:a.kind==='stage'?a.id:'',amount:a.paid,note:'Wpłata z faktury '+r.number})));
- const receipts=[...(p.receipts||[]),...invoiceReceipts,...(p.purchases||[]).filter(item=>item.paidAmount!=null&&purchasePayment({...item,invoicePayments:{}}).paid>0).map(item=>({id:'purchase-payment:'+item.id,purchaseId:item.id,date:item.date,kind:'materials',stageId:'',amount:purchasePayment({...item,invoicePayments:{}}).paid,note:`Rozliczenie zakupu: ${item.shop||''} — ${item.description||''}`}))];
+ const invoiceReceipts=(p.invoiceSettlements||[]).flatMap(r=>(r.allocations||[]).filter(a=>a.paid>0).map(a=>({id:'invoice:'+r.id+':'+a.key,invoiceId:r.id,date:a.date||r.date,kind:['purchase','materials'].includes(a.kind)?'materials':'work',stageId:a.kind==='stage'?a.id:'',amount:a.paid,note:'Wpłata z faktury '+r.number})));
+ const receipts=[...(p.receipts||[]),...invoiceReceipts,...(p.purchases||[]).filter(item=>item.paidAmount!=null&&purchasePayment({...item,invoicePayments:{},receiptPayments:{}}).paid>0).map(item=>({id:'purchase-payment:'+item.id,purchaseId:item.id,date:item.paidDate||item.date,kind:'materials',stageId:'',amount:purchasePayment({...item,invoicePayments:{},receiptPayments:{}}).paid,note:`Rozliczenie zakupu: ${item.shop||''} — ${item.description||''}`}))];
  return receipts.map(receipt=>{if(receipt.invoiceId)return receipt;const invoice=(p.invoiceSettlements||[]).find(r=>(r.existingReceipts||[]).some(x=>x.id===receipt.id));return invoice?{...receipt,invoiceId:invoice.id,note:`Wpłata z faktury ${invoice.number} — wcześniej odnotowana${receipt.note?': '+receipt.note:''}`}:receipt;});
 }
 // Presentation grouping only. Accounting keeps each allocation in effectiveReceipts.

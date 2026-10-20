@@ -60,9 +60,10 @@ export async function purchaseKsefXml(number){
  return new TextDecoder(bytes[0]===255&&bytes[1]===254?'utf-16le':bytes[0]===254&&bytes[1]===255?'utf-16be':'utf-8',{fatal:true}).decode(bytes);
 }
 export const purchaseKsefPreview=xml=>rpc('rs_ksef_purchase_preview',{p_xml:xml});
-export async function savePurchaseKsef(project,payload,link,indices,xml){
+export async function savePurchaseSettlement(project,payload,link,indices,xml){return savePurchaseKsef(project,payload,link,indices,xml,'rs_save_purchase_ksef_settlement');}
+export async function savePurchaseKsef(project,payload,link,indices,xml,endpoint='rs_save_purchase_ksef_form'){
  const args={p_project:project.id,p_revision:project.revision,p_number:link.ksef_number,p_xml:xml,p_indices:indices,p_expected_indices:link.document.selectedIndices??null,p_payload:payload};
- try{return await request('/rest/v1/rpc/rs_save_purchase_ksef_form',{method:'POST',body:JSON.stringify(args),timeoutMs:30000});}
+ try{return await request('/rest/v1/rpc/'+endpoint,{method:'POST',body:JSON.stringify(args),timeoutMs:30000});}
  catch(error){
   if(error.code==='RS_NETWORK_TIMEOUT'||error.name==='AbortError'||error.name==='TypeError'||/RS_CONFLICT/.test(error.message)){
    try{const rows=await request('/rest/v1/rs_projects?select=*&id=eq.'+encodeURIComponent(project.id));const row=rows[0],expected=structuredClone(payload);if(row){const actual=row.payload.purchases?.find(x=>x.sourceKsefNumber===link.ksef_number),submitted=expected.purchases?.find(x=>x.sourceKsefNumber===link.ksef_number);if(actual&&submitted&&sameData(actual.selectedKsefRows,indices))submitted.description=actual.description;}if(row&&row.revision>project.revision&&sameData(clean(row.payload),clean(expected)))return row;}catch{}

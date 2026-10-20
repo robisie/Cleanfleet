@@ -1,4 +1,4 @@
-export const VERSION='1.0.51';
+export const VERSION='1.0.52';
 export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['contract','Umowa'],['rooms','Pomieszczenia'],['offer','Oferta wstępna'],['works','Kalkulacja końcowa'],['payments','Etapy i płatności'],['journal','Dziennik prac'],['handover','Odbiór inwestycji'],['summary','Zestawienie prac'],['purchases','Zakupy i materiały']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -56,6 +56,21 @@ export function purchasePaymentLabel(item){
 export function effectiveReceipts(p){
  const invoiceReceipts=(p.invoiceSettlements||[]).flatMap(r=>(r.allocations||[]).filter(a=>a.paid>0).map(a=>({id:'invoice:'+r.id+':'+a.key,invoiceId:r.id,date:r.date,kind:a.kind==='purchase'?'materials':'work',stageId:a.kind==='stage'?a.id:'',amount:a.paid,note:'Wpłata z faktury '+r.number})));
  return [...(p.receipts||[]),...invoiceReceipts,...(p.purchases||[]).filter(item=>item.paidAmount!=null&&purchasePayment({...item,invoicePayments:{}}).paid>0).map(item=>({id:'purchase-payment:'+item.id,purchaseId:item.id,date:item.date,kind:'materials',stageId:'',amount:purchasePayment({...item,invoicePayments:{}}).paid,note:`Rozliczenie zakupu: ${item.shop||''} — ${item.description||''}`}))];
+}
+// Presentation grouping only. Accounting keeps each allocation in effectiveReceipts.
+export function receiptRows(p){
+ const rows=[],groups=new Map();
+ for(const receipt of effectiveReceipts(p)){
+  if(!receipt.invoiceId){rows.push({...receipt});continue;}
+  const key=JSON.stringify([receipt.invoiceId,receipt.date]);let group=groups.get(key);
+  if(!group){group={...receipt,amount:0,parts:[]};groups.set(key,group);rows.push(group);}
+  group.parts.push(receipt);group.amount=round(group.amount+receipt.amount);
+ }
+ return rows.map(r=>{
+  const parts=r.parts||[r],kinds=new Set(parts.map(x=>x.kind));
+  const labels=[...new Set(parts.map(x=>x.kind==='materials'?'Materiały':p.stages?.find(s=>s.id===x.stageId)?.name||'Rozliczenie końcowe'))];
+  return {...r,kindLabel:kinds.size>1?'Materiały i prace':r.kind==='materials'?'Zaliczka na materiały':'Za prace',stageLabel:labels.join(', ')};
+ });
 }
 export function purchaseTotals(p){
  const items=p.purchases||[],payments=items.map(purchasePayment);

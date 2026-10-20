@@ -11,7 +11,7 @@ async function setup(){
  const root={innerHTML:'',querySelector:node,querySelectorAll:()=>[]};let count=0;
  const context=vm.createContext({console,crypto,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,Blob,File,Map,Set,AbortController,DOMException,atob,btoa,setTimeout,clearTimeout,URL:{createObjectURL:blob=>{const key='blob:'+(count++);blobUrls.set(key,blob);return key;},revokeObjectURL:key=>blobUrls.delete(key)},window:{JSZip:Zip,CFKsefRenderer:{generateInvoice:async()=>new Blob(['%PDF-1.7 fixture'])}},DOMParser:class{parseFromString(){return {doctype:null,documentElement:{localName:'Faktura'},getElementsByTagName:()=>[]};}},document:{}});
  const code=await readFile(new URL('../bill/ksef.js',import.meta.url),'utf8');
- const m=new vm.SourceTextModule(code+`\nexport function setupTest(node,call,rows=[]){root=node;api=call;state=initial();state.loaded=true;state.rows=rows;state.query={kind:state.kind,from:state.from,to:state.to,dateType:state.dateType,sort:'Desc'};state.selected=new Set(rows.map(r=>r.ksefNumber));draw();}export {run,load,downloadSelected};export async function testAssignment(options,project,number){integration=options;chooseInvestment=async()=>project;await run(signal=>assignInvestment(number,signal));return message;}export function testState(){return {state,ready,message,busy:!!controller};}`,{context});
+ const m=new vm.SourceTextModule(code+`\nexport function setupTest(node,call,rows=[]){root=node;api=call;state=initial();state.loaded=true;state.rows=rows;state.query={kind:state.kind,from:state.from,to:state.to,dateType:state.dateType,sort:'Desc'};state.selected=new Set(rows.map(r=>r.ksefNumber));draw();}export {run,load,downloadSelected};export async function testAssignment(options,project,number,known=[]){integration=options;assignments=known;chooseInvestment=async()=>project;await run(signal=>assignInvestment(number,signal));return message;}export function testState(){return {state,ready,message,busy:!!controller};}`,{context});
  await m.link(spec=>{const values=spec.includes('ksef-data')?D:C;return new vm.SyntheticModule(Object.keys(values),function(){for(const[k,v]of Object.entries(values))this.setExport(k,v);},{context});});await m.evaluate();return {n:m.namespace,root,blobUrls,node};
 }
 const number=i=>'6351861297-20261016-123456789ABC-'+String(i).padStart(2,'0');
@@ -57,4 +57,11 @@ test('purchase assignment previews verified XML and forwards only chosen row ind
  n.setupTest(root,async()=>({content:Buffer.from(bytes).toString('base64')}),[entry]);
  const options={projects:[{id:'p',name:'Test'}],preview:async({xml})=>{assert.equal(xml,'<Faktura>rows</Faktura>');calls.push('preview');return {items:[{index:1},{index:2},{index:3}],canSelect:true};},loadLinks:async()=>[],assign:async args=>{calls.push('assign');assert.equal(args.project,'p');assert.deepEqual(Array.from(args.indices),[1,3]);return {document:{}};}};
  await n.testAssignment(options,{project:'p',indices:[1,3]},entry.ksefNumber);assert.deepEqual(calls,['preview','assign']);
+});
+
+test('existing purchase assignments reopen selection and carry the previous state into edit',async()=>{
+ const {n,root}=await setup(),bytes=new TextEncoder().encode('<Faktura>edit</Faktura>'),entry={...row(11),invoiceHash:await D.digest(bytes)},known={ksef_number:entry.ksefNumber,project_id:'old-project',kind:'purchases',selected_indices:[1,3]},saved=[];
+ n.setupTest(root,async()=>({content:Buffer.from(bytes).toString('base64')}),[entry]);
+ await n.testAssignment({projects:[{id:'old-project',name:'Test'}],preview:async()=>({canSelect:true,items:[]}),loadLinks:async()=>[known],assign:async args=>{saved.push(args);return {document:{}};}},{project:'old-project',indices:[2]},entry.ksefNumber,[known]);
+ assert.equal(saved.length,1);assert.equal(saved[0].previous.project_id,'old-project');assert.deepEqual(Array.from(saved[0].previous.selected_indices),[1,3]);assert.deepEqual(Array.from(saved[0].indices),[2]);assert.match(root.innerHTML,/Edytuj przypisanie/);
 });

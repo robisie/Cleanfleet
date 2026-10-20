@@ -24,6 +24,11 @@ export function logout(){session=null;localStorage.removeItem(SESSION_KEY);}
 
 export const call=(body,options={})=>request("/functions/v1/cleanfleet-bill",{method:"POST",body:JSON.stringify(body),timeoutMs:90000,...options});
 
-export const ksefAssignments=()=>request('/rest/v1/rs_ksef_links?select=ksef_number,project_id,kind');
+export const ksefAssignments=()=>request('/rest/v1/rs_ksef_links?select=ksef_number,project_id,kind,selected_indices:document->selectedIndices');
 export const previewKsefPurchase=({xml})=>request('/rest/v1/rpc/rs_ksef_purchase_preview',{method:'POST',body:JSON.stringify({p_xml:xml}),timeoutMs:30000});
-export const assignKsef=({project,number,kind,xml,billId,indices})=>request('/rest/v1/rpc/'+(kind==='purchases'?'rs_assign_ksef_selected':'rs_assign_ksef'),{method:'POST',body:JSON.stringify(kind==='purchases'?{p_project:project,p_number:number,p_xml:xml,p_indices:indices??null,p_bill_id:billId||null}:{p_project:project,p_number:number,p_kind:kind,p_xml:xml,p_bill_id:billId||null}),timeoutMs:30000});
+export const assignKsef=({project,number,kind,xml,billId,indices,previous})=>{
+ const editing=kind==='purchases'&&previous;
+ const rpc=editing?'rs_edit_ksef_purchase':kind==='purchases'?'rs_assign_ksef_selected':'rs_assign_ksef';
+ const body=editing?{p_project:project,p_number:number,p_xml:xml,p_indices:indices??null,p_expected_project:previous.project_id,p_expected_indices:previous.selected_indices??null}:kind==='purchases'?{p_project:project,p_number:number,p_xml:xml,p_indices:indices??null,p_bill_id:billId||null}:{p_project:project,p_number:number,p_kind:kind,p_xml:xml,p_bill_id:billId||null};
+ return request('/rest/v1/rpc/'+rpc,{method:'POST',body:JSON.stringify(body),timeoutMs:30000});
+};

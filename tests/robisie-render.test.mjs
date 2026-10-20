@@ -220,7 +220,7 @@ test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów
  assert.equal(savedSettings.length,1);
 
  module.namespace.testPurchaseDialog();assert.equal(node('#purchase-payment-state').value,'unpaid');assert.ok(node('#dialog').innerHTML.includes('list="shop-suggestions"'));assert.ok(node('#dialog').innerHTML.includes('<option value="Test">'));
- node('#purchase-payment-state').value='partial';node('#purchase-payment-state').onchange();node('#purchase-value-0').value='4';node('#purchase-value-0').oninput();
+ node('#f-charge').value='12';node('#f-amount').value='10';node('#purchase-payment-state').value='partial';node('#purchase-payment-state').onchange();node('#purchase-value-0').value='4';node('#purchase-value-0').oninput();
  await node('#modal-form').onsubmit({preventDefault(){},target:{date:'2026-10-09',shop:' Nowy Sklep ',amount:'10',charge:'12',description:'Testowy zakup',invoice:''}});
  assert.equal(module.namespace.testPayload().purchases.at(-1).paidAmount,4);
  assert.ok(module.namespace.testPurchases().includes('Częściowo rozliczono z inwestorem'));

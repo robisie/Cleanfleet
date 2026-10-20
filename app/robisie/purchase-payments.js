@@ -1,5 +1,5 @@
-import * as C from './core.js?v=1.0.61';
-import * as I from './invoices.js?v=1.0.61';
+import * as C from './core.js?v=1.0.62';
+import * as I from './invoices.js?v=1.0.62';
 
 export const eligible=row=>!!row?.number&&row.status!=='draft'&&row.originKind!=='purchases'&&!row.referenceOnly&&!row.payload?.correction&&row.payload?.currency==='PLN';
 export function rows(project,item){
@@ -24,6 +24,7 @@ export function apply(project,candidate,choice,invoices){
   if(old.paidAmount!=null&&C.round((old.paid?C.number(old.paidAmount):0)+C.invoicePurchasePaid(old)+C.receiptPurchasePaid(old))>charge)throw Error('Wybrane pozycje nie pokrywają zapisanych wpłat. Zmień rozliczenie zakupu.');
   p.purchases=p.purchases.map(x=>x.id===candidate.id?item:x);return I.refreshReceiptLinks(p);
  }
+ if(choice.state!=='unpaid'&&choice.rows.some(r=>!Number.isFinite(Number(r.amount))||Number(r.amount)<0))throw Error('Podaj prawidłową kwotę rozliczenia.');
  const list=choice.state==='unpaid'?[]:choice.rows.filter(r=>C.number(r.amount)>0||r.source==='legacy');
  if(!['unpaid','partial','full'].includes(choice.state)||!Number.isFinite(Number(candidate.charge))||charge<0)throw Error('Wybierz prawidłowy status i koszt zakupu.');
  if(list.some(r=>r.source==='legacy')){

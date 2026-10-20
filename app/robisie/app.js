@@ -1,9 +1,9 @@
-import * as PurchaseItems from './purchase-items.js?v=1.0.57';
-import * as BI from './invoices.js?v=1.0.57';
-import * as Auto from './autosave.js?v=1.0.57';
-import * as C from './core.js?v=1.0.57';
-import * as API from './api.js?v=1.0.57';
-import * as PDF from './pdf.js?v=1.0.57';
+import * as PurchaseItems from './purchase-items.js?v=1.0.58';
+import * as BI from './invoices.js?v=1.0.58';
+import * as Auto from './autosave.js?v=1.0.58';
+import * as C from './core.js?v=1.0.58';
+import * as API from './api.js?v=1.0.58';
+import * as PDF from './pdf.js?v=1.0.58';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',shopFilter=null,projectFilter='',projectSearch='',summarySort={key:'category',direction:1},mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set(),stageInvoiceCache=new Map();
@@ -244,113 +244,168 @@ async function purchaseDialog(id){
   if(selected?.id!==projectId||selected.revision!==revision||$('#dialog').open)throw Error('Widok inwestycji zmienił się. Otwórz zakup ponownie.');
  }
  const originalIndices=ksef?(ksef.link.document.selectedIndices||ksef.preview.items.map(item=>item.index)):[];
- const itemBlock=ksef?`<section class="purchase-invoice-items"><h3>Pozycje faktury z KSeF</h3><p class="muted">Zaznacz pozycje wliczane do kosztu tej inwestycji.…10704 tokens truncated…,line)&&previous.get(line.id).done)}));
- next.workDiscount=saved?saved.discount:number(offer.discount);
- next.changes=saved?structuredClone(saved.changes||[]):[];
- next.activeOfferVersion=offer.version;
- return next;
-}
-export function acceptOfferVersion(project,date=today()){
- if(!(project.offer||[]).some(line=>line.included!==false&&number(line.qty)>0))throw new Error('Dodaj przynajmniej jedną pracę z ilością.');
- const next=structuredClone(project),version=Math.max(0,...(next.acceptedOffers||[]).map(item=>number(item.version)))+1;
- next.acceptedOffers=next.acceptedOffers||[];
- next.acceptedOffers.push({version,date,lines:structuredClone(next.offer),discount:next.discount,materialEstimate:next.materialEstimate});
- next.status='oferta';
- return selectOfferVersion(next,version);
-}
-export function totals(p){
- const offer=workTotals(p.offer||[],p.discount,p.sourceCalculation?.offer),works=workTotals(p.works||[],p.workDiscount??p.discount,p.sourceCalculation?.works),materials=purchaseTotals(p);
- const accepted=activeOffer(p);
- const agreed=accepted?acceptedAmount(accepted):offer.after,workCredit=round(p.workCredit);
- const paid=round(effectiveReceipts(p).filter(x=>x.kind!=='materials').reduce((s,x)=>s+number(x.amount),0));
- return {offer,works,materials,agreed,paid,workCredit,remaining:round(p.calculationPrecision==='source'?((works.sourceAmountApplied?works.done:(p.works||[]).filter(l=>l.done).reduce((s,l)=>s+calculationValue(l),0)*(1-number(p.workDiscount??p.discount)/100))+(p.purchases||[]).reduce((s,x)=>s+purchasePayment(x).charged,0)-effectiveReceipts(p).reduce((s,x)=>s+number(x.amount),0)-workCredit):works.done+materials.charged-paid-materials.advances-workCredit),workRemaining:round(works.done-paid-workCredit),change:round(works.after-agreed)};
-}
-export function aggregate(lines){const map=new Map();for(const l of lines){if(l.included===false)continue;const key=l.serviceId+'|'+l.name+'|'+l.unit;const row=map.get(key)||{name:l.name,category:l.category,unit:l.unit,qty:0,value:0};row.qty+=number(l.qty);row.value=round(row.value+lineValue(l));map.set(key,row);}return [...map.values()].sort((a,b)=>a.category.localeCompare(b.category,'pl')||a.name.localeCompare(b.name,'pl'));}
-export function newProject(name,investor,date=today()){
- return {name,investor,address:'',investorAddress:'',phone:'',email:'',pesel:'',status:'przygotowanie',contractDate:date,contractPlace:'',startDate:'',endDate:'',discount:0,workDiscount:0,materialEstimate:0,rooms:[],offer:[],works:[],acceptedOffers:[],changes:[],purchases:[],receipts:[],journal:[],trips:[],stages:[{id:uid(),name:'Etap I',percent:40,description:'Prace demontażowe i przygotowawcze, pomiary i kalkulacja materiału',due:'',invoice:''},{id:uid(),name:'Etap II',percent:30,description:'Organizacja materiału, zabudowy i instalacje',due:'',invoice:''},{id:uid(),name:'Etap III',percent:30,description:'Prace wykończeniowe i końcowe rozliczenie',due:'',invoice:''}],paymentDays:7,materialAdvance:0,terminationPercent:0,contractText:'',handover:{date:'',receiver:'',notes:'',accepted:true}};
-}
-export function changeRecord(before,after){
- const a=new Map(before.map(x=>[x.id,x])),b=new Map(after.map(x=>[x.id,x]));const list=[];
- for(const [id,l] of b){const old=a.get(id);if(!old||JSON.stringify(old)!==JSON.stringify(l))list.push({id:uid(),date:today(),name:l.name,roomId:l.roomId,before:old||null,after:l,accepted:false});}
- for(const [id,l] of a)if(!b.has(id))list.push({id:uid(),date:today(),name:l.name,roomId:l.roomId,before:l,after:null,accepted:false});
- return list;
-}
-export function contractTemplate(project,settings){
- const p=project.payload,t=totals(p),company=settings.company||{};
- const stages=p.stages.map(s=>`${s.name}: ${quantity(s.percent)}% (${money(t.agreed*number(s.percent)/100)}), ${s.description}.`).join('\n');
- return `UMOWA O WYKONANIE PRAC REMONTOWYCH\nNumer: ${project.contract_number}\nZawarta dnia ${p.contractDate} w ${p.contractPlace||'……………………'}.\n\nZLECENIODAWCA\n${p.investor||'……………………'}, adres: ${p.investorAddress||'……………………'}, PESEL: ${p.pesel||'……………………'}.\n\nWYKONAWCA\n${company.name||'ROBISIĘ-FER sp. z o.o.'}, ${company.address||'……………………'}, NIP: ${company.nip||'6351861297'}, KRS: ${company.krs||'……………………'}, reprezentowany przez ${company.representative||'Michał Sobota – prezes zarządu'}.\n\n§1. Przedmiot umowy\nWykonawca zobowiązuje się wykonać prace remontowe w nieruchomości przy ${p.address||'……………………'}. Zakres i wynagrodzenie określa oferta ${attachment(project,'OFE',activeOffer(p)?.version||1)}. Wymiary pomieszczeń określa załącznik ${attachment(project,'WYM')}.\n\n§2. Termin\nRozpoczęcie: ${p.startDate||'do ustalenia'}. Zakończenie: ${p.endDate||'do ustalenia'}.\n\n§3. Przygotowanie lokalu\nZleceniodawca przygotuje lokal do prac, w szczególności opróżni remontowane pomieszczenia z mebli i dekoracji. Nieprzygotowanie lokalu, które bezpośrednio uniemożliwi lub wstrzyma prace, skutkuje karą umowną 600 zł brutto za każdy dzień roboczy przestoju.\n\n§4. Wynagrodzenie i materiały\nUzgodnione wynagrodzenie za prace wynosi ${money(t.agreed)}. Cena nie obejmuje materiałów. Zleceniodawca dostarcza je na bieżąco lub powierza Wykonawcy ich zakup w swoim imieniu. Uzgodniona zaliczka materiałowa wynosi ${money(p.materialAdvance)} i jest płatna przed rozpoczęciem prac. Zakupy zostaną szczegółowo rozliczone.\n\n§5. Dokumentacja\nZleceniodawca udzieli informacji i udostępni dokumenty potrzebne do prawidłowego wykonania prac. Prace wymagające zezwolenia nie zostaną wykonane bez odpowiedniej dokumentacji.\n\n§6. Rozliczenia\n${stages}\nZapłata nastąpi w ciągu ${p.paymentDays} dni od otrzymania faktury. Rachunek: ${company.account||'……………………'}. Zmiany zakresu i zakupy zostaną rozliczone końcowo zgodnie z kalkulacją ${attachment(project,'KAL-K')} i zestawieniem ${attachment(project,'ROZ')}.\n\n§7. Wykonanie i odbiór\nPrace będą wykonywane zgodnie ze sztuką budowlaną. Odbiór nastąpi zgodnie z ustaleniami stron oraz wymaganiami dotyczącymi wykonywanych prac.\n\n§8. Dostęp do lokalu\nZleceniodawca udostępni klucze na okres realizacji. Wprowadzanie dodatkowych ekip i wykonywanie prac mogących utrudnić realizację wymaga uzgodnienia z Wykonawcą.\n\n§9. Osoby trzecie\nZleceniodawca nie udostępni terenu prac osobom trzecim bez swojej obecności lub obecności Wykonawcy.\n\n§10. Zakończenie przed terminem\nRozliczenie nastąpi według szczegółowej kalkulacji wykonanych prac. Uzgodniona kara za nieuzasadnione rozwiązanie umowy lub niewywiązywanie się z niej wynosi ${quantity(p.terminationPercent)}% sumy końcowego rozliczenia.\n\n§11. Zmiany umowy\nZmiany wymagają formy pisemnej.\n\n§12. Pozostałe sprawy\nW sprawach nieuregulowanych mają zastosowanie przepisy kodeksu cywilnego.\n\n§13. Egzemplarze\nUmowę sporządzono w dwóch jednobrzmiących egzemplarzach, po jednym dla każdej strony.\n\nData i podpis Wykonawcy: ………………………\nData i podpis Inwestora: ………………………`;
-}
-
-// Catalog names and units are shared; each investment retains its price snapshot.
-export const catalogMarkup=(settings,project)=>number(project?.markup??settings.markup??35);
-export const serviceKey=service=>[service.category,service.name,service.unit].map(value=>String(value||'').trim().replace(/\s+/g,' ').toLocaleLowerCase('pl')).join('|');
-export function projectCatalog(settings,project){
- const snapshots=new Map((project?.catalog||[]).map(item=>[item.id,item]));
- return (settings.catalog||[]).map(item=>({...structuredClone(item),base:number(snapshots.get(item.id)?.base??item.base)}));
-}
-export function captureCatalog(settings,project){return {...project,catalog:projectCatalog(settings,project),markup:catalogMarkup(settings,project)};}
-export function catalogCorrectionPreview(catalog,percent){
- const raw=String(percent??'').trim().replace(',','.');const value=Number(raw);
- if(!raw||!Number.isFinite(value)||value<=-100||value>1000||value===0)throw new Error('Wpisz korektę różną od zera, większą niż −100% i nie większą niż 1000%.');
- return catalog.map(item=>({id:item.id,name:item.name,category:item.category,before:round(item.base),after:round(number(item.base)*(1+value/100))}));
-}
-export function correctCatalog(settings,percent,reason='',date=new Date().toISOString()){
- const changes=catalogCorrectionPreview(settings.catalog||[],percent);
- if(!changes.length)throw new Error('Cennik jest pusty.');
- const next=structuredClone(settings),prices=new Map(changes.map(item=>[item.id,item.after]));
- next.catalog=next.catalog.map(item=>({...item,base:prices.get(item.id)}));
- next.catalogCorrections=[...(next.catalogCorrections||[]),{id:uid(),date,percent:number(percent),reason:String(reason).trim(),changes}];
- return next;
-}
-export function lastCatalogCorrection(settings){return (settings.catalogCorrections||[]).filter(item=>!item.undoneAt).at(-1);}
-export function undoCatalogCorrection(settings,date=new Date().toISOString()){
- const last=lastCatalogCorrection(settings);if(!last)throw new Error('Brak korekty do cofnięcia.');
- const prices=new Map((settings.catalog||[]).map(item=>[item.id,item.base]));
- if(last.changes.some(item=>!prices.has(item.id)||round(prices.get(item.id))!==item.after))throw new Error('Po korekcie zmieniono ceny usług. Cofnięcie nadpisałoby te zmiany.');
- const next=structuredClone(settings),previous=new Map(last.changes.map(item=>[item.id,item.before]));
- next.catalog=next.catalog.map(item=>previous.has(item.id)?{...item,base:previous.get(item.id)}:item);
- next.catalogCorrections=next.catalogCorrections.map(item=>item.id===last.id?{...item,undoneAt:date}:item);
- return next;
-}
-
-// Parse arithmetic as numbers and operators only; never execute user-provided code.
-export function calculateNumber(input){
- const source=String(input??'').trim().replaceAll(',','.').replaceAll('−','-').replaceAll('×','*').replaceAll('÷','/');
- if(!source||source.length>500)throw new Error('Wpisz liczbę lub działanie, np. 25+3+7-2.');
- let position=0,depth=0;
- const error=()=>{throw new Error('Nieprawidłowe działanie. Użyj liczb, +, −, *, / i nawiasów.');};
- const space=()=>{while(/\s/.test(source[position]||'')&&position<source.length)position++;};
- function primary(){space();if(++depth>40)error();let value;
-  const token=source[position];
-  if(token==='+'||token==='-'){position++;value=(token==='-'?-1:1)*primary();}
-  else if(token==='('){position++;value=sum();space();if(source[position++]!==')')error();}
-  else {const match=source.slice(position).match(/^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?/i);if(!match)error();position+=match[0].length;value=Number(match[0]);}
-  depth--;return value;
+ const itemBlock=ksef?`<section class="purchase-invoice-items"><h3>Pozycje faktury z KSeF</h3><p class="muted">Zaznacz pozycje wliczane do kosztu tej inwestycji. Ten sam wybór będzie widoczny w Bill.</p>${ksef.preview.warning?`<p class="notice">${esc(ksef.preview.warning)}</p>`:''}${ksef.preview.canSelect?'<div class="actions"><button type="button" id="purchase-items-all">Zaznacz wszystkie</button><button type="button" id="purchase-items-none">Odznacz wszystkie</button></div>':''}${table(['Wlicz','Pozycja','Ilość','VAT','Brutto'],ksef.preview.items.map(item=>`<tr><td><input type="checkbox" name="ksef-item" value="${item.index}" aria-label="Wlicz ${esc(item.name||'pozycję')}" ${originalIndices.includes(item.index)?'checked':''} ${!ksef.preview.canSelect?'disabled':''}></td><td>${esc(item.name||'Pozycja '+item.index)}</td><td>${esc(item.quantity??'—')} ${esc(item.unit||'')}</td><td>${esc(item.vat||'—')}</td><td class="num">${item.gross==null?'—':money(item.gross)}</td></tr>`).join(''))}<p id="purchase-items-total" class="notice" aria-live="polite"></p><p id="purchase-items-error" class="error" role="alert"></p></section>`:loadError?`<p class="notice error">${esc(loadError)}. Możesz edytować zapisane dane zakupu; wybór pozycji wymaga ponownego wczytania faktury.</p>`:'';
+ const links=id?BI.purchaseLinks(p(),id):[];
+ const detachBlock=id&&(links.length||x.paidAmount!=null&&C.purchasePayment(x).paid>0)?`<section class="notice"><h3>Rozliczenie z inwestorem</h3><p>${links.length?'Powiązane faktury sprzedażowe: '+links.map(r=>esc(r.number)).join(', '):'Ten zakup ma ręcznie zapisaną wpłatę od inwestora.'}</p><p>Odłączenie pozostawi otrzymane pieniądze jako zaliczkę na materiały w „Etapach i płatnościach”. Zakup i jego dokument pozostaną bez zmian.</p><button type="button" id="purchase-detach">Odłącz wpłaty i faktury sprzedażowe od zakupu</button></section>`:'';
+ const payment=C.purchasePayment(x);let automaticPaidAmount=!id||payment.state==='full';
+ modal(id?'Edytuj zakup':'Nowy zakup',`<div class="grid">${input('date','Data',x.date,'date','required')}${input('shop','Sklep',x.shop,'text','required list="shop-suggestions" autocomplete="off"')+`<datalist id="shop-suggestions">${shopSuggestions().map(shop=>`<option value="${esc(shop)}"></option>`).join('')}</datalist>`}${input('amount','Rzeczywista kwota zakupu (zł)',x.amount,'number','min="0" step="0.01" required')}${input('charge','Koszt przypisany inwestorowi (zł)',x.charge,'number','min="0" step="0.01" required')}${input('invoice','Numer faktury / paragonu',x.invoice)}</div>${itemBlock}${ksef?'<details><summary>Opis zaznaczonych pozycji</summary>'+text('description','Opis zakupu',x.description,'required readonly')+'</details>':text('description','Opis zakupu',x.description,'required')}${detachBlock}<h3>Wpłata od inwestora na ten zakup</h3><p class="muted">To rozliczenie pieniędzy otrzymanych od inwestora. Faktura zakupowa z KSeF zapisuje koszt; nie potwierdza otrzymania zaliczki ani zapłaty w sklepie.</p><label class="inline-check"><input type="checkbox" id="purchase-paid" name="paid" ${payment.paid>0?'checked':''}> Odnotowano wpłatę inwestora na ten zakup</label><button type="button" id="purchase-pay-full">Opłacono w całości przez inwestora</button><div id="purchase-payment" ${payment.paid>0?'':'hidden'}>${input('paidAmount','Łącznie otrzymano od inwestora na ten zakup (zł)',x.paidAmount==null&&x.paid?x.charge:payment.paid,'number',`min="0" step="0.01" required ${payment.paid>0?'':'disabled'}`)}<p class="muted">Wpisz tylko pieniądze faktycznie otrzymane na ten zakup, z uwzględnieniem przypisanych wpływów z faktur sprzedażowych. Jeśli zaliczka jest już zapisana w „Etapach i płatnościach”, nie wpisuj jej tutaj ponownie.</p></div>`,async fd=>{
+  const amount=C.number(fd.get('amount')),charge=C.number(fd.get('charge')),paid=fd.has('paid'),paidAmount=paid?C.number(fd.get('paidAmount')):0;
+  if(paidAmount<0||paidAmount>charge)throw new Error('Opłacona kwota musi mieścić się między 0 a kosztem przypisanym inwestorowi.');
+  const linkedPaid=C.invoicePurchasePaid(x);if(paidAmount<linkedPaid)throw Error('Kwota jest niższa niż wpływy przypisane z faktur. Najpierw zmień rozliczenie w sekcji Faktury.');
+  const shop=await rememberShop(fd.get('shop'));
+  const entered=Object.fromEntries(fd);delete entered['ksef-item'];
+  const selection=ksef?PurchaseItems.itemSelection(ksef.preview,ksef.preview.canSelect?fd.getAll('ksef-item').map(Number):originalIndices):null;
+  const changed=selection&&JSON.stringify(selection.indices)!==JSON.stringify([...originalIndices].sort((a,b)=>a-b));
+  const item={...x,...entered,shop,amount,charge:C.number(fd.get('charge')),paid,paidAmount:C.round(paidAmount-linkedPaid)};
+  // Preserve zero-value historical adjustments that carry an investor cost.
+  if(id&&!linkedPaid&&x.paidAmount==null&&paid===x.paid&&paidAmount===(x.paid?C.number(x.charge):0))delete item.paidAmount;
+  if(changed){item.amount=selection.total;item.description=selection.description||x.description;item.invoiceItems=selection.items;item.selectedKsefRows=selection.indices;item.invoiceGrossAmount=ksef.preview.gross;}
+  const next=structuredClone(p());if(id)next.purchases=next.purchases.map(r=>r.id===id?item:r);else next.purchases.push(item);BI.refreshReceiptLinks(next);
+  if(changed){
+   if(!ksef.xml)ksef.xml=await API.purchaseKsefXml(x.sourceKsefNumber);
+   await writes.run(async()=>{const result=await API.savePurchaseKsef(selected,next,ksef.link,selection.indices,ksef.xml),row=Array.isArray(result)?result[0]:result;selected=structuredClone(row);all=all.map(r=>r.id===row.id?structuredClone(row):r);projectDirty=false;saveError='';drafts.remove('project:'+row.id);updateSaveState();});
+  }else{selected.payload=next;markDirty();}
+ },id?()=>{if(BI.purchaseLinks(p(),id).length||x.paidAmount!=null&&C.purchasePayment(x).paid>0)throw Error('Użyj przycisku „Odłącz wpłaty i faktury sprzedażowe od zakupu”, a następnie usuń zakup. Otrzymane zaliczki pozostaną zapisane.');p().purchases=p().purchases.filter(r=>r.id!==id);}:null,ksef?'scroll-modal purchase-items-modal':'');
+ if($('#purchase-detach')&&detachBlock)$('#purchase-detach').onclick=async()=>{if(!confirm('Odłączyć zapisane wpłaty i faktury sprzedażowe od tego zakupu? Otrzymane pieniądze pozostaną jako zaliczki na materiały. Dokument zakupu pozostanie przypisany. Niezapisane zmiany pól tego formularza nie zostaną zachowane.'))return;const button=$('#purchase-detach');button.disabled=true;try{selected.payload=BI.detachPurchase(p(),id);markDirty();closeModal();await flushChanges({normalize:false});render();toast('Odłączono rozliczenie zakupu. Otrzymane zaliczki zachowano.');}catch(error){if(dirty){saveFailed(error);render();}else toast(error.message);}finally{button.disabled=false;}};
+ $('#purchase-pay-full').onclick=()=>{automaticPaidAmount=true;$('#purchase-paid').checked=true;$('#purchase-payment').hidden=false;$('#f-paidAmount').disabled=false;$('#f-paidAmount').value=$('#f-charge').value;};
+ $('#purchase-paid').onchange=()=>{const checked=$('#purchase-paid').checked;$('#purchase-payment').hidden=!checked;$('#f-paidAmount').disabled=!checked;};
+ $('#f-paidAmount').oninput=()=>{automaticPaidAmount=false;};
+ $('#f-charge').oninput=()=>{if(automaticPaidAmount)$('#f-paidAmount').value=$('#f-charge').value;};
+ $('#f-amount').oninput=()=>{if(!id){$('#f-charge').value=$('#f-amount').value;if(isNumericInput($('#f-charge')))commitNumericInput($('#f-charge'));}if(automaticPaidAmount&&!id)$('#f-paidAmount').value=$('#f-charge').value;};
+ if(ksef){
+  $('#f-amount').readOnly=true;
+  const boxes=[...$('#dialog').querySelectorAll('input[name="ksef-item"]')];
+  const update=(change=false)=>{try{const choice=PurchaseItems.itemSelection(ksef.preview,ksef.preview.canSelect?boxes.filter(box=>box.checked).map(box=>Number(box.value)):originalIndices);$('#purchase-items-total').textContent=`Wliczone do inwestycji: ${money(choice.total)} · ${choice.indices.length} z ${ksef.preview.items.length} pozycji · cała faktura: ${money(ksef.preview.gross)}`;$('#purchase-items-error').textContent='';$('#modal-form').querySelector('[type="submit"]').disabled=false;if(change){automaticPaidAmount=false;$('#f-amount').value=choice.total;$('#f-charge').value=choice.total;$('#f-description').value=choice.description||x.description;}}catch(error){$('#purchase-items-error').textContent=error.message;$('#modal-form').querySelector('[type="submit"]').disabled=true;}};
+  for(const box of boxes)box.onchange=()=>update(true);
+  for(const [button,checked] of [['purchase-items-all',true],['purchase-items-none',false]])if($('#'+button))$('#'+button).onclick=()=>{for(const box of boxes)box.checked=checked;update(true);};
+  update();
  }
- function product(){let value=primary();space();while(source[position]==='*'||source[position]==='/'){const op=source[position++],right=primary();if(op==='/'&&right===0)throw new Error('Nie można dzielić przez zero.');value=op==='*'?value*right:value/right;space();}return value;}
- function sum(){let value=product();space();while(source[position]==='+'||source[position]==='-'){const op=source[position++],right=product();value=op==='+'?value+right:value-right;space();}return value;}
- const value=sum();space();if(position!==source.length)error();if(!Number.isFinite(value))throw new Error('Wynik działania jest zbyt duży.');
- return Object.is(value,-0)?0:Number.isInteger(value)||/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(source)?value:Number(value.toPrecision(15));
 }
 
-export function categoryNames(values){const names=new Map();for(const value of values){const name=String(value||'').trim().replace(/\s+/g,' '),key=name.toLocaleLowerCase('pl');if(name&&!names.has(key))names.set(key,name);}return [...names.values()].sort((a,b)=>a.localeCompare(b,'pl'));}
-export function canonicalCategory(value,names){const name=String(value||'').trim().replace(/\s+/g,' ');if(!name)throw new Error('Wybierz lub wpisz kategorię pracy.');return names.find(x=>x.toLocaleLowerCase('pl')===name.toLocaleLowerCase('pl'))||name;}
-export function roomWalls(room){if(!room)return [];const parts=room.parts?.length?room.parts:[room];return parts.flatMap((part,i)=>[part.length,part.width,part.length,part.width].map((length,j)=>({id:`${i}-${j}`,name:`${parts.length>1?`Część ${i+1} · `:''}Ściana ${j+1}`,length:number(length),height:number(part.height??room.height),area:roundUp(number(length)*number(part.height??room.height))})));}
-export function selectedWallArea(walls){if(!walls.length)throw new Error('Zaznacz przynajmniej jedną ścianę.');return roundUp(walls.reduce((sum,wall)=>{const area=number(wall.area),deduction=calculateNumber(wall.deduction||0);if(area<=0)throw new Error('Uzupełnij dodatnie wymiary pomieszczenia.');if(deduction<0||deduction>area)throw new Error('Odliczenie musi mieścić się między zerem a powierzchnią ściany.');return sum+area-deduction;},0));}
-
-export function selectedSurfaceArea(room,walls,surfaces={}){if(!room)throw new Error('Wybierz pomieszczenie.');if(!walls.length&&!surfaces.walls&&!surfaces.floor&&!surfaces.ceiling)throw new Error('Zaznacz ściany, sufit lub podłogę.');const areas=roomArea(room);return roundUp((surfaces.walls?areas.walls:walls.length?selectedWallArea(walls):0)+(surfaces.floor?areas.floor:0)+(surfaces.ceiling?areas.ceiling:0));}
-
-// Saved routes belong to one Robisię project. Offer lines retain a priced snapshot.
-export const isTravelService=name=>/^dojazd(?:y)?(?:\s|$|[—–-])/i.test(String(name||'').trim());
-export function savedTrip(data,id=uid()){
- const name=String(data.name||'').trim(),points=data.points;
- if(!name||name.length>200)throw new Error('Podaj nazwę trasy (maksymalnie 200 znaków).');
- if(!Array.isArray(points)||points.length<2||!points.every(point=>point.label&&Array.isArray(point.coords)&&point.coords.length===2&&point.coords.every(Number.isFinite)&&Math.abs(point.coords[0])<=180&&Math.abs(point.coords[1])<=90))throw new Error('Potwierdź wszystkie adresy trasy.');
- const meters=Number(data.meters),consumption=Number(data.consumption),price=Number(data.price);
- if(![meters,consumption,price].every(Number.isFinite)||meters<0||consumption<=0||price<=0)throw new Error('Oblicz trasę z poprawną ceną paliwa i spalaniem.');
- const km=meters/1000,liters=km*consumption/100;
- return {...structuredClone(data),id,name,meters,consumption,price,km,liters,cost:round(liters*price)};
+function stageDialog(id){const x=p().stages.find(x=>x.id===id)||{id:C.uid(),name:'',percent:0,description:'',due:'',invoice:''};modal(id?'Edytuj etap':'Nowy etap',input('name','Nazwa',x.name,'text','required')+`<div class="grid">${input('percent','Udział (%)',x.percent,'number','min="0" max="100" step="0.01" required')}${input('due','Termin płatności',x.due,'date')}${input('invoice','Numer / data faktury',x.invoice)}</div>`+text('description','Zakres etapu',x.description),fd=>{const item={...x,...Object.fromEntries(fd),percent:C.number(fd.get('percent'))};if(id)p().stages=p().stages.map(r=>r.id===id?item:r);else p().stages.push(item);markDirty();},id?()=>{if(C.effectiveReceipts(p()).some(r=>r.stageId===id)||(p().invoiceSettlements||[]).some(r=>r.allocations.some(a=>a.kind==='stage'&&a.id===id)))throw new Error('Najpierw zmień przypisanie wpłat tego etapu.');p().stages=p().stages.filter(r=>r.id!==id);}:null);}
+function journalDialog(id){const x=p().journal.find(x=>x.id===id)||{id:C.uid(),date:C.today(),roomId:'',description:'',investorConfirmed:false,contractorConfirmed:false};modal(id?'Edytuj wpis':'Nowy wpis dziennika',input('date','Data',x.date,'date','required')+`<div class="field"><label>Pomieszczenie</label><select name="roomId"><option value="">Cała inwestycja</option>${p().rooms.map(r=>`<option value="${r.id}" ${r.id===x.roomId?'selected':''}>${esc(r.name)}</option>`).join('')}</select></div>`+text('description','Opis prac / ustaleń',x.description,'required')+`<label class="inline-check"><input type="checkbox" name="investorConfirmed" ${x.investorConfirmed?'checked':''}> Potwierdzone przez inwestora</label><label class="inline-check"><input type="checkbox" name="contractorConfirmed" ${x.contractorConfirmed?'checked':''}> Potwierdzone przez wykonawcę</label>`,fd=>{const item={...x,...Object.fromEntries(fd),investorConfirmed:fd.has('investorConfirmed'),contractorConfirmed:fd.has('contractorConfirmed')};if(id)p().journal=p().journal.map(r=>r.id===id?item:r);else p().journal.push(item);markDirty();},id?()=>p().journal=p().journal.filter(r=>r.id!==id):null);}
+async function rememberService(line){const key=C.serviceKey(line),existing=config.payload.catalog.find(item=>C.serviceKey(item)===key||(!item.unit&&C.serviceKey({...line,unit:''})===C.serviceKey(item)));if(existing){line.serviceId=existing.id;return;}const item={id:C.uid(),name:String(line.name).trim(),category:line.category,unit:line.unit,base:C.round(line.price/(1+currentMarkup()/100))};const payload=structuredClone(config.payload);payload.catalog.push(item);await persistCatalog(payload);line.serviceId=item.id;}
+function serviceDialog(id){const x=config.payload.catalog.find(x=>x.id===id)||{id:C.uid(),name:'',category:'',base:0,unit:''};modal(id?'Edytuj usługę we wspólnym katalogu':'Nowa usługa we wspólnym katalogu',input('name','Nazwa usługi',x.name,'text','required')+categoryField(x.category)+unitField(x.unit,false)+input('base','Cena bazowa (zł)',x.base,'number','min="0" step="0.01" required')+'<p class="muted">Usługa jest wspólna dla wszystkich inwestycji. Istniejące inwestycje zachowują zapisane ceny bazowe i ceny w ofertach.</p>',async fd=>{const unit=readUnit(fd,false);await rememberUnit(unit);const item={...x,name:String(fd.get('name')).trim(),category:C.canonicalCategory(fd.get('category'),categorySuggestions()),unit,base:C.number(fd.get('base'))};const payload=structuredClone(config.payload);const duplicate=payload.catalog.find(service=>service.id!==item.id&&C.serviceKey(service)===C.serviceKey(item));if(duplicate)throw new Error('Taka usługa już jest w cenniku.');if(payload.catalog.some(service=>service.id===item.id))payload.catalog=payload.catalog.map(service=>service.id===item.id?item:service);else payload.catalog.push(item);await persistCatalog(payload);toast('Zapisano usługę we wspólnym cenniku.');});bindUnitField();}
+async function removeService(id){if(busy||selected)return;if(dirty){toast('Poczekaj na automatyczny zapis ustawień.');return;}const service=config.payload.catalog.find(item=>item.id===id);if(!service)return;if(!confirm(`Usunąć usługę „${service.name}” z głównego cennika?\n\nZapisane pozycje ofert i realizacji oraz ich ceny pozostaną bez zmian. Usługa zniknie z listy wyboru przy dodawaniu nowych prac.`))return;busy=true;try{const payload=structuredClone(config.payload);payload.catalog=payload.catalog.filter(item=>item.id!==id);await persistCatalog(payload);render();toast('Usunięto usługę z głównego cennika.');}finally{busy=false;}}
+async function removeProject(id){if(busy)return;const project=all.find(x=>x.id===id);if(!project)return;if(!confirm(`Usunąć inwestycję „${project.payload.name}” (${project.contract_number})?\n\nUsunięte zostaną jej pomieszczenia, prace, rozliczenia i historia. Tej operacji nie można cofnąć. Numer umowy nie zostanie użyty ponownie.`))return;busy=true;try{const deleted=await API.deleteProject(project);if(deleted!==project.id)throw new Error('Nie potwierdzono usunięcia inwestycji. Odśwież listę.');all=all.filter(x=>x.id!==id);if(selected?.id===id){selected=null;view='dashboard';dirty=false;}render();toast('Usunięto inwestycję.');}finally{busy=false;}}
+async function setOfferVersion(version,newVersion=false){if(busy)return;normalizeNumericFields(document);const before=structuredClone(selected),wasDirty=dirty;try{selected.payload=newVersion?C.acceptOfferVersion(p()):C.selectOfferVersion(p(),version);markDirty();await save();toast(`Oferta V${p().activeOfferVersion} obowiązuje w kalkulacji końcowej.`);}catch(error){selected=before;projectDirty=wasDirty;if(projectDirty)keepDraft('project');else drafts.remove('project:'+selected.id);updateSaveState();render();throw error;}}
+function updateWorkStatus(data){if(['przygotowanie','oferta'].includes(data.status)&&(data.works||[]).some(line=>line.done===true))data.status='prace';}
+async function save({normalize=true,renderUI=true,feedback=true}={}){
+ if(normalize)normalizeNumericFields(document);
+ return writes.run(async()=>{
+  if(!selected)return;const current=structuredClone(selected),before=all.find(row=>row.id===current.id),submitted=structuredClone(current.payload);
+  const data=C.captureCatalog(config.payload,Auto.snapshot(submitted));updateWorkStatus(data);
+  const previous=before?.payload;
+  if(previous&&previous.activeOfferVersion===data.activeOfferVersion&&!(previous.works.length===0&&data.acceptedOffers.length>previous.acceptedOffers.length)){const normalize=rows=>rows.map(({done,...rest})=>rest);data.changes.push(...C.changeRecord(normalize(previous.works),normalize(data.works)));}
+  if(previous&&Auto.samePayload(previous,data)){projectDirty=false;drafts.remove('project:'+current.id);updateSaveState();return;}
+  const result=await API.saveProject({...current,payload:previous||{}},Auto.withUndo(data,previous)),row=Array.isArray(result)?result[0]:result;
+  all=all.map(item=>item.id===row.id?structuredClone(row):item);
+  if(selected?.id===row.id){const editedMeanwhile=!Auto.samePayload(selected.payload,submitted);if(editedMeanwhile){selected.revision=row.revision;selected.payload=Auto.mergeEdits(row.payload,submitted,selected.payload);projectDirty=true;keepDraft('project');scheduleSave();}else{selected=structuredClone(row);projectDirty=false;drafts.remove('project:'+row.id);}}
+  saveError='';updateSaveState();if(renderUI&&!projectDirty)render();if(feedback)toast('Zapisano automatycznie.');
+ }).catch(error=>{keepDraft('project');throw error;}).finally(updateSaveState);
 }
-export function tripLineData(trip){
- return {name:'Dojazd — '+trip.name,unit:'szt.',price:round(trip.cost),travelBasis:structuredClone(trip)};
+async function saveConfig({normalize=true,renderUI=true,feedback=true}={}){if(normalize)normalizeNumericFields(document);await persistCatalog(structuredClone(config.payload));if(renderUI&&!settingsDirty)render();if(feedback)toast('Zapisano automatycznie.');}
+async function flushChanges({normalize=true}={}){
+ clearTimeout(autoSaveTimer);if(normalize)normalizeNumericFields(document);
+ if(!normalize&&[...document.querySelectorAll('input[data-numeric="true"]')].some(el=>!el.disabled&&!(el.closest?.('dialog')&&!el.closest('dialog').open)&&(el.dataset.field||el.dataset.config||el.dataset.line)&&el.validationMessage))return;
+ if(settingsDirty)await saveConfig({normalize:false,renderUI:false,feedback:false});
+ if(projectDirty)await save({normalize:false,renderUI:false,feedback:false});
+ await writes.idle();updateSaveState();
+ // Save any edit made while the first request was in flight before navigating.
+ if(normalize&&(settingsDirty||projectDirty))await flushChanges({normalize:false});
 }
+async function undoChanges(){
+ await flushChanges();const scope=undoScope(),row=scope==='settings'?config:selected,undo=row?.payload._undo;if(!undo){toast('Nie ma zapisanej zmiany do cofnięcia.');return;}
+ if(scope==='project'&&p().status==='zakonczona'&&undo.payload.status!=='zakonczona'&&!confirm('Cofnąć zakończenie inwestycji i usunąć powiązany wpis z Moich zarobków?'))return;
+ await writes.run(async()=>{if(scope==='settings'){const result=await API.saveSettings(Auto.snapshot(undo.payload),config.revision,config.payload);acceptConfig(result);settingsDirty=false;drafts.remove('settings');}else{const result=await API.saveProject(selected,Auto.snapshot(undo.payload));selected=Array.isArray(result)?result[0]:result;all=all.map(item=>item.id===selected.id?structuredClone(selected):item);projectDirty=false;drafts.remove('project:'+selected.id);}saveError='';updateSaveState();render();toast('Cofnięto ostatnio zapisaną zmianę.');}).finally(updateSaveState);
+}
+function pdfDialog(){if(dirty){toast('Poczekaj na automatyczny zapis przed przygotowaniem dokumentu.');return;}const initial=view==='overview'?PDF.MODULES.map(([key])=>key):[view];modal('Wybierz części dokumentu PDF',`<p class="muted">Wybrane części zostaną połączone w jeden dokument. Każda rozpocznie się na nowej stronie.</p><div class="row" style="margin-bottom:16px">${btn('pdf-all','Zaznacz wszystkie')}${btn('pdf-none','Odznacz wszystkie')}</div><div class="pdf-choices">${PDF.MODULES.map(([key,label])=>`<label class="pdf-choice"><input type="checkbox" name="pdfModule" value="${key}" ${initial.includes(key)?'checked':''}><span>${esc(label)}</span></label>`).join('')}</div>`,fd=>{const modules=fd.getAll('pdfModule');if(!modules.length)throw new Error('Wybierz przynajmniej jedną część dokumentu.');printDoc(view,null,modules);},null,'','Otwórz dokument PDF');}
+function printDoc(which=view,offer,modules){if(dirty)throw new Error('Poczekaj na automatyczny zapis przed przygotowaniem dokumentu.');const logoUrl=new URL('./assets/robisie-logo.png?v='+C.VERSION,window.location.href).href,html=PDF.buildDocument(selected,config.payload,{modules:modules||[which==='overview'?'data':which],logoUrl,offer});const win=window.open('','_blank');if(!win)throw new Error('Zezwól na otwarcie dokumentu w nowej karcie.');win.document.write(html);win.document.close();}
+document.addEventListener('submit',async e=>{if(e.target.id!=='login')return;e.preventDefault();const f=new FormData(e.target),b=e.target.querySelector('button');b.disabled=true;try{await API.login(f.get('email'),f.get('password'));await load();}catch(err){loginView(err.message);}});
+document.addEventListener('input',e=>{const el=e.target;
+ if(isNumericInput(el)){try{const value=numericInputValue(el);el.setCustomValidity('');el.removeAttribute('aria-invalid');writeNumericValue(el,value);}catch(error){el.setCustomValidity(error.message);if(el.dataset.field||el.dataset.config||el.dataset.line)markDirty();}return;}
+
+ if(el.id==='search-projects'){projectSearch=el.value;$('#project-list').innerHTML=filteredProjectRows();return;}
+ if(el.dataset.field==='status'&&p().status==='zakonczona'&&el.value!=='zakonczona'&&!confirm('Cofnąć zakończenie inwestycji? Powiązany wpis zostanie usunięty z Moich zarobków.')){el.value='zakonczona';return;}
+ if(el.dataset.field){p()[el.dataset.field]=el.type==='number'?C.number(el.value):el.value;markDirty();}
+ if(el.dataset.handover){p().handover[el.dataset.handover]=el.type==='checkbox'?el.checked:el.value;markDirty();}
+ if(el.dataset.config){config.payload[el.dataset.config]=C.number(el.value);markDirty('settings');}
+ if(el.dataset.company){config.payload.company[el.dataset.company]=el.value;markDirty('settings');}
+ if(el.dataset.line){const l=p()[el.dataset.kind].find(x=>x.id===el.dataset.line);l[el.dataset.prop]=el.type==='checkbox'?el.checked:C.number(el.value);if(el.dataset.kind==='works'&&el.dataset.prop==='done'&&el.checked)updateWorkStatus(p());markDirty();}
+});
+document.addEventListener('focusout',e=>{if(isNumericInput(e.target)&&!commitNumericInput(e.target))return;if(!e.target.closest?.('dialog')&&dirty)flushChanges({normalize:false}).catch(saveFailed);});
+document.addEventListener('keydown',e=>{if(isNumericInput(e.target)&&e.key==='Enter'){e.preventDefault();if(commitNumericInput(e.target,true)){if(e.target.dataset.line||e.target.dataset.field||e.target.dataset.config)render();else e.target.blur();}return;}if(e.target.dataset?.projectRow&&['Enter',' '].includes(e.key)){e.preventDefault();e.target.click();}});
+document.addEventListener('toggle',e=>{const el=e.target,key=el.dataset?.roomGroup;if(!key||!el.isConnected)return;if(el.open)openRoomGroups.add(key);else openRoomGroups.delete(key);},true);
+document.addEventListener('change',e=>{if(isNumericInput(e.target)&&!commitNumericInput(e.target))return;if(e.target.id==='line-room'){lineFilter=e.target.value;render();}else if(e.target.dataset.line||e.target.dataset.field==='discount'||e.target.dataset.field==='workDiscount'||e.target.dataset.field==='markup'||e.target.dataset.config==='markup')render();if(!e.target.closest?.('dialog')&&dirty)flushChanges({normalize:false}).catch(saveFailed);});
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const a=b.dataset.action,id=b.dataset.id;try{
+ if(a==='close'){if(modalSubmitting)return;closeModal();return;}if(a==='delete')return;
+ if(a==='stage-invoice'){e.preventDefault();const tab=window.open('about:blank','_blank');if(tab)tab.opener=null;try{await flushChanges();if(tab)tab.location.href=b.href;else window.location.href=b.href;}catch(error){tab?.close();throw error;}return;}
+ if(a==='menu'){mobileOpen=!mobileOpen;$('nav').classList.toggle('open',mobileOpen);return;}
+ if(!b.closest?.('dialog')&&!['undo-changes','draft-restore','draft-discard','reload','logout','nav','back','open'].includes(a))await flushChanges();
+ if(a==='logout'){await flushChanges();API.logout();selected=null;dirty=false;loginView();return;}
+ if(a==='reload'){if(/RS_CONFLICT/.test(saveError)){await writes.idle();await load();}else{await flushChanges();await load();}return;}
+ if(a==='nav'||a==='back'||a==='open'){await flushChanges();dirty=false;projectDirty=false;settingsDirty=false;mobileOpen=false;if(a==='open'){selected=structuredClone(all.find(x=>x.id===id));projectDirty=restoreDraft('project:'+selected.id,selected);if(projectDirty)scheduleSave();view='overview';}else if(a==='back'){selected=null;view='dashboard';}else view=b.dataset.view;lineFilter='';shopFilter=null;summarySort={key:'category',direction:1};render();if(view==='payments')void loadStageInvoices();window.scrollTo(0,0);return;}
+ if(a==='new-project'){modal('Nowa inwestycja',input('name','Nazwa inwestycji','','text','required')+input('investor','Imię i nazwisko inwestora','','text','required')+input('date','Data nadania numeru umowy',C.today(),'date','required')+'<p class="muted">Numer zostanie nadany w bazie według schematu UUR-RS/rok/miesiąc/kolejny numer w danym miesiącu.</p>',async fd=>{const row=await API.createProject(C.captureCatalog(config.payload,C.newProject(fd.get('name'),fd.get('investor'),fd.get('date'))),fd.get('date'));selected=Array.isArray(row)?row[0]:row;all.unshift(structuredClone(selected));view='data';dirty=false;});return;}
+ if(a==='project-filter'){if(!projectFilters.some(([key])=>key===b.dataset.status))return;projectFilter=b.dataset.status;render();return;}
+ if(a==='project-copy'){copyProjectDialog(id);return;}
+ if(a==='summary-sort'){const key=b.dataset.key;if(!['category','name','unit','qty','value'].includes(key))return;summarySort={key,direction:summarySort.key===key?-summarySort.direction:1};render();return;}
+ if(a==='project-delete'){b.disabled=true;await removeProject(id);return;}
+ if(a==='undo-changes'){b.disabled=true;await undoChanges();return;}
+ if(a==='draft-restore'){const key=b.dataset.key,draft=drafts.read()[key];if(draft){if(key==='settings'){config.payload={...draft.payload,_undo:config.payload._undo};markDirty('settings');}else if(selected&&key==='project:'+selected.id){selected.payload={...draft.payload,_undo:selected.payload._undo};markDirty('project');}await flushChanges({normalize:false});render();}return;}if(a==='draft-discard'){drafts.remove(b.dataset.key);render();return;}
+ if(a==='trip-add'||a==='trip-edit'){tripDialog(id);return;}if(a==='trip-delete'){await removeTrip(id);return;}
+ if(a==='room-add'||a==='room-edit'){roomDialog(id);return;}
+ if(a==='line-add'||a==='line-edit'){lineDialog(b.dataset.kind,id);return;}
+ if(a==='use-area'){const room=p().rooms.find(r=>r.id===$('#f-roomId').value);if(!room){toast('Wybierz pomieszczenie.');return;}$('#f-qty').value=C.roomArea(room)[b.dataset.area];if(isNumericInput($('#f-qty')))commitNumericInput($('#f-qty'));chooseServiceUnit(b.dataset.area==='perimeter'?'mb':'m²');return;}
+ if(a==='invoices-refresh'){await loadStageInvoices();return;}
+ if(a==='invoice-allocate'){await invoiceDialog(id);return;}
+ if(a==='settle-all'){settleAllDialog();return;}
+ if(a==='receipt-add'||a==='receipt-edit'){receiptDialog(id);return;}
+ if(a==='purchase-shop'){shopFilter=b.dataset.all==='true'?null:b.dataset.shop;render();return;}
+ if(a==='purchase-add'||a==='purchase-edit'){b.disabled=true;await purchaseDialog(id);return;}
+ if(a==='stage-add'||a==='stage-edit'){stageDialog(id);return;}
+ if(a==='journal-add'||a==='journal-edit'){journalDialog(id);return;}
+ if(a==='catalog-correct'){catalogCorrectionDialog();return;}
+ if(a==='catalog-undo'){await undoCatalog();return;}
+ if(a==='service-delete'){b.disabled=true;await removeService(id);return;}
+ if(a==='service-add'||a==='service-edit'){serviceDialog(id);return;}
+ if(a==='offer-select'){if(p().activeOfferVersion===Number(b.dataset.version)){render();return;}await setOfferVersion(b.dataset.version);return;}
+ if(a==='accept-offer'){normalizeNumericFields(document);if(!p().offer.some(l=>l.included!==false&&l.qty>0))throw new Error('Dodaj przynajmniej jedną pracę z ilością.');if(!confirm('Zapisać tę ofertę jako zaakceptowaną przez inwestora? Jej treść pozostanie w historii.'))return;
+ await setOfferVersion(null,true);return;}
+ if(a==='change-accept'){const change=p().changes.find(x=>x.id===id);change.accepted=true;change.acceptedDate=C.today();markDirty();await save();return;}
+ if(a==='contract-edit'){modal('Treść umowy',text('body','Treść',p().contractText||C.contractTemplate(selected,config.payload),'style="min-height:50vh"'),fd=>{p().contractText=fd.get('body');markDirty();});return;}
+ if(a==='contract-generate'){if(p().contractText&&!confirm('Zastąpić edytowaną treść umowy tekstem z aktualnych danych?'))return;p().contractText=C.contractTemplate(selected,config.payload);markDirty();await flushChanges({normalize:false});render();return;}
+ if(a==='reopen'){if(!confirm('Cofnąć zakończenie inwestycji? Powiązany wpis zostanie usunięty z Moich zarobków.'))return;p().status='prace';markDirty();await save();return;}
+ if(a==='finish'){
+  if(!p().handover.date)throw new Error('Uzupełnij datę odbioru.');
+  if(!p().handover.accepted)throw new Error('Prace muszą być zaakceptowane przed zakończeniem inwestycji.');
+  b.disabled=true;
+  await writes.run(async()=>{
+   const current=structuredClone(selected),amount=C.finalWorkAmount(current.payload);
+   if(!Number.isFinite(amount)||amount<0)throw new Error('Kwota końcowa inwestycji musi być nieujemna.');
+   const result=await API.finishProject(current,amount),row=Array.isArray(result)?result[0]:result;
+   all=all.map(item=>item.id===row.id?structuredClone(row):item);
+   if(selected?.id===row.id){
+    const editedMeanwhile=!Auto.samePayload(selected.payload,current.payload);
+    if(editedMeanwhile){selected.revision=row.revision;selected.payload=Auto.mergeEdits(row.payload,current.payload,selected.payload);projectDirty=true;keepDraft('project');scheduleSave();}
+    else{selected=structuredClone(row);projectDirty=false;drafts.remove('project:'+row.id);}
+   }
+   saveError='';updateSaveState();render();toast('Zakończono inwestycję. Kwota '+money(amount)+' jest w Moich zarobkach.');
+  });return;
+ }
+ if(a==='pdf-all'||a==='pdf-none'){for(const checkbox of $('#dialog').querySelectorAll('input[name="pdfModule"]'))checkbox.checked=a==='pdf-all';return;}
+ if(a==='print'){await flushChanges();pdfDialog();return;}if(a==='offer-print'){await flushChanges();printDoc('offer',p().acceptedOffers.find(x=>x.version===Number(b.dataset.version)));return;}
+ }catch(err){if(dirty)saveFailed(err);else toast(err.message);}finally{if(b.isConnected)b.disabled=false;}});
+window.addEventListener('online',()=>{if(dirty)flushChanges({normalize:false}).catch(saveFailed);});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&dirty)flushChanges({normalize:false}).catch(saveFailed);});
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
+start();
+
+async function refreshLinkedInvestment(){
+ if(!selected||dirty||writes.pending||$('#dialog')?.open)return;
+ if(view==='payments'){await loadStageInvoices();return;}
+ if(!API.project)return;
+ const id=selected.id,revision=selected.revision;
+ try{const latest=await API.project(id);if(latest&&selected?.id===id&&selected.revision===revision&&!dirty&&!writes.pending&&!$('#dialog')?.open&&latest.revision!==revision){selected=structuredClone(latest);all=all.map(row=>row.id===id?structuredClone(latest):row);updateSaveState();render();}}catch{}
+}
+window.addEventListener('focus',()=>{void refreshLinkedInvestment();});
+window.addEventListener('message',event=>{if(event.origin===location.origin&&event.source===window.parent&&event.data?.type==='robisie-pack-activated')void refreshLinkedInvestment();});

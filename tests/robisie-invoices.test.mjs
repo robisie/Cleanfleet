@@ -36,3 +36,28 @@ test('cannot settle draft, correction, foreign currency or unknown target',()=>{
  for(const row of [{...invoice(),status:'draft'},{...invoice(),payload:{...invoice().payload,correction:{}}},{...invoice(),payload:{...invoice().payload,currency:'EUR'}}])assert.throws(()=>I.apply(project(),row,[],'2026-10-20'));
  assert.throws(()=>apply(project(),[{key:'purchase:missing',amount:1,paid:1}]));
 });
+test('linking existing advances and purchase payments changes invoice attribution without changing balances',()=>{
+ const p=project();p.receipts=[{id:'advance',date:'2026-10-06',kind:'materials',amount:500,note:'Zaliczka'}];
+ const before=C.totals(p),available=I.availableReceipts(p,'fv');assert.deepEqual(available.map(r=>r.id),['advance','purchase-payment:m']);
+ const linked=I.apply(p,invoice(),[],'2026-10-20',['advance','purchase-payment:m']);
+ assert.equal(I.paid(linked.invoiceSettlements[0]),700);assert.equal(I.assigned(linked.invoiceSettlements[0]),700);assert.deepEqual(C.totals(linked),before);
+ assert.equal(C.effectiveReceipts(linked).find(r=>r.id==='advance').invoiceId,'fv');assert.equal(C.effectiveReceipts(linked).find(r=>r.id==='advance').date,'2026-10-06');
+ const edited=I.apply(linked,invoice(),[],'2026-10-20',['advance','purchase-payment:m']);assert.deepEqual(C.totals(edited),before);assert.equal(I.paid(edited.invoiceSettlements[0]),700);
+ assert.throws(()=>I.apply(linked,invoice('second'),[],'2026-10-20',['advance']));
+ const unlinked=I.apply(linked,invoice(),[],'2026-10-20',[]);assert.deepEqual(C.totals(unlinked),before);assert.equal(C.effectiveReceipts(unlinked).find(r=>r.id==='advance').invoiceId,undefined);
+});
+test('existing receipts and new payments share the invoice limit and account separately',()=>{
+ const p=project();p.receipts=[{id:'old',date:'2026-10-05',kind:'work',amount:400}];
+ const linked=I.apply(p,invoice('fv','1000.00'),[{key:'stage:s2',amount:600,paid:600}],'2026-10-20',['old']);
+ assert.equal(I.paid(linked.invoiceSettlements[0]),1000);assert.equal(C.totals(linked).paid,1000);
+ assert.throws(()=>I.apply(p,invoice('fv','999.00'),[{key:'stage:s2',amount:600,paid:600}],'2026-10-20',['old']));
+ assert.throws(()=>I.apply(p,invoice(),[],'2026-10-20',['missing']));
+ assert.throws(()=>I.apply(p,invoice(),[],'2026-10-20',['old','old']));
+});
+test('receipt edits update linked invoice amounts and cannot exceed it or delete a linked receipt',()=>{
+ const p=project();p.receipts=[{id:'old',date:'2026-10-05',kind:'materials',amount:500}];
+ const linked=I.apply(p,invoice('fv','700.00'),[],'2026-10-20',['old']);
+ linked.receipts[0].amount=600;I.refreshReceiptLinks(linked);assert.equal(I.paid(linked.invoiceSettlements[0]),600);
+ linked.receipts[0].amount=800;assert.throws(()=>I.refreshReceiptLinks(linked));
+ linked.receipts=[];assert.throws(()=>I.refreshReceiptLinks(linked));
+});

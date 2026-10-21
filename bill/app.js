@@ -1,9 +1,9 @@
-import * as KSEF from './ksef.js?v=1.0.22';
-import * as C from './core.js?v=1.0.22';
-import * as API from './api.js?v=1.0.22';
-import {preview,previewHtml} from './pdf.js?v=1.0.22';
-import * as Demand from './payment-demand.js?v=1.0.22';
-async function fleetPreview(row){const a=await API.call({action:'fleet-attachment',id:row.id});const {previewFleet}=await import('./fleet-pdf.js?v=1.0.22');await previewFleet(a);}
+import * as KSEF from './ksef.js?v=1.0.23';
+import * as C from './core.js?v=1.0.23';
+import * as API from './api.js?v=1.0.23';
+import {preview,previewHtml} from './pdf.js?v=1.0.23';
+import * as Demand from './payment-demand.js?v=1.0.23';
+async function fleetPreview(row){const a=await API.call({action:'fleet-attachment',id:row.id});const {previewFleet}=await import('./fleet-pdf.js?v=1.0.23');await previewFleet(a);}
 const isFleetLines=r=>isFleet(r)&&r.payload.source.fleetLayout==='vehicle-lines';
 const isFleet=r=>r?.payload?.source?.fleetId===r?.id&&!r?.payload?.correction;
 const $=s=>document.querySelector(s),e=C.esc;
@@ -85,11 +85,11 @@ document.addEventListener('click',event=>{const b=event.target.closest('[data-ac
  if(action==='save-buyer'){readEditor();const p=C.party(editor.payload.buyer),existing=data.parties.find(r=>p.nip&&r.payload.nip===p.nip);await work(async()=>{await API.call({action:'save-party',id:existing?.id,revision:existing?.revision,payload:p});await refresh();toast('Kontrahent zapisany');});return;}
  if(action==='fleet-pdf'){await work(()=>fleetPreview(view==='edit'?editor:selected));return;}
  if(action==='payment-demand'){await work(async()=>{
-  const row=await API.call({action:'document',id:selected.id});if(!Demand.canDemand(row))throw Error('Termin płatności tej faktury jeszcze nie upłynął.');
+  const row=await API.call({action:'document',id:selected.id});if(!Demand.canDemand(row))throw Error('Wezwanie wymaga wystawionej faktury z dodatnią kwotą.');
   const source=row.payload.source,project=source?.app==='robisie'?(await API.investmentPurchases(source.id)).payload:null,remaining=Demand.outstanding(row,project);
   if(!remaining)throw Error('Ta faktura jest już rozliczona w całości.');selected=row;
-  const next=new Date(C.today()+'T12:00:00Z');next.setUTCDate(next.getUTCDate()+7);
-  modal('Wezwanie do zapłaty',`<form id="demand-form"><p>Faktura <strong>${e(row.number)}</strong> · termin: ${e(row.payload.dueDate)}.</p><p class="muted">Potwierdź faktycznie niezapłaconą kwotę. Uwzględnij wpłaty zapisane poza aplikacją.</p>${field('demandAmount','Kwota zaległości ('+row.payload.currency+')',(remaining/100).toFixed(2),'number','min="0.01" max="'+(remaining/100).toFixed(2)+'" step="0.01" required')}${field('demandDeadline','Zapłać do',next.toISOString().slice(0,10),'date','min="'+C.today()+'" required')}<footer>${button('close-modal','Anuluj')}<button class="primary">Generuj PDF / drukuj</button></footer></form>`);
+  const next=new Date(C.today()+'T12:00:00Z');next.setUTCDate(next.getUTCDate()+7);const proposed=next.toISOString().slice(0,10),due=row.payload.dueDate,deadline=due>proposed?due:proposed;
+  modal('Wezwanie do zapłaty',`<form id="demand-form"><p>Faktura <strong>${e(row.number)}</strong> · termin: ${e(row.payload.dueDate)}.</p><p class="muted">Potwierdź faktycznie niezapłaconą kwotę. Uwzględnij wpłaty zapisane poza aplikacją.</p>${field('demandAmount','Kwota do zapłaty ('+row.payload.currency+')',(remaining/100).toFixed(2),'number','min="0.01" max="'+(remaining/100).toFixed(2)+'" step="0.01" required')}${field('demandDeadline','Zapłać do',deadline,'date','min="'+(due>C.today()?due:C.today())+'" required')}<footer>${button('close-modal','Anuluj')}<button class="primary">Generuj PDF / drukuj</button></footer></form>`);
  });return;}
  if(action==='preview'){await work(async()=>{let row;if(view==='edit'){readEditor();row=structuredClone(editor);}else row=await API.call({action:'document',id:selected.id});await preview(row);});return;}
  if(action==='zero-correction'){readEditor();for(const line of editor.payload.lines){line.price='0.00';if(line.discount!=null)line.discount='0.00';}dirty=true;render();return;}

@@ -1,13 +1,13 @@
-import * as KSEF from './ksef.js?v=1.0.26';
-import * as C from './core.js?v=1.0.26';
-import * as API from './api.js?v=1.0.26';
-import {preview,previewHtml} from './pdf.js?v=1.0.26';
-import * as Demand from './payment-demand.js?v=1.0.26';
-async function fleetPreview(row){const a=await API.call({action:'fleet-attachment',id:row.id});const {previewFleet}=await import('./fleet-pdf.js?v=1.0.26');await previewFleet(a);}
+import * as KSEF from './ksef.js?v=1.0.27';
+import * as C from './core.js?v=1.0.27';
+import * as API from './api.js?v=1.0.27';
+import {preview,previewHtml} from './pdf.js?v=1.0.27';
+import * as Demand from './payment-demand.js?v=1.0.27';
+async function fleetPreview(row){const a=await API.call({action:'fleet-attachment',id:row.id});const {previewFleet}=await import('./fleet-pdf.js?v=1.0.27');await previewFleet(a);}
 const isFleetLines=r=>isFleet(r)&&r.payload.source.fleetLayout==='vehicle-lines';
 const isFleet=r=>r?.payload?.source?.fleetId===r?.id&&!r?.payload?.correction;
 const $=s=>document.querySelector(s),e=C.esc;
-let searchTimer,searchGeneration=0;
+let searchTimer,searchGeneration=0,demandCompensation=null;
 let investmentAmounts={id:null,options:[],detailed:null};
 let data={invoices:[],parties:[],settings:{},counters:[]},view='invoices',selected=null,editor=null,dirty=false,busy=false,filters={q:'',month:'',brand:'',status:''};
 const brandFromUrl=()=>new URLSearchParams(location.search).get('brand')==='robisie'?'robisie':'cleanfleet';
@@ -89,7 +89,8 @@ document.addEventListener('click',event=>{const b=event.target.closest('[data-ac
   const source=row.payload.source,project=source?.app==='robisie'?(await API.investmentPurchases(source.id)).payload:null,remaining=Demand.outstanding(row,project);
   if(!remaining)throw Error('Ta faktura jest już rozliczona w całości.');selected=row;
   const next=new Date(C.today()+'T12:00:00Z');next.setUTCDate(next.getUTCDate()+7);const proposed=next.toISOString().slice(0,10),due=row.payload.dueDate,deadline=due>proposed?due:proposed;
-  modal('Wezwanie do zapłaty',`<form id="demand-form"><p>Faktura <strong>${e(row.number)}</strong> · termin: ${e(row.payload.dueDate)}.</p><p class="muted">Potwierdź faktycznie niezapłaconą kwotę. Uwzględnij wpłaty zapisane poza aplikacją.</p>${Demand.languageSelect()}${field('demandAmount','Kwota do zapłaty ('+row.payload.currency+')',(remaining/100).toFixed(2),'number','min="0.01" max="'+(remaining/100).toFixed(2)+'" step="0.01" required')}${field('demandDeadline','Zapłać do',deadline,'date','min="'+(due>C.today()?due:C.today())+'" required')}<footer>${button('close-modal','Anuluj')}<button class="primary">Generuj PDF / drukuj</button></footer></form>`);
+  modal('Wezwanie do zapłaty',`<form id="demand-form"><p>Faktura <strong>${e(row.number)}</strong> · termin: ${e(row.payload.dueDate)}.</p><p class="muted">Potwierdź faktycznie niezapłaconą kwotę. Uwzględnij wpłaty zapisane poza aplikacją.</p>${Demand.languageSelect()}${field('demandAmount','Kwota do zapłaty ('+row.payload.currency+')',(remaining/100).toFixed(2),'number','min="0.01" max="'+(remaining/100).toFixed(2)+'" step="0.01" required')}${field('demandDeadline','Zapłać do',deadline,'date','min="'+(due>C.today()?due:C.today())+'" required')}${Demand.compensationControls(row)}<footer>${button('close-modal','Anuluj')}<button class="primary">Generuj PDF / drukuj</button></footer></form>`);
+  demandCompensation=Demand.mountCompensation($('#modal'),()=>row);
  });return;}
  if(action==='preview'){await work(async()=>{let row;if(view==='edit'){readEditor();row=structuredClone(editor);}else row=await API.call({action:'document',id:selected.id});await preview(row);});return;}
  if(action==='zero-correction'){readEditor();for(const line of editor.payload.lines){line.price='0.00';if(line.discount!=null)line.discount='0.00';}dirty=true;render();return;}
@@ -110,7 +111,7 @@ document.addEventListener('click',event=>{const b=event.target.closest('[data-ac
  if(action==='logout'){if(!await abandon())return;KSEF.reset();API.logout();data={invoices:[],parties:[],settings:{},counters:[]};editor=selected=null;dirty=false;login();}
  }catch(err){toast(err.message);const target=$('#page-error');if(target)target.textContent=err.message;}})();});
 document.addEventListener('submit',event=>{event.preventDefault();if(busy)return;const f=event.target,values=new FormData(f);void work(async()=>{
- if(f.id==='demand-form'){const row=await API.call({action:'document',id:selected.id}),source=row.payload.source,project=source?.app==='robisie'?(await API.investmentPurchases(source.id)).payload:null,amount=C.decimal(values.get('demandAmount'));if(amount>Demand.outstanding(row,project))throw Error('Saldo faktury zmieniło się. Otwórz wezwanie ponownie.');const html=Demand.demandHtml(row,{amount,deadline:values.get('demandDeadline'),language:values.get('demandLanguage')||'pl'});closeModal();await previewHtml(html);return;}
+ if(f.id==='demand-form'){const row=await API.call({action:'document',id:selected.id}),source=row.payload.source,project=source?.app==='robisie'?(await API.investmentPurchases(source.id)).payload:null,amount=C.decimal(values.get('demandAmount'));if(amount>Demand.outstanding(row,project))throw Error('Saldo faktury zmieniło się. Otwórz wezwanie ponownie.');const compensation=await demandCompensation?.read(row);const html=Demand.demandHtml(row,{amount,deadline:values.get('demandDeadline'),language:values.get('demandLanguage')||'pl',compensation});closeModal();await previewHtml(html);return;}
  if(f.id==='login'){try{await API.login(values.get('email'),values.get('password'));await refresh();await openRequested();}catch(err){login(err.message);}return;}
  if(f.id==='gus-form'){await API.call({action:'gus-save-key',key:values.get('gusKey')});f.reset();await refresh();render();toast('Klucz zapisany. Połączenie z GUS działa.');return;}
  if(f.id==='settings-form'){await API.call({action:'save-settings',bank:values.get('bank')});await refresh();render();toast('Zapisano rachunek');return;}

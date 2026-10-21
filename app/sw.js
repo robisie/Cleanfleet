@@ -1,5 +1,5 @@
-importScripts('/app/photo-zip-stream.js?v=20261021-bulk1');
-// CleanFleet v1.56.13 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
+importScripts('/app/photo-zip-stream.js?v=20261021-selection1');
+// CleanFleet v1.56.14 — administrator accounting documents module. — more reliable ANPR matching and image preparation.
 self.addEventListener('install', event => {
   self.skipWaiting();
 });
@@ -68,7 +68,7 @@ self.addEventListener('fetch', event => {
 
     let html = await response.text(); 
     // Keep the visible version in sync for pages served through this worker.
-    html = html.replace(/v1\.55\.(?:8|9|10|11|12|13|14|15|16)\b/g, 'v1.56.13');
+    html = html.replace(/v1\.55\.(?:8|9|10|11|12|13|14|15|16)\b/g, 'v1.56.14');
     html = html.replace(/\/app\/reports\.css\?v=[^"']+/g, '/app/reports.css?v=13095');
 
     if (!html.includes('/app/glass-icons.css')) {
@@ -189,7 +189,7 @@ self.addEventListener('fetch', event => {
       '<script src="/app/weather-refresh-v12311.js?v=20260923-13068"></script>\n' +
       '<script src="/app/layout-v11913.js?v=20261010-15517"></script>\n' +
       '<script src="/app/operations-v1200.js?v=20261010-15517"></script>\n' +
-      '<script src="/app/photo-local-v1240.js?v=20261021-bulk1"></script>\n' +
+      '<script src="/app/photo-local-v1240.js?v=20261021-selection1"></script>\n' +
       '<script src="/app/photo-local-ui-v1232.js?v=20260919-13032"></script>\n' +
       '<script src="/app/photo-camera-v1213.js?v=20261010-15517"></script>\n' +
       '<script src="/app/ui-v1209.js?v=20260915-3"></script>\n' +

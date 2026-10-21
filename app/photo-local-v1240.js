@@ -240,9 +240,9 @@
     return saveZipManifest(recordArchive(items,meta),{size:items.reduce((n,x)=>n+(x.size||0),0),recordId});
   }
 
-  async function prepareUnpaidZipDownload(){
+  async function prepareSelectedZipDownload(){
     if(!navigator.serviceWorker?.controller||!window.caches)throw new Error('Uruchom ponownie CleanFleet, aby włączyć pobieranie ZIP.');
-    const records=window.cfUnpaidPhotoRecords?.()||[],groups=new Map();
+    const records=window.cfSelectedPhotoRecords?.()||[],groups=new Map();
     const allowed=new Set(records.map(r=>String(r.id)));
     for(const row of await all()){
       const id=String(row.recordId);
@@ -260,9 +260,9 @@
       names.add(path);entries.push({path,archive});
       size+=items.reduce((n,x)=>n+(x.size||0),0);
     }
-    if(!entries.length)throw new Error('Brak lokalnych zdjęć dla wpisów z aktualnej listy „Niezapłacone” na tym urządzeniu.');
-    if(size>=0xffffffff)throw new Error('Zdjęcia przekraczają limit paczki ZIP 4 GB. Zawęź listę filtrem wykonującego lub pobierz wpisy osobno.');
-    return saveZipManifest({format:'photo-zip-bundle-v1',name:`NIEZAPLACONE_${fmtDate()}.zip`,createdAt:Date.now(),entries},
+    if(!entries.length)throw new Error('Brak lokalnych zdjęć dla zaznaczonych wpisów na tym urządzeniu.');
+    if(size>=0xffffffff)throw new Error('Zdjęcia przekraczają limit paczki ZIP 4 GB. Zaznacz mniej wpisów lub pobierz je osobno.');
+    return saveZipManifest({format:'photo-zip-bundle-v1',name:`ZDJECIA_ZAZNACZONYCH_${fmtDate()}.zip`,createdAt:Date.now(),entries},
       {size,recordId:null,recordCount:entries.length});
   }
 
@@ -373,16 +373,18 @@
     try{clearPreviews();const ready=await prepareZipDownload(recordId);clearBuildProgress();shareDialog({name:ready.name,size:ready.size},recordId,ready)}catch(e){console.error(e);clearBuildProgress();toast(e?.message||'Nie udało się przygotować pobierania ZIP-a.')}finally{busy=false;window.cfPhotoSession?.setBusy(false)}
   }
 
-  async function exportUnpaid(){
+  async function exportSelected(){
     if(busy||window.cfPhotoSession?.get()?.busy){toast('Poczekaj na zakończenie bieżącej operacji zdjęć.');return;}
-    const button=document.getElementById('cfUnpaidPhotosZip');
+    const button=document.getElementById('cfActiveSelectionPhotos');
     busy=true;window.cfPhotoSession?.setBusy(true);if(button)button.disabled=true;
     let ready=null;
-    try{clearPreviews();ready=await prepareUnpaidZipDownload();}
+    try{clearPreviews();ready=await prepareSelectedZipDownload();}
     catch(error){console.error(error);toast(error?.message||'Nie udało się przygotować paczki zdjęć.');}
     finally{busy=false;window.cfPhotoSession?.setBusy(false);if(button)button.disabled=false;}
     if(ready)shareDialog({name:ready.name,size:ready.size},null,ready);
   }
+
+  window.cfExportSelectedRecordPhotos=exportSelected;
 
   async function saveToPhotos(recordId){
     if(busy||window.cfPhotoSession?.get()?.busy)return;
@@ -494,7 +496,6 @@
   }
 
   function events(){
-    document.getElementById('cfUnpaidPhotosZip')?.addEventListener('click',exportUnpaid);
     document.addEventListener('cf:photos-close',()=>{renderVersion++;clearPreviews()});
     document.addEventListener('cf:photos-open',e=>{
       currentRecordId=e.detail.recordId;

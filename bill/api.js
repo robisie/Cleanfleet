@@ -24,7 +24,7 @@ export function logout(){session=null;localStorage.removeItem(SESSION_KEY);}
 
 export const call=(body,options={})=>request("/functions/v1/cleanfleet-bill",{method:"POST",body:JSON.stringify(body),timeoutMs:90000,...options});
 
-export const ksefAssignments=()=>request('/rest/v1/rs_ksef_links?select=ksef_number,project_id,kind,selected_indices:document->selectedIndices');
+export const ksefAssignments=()=>request('/rest/v1/rs_ksef_links?select=ksef_number,project_id,kind,document_id:document->>id,selected_indices:document->selectedIndices');
 export const previewKsefPurchase=({xml})=>request('/rest/v1/rpc/rs_ksef_purchase_preview',{method:'POST',body:JSON.stringify({p_xml:xml}),timeoutMs:30000});
 export const assignKsef=({project,number,kind,xml,billId,indices,previous,replacement,projectRevision})=>{
  const editing=kind==='purchases'&&previous;

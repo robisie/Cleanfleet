@@ -1,9 +1,9 @@
-import * as KSEF from './ksef.js?v=1.0.24';
-import * as C from './core.js?v=1.0.24';
-import * as API from './api.js?v=1.0.24';
-import {preview,previewHtml} from './pdf.js?v=1.0.24';
-import * as Demand from './payment-demand.js?v=1.0.24';
-async function fleetPreview(row){const a=await API.call({action:'fleet-attachment',id:row.id});const {previewFleet}=await import('./fleet-pdf.js?v=1.0.24');await previewFleet(a);}
+import * as KSEF from './ksef.js?v=1.0.25';
+import * as C from './core.js?v=1.0.25';
+import * as API from './api.js?v=1.0.25';
+import {preview,previewHtml} from './pdf.js?v=1.0.25';
+import * as Demand from './payment-demand.js?v=1.0.25';
+async function fleetPreview(row){const a=await API.call({action:'fleet-attachment',id:row.id});const {previewFleet}=await import('./fleet-pdf.js?v=1.0.25');await previewFleet(a);}
 const isFleetLines=r=>isFleet(r)&&r.payload.source.fleetLayout==='vehicle-lines';
 const isFleet=r=>r?.payload?.source?.fleetId===r?.id&&!r?.payload?.correction;
 const $=s=>document.querySelector(s),e=C.esc;
@@ -23,7 +23,7 @@ function render(){
  const title=view==='edit'?(editor?.payload?.correction?'Nowa korekta':'Nowa faktura'):view==='detail'?(selected.number||'Szkic faktury'):view==='parties'?'Kontrahenci':view==='ksef'?'KSeF':view==='settings'?'Ustawienia':'Faktury';
  $('#app').innerHTML=`<header class="topbar"><div><div class="brand">Bill<span>.</span></div><small>Robisię-Fer · CleanFleet & Robisię</small></div><div class="row"><span class="muted small">${C.VERSION}</span>${button('logout','Wyloguj')}</div></header><div class="shell"><nav>${[['invoices','Faktury'],['parties','Kontrahenci'],['ksef','KSeF'],['settings','Ustawienia']].map(([v,l])=>button('nav',l,view===v?'active':'',`data-view="${v}"`)).join('')}<div class="links"><a href="/app/">CleanFleet ↗</a><a href="/app/robisie/">Robisię ↗</a></div></nav><main><div class="toolbar"><div><h1>${e(title)}</h1><p class="muted">${view==='edit'?'Wspólne dane i numeracja. Logo wybierasz osobno.':view==='invoices'?'Sprzedaż obu marek w jednym miejscu.':view==='detail'?e(brandName(selected.payload.brand)):''}</p></div><div class="actions">${view==='invoices'?button('new','+ Wystaw fakturę','primary'):view==='parties'?button('new-party','+ Dodaj kontrahenta','primary'):['edit','detail'].includes(view)?button('back','← Wróć do faktur'):''}</div></div><p id="page-error" class="error" role="alert"></p>${view==='invoices'?list():view==='parties'?parties():view==='ksef'?KSEF.view():view==='settings'?settings():view==='edit'?edit():detail()}</main></div>`;
  if(view==='edit'){syncCorrectionControls();if(editor.payload.source?.invoiceMode==='detailed'){const cur=document.querySelector('[name=currency]');if(cur)cur.disabled=true;}if(isFleet(editor)){for(const node of document.querySelectorAll('[name=currency],#source-select'))node.disabled=true;}}
- if(view==='ksef')KSEF.mount($('#ksef-panel'),API.call,{projects:data.sources?.projects||[],assign:API.assignKsef,preview:API.previewKsefPurchase,loadLinks:API.ksefAssignments,findPurchases:API.investmentPurchases,cfContext:API.cleanfleetCostContext,cfCompanies:API.cleanfleetCompanies,cfLinks:API.cleanfleetCostLinks,cfSave:API.saveCleanfleetCosts});
+ if(view==='ksef')KSEF.mount($('#ksef-panel'),API.call,{projects:data.sources?.projects||[],assign:API.assignKsef,preview:API.previewKsefPurchase,loadLinks:API.ksefAssignments,findPurchases:API.investmentPurchases,cfContext:API.cleanfleetCostContext,cfCompanies:API.cleanfleetCompanies,cfLinks:API.cleanfleetCostLinks,cfSave:API.saveCleanfleetCosts,bank:data.settings.bank||''});
 }
 function scheduleSearch(){clearTimeout(searchTimer);const generation=++searchGeneration;searchTimer=setTimeout(async()=>{try{const rows=await API.call({action:'search',...filters});if(generation===searchGeneration&&view==='invoices'){$('#invoice-results').innerHTML=invoiceRows(rows);for(const r of rows){const i=data.invoices.findIndex(x=>x.id===r.id);if(i<0)data.invoices.push(r);else data.invoices[i]=r;}}}catch(err){toast(err.message);}},350);}
 function filtered(){return data.invoices.filter(r=>{const p=r.payload,q=filters.q.toLocaleLowerCase('pl');return(!filters.month||p.issueDate?.startsWith(filters.month))&&(!filters.brand||p.brand===filters.brand)&&(!filters.status||r.status===filters.status)&&(!q||[r.number,r.ksef_number,p.buyer?.name,p.buyer?.nip,p.recipient?.name,...(p.lines||[]).map(l=>l.name)].join(' ').toLocaleLowerCase('pl').includes(q));});}

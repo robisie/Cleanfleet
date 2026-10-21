@@ -1,4 +1,4 @@
-import * as C from './core.js?v=1.0.24';
+import * as C from './core.js?v=1.0.25';
 export function canDemand(row){
  return Boolean(row?.number&&row.status!=='draft'&&/^\d{4}-\d{2}-\d{2}$/.test(row.payload?.dueDate||'')&&C.invoiceAmount(row.payload)>0);
 }

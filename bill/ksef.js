@@ -1,6 +1,6 @@
-import {selectedAmount,duplicatePurchases} from './purchase-import.js?v=1.0.25';
-import {esc,today} from './core.js?v=1.0.25';
-import {monthDates,counterparty,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.25';
+import {selectedAmount,duplicatePurchases} from './purchase-import.js?v=1.0.26';
+import {esc,today} from './core.js?v=1.0.26';
+import {monthDates,counterparty,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.26';
 const e=esc;
 let integration={},assignments=[],cfLinks=[];
 function initial(){const month=today().slice(0,7);return {month,...monthDates(month),kind:'purchases',dateType:'Issue',sort:'Desc',q:'',rows:[],selected:new Set(),loaded:false,hasMore:false,isTruncated:false,page:0,ticket:'',ticketAt:0,query:null,listError:false,partial:false,partialWarning:''};}
@@ -117,6 +117,6 @@ async function paymentDemand(number,signal){
  const projectId=link?.project_id||(original?.payload?.source?.app==='robisie'?original.payload.source.id:null);
  if(projectId&&!integration.findPurchases)throw Error('Nie można sprawdzić zapisanych wpłat inwestora.');
  const loadProject=projectId?async()=>(await integration.findPurchases(projectId)).payload:null;
- const {showKsefDemand}=await import('./ksef-demand.js?v=1.0.25');check(signal);
+ const {showKsefDemand}=await import('./ksef-demand.js?v=1.0.26');check(signal);
  const saved=await showKsefDemand({xml,metadata:row,original,link,loadProject,defaultBank:integration.bank||'',signal});if(saved)progress('Wezwanie do zapłaty jest gotowe.');
 }

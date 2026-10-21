@@ -73,7 +73,8 @@
     }
     return {blob:original,normalized:false};
   }
-  async function* chunks(manifest,getPhoto){
+  async function* chunks(manifest,getPhoto,onArchive){
+    if(manifest.entries.length>65535)throw Error('Za dużo plików w paczce ZIP. Podziel eksport.');
     const central=[];let offset=0,count=0;const dt=dosDateTime(new Date(manifest.createdAt));
     for(const entry of manifest.entries){
       let blob=new Blob([]),path=entry.path;
@@ -83,21 +84,31 @@
       offset+=header.length;yield header;
       let crc=0xffffffff,size=0;
       // slice caps the memory held by both Blob-backed and legacy ArrayBuffer photos.
+      if(entry.archive){
+        for await(const data of chunks(entry.archive,getPhoto)){
+          crc=crcUpdate(crc,data);size+=data.length;offset+=data.length;
+          if(size>0xffffffff||offset>0xffffffff)throw Error('Paczka przekracza limit ZIP 4 GB. Podziel zdjęcia na mniejsze zestawy.');
+          yield data;
+        }
+      }
       for(let at=0;at<blob.size;at+=65536){const data=new Uint8Array(await blob.slice(at,at+65536).arrayBuffer());crc=crcUpdate(crc,data);size+=data.length;offset+=data.length;yield data}
       crc=(crc^0xffffffff)>>>0;
       if(size>0xffffffff||offset>0xffffffff)throw Error('Paczka przekracza limit ZIP 4 GB. Podziel zdjęcia na mniejsze zestawy.');
       if(!directory){const descriptor=join([u32(0x08074b50),u32(crc),u32(size),u32(size)]);offset+=descriptor.length;yield descriptor}
       central.push(join([u32(0x02014b50),u16(20),u16(20),u16(flags),u16(0),u16(dt.time),u16(dt.date),u32(crc),u32(size),u32(size),u16(name.length),u16(0),u16(0),u16(0),u16(0),u32(directory?0x10:0),u32(start),name]));count++;
+      if(entry.archive)onArchive?.(count,manifest.entries.length);
     }
     const centralOffset=offset,centralSize=central.reduce((n,p)=>n+p.length,0);
+    if(offset+centralSize+22>0xffffffff)throw Error('Paczka przekracza limit ZIP 4 GB. Podziel eksport.');
     for(const data of central)yield data;
     yield join([u32(0x06054b50),u16(0),u16(0),u16(count),u16(count),u32(centralSize),u32(centralOffset),u16(0)]);
   }
-  function response(manifest,getPhoto){
-    const iterator=chunks(manifest,getPhoto);
+  function response(manifest,getPhoto,onArchive){
+    const iterator=chunks(manifest,getPhoto,onArchive);
     const body=new ReadableStream({async pull(controller){try{const item=await iterator.next();if(item.done)controller.close();else controller.enqueue(item.value)}catch(error){controller.error(error);await iterator.return()}},async cancel(){await iterator.return()}},{highWaterMark:0});
     return new Response(body,{headers:{'Content-Type':'application/zip','Content-Disposition':`attachment; filename="${manifest.name.replace(/[^A-Za-z0-9._-]/g,'_')}"; filename*=UTF-8''${encodeURIComponent(manifest.name)}`,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
   }
   root.CFPhotoZipStream={response};
   if(typeof module!=='undefined')module.exports=root.CFPhotoZipStream;
 })(typeof self!=='undefined'?self:globalThis);
+

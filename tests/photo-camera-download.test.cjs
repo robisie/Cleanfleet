@@ -7,7 +7,7 @@ function cacheHarness(){
 }
 function localHarness(){
  const c=cacheHarness(),storage=new Map();
- const context={window:{},document:{addEventListener(){},readyState:'loading'},navigator:{serviceWorker:{controller:{}},userAgent:'iPhone',platform:'iPhone',maxTouchPoints:5},TextEncoder,Blob,File,Response,URL,DOMException,AbortController,setTimeout:()=>0,crypto:require('node:crypto').webcrypto,console,caches:{open:async()=>c.cache},sessionStorage:{setItem:(k,v)=>storage.set(k,v),getItem:k=>storage.get(k)}};
+ const context={window:{},document:{addEventListener(){},readyState:'loading'},navigator:{serviceWorker:{controller:{},addEventListener(){},removeEventListener(){}},userAgent:'iPhone',platform:'iPhone',maxTouchPoints:5},TextEncoder,Blob,File,Response,URL,DOMException,AbortController,setTimeout:()=>0,crypto:require('node:crypto').webcrypto,console,caches:{open:async()=>c.cache},sessionStorage:{setItem:(k,v)=>storage.set(k,v),getItem:k=>storage.get(k)}};
  context.window.caches=context.caches;
  let source=fs.readFileSync('app/photo-local-v1240.js','utf8').replace("  if(document.readyState==='loading')",'  window.harness={prepareZipDownload,prepareZipFile,readPreparedZip,shareDialog,isAppleMobile,setBuild:fn=>prepareZipFile=fn,setSources:(rows,meta)=>{byRecord=async()=>rows;metadata=async()=>meta}};\n  if(document.readyState===\'loading\')');
  vm.runInNewContext(source,context);return {context,c,storage,h:context.window.harness};
@@ -34,7 +34,7 @@ test('download route streams a persisted manifest and keeps legacy ready ZIPs re
 });
 test('ZIP dialog displays byte progress, remains closeable and opens ready file separately without native sharing',async()=>{
  const {h,context}=localHarness(),nodes=new Map();let release,abortSignal;
- const el={querySelector:s=>{if(!nodes.has(s))nodes.set(s,{style:{},click(){this.onclick?.()}});return nodes.get(s)},remove(){this.removed=true}};
+ const el={setAttribute(){},addEventListener(){},querySelector:s=>{if(!nodes.has(s))nodes.set(s,{style:{},click(){this.onclick?.()}});return nodes.get(s)},remove(){this.removed=true}};
  context.document.querySelector=()=>null;context.document.createElement=()=>el;context.document.body={appendChild(){}};context.navigator.share=()=>{throw Error('must not share large ZIP on iOS')};
  h.setBuild(async(ready,update,signal)=>{abortSignal=signal;update(50,100,false);return await new Promise(resolve=>release=resolve)});
  h.shareDialog({name:'test.zip',size:100},'record',{url:'/app/photo-download/id/test.zip',size:100});
@@ -54,3 +54,4 @@ test('preparing 81-photo download persists metadata only and replaces the prior 
  assert.equal(JSON.parse(storage.get('cf-photo-zip-ready')).url,ready.url);
  await h.prepareZipDownload('record');assert.equal(c.entries.size,1);assert.ok(!c.entries.has(ready.url));
 });
+

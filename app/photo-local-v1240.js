@@ -89,8 +89,8 @@
     renderLocal().catch(error=>console.warn('CleanFleet photo preview',error));
   };
 
-  async function metadata(recordId){
-    let data=window.cfPhotoSession?.get()?.record;
+  async function metadata(recordId,record=null){
+    let data=record||window.cfPhotoSession?.get()?.record;
     if(!data?.plate||String(data.id)!==String(recordId)){
     if(typeof cfSupabase==='undefined'||!cfSupabase)throw new Error('Brak danych wpisu. Otwórz wpis przy połączeniu z internetem.');
     const result=await cfSupabase.from('wash_records').select('plate,type,order_date,order_due_date,wash_date,schedule_proposed_date').eq('id',recordId).single();
@@ -216,20 +216,54 @@
   const ZIP_READY_KEY='cf-photo-zip-ready';
   const isAppleMobile=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 
-  async function prepareZipDownload(recordId){
-    if(!navigator.serviceWorker?.controller||!window.caches)throw new Error('Uruchom ponownie CleanFleet, aby włączyć pobieranie ZIP.');
-    const items=await byRecord(recordId),meta=await metadata(recordId),root=`${meta.date}/${meta.plate}`;
+  function recordArchive(items,meta){
+    const root=`${meta.date}/${meta.plate}`;
     const entries=[{path:`${root}/przed/`},{path:`${root}/po/`}];
     for(const kind of ['przed','po'])items.filter(x=>x.kind===kind).forEach((x,i)=>entries.push({id:x.id,path:`${root}/${kind}/${String(i+1).padStart(3,'0')}.${extFor(x.name,x.mime)}`}));
-    const name=`${meta.type}_${meta.plate}_${meta.date}.zip`,url=`/app/photo-download/${uid()}/${encodeURIComponent(name)}`;
-    const manifest={format:'photo-zip-stream-v1',name,createdAt:Date.now(),entries};
+    return {format:'photo-zip-stream-v1',name:`${meta.type}_${meta.plate}_${meta.date}.zip`,createdAt:Date.now(),entries};
+  }
+
+  async function saveZipManifest(manifest,details){
+    const name=manifest.name,url=`/app/photo-download/${uid()}/${encodeURIComponent(name)}`;
     const cache=await caches.open(ZIP_CACHE);
-    // Persist only names/IDs, never a second copy of all photos or a complete ZIP.
     await cache.put(url,new Response(JSON.stringify(manifest),{headers:{'Content-Type':'application/json'}}));
-    const ready={url,name,size:items.reduce((n,x)=>n+(x.size||0),0),recordId,streaming:true};
+    const ready={url,name,...details,streaming:true};
     sessionStorage.setItem(ZIP_READY_KEY,JSON.stringify(ready));
     for(const key of await cache.keys())if(new URL(key.url).pathname!==url)await cache.delete(key);
     return ready;
+  }
+
+  async function prepareZipDownload(recordId){
+    if(!navigator.serviceWorker?.controller||!window.caches)throw new Error('Uruchom ponownie CleanFleet, aby włączyć pobieranie ZIP.');
+    const items=await byRecord(recordId),meta=await metadata(recordId);
+    // Persist only names/IDs, never a second copy of all photos or a complete ZIP.
+    return saveZipManifest(recordArchive(items,meta),{size:items.reduce((n,x)=>n+(x.size||0),0),recordId});
+  }
+
+  async function prepareUnpaidZipDownload(){
+    if(!navigator.serviceWorker?.controller||!window.caches)throw new Error('Uruchom ponownie CleanFleet, aby włączyć pobieranie ZIP.');
+    const records=window.cfUnpaidPhotoRecords?.()||[],groups=new Map();
+    const allowed=new Set(records.map(r=>String(r.id)));
+    for(const row of await all()){
+      const id=String(row.recordId);
+      if(!allowed.has(id)||!['przed','po'].includes(row.kind))continue;
+      if(!groups.has(id))groups.set(id,[]);
+      groups.get(id).push(row);
+    }
+    const entries=[],names=new Set();let size=0;
+    for(const record of records){
+      const items=groups.get(String(record.id));if(!items?.length)continue;
+      items.sort((a,b)=>a.createdAt-b.createdAt);
+      const archive=recordArchive(items,await metadata(record.id,record));
+      let path=archive.name,suffix=2;
+      while(names.has(path))path=archive.name.replace(/\.zip$/,`_${suffix++}.zip`);
+      names.add(path);entries.push({path,archive});
+      size+=items.reduce((n,x)=>n+(x.size||0),0);
+    }
+    if(!entries.length)throw new Error('Brak lokalnych zdjęć dla wpisów z aktualnej listy „Niezapłacone” na tym urządzeniu.');
+    if(size>=0xffffffff)throw new Error('Zdjęcia przekraczają limit paczki ZIP 4 GB. Zawęź listę filtrem wykonującego lub pobierz wpisy osobno.');
+    return saveZipManifest({format:'photo-zip-bundle-v1',name:`NIEZAPLACONE_${fmtDate()}.zip`,createdAt:Date.now(),entries},
+      {size,recordId:null,recordCount:entries.length});
   }
 
   const ZIP_FILE_DIR='cleanfleet-photo-exports';
@@ -278,14 +312,25 @@
   }
 
   function shareDialog(file,recordId,ready=null){
-    document.querySelector('.cf-local-zip-ready')?.remove();
+    document.querySelector('.cf-local-zip-ready')?.dispatchEvent(new Event('cf:zip-dismiss'));
     const el=document.createElement('div');el.className='cf-local-zip-ready';
     el.innerHTML='<div class="cf-local-zip-card" role="dialog" aria-modal="true" aria-label="Paczka zdjęć"><h3 data-zip-title>Przygotowanie ZIP-a</h3><div data-zip-name style="font-size:12px;font-weight:900;word-break:break-word"></div><div data-zip-size style="font-size:11px;color:#6f756f;margin:5px 0 14px"></div><progress data-zip-progress max="100" value="0" aria-label="Postęp tworzenia ZIP" style="width:100%;height:16px;accent-color:#9fbd17"></progress><p data-zip-status role="status" aria-live="polite"></p><button data-local-prepare type="button">Przygotuj ZIP ponownie</button><a data-local-download target="_blank" rel="noopener" hidden>Zapisz ZIP w Plikach</a><button data-local-cleaned type="button" hidden>ZIP zapisany — wyczyść zdjęcia</button><button data-local-close type="button">Anuluj</button></div>';
     document.body.appendChild(el);
     const title=el.querySelector('[data-zip-title]'),size=el.querySelector('[data-zip-size]'),progress=el.querySelector('[data-zip-progress]'),status=el.querySelector('[data-zip-status]'),download=el.querySelector('[data-local-download]'),close=el.querySelector('[data-local-close]'),retry=el.querySelector('[data-local-prepare]'),cleanup=el.querySelector('[data-local-cleaned]');
     el.querySelector('[data-zip-name]').textContent=file.name;
     let controller=null,url=null,closed=false;
-    function dismiss(){closed=true;controller?.abort();el.remove();if(url)setTimeout(()=>URL.revokeObjectURL(url),60000);}
+    function release(){busy=false;window.cfPhotoSession?.setBusy(false);}
+    function dismiss(){closed=true;controller?.abort();if(!controller)release();navigator.serviceWorker?.removeEventListener('message',onArchive);el.remove();if(url)setTimeout(()=>URL.revokeObjectURL(url),60000);}
+    el.addEventListener('cf:zip-dismiss',dismiss,{once:true});
+    const recordProgress=document.createElement('p');recordProgress.setAttribute('role','status');
+    if(ready?.recordCount){recordProgress.textContent=`Przygotowywanie 0 z ${ready.recordCount} wpisów`;status.before(recordProgress);}
+    function onArchive(event){
+      const data=event.data;
+      if(!closed&&data?.type==='cf-photo-zip-progress'&&data.url===ready?.url){
+        recordProgress.textContent=`Przygotowywanie ${data.done} z ${data.total} wpisów`;
+      }
+    }
+    navigator.serviceWorker?.addEventListener('message',onArchive);
     close.onclick=dismiss;
     cleanup.onclick=()=>{dismiss();cleanupDialog(recordId)};
     function update(bytes,total,done){
@@ -296,22 +341,27 @@
     }
     function finish(prepared){
       if(closed)return;
+      release();
+      if(ready?.recordCount)recordProgress.textContent=`Gotowe: ${ready.recordCount} ZIP-ów z wpisów`;
       file=prepared;url=URL.createObjectURL(prepared);download.href=url;download.download=prepared.name;download.target='_blank';download.rel='noopener';
       title.textContent='ZIP gotowy do zapisania';update(prepared.size,prepared.size,true);
       download.hidden=false;retry.hidden=true;close.textContent='Zamknij';controller=null;
     }
     async function prepare(){
       if(closed||controller)return;
+      if(busy||window.cfPhotoSession?.get()?.busy){status.textContent='Poczekaj na zakończenie bieżącej operacji zdjęć.';retry.hidden=false;return;}
+      busy=true;window.cfPhotoSession?.setBusy(true);
+      if(ready?.recordCount)recordProgress.textContent=`Przygotowywanie 0 z ${ready.recordCount} wpisów`;
       controller=new AbortController();retry.hidden=true;download.hidden=true;cleanup.hidden=true;close.textContent='Anuluj';title.textContent='Przygotowanie ZIP-a';update(0,ready?.size||file.size,false);
       try{
         const prepared=await prepareZipFile(ready,update,controller.signal);
         finish(prepared);
       }catch(error){
         if(!closed){title.textContent='Nie ukończono ZIP-a';status.textContent=error?.name==='AbortError'?'Anulowano przygotowanie. Zdjęcia pozostają w CleanFleet.':(error?.name==='QuotaExceededError'?'Brak miejsca na przygotowanie ZIP-a. Zwolnij miejsce na urządzeniu i spróbuj ponownie.':error?.message||'Nie udało się przygotować ZIP-a.');retry.hidden=false;close.textContent='Zamknij';}
-      }finally{controller=null;}
+      }finally{controller=null;release();}
     }
     retry.onclick=prepare;
-    download.onclick=()=>{status.textContent='Zapis otworzył się w osobnym oknie. Wybierz „Otwórz w…” / zapis w Plikach. Wróć do CleanFleet po zakończeniu zapisu.';cleanup.hidden=false;};
+    download.onclick=()=>{status.textContent='Zapis otworzył się w osobnym oknie. Wybierz „Otwórz w…” / zapis w Plikach. Wróć do CleanFleet po zakończeniu zapisu.';cleanup.hidden=!recordId;};
     if(file.slice){finish(file);return;}
     // Old manifest-only ready dialogs are rebuilt with visible, cancellable progress.
     update(0,ready?.size||file.size,false);retry.hidden=true;
@@ -321,6 +371,17 @@
   async function exportCombined(recordId){
     if(busy||window.cfPhotoSession?.get()?.busy)return;busy=true;window.cfPhotoSession?.setBusy(true);
     try{clearPreviews();const ready=await prepareZipDownload(recordId);clearBuildProgress();shareDialog({name:ready.name,size:ready.size},recordId,ready)}catch(e){console.error(e);clearBuildProgress();toast(e?.message||'Nie udało się przygotować pobierania ZIP-a.')}finally{busy=false;window.cfPhotoSession?.setBusy(false)}
+  }
+
+  async function exportUnpaid(){
+    if(busy||window.cfPhotoSession?.get()?.busy){toast('Poczekaj na zakończenie bieżącej operacji zdjęć.');return;}
+    const button=document.getElementById('cfUnpaidPhotosZip');
+    busy=true;window.cfPhotoSession?.setBusy(true);if(button)button.disabled=true;
+    let ready=null;
+    try{clearPreviews();ready=await prepareUnpaidZipDownload();}
+    catch(error){console.error(error);toast(error?.message||'Nie udało się przygotować paczki zdjęć.');}
+    finally{busy=false;window.cfPhotoSession?.setBusy(false);if(button)button.disabled=false;}
+    if(ready)shareDialog({name:ready.name,size:ready.size},null,ready);
   }
 
   async function saveToPhotos(recordId){
@@ -433,6 +494,7 @@
   }
 
   function events(){
+    document.getElementById('cfUnpaidPhotosZip')?.addEventListener('click',exportUnpaid);
     document.addEventListener('cf:photos-close',()=>{renderVersion++;clearPreviews()});
     document.addEventListener('cf:photos-open',e=>{
       currentRecordId=e.detail.recordId;
@@ -457,6 +519,7 @@
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
+
 
 
 

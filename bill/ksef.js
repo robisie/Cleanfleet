@@ -1,6 +1,6 @@
-import {selectedAmount,duplicatePurchases} from './purchase-import.js?v=1.0.23';
-import {esc,today} from './core.js?v=1.0.23';
-import {monthDates,counterparty,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.23';
+import {selectedAmount,duplicatePurchases} from './purchase-import.js?v=1.0.24';
+import {esc,today} from './core.js?v=1.0.24';
+import {monthDates,counterparty,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.24';
 const e=esc;
 let integration={},assignments=[],cfLinks=[];
 function initial(){const month=today().slice(0,7);return {month,...monthDates(month),kind:'purchases',dateType:'Issue',sort:'Desc',q:'',rows:[],selected:new Set(),loaded:false,hasMore:false,isTruncated:false,page:0,ticket:'',ticketAt:0,query:null,listError:false,partial:false,partialWarning:''};}

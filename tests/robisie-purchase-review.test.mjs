@@ -28,6 +28,7 @@ test('payment demand is available for issued invoices before, on and after the d
 test('demand deducts linked advances and allocations, validates balance, escapes content',()=>{
  const r=row();r.payload.buyer.name='<script>';assert.equal(Demand.outstanding(r,{invoiceSettlements:[{id:'i',existingReceipts:[{amount:30}],allocations:[{paid:20}]}]}),5000);
  globalThis.location={origin:'https://cleanfleet.pl'};const html=Demand.demandHtml(r,{amount:5000,deadline:'2026-10-27',date:'2026-10-20'});assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>'));assert.ok(html.includes('A/1'));assert.throws(()=>Demand.demandHtml(r,{amount:10001,deadline:'2026-10-27',date:'2026-10-20'}));assert.throws(()=>Demand.demandHtml(r,{amount:5000,deadline:'2026-10-20',date:'2026-10-20'}));
+ assert.match(html,/class="document-header"/);assert.match(html,/class="parties"/);assert.match(html,/class="payment"/);assert.match(html,/assets\/robisie-logo\.png/);assert.match(html,/@page\{size:A4;margin:15mm 12mm\}/);
 });
 
 test('before the original due date, demand uses neutral wording and cannot shorten the payment term',()=>{

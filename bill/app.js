@@ -1,9 +1,9 @@
-import * as KSEF from './ksef.js?v=1.0.23';
-import * as C from './core.js?v=1.0.23';
-import * as API from './api.js?v=1.0.23';
-import {preview,previewHtml} from './pdf.js?v=1.0.23';
-import * as Demand from './payment-demand.js?v=1.0.23';
-async function fleetPreview(row){const a=await API.call({action:'fleet-attachment',id:row.id});const {previewFleet}=await import('./fleet-pdf.js?v=1.0.23');await previewFleet(a);}
+import * as KSEF from './ksef.js?v=1.0.24';
+import * as C from './core.js?v=1.0.24';
+import * as API from './api.js?v=1.0.24';
+import {preview,previewHtml} from './pdf.js?v=1.0.24';
+import * as Demand from './payment-demand.js?v=1.0.24';
+async function fleetPreview(row){const a=await API.call({action:'fleet-attachment',id:row.id});const {previewFleet}=await import('./fleet-pdf.js?v=1.0.24');await previewFleet(a);}
 const isFleetLines=r=>isFleet(r)&&r.payload.source.fleetLayout==='vehicle-lines';
 const isFleet=r=>r?.payload?.source?.fleetId===r?.id&&!r?.payload?.correction;
 const $=s=>document.querySelector(s),e=C.esc;

@@ -35,3 +35,8 @@ export const assignKsef=({project,number,kind,xml,billId,indices,previous,replac
 };
 
 export const investmentPurchases=async id=>{const rows=await request('/rest/v1/rs_projects?id=eq.'+encodeURIComponent(id)+'&select=id,revision,payload');if(!rows?.[0])throw Error('Nie znaleziono inwestycji.');return rows[0];};
+
+export const cleanfleetCostContext=number=>request('/rest/v1/rpc/cf_ksef_cost_context',{method:'POST',body:JSON.stringify({p_number:number})});
+export const cleanfleetCompanies=()=>request('/rest/v1/rpc/cf_admin_companies_list',{method:'POST',body:'{}'});
+export const cleanfleetCostLinks=()=>request('/rest/v1/cf_purchases?source_ksef_number=not.is.null&select=source_ksef_number,source_ksef_index');
+export const saveCleanfleetCosts=({number,xml,entries,revision})=>request('/rest/v1/rpc/cf_save_ksef_costs',{method:'POST',body:JSON.stringify({p_number:number,p_xml:xml,p_entries:entries,p_revision:revision}),timeoutMs:30000});

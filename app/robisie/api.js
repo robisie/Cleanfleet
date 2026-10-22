@@ -43,8 +43,10 @@ export const saveSettings=(payload,revision,previous)=>fastSave('rs_save_setting
 
 export const deleteProject=project=>rpc('rs_delete_project',{p_id:project.id,p_revision:project.revision});
 
-// The server commits the completion and its unique earnings entry together.
-export const finishProject=(project,amount)=>rpc('rs_finish_project_with_earnings',{p_id:project.id,p_revision:project.revision,p_amount:amount});
+// Completion never writes earnings. Adding earnings is a separate, idempotent RPC.
+export const finishProject=project=>rpc('rs_finish_project',{p_id:project.id,p_revision:project.revision});
+export const addProjectEarnings=(project,amount)=>rpc('rs_add_project_earnings',{p_id:project.id,p_revision:project.revision,p_amount:amount});
+export const projectEarnings=id=>request('/rest/v1/cf_earnings?select=id,my_amount,work_date,source_robisie_project_id&source_robisie_project_id=eq.'+encodeURIComponent(id)).then(rows=>rows[0]||null);
 
 export async function stageInvoices(id){
  const [bill,linked]=await Promise.all([request('/functions/v1/cleanfleet-bill',{method:'POST',body:JSON.stringify({action:'search',sourceApp:'robisie',sourceId:id})}),request('/rest/v1/rs_ksef_links?select=document&project_id=eq.'+encodeURIComponent(id))]);

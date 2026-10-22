@@ -1,5 +1,5 @@
-import * as C from './core.js?v=1.0.66';
-import * as B from './purchase-settlement.js?v=1.0.66';
+import * as C from './core.js?v=1.0.67';
+import * as B from './purchase-settlement.js?v=1.0.67';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function markup(project,documents){
  const sources=B.sources(project,documents),unlinked=(project.receipts||[]).filter(r=>r.kind==='materials'&&!(project.invoiceSettlements||[]).some(i=>(i.existingReceipts||[]).some(x=>x.id===r.id)));

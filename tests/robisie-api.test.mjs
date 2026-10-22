@@ -5,11 +5,11 @@ import vm from 'node:vm';
 const source=await fs.readFile(new URL('../app/robisie/api.js',import.meta.url),'utf8');
 async function api(fetch,session={access_token:'test',expires_at:9999999999},timeout=false){const storage=new Map([['robisie-auth-session-v1',JSON.stringify(session)]]);const context=vm.createContext({fetch,AbortController,structuredClone,clearTimeout,setTimeout:timeout?(fn)=>setTimeout(fn,20):setTimeout,localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}});const mod=new vm.SourceTextModule(source,{context});await mod.link(()=>{});await mod.evaluate();mod.namespace.restoreSession();return mod.namespace;}
 const response=value=>({ok:true,text:async()=>JSON.stringify(value)});
-test('completion submits the saved revision and full calculated amount in one RPC',async()=>{
+test('completion submits only the saved revision and does not add earnings',async()=>{
  let url,args;const a=await api(async(u,o)=>{url=u;args=JSON.parse(o.body);return response({id:'p',revision:8,payload:{status:'zakonczona'}});});
- const row=await a.finishProject({id:'p',revision:7},1234.56);
- assert.ok(url.endsWith('/rs_finish_project_with_earnings'));
- assert.deepEqual(args,{p_id:'p',p_revision:7,p_amount:1234.56});assert.equal(row.payload.status,'zakonczona');
+ const row=await a.finishProject({id:'p',revision:7});
+ assert.ok(url.endsWith('/rs_finish_project'));
+ assert.deepEqual(args,{p_id:'p',p_revision:7});assert.equal(row.payload.status,'zakonczona');
 });
 test('small edit sends only changed fields and reconstructs the confirmed full project from metadata',async()=>{
  let args,url;const a=await api(async(u,o)=>{url=u;args=JSON.parse(o.body);return response({id:'p',revision:2,updated_at:'now'});});

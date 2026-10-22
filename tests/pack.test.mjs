@@ -104,3 +104,11 @@ test('tab indicators distinguish closed, active and background apps through swit
  p.c.window.testCloseTab('app:bill');assert.equal(status('bill'),'Zamknięta');assert.equal(status('robisie'),'W tle');assert.equal(tab('bill').children.length,1);
  await p.c.window.testOpenApplication('bill');assert.equal(status('bill'),'Aktywna');p.c.window.testCloseTab('app:bill');assert.equal(status('robisie'),'Aktywna');assert.equal(status('bill'),'Zamknięta');
 });
+
+test('CleanFleet invoice messages preserve its frame and reuse Bill through a return to CleanFleet',async()=>{
+ const p=await panel({query:'?application=cleanfleet'}),source=p.ids.frameHost.children[0],original=source.src;
+ const send=url=>p.events.message({origin:'https://cleanfleet.pl',source:source.contentWindow,data:{type:'robisie-pack-open-url',url}});
+ send('https://cleanfleet.pl/bill/?invoice=fleet-draft&edit=1');const bill=p.ids.frameHost.children[1];assert.equal(source.src,original);assert.equal(source.hidden,true);assert.equal(bill.hidden,false);assert.equal(bill.src,'https://cleanfleet.pl/bill/?invoice=fleet-draft&edit=1');
+ await p.c.window.testOpenApplication('cleanfleet');assert.equal(source.hidden,false);assert.equal(source.src,original);assert.equal(bill.hidden,true);
+ const messages=[];bill.contentWindow.postMessage=(data,origin)=>messages.push({data,origin});send('https://cleanfleet.pl/bill/?invoice=existing');assert.equal(p.ids.frameHost.children.length,2);assert.equal(messages.find(m=>m.data.type==='robisie-pack-navigate').data.url,'https://cleanfleet.pl/bill/?invoice=existing');assert.equal(source.src,original);assert.equal(bill.hidden,false);
+});

@@ -1,4 +1,4 @@
-import {round,number} from './core.js?v=1.0.67';
+import {round,number} from './core.js?v=1.0.68';
 export function cachedPreview(link){
  const items=link.items;if(!Array.isArray(items)||!items.length||!items.every(x=>Number.isInteger(x.index)&&x.index>0))return null;
  const gross=Number(link.document.grossAmount),currency=link.document.payload.currency;

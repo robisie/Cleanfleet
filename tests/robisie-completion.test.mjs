@@ -33,7 +33,7 @@ test('completion shows separate balances and counts invoice-linked receipts only
  p.receipts=[{id:'m',kind:'materials',amount:600},{id:'w',kind:'work',amount:200}];
  p.invoiceSettlements=[{id:'fv',number:'FV',total:600,allocations:[],existingReceipts:[{id:'m',kind:'materials',amount:600}]}];
  const s=Completion.summary(p);assert.equal(s.workCost,850);assert.equal(s.workReceived,200);assert.equal(s.materialReceived,600);assert.equal(s.materialBalance,-100);assert.equal(s.due,650);assert.equal(s.refund,100);assert.equal(s.unallocated,500);assert.equal(s.unfinished,1);
- const html=Completion.markup({...p,name:'<script>'},[{id:'a',number:'FV',status:'issued',payload:{currency:'PLN'}}]);assert.match(html,/Materiały/);assert.match(html,/Robocizna/);assert.match(html,/completion-invoice-link/);assert.doesNotMatch(html,/<script>/);
+ const html=Completion.markup({...p,name:'<script>'},[{id:'a',number:'FV',status:'issued',payload:{currency:'PLN',lines:[{qty:'1',price:'600'}]}}]);assert.match(html,/Materiały/);assert.match(html,/Robocizna/);assert.match(html,/completion-invoice-link/);assert.doesNotMatch(html,/<script>/);
 });
 test('unpaid purchase documents are fully included, while invoices alone never count as received money',()=>{
  const p=C.newProject('A','B');p.purchases=[{id:'p',amount:640.52,charge:640.52,paid:false}];
@@ -71,5 +71,49 @@ test('bulk material allocation from closeout uses the existing advance and retur
 test('server-side revision conflicts leave the completion open without creating earnings',async()=>{
  const db=fixture(),ui=await open(db);try{
   await ui.click('finish');db.revision++;await ui.submit({completionDate:'2026-10-22',completionAccepted:'on'});assert.notEqual(db.payload.status,'zakonczona');assert.equal(db.earnings,undefined);assert.equal(ui.node('#dialog').open,true);
+ }finally{ui.close();}
+});
+
+const sale=(id,value)=>({id,number:id,status:'issued',payload:{currency:'PLN',issueDate:'2026-10-20',lines:[{qty:'1',price:String(value)}]}});
+const splitFixture=()=>{
+ const p=C.newProject('Inwestycja','Inwestor');p.works=[{id:'w',qty:1,price:1000,done:true}];
+ p.purchases=[640.52,364.92,81.4,1171.13,2398,45].map((v,i)=>({id:'p'+i,date:'2026-10-'+String(i+1).padStart(2,'0'),amount:v,charge:v,paid:false,paidAmount:0}));
+ p.receipts=[{id:'a',kind:'materials',amount:1000,date:'2026-10-12'},{id:'b',kind:'materials',amount:1900,date:'2026-10-06'},{id:'c',kind:'materials',amount:1765.65,date:'2026-10-20'}];
+ p.purchases[0].receiptPayments={a:367.65,b:272.87};p.purchases[1].receiptPayments={b:364.92};p.purchases[2].receiptPayments={b:81.4};p.purchases[3].receiptPayments={b:1171.13};p.purchases[4].receiptPayments={a:632.35,c:1765.65};
+ p.invoiceSettlements=[{id:'A1',number:'A1',total:1765.65,allocations:[],existingReceipts:[{id:'c',kind:'materials',amount:1765.65}]},{id:'A2',number:'A2',total:2900,allocations:[],existingReceipts:[{id:'a',kind:'materials',amount:1000},{id:'b',kind:'materials',amount:1900}]}];
+ return {project:p,documents:[sale('A1',1765.65),sale('A2',2900)]};
+};
+test('two paid invoices expose actual purchase allocation and the unused 9.68 rather than reporting both fully allocated',()=>{
+ const {project,documents}=splitFixture(),rows=Completion.invoiceSummaries(project,documents);
+ assert.deepEqual(rows.map(r=>[r.number,r.received,r.materials,r.work,r.available,r.remaining,r.unpaid]),[['A1',1765.65,1765.65,0,0,0,0],['A2',2900,2890.32,0,9.68,9.68,0]]);
+ const html=Completion.markup(project,documents);assert.match(html,/Pozostało do rozliczenia/);assert.match(html,/Otrzymane, jeszcze niewykorzystane/);assert.match(html,/Uregulowano całość/);
+});
+test('settle all uses existing 9.68, records only 35.32 of new materials plus work, and is idempotent',()=>{
+ const {project,documents}=splitFixture(),saved=JSON.stringify(project),result=Completion.settleAll(project,documents,'2026-10-22');
+ assert.equal(JSON.stringify(project),saved);assert.equal(result.newMoney,1035.32);assert.equal(result.allocated,45);assert.equal(result.after.due,0);assert.equal(result.after.unallocated,0);assert.equal(result.after.open,false);
+ assert.deepEqual(result.invoices.map(r=>r.remaining),[0,0]);assert.equal(result.project.receipts.length,5);assert.equal(BI.paid(result.project.invoiceSettlements[1]),2900);
+ const again=Completion.settleAll(result.project,documents,'2026-10-22');assert.equal(again.newMoney,0);assert.equal(again.project.receipts.length,5);assert.deepEqual(again.project,result.project);
+});
+test('missing money is split across unpaid invoice balances and purposes without doubling an earlier receipt',()=>{
+ const p=C.newProject('A','B');p.purchases=[{id:'p',amount:300,charge:300,paidAmount:0}];p.works=[{id:'w',qty:1,price:500,done:true}];p.receipts=[{id:'old',kind:'materials',amount:100,date:'2026-10-01'}];
+ p.invoiceSettlements=[{id:'FV',number:'FV',total:600,allocations:[],existingReceipts:[{id:'old',kind:'materials',amount:100}]}];
+ const result=Completion.settleAll(p,[sale('FV',600)],'2026-10-22');assert.equal(result.newMoney,700);assert.equal(result.after.open,false);assert.equal(BI.paid(result.project.invoiceSettlements[0]),600);
+ assert.deepEqual(result.additions.map(r=>[r.kind,r.amount,r.number]),[['materials',200,'FV'],['work',300,'FV'],['work',200,'Wpłata bez faktury']]);assert.equal(result.project.receipts[0].date,'2026-10-01');
+ const rows=Completion.invoiceSummaries(result.project,[sale('FV',600)]);assert.equal(rows[0].materials,300);assert.equal(rows[0].work,300);assert.equal(rows[0].remaining,0);
+});
+test('unpaid invoice amount and available already-received money are separate',()=>{
+ const p=C.newProject('A','B');p.receipts=[{id:'a',kind:'materials',amount:100}];p.invoiceSettlements=[{id:'FV',total:500,allocations:[],existingReceipts:[{id:'a',kind:'materials',amount:100}]}];
+ const row=Completion.invoiceSummaries(p,[sale('FV',500)])[0];assert.equal(row.remaining,500);assert.equal(row.unpaid,400);assert.equal(row.available,100);
+});
+test('invoice pools and legacy paid allocations remain intact, refunds are not silently marked returned',()=>{
+ const p=C.newProject('A','B');p.purchases=[{id:'p',amount:100,charge:100,paidAmount:0}];p.invoiceSettlements=[{id:'FV',number:'FV',total:150,date:'2026-10-01',allocations:[{key:'materials:advance',kind:'materials',id:'advance',amount:150,paid:150}],existingReceipts:[]}];
+ const result=Completion.settleAll(p,[sale('FV',150)],'2026-10-22');assert.equal(result.newMoney,0);assert.equal(result.after.refund,50);assert.equal(result.after.open,true);assert.equal(C.purchaseTotals(result.project).advances,150);assert.equal(result.invoices[0].remaining,50);
+ assert.throws(()=>Completion.settleAll(p,[sale('FV',150)],'2026-02-30'),/prawidłową datę/);
+});
+test('one-button preview needs confirmation for new money and returns to updated closure after one save',async()=>{
+ const f=splitFixture(),db={id:'p',contract_number:'UUR',revision:1,payload:f.project,documents:f.documents},ui=await open(db);try{
+  await ui.click('finish');await ui.click('completion-settle-all');assert.match(ui.node('#dialog').innerHTML,/confirmSettlementMoney/);assert.equal(db.payload.receipts.length,3);
+  await ui.submit({fullSettlementDate:'2026-10-22'});assert.equal(db.payload.receipts.length,3);assert.equal(db.revision,1);
+  await ui.submit({fullSettlementDate:'2026-10-22',confirmSettlementMoney:'on'});assert.equal(db.revision,2);assert.equal(db.payload.receipts.length,5);assert.equal(Completion.summary(db.payload).open,false);assert.match(ui.node('#dialog').innerHTML,/Zamknięcie inwestycji/);assert.equal(db.finishCalls,undefined);assert.equal(db.earnings,undefined);
  }finally{ui.close();}
 });

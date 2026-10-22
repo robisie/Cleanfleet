@@ -1,14 +1,14 @@
-import * as Completion from './completion.js?v=1.0.67';
-import * as PurchaseSettlement from './purchase-settlement.js?v=1.0.67';
-import * as PurchaseSettlementForm from './purchase-settlement-form.js?v=1.0.67';
-import * as PurchasePayments from './purchase-payments.js?v=1.0.67';
-import * as PurchasePaymentForm from './purchase-payment-form.js?v=1.0.67';
-import * as PurchaseItems from './purchase-items.js?v=1.0.67';
-import * as BI from './invoices.js?v=1.0.67';
-import * as Auto from './autosave.js?v=1.0.67';
-import * as C from './core.js?v=1.0.67';
-import * as API from './api.js?v=1.0.67';
-import * as PDF from './pdf.js?v=1.0.67';
+import * as Completion from './completion.js?v=1.0.68';
+import * as PurchaseSettlement from './purchase-settlement.js?v=1.0.68';
+import * as PurchaseSettlementForm from './purchase-settlement-form.js?v=1.0.68';
+import * as PurchasePayments from './purchase-payments.js?v=1.0.68';
+import * as PurchasePaymentForm from './purchase-payment-form.js?v=1.0.68';
+import * as PurchaseItems from './purchase-items.js?v=1.0.68';
+import * as BI from './invoices.js?v=1.0.68';
+import * as Auto from './autosave.js?v=1.0.68';
+import * as C from './core.js?v=1.0.68';
+import * as API from './api.js?v=1.0.68';
+import * as PDF from './pdf.js?v=1.0.68';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',shopFilter=null,projectFilter='',projectSearch='',summarySort={key:'category',direction:1},mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set(),stageInvoiceCache=new Map(),projectEarningsCache=new Map();
@@ -220,6 +220,16 @@ async function earningsDialog(){
   if(selected.id!==baseline.id||selected.revision!==baseline.revision)throw Error('Inwestycja zmieniła się. Otwórz dodawanie zarobku ponownie.');
   await writes.run(async()=>{const result=await API.addProjectEarnings(baseline,amount),entry=Array.isArray(result)?result[0]:result;projectEarningsCache.set(baseline.id,entry);});toast('Dodano inwestycję do Moich zarobków.');
  },null,'scroll-modal','Dodaj do moich zarobków');
+}
+async function settleAllCompletionDialog(){
+ await refreshCompletionData();const baseline=structuredClone(selected),documents=stageInvoiceCache.get(selected.id)||[],preview=Completion.settleAll(baseline.payload,documents);
+ const additions=table(['Źródło nowej wpłaty','Przeznaczenie','Kwota'],preview.additions.map(r=>`<tr><td>${esc(r.number)}</td><td>${r.kind==='materials'?'Materiały':'Wykonana robocizna'}</td><td class="num">${money(r.amount)}</td></tr>`).join(''));
+ modal('Uregulowano całość',`<p>Rozliczymy zakupy i wykonaną robociznę, zachowując wcześniejsze wpłaty oraz ich powiązania.</p><div class="metrics">${metric('Zakupy rozliczane teraz',money(preview.allocated))}${metric('Nowa wpłata do potwierdzenia',money(preview.newMoney),'gold')}</div>${preview.newMoney>0?`${input('fullSettlementDate','Data otrzymania brakującej wpłaty',C.today(),'date','required')}${additions}<label class="inline-check"><input type="checkbox" name="confirmSettlementMoney" required> Potwierdzam otrzymanie dodatkowych ${money(preview.newMoney)} od inwestora.</label>`:'<p class="positive">Wystarczą wcześniej zapisane pieniądze. Nie dodamy nowej wpłaty.</p>'}${preview.after.refund>0?`<p class="notice">Pozostanie ${money(preview.after.refund)} do zwrotu inwestorowi. To rozliczenie nie potwierdza wykonania zwrotu.</p>`:''}${preview.before.unfinished?`<p class="notice">Pozycje nieoznaczone jako wykonane (${preview.before.unfinished}) pozostaną poza rozliczeniem robocizny.</p>`:''}<h3>Faktury po rozliczeniu</h3>${Completion.invoicesMarkup(preview.project,documents)}<p class="muted">Nowe wpłaty przypiszemy do niezapłaconej części faktur sprzedażowych, do wysokości brakującego rozliczenia. Resztę zapiszemy jako wpłatę bez faktury. To nie kończy inwestycji ani nie dodaje zarobku.</p>`,fd=>{
+  if(selected.id!==baseline.id||selected.revision!==baseline.revision)throw Error('Inwestycja zmieniła się. Otwórz rozliczenie ponownie.');
+  if(preview.newMoney>0&&!fd.has('confirmSettlementMoney'))throw Error('Potwierdź otrzymanie brakującej wpłaty.');
+  const result=Completion.settleAll(baseline.payload,documents,preview.newMoney>0?fd.get('fullSettlementDate'):C.today());
+  selected.payload=result.project;markDirty();
+ },null,'scroll-modal completion-modal','Potwierdź rozliczenie');
 }
 const defaultUnits=['m²','mb','szt.','godz.','kpl','m','m³'];
 const customUnitValue='__robisie_custom_unit__';
@@ -478,6 +488,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
   b.disabled=true;await flushChanges({normalize:false});completionReturnId=selected.id;closeModal();
   try{
    if(action==='completion-purchases')await settlePurchasesDialog();
+   else if(action==='completion-settle-all')await settleAllCompletionDialog();
    else if(action==='completion-receipt')receiptDialog(null,kind,Math.max(0,remaining)||'');
    else if(action==='completion-work-paid')settleAllDialog(true);
    else if(action==='completion-invoice-link')await invoiceDialog(invoiceId);

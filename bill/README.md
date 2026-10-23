@@ -113,3 +113,6 @@ Wdrożenie: migracja `20261023130048_ksef_corrections_stock.sql`, następnie pli
 
 
 Towar jest dostępny z głównego panelu Robisię (1.0.71), a nie z zakładek Bill. Widok współdzieli obsługę stanów i używa sesji Robisię. Bill 1.0.32 zachowuje grupowanie faktur i korekt.
+
+
+Robisię 1.0.72 / Bill 1.0.33: wczytywanie Towaru pokazuje zapisany stan przed synchronizacją. Odrzucenie XML konkretnej faktury nie przerywa pozostałych importów. Błędy z numerami dokumentów są pokazane osobno; niepełne wyniki nie są oznaczane jako pusty magazyn. Nieodczytane korekty lub błąd historii blokują przypisywanie niezweryfikowanych ilości. Ta poprawka działa z dotychczasowymi funkcjami bazy i nie wymaga migracji.

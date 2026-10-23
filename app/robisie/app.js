@@ -1,14 +1,14 @@
-import * as Completion from './completion.js?v=1.0.71';
-import * as PurchaseSettlement from './purchase-settlement.js?v=1.0.71';
-import * as PurchaseSettlementForm from './purchase-settlement-form.js?v=1.0.71';
-import * as PurchasePayments from './purchase-payments.js?v=1.0.71';
-import * as PurchasePaymentForm from './purchase-payment-form.js?v=1.0.71';
-import * as PurchaseItems from './purchase-items.js?v=1.0.71';
-import * as BI from './invoices.js?v=1.0.71';
-import * as Auto from './autosave.js?v=1.0.71';
-import * as C from './core.js?v=1.0.71';
-import * as API from './api.js?v=1.0.71';
-import * as PDF from './pdf.js?v=1.0.71';
+import * as Completion from './completion.js?v=1.0.72';
+import * as PurchaseSettlement from './purchase-settlement.js?v=1.0.72';
+import * as PurchaseSettlementForm from './purchase-settlement-form.js?v=1.0.72';
+import * as PurchasePayments from './purchase-payments.js?v=1.0.72';
+import * as PurchasePaymentForm from './purchase-payment-form.js?v=1.0.72';
+import * as PurchaseItems from './purchase-items.js?v=1.0.72';
+import * as BI from './invoices.js?v=1.0.72';
+import * as Auto from './autosave.js?v=1.0.72';
+import * as C from './core.js?v=1.0.72';
+import * as API from './api.js?v=1.0.72';
+import * as PDF from './pdf.js?v=1.0.72';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',shopFilter=null,projectFilter='',projectSearch='',summarySort={key:'category',direction:1},mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set(),stageInvoiceCache=new Map(),projectEarningsCache=new Map();
@@ -17,7 +17,7 @@ let stockPanel=null,stockMountGeneration=0;
 function closeStock(){stockMountGeneration++;stockPanel?.unmount();}
 async function mountStockPanel(){
  const host=$('#robisie-stock-panel'),generation=++stockMountGeneration;
- try{const module=await import('../../bill/ksef.js?v=1.0.32');if(generation!==stockMountGeneration||view!=='stock'||$('#robisie-stock-panel')!==host)return;stockPanel=module;module.mountStock(host,API.ksefCall,API.stockIntegration(all,row=>{all=all.map(r=>r.id===row.id?{...row,payload:C.captureCatalog(config.payload,row.payload)}:r);}));}
+ try{const module=await import('../../bill/ksef.js?v=1.0.33');if(generation!==stockMountGeneration||view!=='stock'||$('#robisie-stock-panel')!==host)return;stockPanel=module;module.mountStock(host,API.ksefCall,API.stockIntegration(all,row=>{all=all.map(r=>r.id===row.id?{...row,payload:C.captureCatalog(config.payload,row.payload)}:r);}));}
  catch(error){if(generation===stockMountGeneration&&view==='stock')host.textContent='Nie udało się wczytać towarów: '+error.message;}
 }
 let stageInvoiceLoading=null,purchaseDialogLoading=false;

@@ -1,14 +1,14 @@
-import * as Completion from './completion.js?v=1.0.73';
-import * as PurchaseSettlement from './purchase-settlement.js?v=1.0.73';
-import * as PurchaseSettlementForm from './purchase-settlement-form.js?v=1.0.73';
-import * as PurchasePayments from './purchase-payments.js?v=1.0.73';
-import * as PurchasePaymentForm from './purchase-payment-form.js?v=1.0.73';
-import * as PurchaseItems from './purchase-items.js?v=1.0.73';
-import * as BI from './invoices.js?v=1.0.73';
-import * as Auto from './autosave.js?v=1.0.73';
-import * as C from './core.js?v=1.0.73';
-import * as API from './api.js?v=1.0.73';
-import * as PDF from './pdf.js?v=1.0.73';
+import * as Completion from './completion.js?v=1.0.74';
+import * as PurchaseSettlement from './purchase-settlement.js?v=1.0.74';
+import * as PurchaseSettlementForm from './purchase-settlement-form.js?v=1.0.74';
+import * as PurchasePayments from './purchase-payments.js?v=1.0.74';
+import * as PurchasePaymentForm from './purchase-payment-form.js?v=1.0.74';
+import * as PurchaseItems from './purchase-items.js?v=1.0.74';
+import * as BI from './invoices.js?v=1.0.74';
+import * as Auto from './autosave.js?v=1.0.74';
+import * as C from './core.js?v=1.0.74';
+import * as API from './api.js?v=1.0.74';
+import * as PDF from './pdf.js?v=1.0.74';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',shopFilter=null,projectFilter='',projectSearch='',summarySort={key:'category',direction:1},mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set(),stageInvoiceCache=new Map(),projectEarningsCache=new Map();
@@ -55,7 +55,7 @@ async function persistCatalog(payload){
  }).finally(updateSaveState);
 }
 
-const title=()=>C.MODULES.find(x=>x[0]===view)?.[1]||({dashboard:'Panel administratora',stock:'Towar',catalog:'Cennik',settings:'Dane wykonawcy',trips:'Dojazdy'}[view]||'Robisię');
+const title=()=>C.MODULES.find(x=>x[0]===view)?.[1]||({dashboard:'Panel administratora',stock:'Magazyn',catalog:'Cennik',settings:'Dane wykonawcy',trips:'Dojazdy'}[view]||'Robisię');
 const btn=(action,label,cls='',extra='')=>`<button type="button" data-action="${action}" class="${cls}" ${extra}>${label}</button>`;
 const input=(name,label,value='',type='text',extra='')=>`<div class="field"><label for="f-${esc(name)}">${label}</label><input id="f-${esc(name)}" name="${esc(name)}" type="${type==='number'?'text':type}" ${type==='number'?'data-numeric="true" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" title="Możesz wpisać liczbę lub działanie, np. 25+3+7-2"':''} value="${esc(value)}" ${p()?.calculationPrecision==='source'&&type==='number'?extra.replace(/step="[^"]+"/g,'step="any"'):extra}></div>`;
 const text=(name,label,value='',extra='')=>`<div class="field"><label for="f-${esc(name)}">${label}</label><textarea id="f-${esc(name)}" name="${esc(name)}" ${extra}>${esc(value)}</textarea></div>`;
@@ -88,8 +88,8 @@ async function openRequestedPurchase(){
  if(invoice){await loadStageInvoices();if((stageInvoiceCache.get(target.id)||[]).some(row=>row.id===invoice))await invoicePaidDialog(invoice);return;}
  const purchase=p().purchases.find(x=>x.sourceKsefNumber===ksef);if(purchase)await purchaseDialog(purchase.id);
 }
-function render(){closeStock();const side=selected?C.MODULES:[['dashboard','Inwestycje'],['stock','Towar'],['catalog','Cennik'],['settings','Dane wykonawcy']];
- $('#app').innerHTML=`<header class="topbar"><div class="row">${btn('menu','Menu','mobile-menu')}${logoMarkup()}<span class="version">Inwestycje remontowe · ${C.VERSION}</span></div><div class="row topbar-actions"><a class="button" style="font-size:14px" href="/bill/?new=1&brand=robisie${selected?'&source='+encodeURIComponent(selected.id):''}" target="_blank" rel="noopener">Wystaw fakturę</a>${selected?btn('receipt-add','+ Dodaj wpłatę','primary quick-receipt'): ''}<span class="muted" id="save-state">${saveError?'Błąd zapisu — kopia zachowana na urządzeniu':writes.pending?'Zapisywanie…':dirty?'Oczekiwanie na automatyczny zapis':'Dane zapisane w bazie'}</span>${btn('logout','Wyloguj','logout')}</div></header><div class="shell"><nav class="${mobileOpen?'open':''}">${selected?btn('back','Wszystkie inwestycje')+'<p class="muted" style="padding:10px">'+esc(p().name)+'<br>'+esc(selected.contract_number)+'</p>':''}${side.map(([key,label])=>btn('nav',label,view===key?'active':'',`data-view="${key}"`)).join('')}${selected?btn('nav','Cennik',view==='catalog'?'active':'','data-view="catalog"')+btn('nav','Dojazdy',view==='trips'?'active':'','data-view="trips"'):''}</nav><main><div class="toolbar"><div><h1>${title()}</h1><p class="muted">${selected?esc(p().name)+' · '+esc(selected.contract_number):'Robisię — prowadzenie inwestycji'}</p></div><div class="actions">${selected?(view==='trips'?'':btn('print','Generuj PDF'))+undoButton():view==='dashboard'?btn('nav','Towar','',`data-view="stock"`)+btn('new-project','Nowa inwestycja','primary'):view==='stock'?'':undoButton()}</div></div>${recoveryNotice()}<div id="content">${content()}</div>${selected?`<div class="savebar"><span class="muted">Zmiany zapisują się automatycznie. Możesz cofnąć ostatni zapis.</span>${undoButton()}</div>`:''}</main></div>`;
+function render(){closeStock();const side=selected?C.MODULES:[['dashboard','Inwestycje'],['stock','Magazyn'],['catalog','Cennik'],['settings','Dane wykonawcy']];
+ $('#app').innerHTML=`<header class="topbar"><div class="row">${btn('menu','Menu','mobile-menu')}${logoMarkup()}<span class="version">Inwestycje remontowe · ${C.VERSION}</span></div><div class="row topbar-actions"><a class="button" style="font-size:14px" href="/bill/?new=1&brand=robisie${selected?'&source='+encodeURIComponent(selected.id):''}" target="_blank" rel="noopener">Wystaw fakturę</a>${selected?btn('receipt-add','+ Dodaj wpłatę','primary quick-receipt'): ''}<span class="muted" id="save-state">${saveError?'Błąd zapisu — kopia zachowana na urządzeniu':writes.pending?'Zapisywanie…':dirty?'Oczekiwanie na automatyczny zapis':'Dane zapisane w bazie'}</span>${btn('logout','Wyloguj','logout')}</div></header><div class="shell"><nav class="${mobileOpen?'open':''}">${selected?btn('back','Wszystkie inwestycje')+'<p class="muted" style="padding:10px">'+esc(p().name)+'<br>'+esc(selected.contract_number)+'</p>':''}${side.map(([key,label])=>btn('nav',label,view===key?'active':'',`data-view="${key}"`)).join('')}${selected?btn('nav','Cennik',view==='catalog'?'active':'','data-view="catalog"')+btn('nav','Dojazdy',view==='trips'?'active':'','data-view="trips"'):''}</nav><main><div class="toolbar"><div><h1>${title()}</h1><p class="muted">${selected?esc(p().name)+' · '+esc(selected.contract_number):'Robisię — prowadzenie inwestycji'}</p></div><div class="actions">${selected?(view==='trips'?'':btn('print','Generuj PDF'))+undoButton():view==='dashboard'?btn('nav','Magazyn','',`data-view="stock"`)+btn('new-project','Nowa inwestycja','primary'):view==='stock'?'':undoButton()}</div></div>${recoveryNotice()}<div id="content">${content()}</div>${selected?`<div class="savebar"><span class="muted">Zmiany zapisują się automatycznie. Możesz cofnąć ostatni zapis.</span>${undoButton()}</div>`:''}</main></div>`;
  if(view==='stock')void mountStockPanel();
 }
 function content(){switch(view){case'stock':return '<div id="robisie-stock-panel" class="robisie-stock"><p role="status">Ładowanie towarów…</p></div>';case'dashboard':return dashboard();case'trips':return tripsView();case'catalog':return catalogView();case'settings':return settingsView();case'overview':return overview();case'data':return dataView();case'rooms':return roomsView();case'offer':return linesView('offer');case'works':return linesView('works');case'summary':return summaryView();case'payments':return paymentsView();case'purchases':return purchasesView();case'journal':return journalView();case'contract':return contractView();case'handover':return handoverView();default:return '';}}

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {relatedGroups,historyRanges} from '../bill/ksef-relations.js';
-import {stockMarkup,stockStores} from '../bill/stock.js';
+import {stockMarkup,stockStores,stockSummaryMarkup} from '../bill/stock.js';
 const row=(id,date,type='Vat',seller='1111111111')=>({ksefNumber:id,invoiceNumber:id,issueDate:date,invoiceType:type,seller:{nip:seller,name:'Sklep'},grossAmount:100,currency:'PLN'});
 const a=row('original','2026-01-10'),b=row('correction','2026-04-10','Kor'),c=row('correction2','2026-06-10','Kor');
 const docs=[{metadata:a},{metadata:b,references:[{ksefNumber:a.ksefNumber}]},{metadata:c,references:[{ksefNumber:a.ksefNumber}]}];
@@ -32,7 +32,12 @@ test('history intervals cover every day including DST and leap days without gaps
  const ranges=historyRanges('2024-01-01','2026-10-23');assert.equal(ranges[0].from,'2024-01-01');assert.equal(ranges.at(-1).to,'2026-10-23');for(const [i,r]of ranges.entries()){assert.ok((Date.parse(r.to)-Date.parse(r.from))/86400000<=98);if(i)assert.equal((Date.parse(r.from)-Date.parse(ranges[i-1].to))/86400000,1);}
 });
 test('stock markup escapes product and source, exposes available quantities, cost and actions',()=>{
- const html=stockMarkup([{metadata:a,item:{index:1,name:'<script>',unit:'szt.',gross:400},capacity:4,assigned:2,manualReturned:1,correctedReturned:1,returned:1,available:1}]);assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>'));assert.match(html,/Pozostało: 1/);assert.match(html,/100,00/);assert.match(html,/Przypisz do inwestycji/);assert.match(html,/Cofnij ręczny zwrot/);
+ const html=stockMarkup([{metadata:a,item:{index:1,name:'<script>',unit:'szt.',gross:400},capacity:4,assigned:2,manualReturned:1,correctedReturned:1,returned:1,available:1}]);assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>'));assert.match(html,/Pozostało: 1/);assert.match(html,/100,00/);assert.match(html,/Robisię · inwestycja/);assert.match(html,/Cofnij ręczny zwrot/);
+});
+test('warehouse offers four destinations and summarizes available value without mixing units',()=>{
+ const meta={...a,currency:'PLN'},rows=[{metadata:meta,item:{index:1,name:'Farba',unit:'szt.',gross:300},capacity:3,assigned:1,available:2,returned:0,classifiedAuto:1,uses:{auto:{quantity:1,revision:2}}},{metadata:meta,item:{index:2,name:'Taśma',unit:'m',gross:50},capacity:5,assigned:0,available:5,returned:0}];
+ const html=stockMarkup(rows);for(const label of ['Robisię · inwestycja','CleanFleet','Auto','Koszty firmowe'])assert.match(html,new RegExp(label));assert.match(html,/Auto: 1/);assert.match(html,/data-category="auto"/);
+ const summary=stockSummaryMarkup(rows);assert.match(summary,/Podsumowanie magazynu/);assert.match(summary,/250,00\s+zł/);assert.match(summary,/2 szt./);assert.match(summary,/5 m/);assert.match(stockSummaryMarkup([],{incomplete:true}),/Część dokumentów nie została wczytana/);
 });
 test('stock sorts newest invoices, groups their items and combines shop and status filters',()=>{
  const item=(metadata,index,available,returned)=>({metadata,item:{index,name:'Towar '+index,unit:'szt.',gross:100},capacity:1,assigned:0,returned,available});

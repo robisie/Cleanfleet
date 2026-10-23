@@ -21,7 +21,7 @@ async function request(path,options={},auth=true){
 export async function login(email,password){const s=await request('/auth/v1/token?grant_type=password',{method:'POST',body:JSON.stringify({email,password})},false);setSession(s);return s;}
 export function logout(){session=null;localStorage.removeItem(SESSION_KEY);}
 export const rpc=(name,args={})=>request('/rest/v1/rpc/'+name,{method:'POST',body:JSON.stringify(args)});
-// Towar uses Robisię's authenticated session, including KSeF reads and quantity writes.
+// Magazyn uses Robisię's authenticated session, including KSeF reads and quantity writes.
 export const ksefCall=(body,options={})=>request('/functions/v1/cleanfleet-bill',{method:'POST',body:JSON.stringify(body),timeoutMs:90000,...options});
 const stockRpc=(name,args={})=>request('/rest/v1/rpc/'+name,{method:'POST',body:JSON.stringify(args),timeoutMs:90000});
 export function stockIntegration(rows,onChange=()=>{}){return {
@@ -32,8 +32,12 @@ export function stockIntegration(rows,onChange=()=>{}){return {
  storeXml:(number,xml)=>stockRpc('rs_ksef_store_xml',{p_number:number,p_xml:xml}),
  stock:()=>stockRpc('rs_ksef_stock'),
  setReturn:({number,index,quantity,revision})=>stockRpc('rs_ksef_set_return',{p_number:number,p_index:index,p_quantity:quantity,p_revision:revision}),
+ setUse:({number,index,category,quantity,revision})=>stockRpc('rs_ksef_set_use',{p_number:number,p_index:index,p_category:category,p_quantity:quantity,p_revision:revision}),
  loadLinks:()=>request('/rest/v1/rs_ksef_links?select=*'),
  cfLinks:()=>request('/rest/v1/cf_purchases?source_ksef_number=not.is.null&select=source_ksef_number,source_ksef_index'),
+ cfContext:number=>stockRpc('cf_ksef_cost_context',{p_number:number}),
+ cfCompanies:()=>stockRpc('cf_admin_companies_list'),
+ cfSave:({number,xml,entries,revision})=>stockRpc('cf_save_ksef_costs',{p_number:number,p_xml:xml,p_entries:entries,p_revision:revision}),
  preview:({xml})=>stockRpc('rs_ksef_purchase_preview',{p_xml:xml}),
  allocationContext:number=>stockRpc('rs_ksef_allocation_context',{p_number:number}),
  findPurchases:project,

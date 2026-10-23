@@ -26,3 +26,6 @@ dialog.kf-assignment-modal{width:min(920px,calc(100vw - 32px));max-width:calc(10
 .bill-payment-state.paid{background:#eaf5ee;color:#23623a}.bill-payment-state.partial{background:#fff6e5;color:#835413}.bill-payment-state.unpaid{background:#fff0ef;color:#a82a36}
 .bill-payment-state button{min-height:38px;padding:5px 12px;background:white}
 .detail-payment-state{margin-bottom:18px}
+.bill-payment-state.manual_paid{background:#e9f6ee;color:#176145}
+.bill-bank-payments{font-size:.9em;margin-top:6px;max-width:650px}
+.bill-bank-payments div{padding:4px 0;border-top:1px solid #ddd}

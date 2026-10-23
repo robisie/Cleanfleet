@@ -11,10 +11,13 @@ test('Towar uses Robisię session for inventory reads, returns and project alloc
  const integration=a.stockIntegration([{id:'p',payload:{name:'Remont'},contract_number:'UUR/1'}],row=>changed.push(row));
  assert.equal(integration.projects[0].name,'Remont');assert.equal(integration.projects[0].number,'UUR/1');
  await integration.stock();await integration.setReturn({number:'ksef',index:1,quantity:2,revision:3});
+ await integration.setUse({number:'ksef',index:1,category:'auto',quantity:1.5,revision:0});
  const link=await integration.assign({project:'p',number:'ksef',xml:'verified',entries:[{index:1,quantity:1}],projectRevision:1});
  assert.equal(link.ksef_number,'ksef');assert.equal(changed[0].revision,2);
  assert.ok(calls[0].url.endsWith('/rs_ksef_stock'));assert.deepEqual(calls[1].args,{p_number:'ksef',p_index:1,p_quantity:2,p_revision:3});
- assert.equal(calls[2].args.p_project,'p');assert.equal(calls[2].args.p_entries[0].quantity,1);
+ assert.ok(calls[2].url.endsWith('/rs_ksef_set_use'));assert.deepEqual(calls[2].args,{p_number:'ksef',p_index:1,p_category:'auto',p_quantity:1.5,p_revision:0});
+ assert.equal(calls[3].args.p_project,'p');assert.equal(calls[3].args.p_entries[0].quantity,1);
+ assert.equal(typeof integration.cfContext,'function');assert.equal(typeof integration.cfCompanies,'function');assert.equal(typeof integration.cfSave,'function');
  assert.ok(calls.every(c=>c.headers.Authorization==='Bearer test'));
 });
 test('leaving Towar cancels a KSeF request using the Robisię transport',async()=>{

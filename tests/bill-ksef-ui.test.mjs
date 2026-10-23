@@ -34,6 +34,12 @@ test('Towar filters shops and returned stock without fetching the list again',as
  root.onchange({target:{id:'kf-stock-store',value:'222',dataset:{}}});root.onchange({target:{id:'kf-stock-status',value:'returned',dataset:{}}});
  assert.match(node('#kf-stock-results').innerHTML,/Oddany produkt/);assert.doesNotMatch(node('#kf-stock-results').innerHTML,/Nowy produkt/);assert.equal(reads,2);n.unmount();
 });
+test('Magazyn summary opens from the main stock panel',async()=>{
+ const {n,root}=await setup();n.mountStock(root,async()=>({invoices:[],hasMore:false}),{index:async()=>[],storeMetadata:async()=>{},stock:async()=>[{metadata:row(1),item:{index:1,name:'Farba',unit:'szt.',gross:200},capacity:2,assigned:0,returned:0,available:2}]});
+ for(let i=0;i<50&&n.testState().busy;i++)await new Promise(resolve=>setTimeout(resolve,1));
+ assert.match(root.innerHTML,/data-kf="stock-summary"/);root.onclick({target:{closest:()=>({dataset:{kf:'stock-summary'}})},stopPropagation(){}});
+ assert.match(root.innerHTML,/Podsumowanie magazynu/);assert.match(root.innerHTML,/200,00/);n.unmount();
+});
 test('one rejected XML does not hide saved goods or stop reading the next invoice',async()=>{
  const {n,root}=await setup(),bytes=new TextEncoder().encode('<Faktura/>'),docs=await Promise.all([1,2].map(async i=>({metadata:{...row(i),invoiceHash:await D.digest(bytes)},hasPreview:false}))),attempts=[];
  const goods=[{metadata:row(3),item:{index:1,name:'Zapisana farba',unit:'szt.',gross:100},capacity:1,assigned:0,returned:0,available:1}];

@@ -330,18 +330,19 @@ test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów
  const ksefRow=structuredClone(row);ksefRow.payload.purchases[0].sourceKsefNumber='source-number';
  ksefFixture={document:{grossAmount:150,referenceOnly:false,selectedIndices:[1],payload:{currency:'PLN'}},items:[{index:1,name:'Farba inwestycji',quantity:1,unit:'szt.',vat:'23',gross:100},{index:2,name:'Pozycja wcześniej wykluczona',quantity:1,unit:'szt.',vat:'23',gross:50}]};
  module.namespace.testRender(ksefRow,structuredClone(shared));
- const purchaseBoxes=[{checked:true,value:'1'},{checked:false,value:'2'}];node('#dialog').querySelectorAll=selector=>selector?.includes('ksef-item')?purchaseBoxes:radios;
+ ksefFixture.project_id=ksefRow.id;ksefFixture.kind='purchases';
+ const purchaseBoxes=[{checked:true,dataset:{allocationCheck:'1'},disabled:false},{checked:false,dataset:{allocationCheck:'2'},disabled:false}];node('.ksef-allocation').querySelectorAll=()=>purchaseBoxes;node('[data-allocation-quantity=\"1\"]').value='1';node('[data-allocation-quantity=\"2\"]').value='1';
  // Open the imported row through the regular action, as in the application.
  await listeners.get('click')({target:{closest:()=>({dataset:{action:'purchase-edit',id:ksefRow.payload.purchases[0].id},isConnected:true})}});
- assert.ok(node('#dialog').innerHTML.includes('Pozycje faktury z KSeF'));assert.ok(node('#dialog').innerHTML.includes('Pozycja wcześniej wykluczona'));
- assert.match(node('#dialog').innerHTML,/value="1"[^>]*checked/);assert.ok(node('#purchase-items-total').textContent.includes(C.money(100)));
+ assert.ok(node('#dialog').innerHTML.includes('Pozycje faktury zakupowej'));assert.ok(node('#dialog').innerHTML.includes('Pozycja wcześniej wykluczona'));
+ assert.match(node('#dialog').innerHTML,/data-allocation-check="1"[^>]*checked/);assert.ok(node('[data-allocation-total]').textContent.includes(C.money(100)));
  purchaseBoxes[1].checked=true;purchaseBoxes[1].onchange();assert.equal(node('#f-amount').value,150);assert.equal(node('#f-charge').value,150);
- module.namespace.testRender(ksefRow,structuredClone(shared));context.window.location.href='https://cleanfleet.pl/app/robisie/?project=p&purchaseKsef=source-number';await module.namespace.testOpenRequestedPurchase();assert.ok(node('#dialog').innerHTML.includes('Pozycje faktury z KSeF'));assert.ok(node('#dialog').innerHTML.includes('Rozliczenie zakupu z inwestorem'));
+ module.namespace.testRender(ksefRow,structuredClone(shared));context.window.location.href='https://cleanfleet.pl/app/robisie/?project=p&purchaseKsef=source-number';await module.namespace.testOpenRequestedPurchase();assert.ok(node('#dialog').innerHTML.includes('Pozycje faktury zakupowej'));assert.ok(node('#dialog').innerHTML.includes('Rozliczenie zakupu z inwestorem'));
  const resetRow=structuredClone(ksefRow);delete resetRow.payload.purchases[0].sourceKsefNumber;Object.assign(resetRow.payload.purchases[0],{invoice:'FV-1',supplierNip:'1234567890'});
  Object.assign(ksefFixture,{project_id:resetRow.id,kind:'purchases',ksef_number:'1234567890-20261001-ABCDEF123456-AA'});Object.assign(ksefFixture.document,{number:'FV-1',importedAmount:100});
  const priorPurchase=structuredClone(resetRow.payload.purchases[0]);module.namespace.testRender(resetRow,structuredClone(shared));
  await listeners.get('click')({target:{closest:()=>({dataset:{action:'purchase-edit',id:priorPurchase.id},isConnected:true})}});
- assert.ok(node('#dialog').innerHTML.includes('Pozycja wcześniej wykluczona'));assert.ok(node('#dialog').innerHTML.includes('Pozycje faktury z KSeF'));
+ assert.ok(node('#dialog').innerHTML.includes('Pozycja wcześniej wykluczona'));assert.ok(node('#dialog').innerHTML.includes('Pozycje faktury zakupowej'));
  const recovered=module.namespace.testPayload().purchases[0];assert.equal(recovered.sourceKsefNumber,ksefFixture.ksef_number);assert.equal(recovered.amount,priorPurchase.amount);assert.equal(recovered.charge,priorPurchase.charge);assert.equal(recovered.paid,priorPurchase.paid);assert.ok(module.namespace.testProjects()[0].revision>resetRow.revision);
 
 

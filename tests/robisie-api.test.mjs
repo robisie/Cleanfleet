@@ -5,6 +5,17 @@ import vm from 'node:vm';
 const source=await fs.readFile(new URL('../app/robisie/api.js',import.meta.url),'utf8');
 async function api(fetch,session={access_token:'test',expires_at:9999999999},timeout=false){const storage=new Map([['robisie-auth-session-v1',JSON.stringify(session)]]);const context=vm.createContext({fetch,AbortController,structuredClone,clearTimeout,setTimeout:timeout?(fn)=>setTimeout(fn,20):setTimeout,localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}});const mod=new vm.SourceTextModule(source,{context});await mod.link(()=>{});await mod.evaluate();mod.namespace.restoreSession();return mod.namespace;}
 const response=value=>({ok:true,text:async()=>JSON.stringify(value)});
+test('quantity editor submits amounts, quantities and the document version in one transaction',async()=>{
+ let args,url;const a=await api(async(u,o)=>{url=u;args=JSON.parse(o.body);return response({project:{id:'p',revision:3,payload:{}}});});
+ const payload={purchases:[{id:'buy',sourceKsefNumber:'number',amount:180,charge:220}]},link={ksef_number:'number',document:{selectedQuantities:[{index:1,quantity:2,gross:200}]}},entries=[{index:1,quantity:1.5,gross:150}];
+ const row=await a.savePurchaseAllocation({id:'p',revision:2},payload,link,entries,null);
+ assert.ok(url.endsWith('/rs_allocate_ksef_purchase'));assert.equal(row.revision,3);assert.deepEqual(args,{p_project:'p',p_number:'number',p_xml:null,p_entries:entries,p_revision:2,p_expected_document:link.document,p_payload:payload});
+});
+test('lost quantity-save response is confirmed by reading the whole saved project',async()=>{
+ const entries=[{index:1,quantity:2,gross:200}],payload={purchases:[{id:'buy',sourceKsefNumber:'number',selectedKsefQuantities:entries,amount:180,charge:220,description:'Farba 2 szt.'}]},calls=[];
+ const a=await api(async(u,o={})=>{calls.push(o.method||'GET');if(o.method==='POST')throw new TypeError('lost response');return response([{id:'p',revision:3,payload}]);});
+ const row=await a.savePurchaseAllocation({id:'p',revision:2},payload,{ksef_number:'number',document:{}},entries,null);assert.equal(row.revision,3);assert.deepEqual(calls,['POST','GET']);
+});
 test('completion submits only the saved revision and does not add earnings',async()=>{
  let url,args;const a=await api(async(u,o)=>{url=u;args=JSON.parse(o.body);return response({id:'p',revision:8,payload:{status:'zakonczona'}});});
  const row=await a.finishProject({id:'p',revision:7});

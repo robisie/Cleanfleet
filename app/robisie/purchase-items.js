@@ -1,4 +1,5 @@
 import {round,number} from './core.js?v=1.0.68';
+import {savedEntries} from './ksef-allocation.js?v=1.0.70';
 export function cachedPreview(link){
  const items=link.items;if(!Array.isArray(items)||!items.length||!items.every(x=>Number.isInteger(x.index)&&x.index>0))return null;
  const gross=Number(link.document.grossAmount),currency=link.document.payload.currency;
@@ -26,10 +27,12 @@ export function restoreSource(project,id,links,projectId){
  const matches=links.filter(l=>l.project_id===projectId&&l.kind==='purchases'&&!l.document.referenceOnly&&l.document.number===item.invoice&&l.ksef_number.slice(0,10)===item.supplierNip);
  if(matches.length!==1)return null;
  const link=matches[0],preview=cachedPreview(link);if(!preview)return null;
- const selection=itemSelection(preview,link.document.selectedIndices??null);
- if(round(item.amount)!==round(selection.total)||round(link.document.importedAmount??selection.total)!==round(selection.total))return null;
+ const split=Array.isArray(link.document.selectedQuantities),selection=split?{indices:savedEntries(link,preview.items).map(x=>x.index),items:link.document.selectedItems,total:link.document.importedAmount}:itemSelection(preview,link.document.selectedIndices??null);
+ if(!Array.isArray(selection.items)||round(item.allocatedInvoiceAmount??item.amount)!==round(selection.total)||round(link.document.importedAmount??selection.total)!==round(selection.total))return null;
  if(project.purchases.some(p=>p.id!==id&&p.sourceKsefNumber===link.ksef_number))return null;
  const next=structuredClone(project),purchase=next.purchases.find(p=>p.id===id);
  Object.assign(purchase,{sourceKsefNumber:link.ksef_number,selectedKsefRows:selection.indices,invoiceItems:selection.items,invoiceGrossAmount:preview.gross});
+ if(split)Object.assign(purchase,{selectedKsefQuantities:savedEntries(link,preview.items),allocatedInvoiceAmount:selection.total});
  return next;
 }
+export {allocationMarkup,mountAllocation,quantitySelection,savedEntries} from './ksef-allocation.js?v=1.0.70';

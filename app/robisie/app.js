@@ -1,14 +1,14 @@
-import * as Completion from './completion.js?v=1.0.68';
-import * as PurchaseSettlement from './purchase-settlement.js?v=1.0.68';
-import * as PurchaseSettlementForm from './purchase-settlement-form.js?v=1.0.68';
-import * as PurchasePayments from './purchase-payments.js?v=1.0.68';
-import * as PurchasePaymentForm from './purchase-payment-form.js?v=1.0.68';
-import * as PurchaseItems from './purchase-items.js?v=1.0.68';
-import * as BI from './invoices.js?v=1.0.68';
-import * as Auto from './autosave.js?v=1.0.68';
-import * as C from './core.js?v=1.0.69';
-import * as API from './api.js?v=1.0.68';
-import * as PDF from './pdf.js?v=1.0.68';
+import * as Completion from './completion.js?v=1.0.70';
+import * as PurchaseSettlement from './purchase-settlement.js?v=1.0.70';
+import * as PurchaseSettlementForm from './purchase-settlement-form.js?v=1.0.70';
+import * as PurchasePayments from './purchase-payments.js?v=1.0.70';
+import * as PurchasePaymentForm from './purchase-payment-form.js?v=1.0.70';
+import * as PurchaseItems from './purchase-items.js?v=1.0.70';
+import * as BI from './invoices.js?v=1.0.70';
+import * as Auto from './autosave.js?v=1.0.70';
+import * as C from './core.js?v=1.0.70';
+import * as API from './api.js?v=1.0.70';
+import * as PDF from './pdf.js?v=1.0.70';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',shopFilter=null,projectFilter='',projectSearch='',summarySort={key:'category',direction:1},mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set(),stageInvoiceCache=new Map(),projectEarningsCache=new Map();
@@ -354,30 +354,30 @@ async function purchaseDialog(id){
   try{
    const link=await API.purchaseKsefLink(x.sourceKsefNumber,projectId);let preview=PurchaseItems.cachedPreview(link),xml=null;
    if(!preview){xml=await API.purchaseKsefXml(x.sourceKsefNumber);preview=await API.purchaseKsefPreview(xml);if(C.round(preview.gross)!==C.round(link.document.grossAmount)||preview.currency!==link.document.payload.currency)throw Error('Dane faktury nie zgadzają się z wcześniejszym importem.');}
-   ksef={link,preview,xml};
+   const context=API.purchaseKsefAllocationContext?await API.purchaseKsefAllocationContext(x.sourceKsefNumber):{links:[link],blocked:[]};
+   ksef={link,preview,xml,context};
   }catch(error){loadError='Nie udało się wczytać pełnej listy pozycji: '+error.message;}
   finally{busy=false;}
   if(selected?.id!==projectId||selected.revision!==revision||$('#dialog').open)throw Error('Widok inwestycji zmienił się. Otwórz zakup ponownie.');
  }
  let salesDocuments=stageInvoiceCache.get(projectId)||[];try{if(API.stageInvoices){salesDocuments=await API.stageInvoices(projectId);stageInvoiceCache.set(projectId,salesDocuments);}}catch{loadError+=(loadError?' · ':'')+'Nie udało się odświeżyć faktur sprzedażowych. Dostępne są wcześniej wczytane dokumenty.';}
  if(selected?.id!==projectId||selected.revision!==revision)throw Error('Widok inwestycji zmienił się. Otwórz zakup ponownie.');
- const originalIndices=ksef?(ksef.link.document.selectedIndices||ksef.preview.items.map(item=>item.index)):[];
- const itemBlock=ksef?`<section class="purchase-invoice-items"><h3>Pozycje faktury z KSeF</h3><p class="muted">Zaznacz pozycje wliczane do kosztu tej inwestycji. Ten sam wybór będzie widoczny w Bill.</p>${ksef.preview.warning?`<p class="notice">${esc(ksef.preview.warning)}</p>`:''}${ksef.preview.canSelect?'<div class="actions"><button type="button" id="purchase-items-all">Zaznacz wszystkie</button><button type="button" id="purchase-items-none">Odznacz wszystkie</button></div>':''}${table(['Wlicz','Pozycja','Ilość','VAT','Brutto'],ksef.preview.items.map(item=>`<tr><td><input type="checkbox" name="ksef-item" value="${item.index}" aria-label="Wlicz ${esc(item.name||'pozycję')}" ${originalIndices.includes(item.index)?'checked':''} ${!ksef.preview.canSelect?'disabled':''}></td><td>${esc(item.name||'Pozycja '+item.index)}</td><td>${esc(item.quantity??'—')} ${esc(item.unit||'')}</td><td>${esc(item.vat||'—')}</td><td class="num">${item.gross==null?'—':money(item.gross)}</td></tr>`).join(''))}<p id="purchase-items-total" class="notice" aria-live="polite"></p><p id="purchase-items-error" class="error" role="alert"></p></section>`:loadError?`<p class="notice error">${esc(loadError)}. Możesz edytować zapisane dane zakupu; wybór pozycji wymaga ponownego wczytania faktury.</p>`:'';
+ const itemBlock=ksef?PurchaseItems.allocationMarkup(ksef.preview,ksef.context.links,projectId,ksef.context.blocked,PurchaseItems.savedEntries(ksef.link,ksef.preview.items)):loadError?`<p class="notice error">${esc(loadError)}. Otwórz zakup ponownie, aby edytować pozycje faktury.</p>`:'';
+
  const links=id?BI.purchaseLinks(p(),id):[];
  const detachBlock=id&&(links.length||C.receiptPurchasePaid(x)>0||x.paidAmount!=null&&C.purchasePayment(x).paid>0)?`<section class="notice"><h3>Rozliczenie z inwestorem</h3><p>${links.length?'Powiązane faktury sprzedażowe: '+links.map(r=>esc(r.number)).join(', '):'Ten zakup ma ręcznie zapisaną wpłatę od inwestora.'}</p><p>Odłączenie pozostawi otrzymane pieniądze jako zaliczkę na materiały w „Etapach i płatnościach”. Zakup i jego dokument pozostaną bez zmian.</p><button type="button" id="purchase-detach">Odłącz wpłaty i faktury sprzedażowe od zakupu</button></section>`:'';
- let paymentForm;
- modal(id?'Edytuj zakup':'Nowy zakup',`<div class="grid">${input('date','Data',x.date,'date','required')}${input('shop','Sklep',x.shop,'text','required list="shop-suggestions" autocomplete="off"')+`<datalist id="shop-suggestions">${shopSuggestions().map(shop=>`<option value="${esc(shop)}"></option>`).join('')}</datalist>`}${input('amount','Rzeczywista kwota zakupu (zł)',x.amount,'number','min="0" step="0.01" required')}${input('charge','Koszt przypisany inwestorowi (zł)',x.charge,'number','min="0" step="0.01" required')}${input('invoice','Numer faktury / paragonu',x.invoice)}<label class="field">Dokument zakupu<select name="documentType" ${x.sourceKsefNumber?'disabled':''}><option value="unknown">Brak potwierdzonej faktury</option><option value="invoice" ${x.sourceKsefNumber||x.documentType==='invoice'?'selected':''}>Faktura</option><option value="nip-receipt" ${!x.sourceKsefNumber&&x.documentType==='nip-receipt'?'selected':''}>Paragon z NIP-em</option></select></label></div>${itemBlock}${ksef?'<details><summary>Opis zaznaczonych pozycji</summary>'+text('description','Opis zakupu',x.description,'required readonly')+'</details>':text('description','Opis zakupu',x.description,'required')}${detachBlock}${PurchasePaymentForm.markup}`,async fd=>{
+ let paymentForm,allocationForm;
+ modal(id?'Edytuj zakup':'Nowy zakup',`<div class="grid">${input('date','Data',x.date,'date','required')}${input('shop','Sklep',x.shop,'text','required list="shop-suggestions" autocomplete="off"')+`<datalist id="shop-suggestions">${shopSuggestions().map(shop=>`<option value="${esc(shop)}"></option>`).join('')}</datalist>`}${input('amount','Kwota zakupu w tej inwestycji (zł)',x.amount,'number','min="0" step="0.01" required')}${input('charge','Koszt przypisany inwestorowi (zł)',x.charge,'number','min="0" step="0.01" required')}${input('invoice','Numer faktury / paragonu',x.invoice)}<label class="field">Dokument zakupu<select name="documentType" ${x.sourceKsefNumber?'disabled':''}><option value="unknown">Brak potwierdzonej faktury</option><option value="invoice" ${x.sourceKsefNumber||x.documentType==='invoice'?'selected':''}>Faktura</option><option value="nip-receipt" ${!x.sourceKsefNumber&&x.documentType==='nip-receipt'?'selected':''}>Paragon z NIP-em</option></select></label></div>${itemBlock}${ksef?'<details><summary>Opis zaznaczonych pozycji</summary>'+text('description','Opis zakupu',x.description,'required readonly')+'</details>':text('description','Opis zakupu',x.description,'required')}${detachBlock}${PurchasePaymentForm.markup}`,async fd=>{
   const amount=C.number(fd.get('amount')),charge=C.number(fd.get('charge'));
   const shop=shopName(fd.get('shop'));if(!shop)throw Error('Wpisz nazwę sklepu.');
   const entered=Object.fromEntries(fd);delete entered['ksef-item'];
-  const selection=ksef?PurchaseItems.itemSelection(ksef.preview,ksef.preview.canSelect?fd.getAll('ksef-item').map(Number):originalIndices):null;
-  const changed=selection&&JSON.stringify(selection.indices)!==JSON.stringify([...originalIndices].sort((a,b)=>a-b));
+  const selection=ksef?allocationForm.read():null;
+  const changed=!!selection;
   const item={...x,...entered,shop,amount,charge};
-  if(changed){item.amount=selection.total;item.description=selection.description||x.description;item.invoiceItems=selection.items;item.selectedKsefRows=selection.indices;item.invoiceGrossAmount=ksef.preview.gross;}
+  if(changed){item.description=selection.description||x.description;item.invoiceItems=selection.items;item.selectedKsefRows=selection.indices;item.selectedKsefQuantities=selection.entries;item.allocatedInvoiceAmount=selection.total;item.invoiceGrossAmount=ksef.preview.gross;}
   const next=PurchasePayments.apply(p(),item,paymentForm.read(),salesDocuments);await rememberShop(shop);
   if(changed){
-   if(!ksef.xml)ksef.xml=await API.purchaseKsefXml(x.sourceKsefNumber);
-   await writes.run(async()=>{const result=await API.savePurchaseSettlement(selected,next,ksef.link,selection.indices,ksef.xml),row=Array.isArray(result)?result[0]:result;selected=structuredClone(row);all=all.map(r=>r.id===row.id?structuredClone(row):r);projectDirty=false;saveError='';drafts.remove('project:'+row.id);updateSaveState();});
+   await writes.run(async()=>{const result=await API.savePurchaseAllocation(selected,next,ksef.link,selection.entries,ksef.xml),row=Array.isArray(result)?result[0]:result;selected=structuredClone(row);all=all.map(r=>r.id===row.id?structuredClone(row):r);projectDirty=false;saveError='';drafts.remove('project:'+row.id);updateSaveState();});
   }else{selected.payload=next;markDirty();}
  },id?()=>{if(BI.purchaseLinks(p(),id).length||C.receiptPurchasePaid(x)>0||x.paidAmount!=null&&C.purchasePayment(x).paid>0)throw Error('Użyj przycisku „Odłącz wpłaty i faktury sprzedażowe od zakupu”, a następnie usuń zakup. Otrzymane zaliczki pozostaną zapisane.');p().purchases=p().purchases.filter(r=>r.id!==id);}:null,ksef?'scroll-modal purchase-items-modal':'');
  if($('#purchase-detach')&&detachBlock)$('#purchase-detach').onclick=async()=>{if(!confirm('Odłączyć zapisane wpłaty i faktury sprzedażowe od tego zakupu? Otrzymane pieniądze pozostaną jako zaliczki na materiały. Dokument zakupu pozostanie przypisany. Niezapisane zmiany pól tego formularza nie zostaną zachowane.'))return;const button=$('#purchase-detach');button.disabled=true;try{selected.payload=BI.detachPurchase(p(),id);markDirty();closeModal();await flushChanges({normalize:false});render();toast('Odłączono rozliczenie zakupu. Otrzymane zaliczki zachowano.');}catch(error){if(dirty){saveFailed(error);render();}else toast(error.message);}finally{button.disabled=false;}};
@@ -385,13 +385,12 @@ async function purchaseDialog(id){
  $('#f-charge').oninput=()=>paymentForm.update();
  $('#f-amount').oninput=()=>{if(!id){$('#f-charge').value=$('#f-amount').value;if(isNumericInput($('#f-charge')))commitNumericInput($('#f-charge'));}paymentForm.update();};
  if(ksef){
-  $('#f-amount').readOnly=true;
-  const boxes=[...$('#dialog').querySelectorAll('input[name="ksef-item"]')];
-  const update=(change=false)=>{try{const choice=PurchaseItems.itemSelection(ksef.preview,ksef.preview.canSelect?boxes.filter(box=>box.checked).map(box=>Number(box.value)):originalIndices);$('#purchase-items-total').textContent=`Wliczone do inwestycji: ${money(choice.total)} · ${choice.indices.length} z ${ksef.preview.items.length} pozycji · cała faktura: ${money(ksef.preview.gross)}`;$('#purchase-items-error').textContent='';$('#modal-form').querySelector('[type="submit"]').disabled=false;if(change){$('#f-amount').value=choice.total;$('#f-charge').value=choice.total;$('#f-description').value=choice.description||x.description;paymentForm.update();}}catch(error){$('#purchase-items-error').textContent=error.message;$('#modal-form').querySelector('[type="submit"]').disabled=true;}};
-  for(const box of boxes)box.onchange=()=>update(true);
-  for(const [button,checked] of [['purchase-items-all',true],['purchase-items-none',false]])if($('#'+button))$('#'+button).onclick=()=>{for(const box of boxes)box.checked=checked;update(true);};
-  update();
+  allocationForm=PurchaseItems.mountAllocation($('#dialog'),ksef.preview,ksef.context.links,projectId,ksef.context.blocked,(choice,change)=>{
+   $('#modal-form').querySelector('[type="submit"]').disabled=!choice;
+   if(choice&&change){$('#f-amount').value=choice.total;$('#f-charge').value=choice.total;$('#f-description').value=choice.description||x.description;paymentForm.update();}
+  });
  }
+
  }finally{purchaseDialogLoading=false;}
 }
 

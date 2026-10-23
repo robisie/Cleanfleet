@@ -24,14 +24,13 @@ export function logout(){session=null;localStorage.removeItem(SESSION_KEY);}
 
 export const call=(body,options={})=>request("/functions/v1/cleanfleet-bill",{method:"POST",body:JSON.stringify(body),timeoutMs:90000,...options});
 
-export const ksefAssignments=()=>request('/rest/v1/rs_ksef_links?select=ksef_number,project_id,kind,document_id:document->>id,selected_indices:document->selectedIndices');
+export const ksefAssignments=()=>request('/rest/v1/rs_ksef_links?select=*');
 export const previewKsefPurchase=({xml})=>request('/rest/v1/rpc/rs_ksef_purchase_preview',{method:'POST',body:JSON.stringify({p_xml:xml}),timeoutMs:30000});
-export const assignKsef=({project,number,kind,xml,billId,indices,previous,replacement,projectRevision})=>{
- const editing=kind==='purchases'&&previous;
- const rpc=editing?'rs_edit_ksef_purchase':kind==='purchases'&&projectRevision!=null?'rs_import_ksef_purchase':kind==='purchases'?'rs_assign_ksef_selected':'rs_assign_ksef';
- const body=editing?{p_project:project,p_number:number,p_xml:xml,p_indices:indices??null,p_expected_project:previous.project_id,p_expected_indices:previous.selected_indices??null}:kind==='purchases'?{p_project:project,p_number:number,p_xml:xml,p_indices:indices??null,p_bill_id:billId||null}:{p_project:project,p_number:number,p_kind:kind,p_xml:xml,p_bill_id:billId||null};
- if(rpc==='rs_import_ksef_purchase'){body.p_replace_purchase=replacement||null;body.p_expected_revision=projectRevision;}
- return request('/rest/v1/rpc/'+rpc,{method:'POST',body:JSON.stringify(body),timeoutMs:30000});
+export const ksefAllocationContext=number=>request('/rest/v1/rpc/rs_ksef_allocation_context',{method:'POST',body:JSON.stringify({p_number:number})});
+export const unassignKsef=({project,number,revision})=>request('/rest/v1/rpc/rs_unassign_ksef_purchase',{method:'POST',body:JSON.stringify({p_project:project,p_number:number,p_revision:revision}),timeoutMs:30000});
+export const assignKsef=({project,number,kind,xml,billId,entries,previous,replacement,projectRevision,indices,referenceOnly})=>{
+ if(kind==='purchases'&&!referenceOnly)return request('/rest/v1/rpc/rs_allocate_ksef_purchase',{method:'POST',body:JSON.stringify({p_project:project,p_number:number,p_xml:xml,p_entries:entries,p_revision:projectRevision,p_expected_document:previous?.document??null,p_replace_purchase:replacement||null,p_bill_id:billId||null}),timeoutMs:30000}).then(result=>result.link);
+ return request('/rest/v1/rpc/rs_assign_ksef',{method:'POST',body:JSON.stringify({p_project:project,p_number:number,p_kind:kind,p_xml:xml,p_bill_id:billId||null}),timeoutMs:30000});
 };
 
 export const investmentPurchases=async id=>{const rows=await request('/rest/v1/rs_projects?id=eq.'+encodeURIComponent(id)+'&select=id,revision,payload');if(!rows?.[0])throw Error('Nie znaleziono inwestycji.');return rows[0];};

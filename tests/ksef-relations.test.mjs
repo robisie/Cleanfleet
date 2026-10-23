@@ -36,7 +36,7 @@ test('stock markup escapes product and source, exposes available quantities, cos
 });
 test('warehouse offers four destinations and summarizes available value without mixing units',()=>{
  const meta={...a,currency:'PLN'},rows=[{metadata:meta,item:{index:1,name:'Farba',unit:'szt.',gross:300},capacity:3,assigned:1,available:2,returned:0,classifiedAuto:1,uses:{auto:{quantity:1,revision:2}}},{metadata:meta,item:{index:2,name:'Taśma',unit:'m',gross:50},capacity:5,assigned:0,available:5,returned:0}];
- const html=stockMarkup(rows);for(const label of ['Robisię · inwestycja','CleanFleet','Auto','Koszty firmowe'])assert.match(html,new RegExp(label));assert.match(html,/Auto: 1/);assert.match(html,/data-category="auto"/);
+ const html=stockMarkup(rows);for(const label of ['Robisię · inwestycja','CleanFleet','Auto','Koszty firmowe'])assert.match(html,new RegExp(label));assert.match(html,/Auto: 1/);assert.match(html,/data-category="auto"/);assert.equal((html.match(/data-kf="stock-invoice-assign"/g)||[]).length,1);
  const summary=stockSummaryMarkup(rows);assert.match(summary,/Podsumowanie magazynu/);assert.match(summary,/250,00\s+zł/);assert.match(summary,/2 szt./);assert.match(summary,/5 m/);assert.match(stockSummaryMarkup([],{incomplete:true}),/Część dokumentów nie została wczytana/);
 });
 test('stock sorts newest invoices, groups their items and combines shop and status filters',()=>{

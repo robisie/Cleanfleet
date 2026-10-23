@@ -33,6 +33,7 @@ export function stockIntegration(rows,onChange=()=>{}){return {
  stock:()=>stockRpc('rs_ksef_stock'),
  setReturn:({number,index,quantity,revision})=>stockRpc('rs_ksef_set_return',{p_number:number,p_index:index,p_quantity:quantity,p_revision:revision}),
  setUse:({number,index,category,quantity,revision})=>stockRpc('rs_ksef_set_use',{p_number:number,p_index:index,p_category:category,p_quantity:quantity,p_revision:revision}),
+ setInvoiceUse:({number,category,indices})=>stockRpc('rs_ksef_set_invoice_use',{p_number:number,p_category:category,p_expected_indices:indices}),
  loadLinks:()=>request('/rest/v1/rs_ksef_links?select=*'),
  cfLinks:()=>request('/rest/v1/cf_purchases?source_ksef_number=not.is.null&select=source_ksef_number,source_ksef_index'),
  cfContext:number=>stockRpc('cf_ksef_cost_context',{p_number:number}),

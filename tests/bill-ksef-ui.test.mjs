@@ -1,3 +1,4 @@
+import * as SupplierSuggestions from '../bill/stock-suggestions.js';
 import * as Relations from '../bill/ksef-relations.js';
 import * as Stock from '../bill/stock.js';
 import * as Suggestions from '../bill/cost-suggestions.js';
@@ -15,11 +16,39 @@ async function setup(){
  const root={innerHTML:'',querySelector:node,querySelectorAll:()=>[]};let count=0;
  const context=vm.createContext({console,crypto,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,Blob,File,Map,Set,AbortController,DOMException,atob,btoa,setTimeout,clearTimeout,URL:{createObjectURL:blob=>{const key='blob:'+(count++);blobUrls.set(key,blob);return key;},revokeObjectURL:key=>blobUrls.delete(key)},window:{JSZip:Zip,CFKsefRenderer:{generateInvoice:async()=>new Blob(['%PDF-1.7 fixture'])}},DOMParser:class{parseFromString(){return {doctype:null,documentElement:{localName:'Faktura'},getElementsByTagName:()=>[]};}},document:{}});
  const code=await readFile(new URL('../bill/ksef.js',import.meta.url),'utf8');
- const m=new vm.SourceTextModule(code+`\nexport function setupTest(node,call,rows=[],kind='purchases'){root=node;api=call;state=initial();state.kind=kind;state.loaded=true;state.rows=rows;state.query={kind:state.kind,from:state.from,to:state.to,dateType:state.dateType,sort:'Desc'};state.selected=new Set(rows.map(r=>r.ksefNumber));draw();}export {run,load,downloadSelected};export async function testAssignment(options,project,number,known=[],duplicateChoice){if(duplicateChoice!==undefined)chooseDuplicate=async()=>duplicateChoice;integration=options;assignments=known;chooseInvestment=async()=>project;await run(signal=>assignInvestment(number,signal));return message;}export async function testDemand(options,number){integration=options;await run(signal=>paymentDemand(number,signal));return message;}export function testState(){return {state,ready,message,busy:!!controller};}`,{context});
- await m.link(spec=>{const values=spec.includes('ksef-relations')?Relations:spec.includes('stock.js')?Stock:spec.includes('cost-suggestions')?Suggestions:spec.includes('purchase-import')?Import:spec.includes('ksef-data')?D:C;return new vm.SyntheticModule(Object.keys(values),function(){for(const[k,v]of Object.entries(values))this.setExport(k,v);},{context});});await m.evaluate();return {n:m.namespace,root,blobUrls,node};
+ const m=new vm.SourceTextModule(code+`\nexport function setupTest(node,call,rows=[],kind='purchases'){root=node;api=call;state=initial();state.kind=kind;state.loaded=true;state.rows=rows;state.query={kind:state.kind,from:state.from,to:state.to,dateType:state.dateType,sort:'Desc'};state.selected=new Set(rows.map(r=>r.ksefNumber));draw();}export {run,load,downloadSelected};export async function testAssignment(options,project,number,known=[],duplicateChoice){if(duplicateChoice!==undefined)chooseDuplicate=async()=>duplicateChoice;integration=options;assignments=known;chooseInvestment=async()=>project;await run(signal=>assignInvestment(number,signal));return message;}export async function testDemand(options,number){integration=options;await run(signal=>paymentDemand(number,signal));return message;}export async function testSupplierSuggestions(options,rows,source,selected,target={kind:'firmowe',label:'Koszty firmowe'}){integration=options;stockRows=rows;chooseSupplierInvoices=async(candidates,label,signal,unavailable)=>typeof selected==='function'?selected(candidates,label,signal,unavailable):selected;await run(signal=>suggestSupplierInvoices(source,target,signal));return {message,rows:stockRows};}export function testState(){return {state,ready,message,busy:!!controller};}`,{context});
+ await m.link(spec=>{const values=spec.includes('ksef-relations')?Relations:spec.includes('stock.js')?Stock:spec.includes('stock-suggestions')?SupplierSuggestions:spec.includes('cost-suggestions')?Suggestions:spec.includes('purchase-import')?Import:spec.includes('ksef-data')?D:C;return new vm.SyntheticModule(Object.keys(values),function(){for(const[k,v]of Object.entries(values))this.setExport(k,v);},{context});});await m.evaluate();return {n:m.namespace,root,blobUrls,node};
 }
 const number=i=>'6351861297-20261016-123456789ABC-'+String(i).padStart(2,'0');
 const row=i=>({ksefNumber:number(i),invoiceNumber:'FV/'+i,issueDate:'2026-10-16',seller:{nip:'6351861297',name:'<img src=x onerror=alert(1)>'},buyer:{name:'Nabywca'},grossAmount:100,currency:'PLN'});
+const supplierGoods=()=>[1,2,3].map(i=>({metadata:row(i),item:{index:1,name:'Koszt',unit:'szt.',gross:100},capacity:1,assigned:i===1?1:0,classifiedCompany:i===1?1:0,available:i===1?0:1,returned:0}));
+test('supplier batch writes only checked invoices; skipping the dialog writes nothing',async()=>{
+ for(const selected of [null,[],[number(3)]]){
+  const {n}=await setup(),goods=supplierGoods(),writes=[];
+  const result=await n.testSupplierSuggestions({stock:async()=>goods,setInvoiceUse:async args=>writes.push(args)},goods,number(1),selected);
+  assert.equal(writes.length,selected?.length||0);if(writes.length){assert.equal(writes[0].number,number(3));assert.equal(writes[0].category,'firmowe');assert.deepEqual(Array.from(writes[0].indices),[1]);assert.match(result.message,/Dodatkowo zapisano 1 z 1/);}
+ }
+});
+test('supplier batch rechecks changes after selection and continues past one failed invoice',async()=>{
+ const {n}=await setup(),goods=supplierGoods(),writes=[];let reads=0;
+ const result=await n.testSupplierSuggestions({stock:async()=>{reads++;return goods;},setInvoiceUse:async args=>{writes.push(args.number);if(args.number===number(2))throw Error('Stan się zmienił');}},goods,number(1),[number(2),number(3)]);
+ assert.deepEqual(writes,[number(2),number(3)]);assert.match(result.message,/Dodatkowo zapisano 1 z 2/);assert.match(result.message,/FV\/2: Stan się zmienił/);assert.equal(reads,2);
+ const next=await setup(),stale=supplierGoods();stale[1]={...stale[1],assigned:1,available:0};let saved=0;
+ const failed=await next.n.testSupplierSuggestions({stock:async()=>stale,setInvoiceUse:async()=>saved++},supplierGoods(),number(1),[number(2)]);
+ assert.equal(saved,0);assert.match(failed.message,/Stan zmienił się/);
+});
+test('supplier batch preserves CleanFleet category and company without copying invoice notes',async()=>{
+ const {n,root}=await setup(),goods=supplierGoods(),bytes=new TextEncoder().encode('<Faktura>koszt</Faktura>');goods[1].metadata.invoiceHash=await D.digest(bytes);n.setupTest(root,async()=>({content:Buffer.from(bytes).toString('base64')}));let written;
+ await n.testSupplierSuggestions({stock:async()=>goods,cfContext:async()=>({blocked:[],purchases:[]}),cfSave:async args=>written=args},goods,number(1),[number(2)],{kind:'cleanfleet',category:'Chemia',company_id:'firma',label:'CleanFleet · Chemia'});
+ assert.equal(written.number,number(2));assert.equal(written.xml,'<Faktura>koszt</Faktura>');assert.equal(written.entries[0].category,'Chemia');assert.equal(written.entries[0].company_id,'firma');assert.equal(written.entries[0].note,'');
+});
+test('supplier investment batch imports full quantities with current revision and flags manual duplicates',async()=>{
+ for(const manual of [false,true]){
+  const {n,root}=await setup(),goods=supplierGoods(),bytes=new TextEncoder().encode('<Faktura>inwestycja</Faktura>');goods[1].metadata.invoiceHash=await D.digest(bytes);n.setupTest(root,async()=>({content:Buffer.from(bytes).toString('base64')}));let written;
+  const result=await n.testSupplierSuggestions({stock:async()=>goods,allocationContext:async()=>({links:[],blocked:[]}),findPurchases:async()=>({revision:12,payload:{purchases:[{amount:100,sourceKsefNumber:manual?null:number(1)}]}}),assign:async args=>written=args},goods,number(1),[number(2)],{kind:'investment',project:'project',label:'Robisię · Remont'});
+  if(manual){assert.equal(written,undefined);assert.match(result.message,/ręczny zakup/);}else{assert.equal(written.project,'project');assert.equal(written.projectRevision,12);assert.deepEqual(Array.from(written.entries,e=>({index:e.index,quantity:e.quantity})),[{index:1,quantity:1}]);}
+ }
+});
 test('Bill has only invoice tabs; Robisię mounts the standalone Towar view with its inventory',async()=>{
  const {n,root}=await setup();n.setupTest(root,async()=>({invoices:[],hasMore:false}),[]);assert.ok(!root.innerHTML.includes('data-kf="stock"'));
  let loaded=false;n.mountStock(root,async()=>({invoices:[],page:0,hasMore:false}),{index:async()=>[],storeMetadata:async()=>{},stock:async()=>{loaded=true;return [{metadata:row(1),item:{index:1,name:'Farba',unit:'szt.',gross:400},capacity:4,assigned:2,returned:0,available:2}];}});

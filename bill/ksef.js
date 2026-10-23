@@ -1,9 +1,10 @@
-import {relatedGroups,historyRanges,isCorrection,decodeXml} from './ksef-relations.js?v=1.0.36';
-import {stockMarkup,stockStores,stockSummaryMarkup,returnDialog,useDialog,invoiceDestinationDialog} from './stock.js?v=1.0.36';
-import {selectedAmount,duplicatePurchases,allocationMarkup,mountAllocation,savedEntries} from './purchase-import.js?v=1.0.36';
-import {esc,today} from './core.js?v=1.0.36';
-import {monthDates,counterparty,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.36';
-import {hint,remember} from './cost-suggestions.js?v=1.0.36';
+import {relatedGroups,historyRanges,isCorrection,decodeXml} from './ksef-relations.js?v=1.0.37';
+import {stockMarkup,stockStores,stockSummaryMarkup,returnDialog,useDialog,invoiceDestinationDialog} from './stock.js?v=1.0.37';
+import {selectedAmount,duplicatePurchases,allocationMarkup,mountAllocation,savedEntries} from './purchase-import.js?v=1.0.37';
+import {esc,today} from './core.js?v=1.0.37';
+import {monthDates,counterparty,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.37';
+import {hint,remember} from './cost-suggestions.js?v=1.0.37';
+import {wholeInvoiceFree,similarInvoiceCandidates,supplierSuggestionDialog} from './stock-suggestions.js?v=1.0.37';
 const e=esc;
 let integration={},assignments=[],cfLinks=[],documents=[],stockRows=[],historySyncedAt=0;
 const invoice=number=>state.rows.find(r=>r.ksefNumber===number)||documents.find(d=>d.metadata.ksefNumber===number)?.metadata;
@@ -88,16 +89,57 @@ async function assignWholeInvoice(number,signal){
  stockRows=await integration.stock();check(signal);
  const rows=stockRows.filter(r=>r.metadata.ksefNumber===number);
  if(rows.length!==initial.length||rows.some(r=>!initial.some(x=>x.item.index===r.item.index)))throw Error('Lista pozycji faktury zmieniła się. Odśwież Magazyn.');
- if(rows.some(r=>Number(r.available)!==Number(r.capacity)||Number(r.returned)>0||Number(r.assigned)>0))throw Error('Część faktury jest już przypisana albo zwrócona. Edytuj pojedyncze pozycje lub cofnij wcześniejsze przypisanie.');
+ if(!wholeInvoiceFree(rows))throw Error('Część faktury jest już przypisana albo zwrócona. Edytuj pojedyncze pozycje lub cofnij wcześniejsze przypisanie.');
+ let target=null;
  if(destination==='auto'||destination==='firmowe'){
   await integration.setInvoiceUse({number,category:destination,indices:rows.map(r=>r.item.index)});
   progress('Przypisano całą fakturę: '+(destination==='auto'?'Auto':'Koszty firmowe')+'.');
+  target={kind:destination,label:destination==='auto'?'Auto':'Koszty firmowe'};
  }else{
   state.stockIndex=null;state.stockWholeInvoice=destination==='investment';
-  try{if(destination==='investment')await assignInvestment(number,signal);else await assignCleanfleet(number,signal);}
+  try{target=destination==='investment'?await assignInvestment(number,signal):await assignCleanfleet(number,signal);}
   finally{state.stockWholeInvoice=false;}
  }
  stockRows=await integration.stock();
+ check(signal);
+ const field={auto:'classifiedAuto',firmowe:'classifiedCompany',cleanfleet:'cleanfleetAssigned',investment:'projectAssigned'}[target?.kind];
+ const saved=stockRows.filter(r=>r.metadata.ksefNumber===number);
+ if(field&&saved.length===rows.length&&saved.every(r=>Number(r[field])===Number(r.capacity)&&!Number(r.returned)))await suggestSupplierInvoices(number,target,signal);
+}
+function chooseSupplierInvoices(candidates,label,signal,unavailable){return supplierSuggestionDialog(candidates,label,signal,unavailable);}
+async function suggestSupplierInvoices(sourceNumber,target,signal){
+ const {candidates,unavailable}=similarInvoiceCandidates(stockRows,sourceNumber);
+ if(!candidates.length)return;
+ const selected=await chooseSupplierInvoices(candidates,target.label,signal,unavailable);if(!selected?.length)return;check(signal);
+ stockRows=await integration.stock();check(signal);
+ const chosen=candidates.filter(c=>selected.includes(c.metadata.ksefNumber)),failures=[];let saved=0,cancelled=false;
+ try{
+  for(const [index,candidate] of chosen.entries()){
+   if(signal.aborted){cancelled=true;break;}progress('Przypisywanie faktur od tego wystawcy: '+(index+1)+' z '+chosen.length+'…');
+   try{
+    const current=stockRows.filter(r=>r.metadata.ksefNumber===candidate.metadata.ksefNumber);
+    if(!wholeInvoiceFree(current)||current.length!==candidate.indices.length||current.some(r=>!candidate.indices.includes(r.item.index)))throw Error('Stan zmienił się. Sprawdź fakturę i przypisz ją ponownie.');
+    await assignSupplierInvoice({...candidate,rows:current},target,signal);saved++;
+   }catch(error){if(signal.aborted){cancelled=true;break;}failures.push(candidate.metadata.invoiceNumber+': '+(error.message||'Nie potwierdzono zapisu.'));}
+  }
+ }finally{stockRows=await integration.stock();}
+ progress('Faktura źródłowa została przypisana. Dodatkowo zapisano '+saved+' z '+chosen.length+' zaznaczonych faktur → '+target.label+'.'+(cancelled?' Przerwano dalsze przypisania. Zapisane faktury pozostają przypisane.':'')+(failures.length?'\nWymagają sprawdzenia:\n'+failures.join('\n'):''));
+}
+async function assignSupplierInvoice(candidate,target,signal){
+ const number=candidate.metadata.ksefNumber;
+ if(target.kind==='auto'||target.kind==='firmowe')return integration.setInvoiceUse({number,category:target.kind,indices:candidate.indices});
+ const bytes=await singleBytes(candidate.metadata,signal);check(signal);const xml=decodeXml(bytes);
+ if(target.kind==='cleanfleet'){
+  const context=await integration.cfContext(number);check(signal);
+  if(context.link||context.purchases?.length||context.blocked?.length)throw Error('Faktura ma już powiązania. Sprawdź ją osobno.');
+  return integration.cfSave({number,xml,revision:null,entries:candidate.indices.map(index=>({index,category:target.category,company_id:target.company_id,note:''}))});
+ }
+ const context=await integration.allocationContext(number);check(signal);
+ if(context.links?.length||context.blocked?.length)throw Error('Faktura ma już powiązania. Sprawdź ją osobno.');
+ const current=await integration.findPurchases(target.project);check(signal);
+ if(duplicatePurchases((current.payload.purchases||[]).filter(p=>!p.sourceKsefNumber),candidate.amount).length)throw Error('W inwestycji istnieje ręczny zakup o tej kwocie. Sprawdź duplikat i przypisz fakturę osobno.');
+ const result=await integration.assign({project:target.project,number,kind:'purchases',xml,entries:candidate.rows.map(r=>({index:r.item.index,quantity:Number(r.capacity)})),previous:null,projectRevision:current.revision,replacement:null});
+ return result;
 }
 async function classifyStock(number,index,category,signal){
  const row=stockRows.find(r=>r.metadata.ksefNumber===number&&r.item.index===index);if(!row||!['auto','firmowe'].includes(category))throw Error('Odśwież Magazyn.');
@@ -166,6 +208,7 @@ async function assignInvestment(number,signal){
  assignments=await integration.loadLinks();
  if(state.kind==='purchases'&&!result.document?.referenceOnly)state.purchaseTarget={project,number};
  progress(result.document?.referenceOnly?'Powiązano dokument. Korekta lub waluta obca wymaga osobnego rozliczenia — nie zmieniono kwot w PLN.':state.kind==='purchases'?(existing?'Zaktualizowano przypisanie i pozycje zakupu. Odśwież inwestycję w Robisię.':replacement?'Uzupełniono istniejący zakup fakturą. Zachowano jego rozliczenia. Odśwież inwestycję w Robisię.':'Dodano '+(indices?.length??details?.items?.length??0)+' pozycji z faktury do inwestycji · '+new Intl.NumberFormat('pl-PL',{style:'currency',currency:'PLN'}).format(entries?choice.total:details?selectedAmount(details,indices):row.grossAmount)+'. Wpłaty inwestora pozostały bez zmian.'):'Faktura jest dostępna w Etapach i płatnościach inwestycji. Wystawienie nie zapisuje wpłaty.');
+ if(!result.document?.referenceOnly)return {kind:'investment',project,label:'Robisię · '+(integration.projects.find(p=>p.id===project)?.name||'inwestycja')};
 }
 function chooseInvestment(row,signal,details=null,existing=null){if(details?.links)return chooseQuantityInvestment(row,signal,details);return new Promise(resolve=>{
  const money=value=>new Intl.NumberFormat('pl-PL',{style:'currency',currency:row.currency}).format(value),items=details?.items||[];
@@ -209,6 +252,7 @@ async function assignCleanfleet(number,signal){
  const seller=counterparty(row,'purchases').id,suggestion=hint(globalThis.localStorage,integration.userId,seller)?.cleanfleet;
  let savedEntries=[];const saved=await editCosts({number,xml,preview:details,context,companies,save:integration.cfSave,signal,suggestion,focusIndex:state.stock?state.stockIndex:null,onSaved:entries=>{savedEntries=entries;if(entries.length)remember(globalThis.localStorage,integration.userId,seller,{cleanfleet:{category:entries[0].category,company_id:entries[0].company_id}});}});
  if(saved){cfLinks=await integration.cfLinks();progress('Zapisano '+savedEntries.length+' pozycji w kosztach CleanFleet · '+new Intl.NumberFormat('pl-PL',{style:'currency',currency:'PLN'}).format(savedEntries.reduce((sum,entry)=>sum+Number(details?.items?.find(item=>item.index===entry.index)?.gross||0),0))+'. Faktura pozostała w Bill.');}
+ if(saved&&savedEntries.length&&savedEntries.every(entry=>entry.category===savedEntries[0].category&&(entry.company_id||null)===(savedEntries[0].company_id||null)))return {kind:'cleanfleet',category:savedEntries[0].category,company_id:savedEntries[0].company_id||null,label:'CleanFleet · '+savedEntries[0].category+(savedEntries[0].company_id?' · '+(companies.find(c=>c.id===savedEntries[0].company_id)?.short_name||companies.find(c=>c.id===savedEntries[0].company_id)?.name||'wybrana firma'):' · koszt ogólny')};
 }
 
 async function paymentDemand(number,signal){
@@ -221,6 +265,6 @@ async function paymentDemand(number,signal){
  const projectId=link?.project_id||(original?.payload?.source?.app==='robisie'?original.payload.source.id:null);
  if(projectId&&!integration.findPurchases)throw Error('Nie można sprawdzić zapisanych wpłat inwestora.');
  const loadProject=projectId?async()=>(await integration.findPurchases(projectId)).payload:null;
- const {showKsefDemand}=await import('./ksef-demand.js?v=1.0.36');check(signal);
+ const {showKsefDemand}=await import('./ksef-demand.js?v=1.0.37');check(signal);
  const saved=await showKsefDemand({xml,metadata:row,original,link,loadProject,defaultBank:integration.bank||'',signal});if(saved)progress('Wezwanie do zapłaty jest gotowe.');
 }

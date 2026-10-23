@@ -10,17 +10,36 @@ async function request(path,options={},auth=true){
   if(!refreshing)refreshing=request('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:JSON.stringify({refresh_token:session.refresh_token})},false).then(setSession).finally(()=>{refreshing=null;});
   await refreshing;
  }
- const {timeoutMs=15000,...init}=options,controller=new AbortController();let timer;
+ const {timeoutMs=15000,signal:externalSignal,...init}=options,controller=new AbortController();let timer;const abort=()=>controller.abort();if(externalSignal?.aborted)controller.abort();externalSignal?.addEventListener('abort',abort,{once:true});
  try{return await Promise.race([(async()=>{
   const res=await fetch(URL+path,{...init,signal:controller.signal,headers:{apikey:KEY,'Content-Type':'application/json',...(auth&&session?.access_token?{Authorization:'Bearer '+session.access_token}:{}),...init.headers}});
   const raw=await res.text();let data;try{data=raw?JSON.parse(raw):null;}catch{throw new Error('Nieprawidłowa odpowiedź serwera.');}
   if(!res.ok){const error=new Error(data?.message||data?.error_description||'Nie udało się zapisać danych.');error.code=data?.code;throw error;}
   return data;
- })(),new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();const error=new Error('Połączenie trwa zbyt długo. Zmiany zachowano na urządzeniu.');error.code='RS_NETWORK_TIMEOUT';reject(error);},timeoutMs);})]);}finally{clearTimeout(timer);}
+ })(),new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();const error=new Error('Połączenie trwa zbyt długo. Zmiany zachowano na urządzeniu.');error.code='RS_NETWORK_TIMEOUT';reject(error);},timeoutMs);})]);}finally{clearTimeout(timer);externalSignal?.removeEventListener('abort',abort);}
 }
 export async function login(email,password){const s=await request('/auth/v1/token?grant_type=password',{method:'POST',body:JSON.stringify({email,password})},false);setSession(s);return s;}
 export function logout(){session=null;localStorage.removeItem(SESSION_KEY);}
 export const rpc=(name,args={})=>request('/rest/v1/rpc/'+name,{method:'POST',body:JSON.stringify(args)});
+// Towar uses Robisię's authenticated session, including KSeF reads and quantity writes.
+export const ksefCall=(body,options={})=>request('/functions/v1/cleanfleet-bill',{method:'POST',body:JSON.stringify(body),timeoutMs:90000,...options});
+const stockRpc=(name,args={})=>request('/rest/v1/rpc/'+name,{method:'POST',body:JSON.stringify(args),timeoutMs:90000});
+export function stockIntegration(rows,onChange=()=>{}){return {
+ userId:getSession()?.user?.id,
+ projects:rows.map(r=>({id:r.id,name:r.payload.name,number:r.contract_number})),
+ index:()=>stockRpc('rs_ksef_document_index'),
+ storeMetadata:rows=>stockRpc('rs_ksef_store_metadata',{p_rows:rows}),
+ storeXml:(number,xml)=>stockRpc('rs_ksef_store_xml',{p_number:number,p_xml:xml}),
+ stock:()=>stockRpc('rs_ksef_stock'),
+ setReturn:({number,index,quantity,revision})=>stockRpc('rs_ksef_set_return',{p_number:number,p_index:index,p_quantity:quantity,p_revision:revision}),
+ loadLinks:()=>request('/rest/v1/rs_ksef_links?select=*'),
+ cfLinks:()=>request('/rest/v1/cf_purchases?source_ksef_number=not.is.null&select=source_ksef_number,source_ksef_index'),
+ preview:({xml})=>stockRpc('rs_ksef_purchase_preview',{p_xml:xml}),
+ allocationContext:number=>stockRpc('rs_ksef_allocation_context',{p_number:number}),
+ findPurchases:project,
+ assign:async({project:projectId,number,xml,entries,previous,replacement,projectRevision})=>{const result=await stockRpc('rs_allocate_ksef_purchase',{p_project:projectId,p_number:number,p_xml:xml,p_entries:entries,p_revision:projectRevision,p_expected_document:previous?.document??null,p_replace_purchase:replacement||null});await onChange(result.project);return result.link;},
+ unassign:async({project:projectId,number,revision})=>{const result=await stockRpc('rs_unassign_ksef_purchase',{p_project:projectId,p_number:number,p_revision:revision});await onChange(result);return result;}
+};}
 export const projects=()=>request('/rest/v1/rs_projects?select=*&order=created_at.desc');
 export const settings=()=>request('/rest/v1/rs_settings?select=*');
 export const createProject=(payload,date)=>rpc('rs_create_project',{p_payload:payload,p_date:date});

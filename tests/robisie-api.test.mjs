@@ -5,6 +5,22 @@ import vm from 'node:vm';
 const source=await fs.readFile(new URL('../app/robisie/api.js',import.meta.url),'utf8');
 async function api(fetch,session={access_token:'test',expires_at:9999999999},timeout=false){const storage=new Map([['robisie-auth-session-v1',JSON.stringify(session)]]);const context=vm.createContext({fetch,AbortController,structuredClone,clearTimeout,setTimeout:timeout?(fn)=>setTimeout(fn,20):setTimeout,localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}});const mod=new vm.SourceTextModule(source,{context});await mod.link(()=>{});await mod.evaluate();mod.namespace.restoreSession();return mod.namespace;}
 const response=value=>({ok:true,text:async()=>JSON.stringify(value)});
+test('Towar uses Robisię session for inventory reads, returns and project allocation',async()=>{
+ const calls=[],changed=[],savedProject={id:'p',revision:2,payload:{name:'Remont',purchases:[]}};
+ const a=await api(async(url,options)=>{calls.push({url,headers:options.headers,args:JSON.parse(options.body||'{}')});return response(url.endsWith('/rs_allocate_ksef_purchase')?{project:savedProject,link:{ksef_number:'ksef'}}:[]);});
+ const integration=a.stockIntegration([{id:'p',payload:{name:'Remont'},contract_number:'UUR/1'}],row=>changed.push(row));
+ assert.equal(integration.projects[0].name,'Remont');assert.equal(integration.projects[0].number,'UUR/1');
+ await integration.stock();await integration.setReturn({number:'ksef',index:1,quantity:2,revision:3});
+ const link=await integration.assign({project:'p',number:'ksef',xml:'verified',entries:[{index:1,quantity:1}],projectRevision:1});
+ assert.equal(link.ksef_number,'ksef');assert.equal(changed[0].revision,2);
+ assert.ok(calls[0].url.endsWith('/rs_ksef_stock'));assert.deepEqual(calls[1].args,{p_number:'ksef',p_index:1,p_quantity:2,p_revision:3});
+ assert.equal(calls[2].args.p_project,'p');assert.equal(calls[2].args.p_entries[0].quantity,1);
+ assert.ok(calls.every(c=>c.headers.Authorization==='Bearer test'));
+});
+test('leaving Towar cancels a KSeF request using the Robisię transport',async()=>{
+ let cancelled=false;const a=await api((url,options)=>new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>{cancelled=true;reject(new Error('aborted'));},{once:true})));
+ const controller=new AbortController(),pending=a.ksefCall({action:'ksef-list'},{signal:controller.signal});controller.abort();await assert.rejects(pending,/aborted/);assert.equal(cancelled,true);
+});
 test('quantity editor submits amounts, quantities and the document version in one transaction',async()=>{
  let args,url;const a=await api(async(u,o)=>{url=u;args=JSON.parse(o.body);return response({project:{id:'p',revision:3,payload:{}}});});
  const payload={purchases:[{id:'buy',sourceKsefNumber:'number',amount:180,charge:220}]},link={ksef_number:'number',document:{selectedQuantities:[{index:1,quantity:2,gross:200}]}},entries=[{index:1,quantity:1.5,gross:150}];

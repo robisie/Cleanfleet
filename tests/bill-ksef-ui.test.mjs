@@ -20,6 +20,12 @@ async function setup(){
 }
 const number=i=>'6351861297-20261016-123456789ABC-'+String(i).padStart(2,'0');
 const row=i=>({ksefNumber:number(i),invoiceNumber:'FV/'+i,issueDate:'2026-10-16',seller:{nip:'6351861297',name:'<img src=x onerror=alert(1)>'},buyer:{name:'Nabywca'},grossAmount:100,currency:'PLN'});
+test('Bill has only invoice tabs; Robisię mounts the standalone Towar view with its inventory',async()=>{
+ const {n,root}=await setup();n.setupTest(root,async()=>({invoices:[],hasMore:false}),[]);assert.ok(!root.innerHTML.includes('data-kf="stock"'));
+ let loaded=false;n.mountStock(root,async()=>({invoices:[],page:0,hasMore:false}),{index:async()=>[],storeMetadata:async()=>{},stock:async()=>{loaded=true;return [{metadata:row(1),item:{index:1,name:'Farba',unit:'szt.',gross:400},capacity:4,assigned:2,returned:0,available:2}];}});
+ for(let i=0;i<50&&n.testState().busy;i++)await new Promise(resolve=>setTimeout(resolve,1));
+ assert.equal(loaded,true);assert.match(root.innerHTML,/Pozostało: 2/);assert.match(root.innerHTML,/data-kf="stock-assign"/);assert.ok(!root.innerHTML.includes('data-kf="kind"'));n.unmount();
+});
 test('KSeF panel escapes metadata, merges pages and changes month without keeping old selection',async()=>{
  const {n,root}=await setup(),calls=[];n.setupTest(root,async body=>{calls.push(body);return {invoices:[row(body.page+1)],page:body.page,hasMore:body.page===0,ticket:'encrypted'};});
  await n.run(n.load);await n.run(signal=>n.load(signal,true));assert.equal(n.testState().state.rows.length,2);assert.equal(calls[1].page,1);assert.equal(calls[1].ticket,'encrypted');assert.match(root.innerHTML,/&lt;img src=x/);assert.ok(!root.innerHTML.includes('<img src=x'));

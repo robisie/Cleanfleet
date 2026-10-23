@@ -110,3 +110,6 @@ Zakładka Towar wczytuje pozycje z nieprzypisanych i częściowo przypisanych za
 Każdy zapis sprawdza dostępny stan, wersję zwrotu i blokadę transakcyjną faktury. Nowe przypisania nie mogą wykorzystać zwróconego towaru, także ze starszych klientów i przez CleanFleet. Korekta przekraczająca wcześniej przypisany stan oznacza konflikt do sprawdzenia; nie przepisuje rozliczeń inwestora.
 
 Wdrożenie: migracja `20261023130048_ksef_corrections_stock.sql`, następnie pliki Bill 1.0.31. Nie wymaga zmiany funkcji Edge. Testy SQL działają w transakcjach zakończonych ROLLBACK.
+
+
+Towar jest dostępny z głównego panelu Robisię (1.0.71), a nie z zakładek Bill. Widok współdzieli obsługę stanów i używa sesji Robisię. Bill 1.0.32 zachowuje grupowanie faktur i korekt.

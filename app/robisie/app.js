@@ -1,18 +1,25 @@
-import * as Completion from './completion.js?v=1.0.70';
-import * as PurchaseSettlement from './purchase-settlement.js?v=1.0.70';
-import * as PurchaseSettlementForm from './purchase-settlement-form.js?v=1.0.70';
-import * as PurchasePayments from './purchase-payments.js?v=1.0.70';
-import * as PurchasePaymentForm from './purchase-payment-form.js?v=1.0.70';
-import * as PurchaseItems from './purchase-items.js?v=1.0.70';
-import * as BI from './invoices.js?v=1.0.70';
-import * as Auto from './autosave.js?v=1.0.70';
-import * as C from './core.js?v=1.0.70';
-import * as API from './api.js?v=1.0.70';
-import * as PDF from './pdf.js?v=1.0.70';
+import * as Completion from './completion.js?v=1.0.71';
+import * as PurchaseSettlement from './purchase-settlement.js?v=1.0.71';
+import * as PurchaseSettlementForm from './purchase-settlement-form.js?v=1.0.71';
+import * as PurchasePayments from './purchase-payments.js?v=1.0.71';
+import * as PurchasePaymentForm from './purchase-payment-form.js?v=1.0.71';
+import * as PurchaseItems from './purchase-items.js?v=1.0.71';
+import * as BI from './invoices.js?v=1.0.71';
+import * as Auto from './autosave.js?v=1.0.71';
+import * as C from './core.js?v=1.0.71';
+import * as API from './api.js?v=1.0.71';
+import * as PDF from './pdf.js?v=1.0.71';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',shopFilter=null,projectFilter='',projectSearch='',summarySort={key:'category',direction:1},mobileOpen=false,configBaseline=null;
 const openRoomGroups=new Set(),stageInvoiceCache=new Map(),projectEarningsCache=new Map();
 let completionReturnId=null,settlementReturnId=null;
+let stockPanel=null,stockMountGeneration=0;
+function closeStock(){stockMountGeneration++;stockPanel?.unmount();}
+async function mountStockPanel(){
+ const host=$('#robisie-stock-panel'),generation=++stockMountGeneration;
+ try{const module=await import('../../bill/ksef.js?v=1.0.32');if(generation!==stockMountGeneration||view!=='stock'||$('#robisie-stock-panel')!==host)return;stockPanel=module;module.mountStock(host,API.ksefCall,API.stockIntegration(all,row=>{all=all.map(r=>r.id===row.id?{...row,payload:C.captureCatalog(config.payload,row.payload)}:r);}));}
+ catch(error){if(generation===stockMountGeneration&&view==='stock')host.textContent='Nie udało się wczytać towarów: '+error.message;}
+}
 let stageInvoiceLoading=null,purchaseDialogLoading=false;
 function invoiceHref(row){return row.externalKsef&&!row.sourceBillId?'/bill/?ksef='+encodeURIComponent(row.ksef_number)+'&month='+encodeURIComponent(row.payload.issueDate.slice(0,7))+'&kind='+encodeURIComponent(row.originKind||'sales'):'/bill/?invoice='+encodeURIComponent(row.sourceBillId||row.id);}
 function stageInvoiceCell(stage){const records=stageInvoiceCache.get(selected.id)||[],assigned=new Set((p().invoiceSettlements||[]).filter(r=>r.allocations.some(a=>a.kind==='stage'&&a.id===stage.id&&a.amount>0)).map(r=>r.id)),linked=records.filter(row=>row.payload?.source?.stageId===stage.id||assigned.has(row.id));if(linked.length)return linked.map(invoice=>`<a class="button" href="${invoiceHref(invoice)}" target="_blank" rel="noopener">${esc(invoice.number||'Kontynuuj szkic')}</a>`).join(' ');if(stage.invoice)return esc(stage.invoice);return `<a class="button" data-action="stage-invoice" href="/bill/?new=1&amp;brand=robisie&amp;source=${encodeURIComponent(selected.id)}&amp;stage=${encodeURIComponent(stage.id)}" target="_blank" rel="noopener">Dodaj</a>`;}
@@ -48,7 +55,7 @@ async function persistCatalog(payload){
  }).finally(updateSaveState);
 }
 
-const title=()=>C.MODULES.find(x=>x[0]===view)?.[1]||({dashboard:'Panel administratora',catalog:'Cennik',settings:'Dane wykonawcy',trips:'Dojazdy'}[view]||'Robisię');
+const title=()=>C.MODULES.find(x=>x[0]===view)?.[1]||({dashboard:'Panel administratora',stock:'Towar',catalog:'Cennik',settings:'Dane wykonawcy',trips:'Dojazdy'}[view]||'Robisię');
 const btn=(action,label,cls='',extra='')=>`<button type="button" data-action="${action}" class="${cls}" ${extra}>${label}</button>`;
 const input=(name,label,value='',type='text',extra='')=>`<div class="field"><label for="f-${esc(name)}">${label}</label><input id="f-${esc(name)}" name="${esc(name)}" type="${type==='number'?'text':type}" ${type==='number'?'data-numeric="true" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" title="Możesz wpisać liczbę lub działanie, np. 25+3+7-2"':''} value="${esc(value)}" ${p()?.calculationPrecision==='source'&&type==='number'?extra.replace(/step="[^"]+"/g,'step="any"'):extra}></div>`;
 const text=(name,label,value='',extra='')=>`<div class="field"><label for="f-${esc(name)}">${label}</label><textarea id="f-${esc(name)}" name="${esc(name)}" ${extra}>${esc(value)}</textarea></div>`;
@@ -68,7 +75,7 @@ async function start(){
  if(!API.restoreSession()){loginView();return;}await load();
  }catch(e){failure(e);}
 }
-function loginView(message=''){$('#app').innerHTML=`<div class="login card">${logoMarkup()}<p class="muted">Inwestycje remontowe</p><h1>Logowanie administratora</h1>${message?`<div class="notice error">${esc(message)}</div>`:''}<form id="login">${input('email','Adres e-mail','','email','autocomplete="username" required')}${input('password','Hasło','','password','autocomplete="current-password" required')}<button class="primary" type="submit">Zaloguj się</button></form><p class="muted" style="margin-top:22px">Użyj konta administratora CleanFleet.</p><span class="version">Wersja ${C.VERSION}</span></div>`;}
+function loginView(message=''){closeStock();stockPanel?.reset();$('#app').innerHTML=`<div class="login card">${logoMarkup()}<p class="muted">Inwestycje remontowe</p><h1>Logowanie administratora</h1>${message?`<div class="notice error">${esc(message)}</div>`:''}<form id="login">${input('email','Adres e-mail','','email','autocomplete="username" required')}${input('password','Hasło','','password','autocomplete="current-password" required')}<button class="primary" type="submit">Zaloguj się</button></form><p class="muted" style="margin-top:22px">Użyj konta administratora CleanFleet.</p><span class="version">Wersja ${C.VERSION}</span></div>`;}
 function failure(e){if(e.code==='PGRST205'||e.code==='PGRST202'||/rs_projects|rs_settings|rs_create_project/.test(e.message)){
  $('#app').innerHTML=`<div class="login card">${logoMarkup()}<h1>Aplikacja czeka na uruchomienie bazy</h1><p>Moduły są przygotowane. Zapisywanie inwestycji będzie dostępne po utworzeniu osobnych tabel Robisię.</p><p class="muted">Zmiana bazy wymaga zatwierdzenia przez administratora. Nie zapisano żadnych danych inwestycji.</p>${btn('reload','Sprawdź ponownie','primary')} ${btn('logout','Wyloguj')}<p class="version" style="margin-top:18px">Wersja ${C.VERSION}</p></div>`;
  }else if(/JWT|token|expired|session|401/i.test(e.message)){API.logout();loginView('Sesja wygasła. Zaloguj się ponownie.');}else{$('#app').innerHTML=`<div class="login card"><h1>Nie udało się wczytać danych</h1><div class="notice error">${esc(e.message)}</div>${btn('reload','Spróbuj ponownie','primary')} ${btn('logout','Wyloguj')}</div>`;}}
@@ -81,10 +88,11 @@ async function openRequestedPurchase(){
  if(invoice){await loadStageInvoices();if((stageInvoiceCache.get(target.id)||[]).some(row=>row.id===invoice))await invoicePaidDialog(invoice);return;}
  const purchase=p().purchases.find(x=>x.sourceKsefNumber===ksef);if(purchase)await purchaseDialog(purchase.id);
 }
-function render(){const side=selected?C.MODULES:[['dashboard','Inwestycje'],['catalog','Cennik'],['settings','Dane wykonawcy']];
- $('#app').innerHTML=`<header class="topbar"><div class="row">${btn('menu','Menu','mobile-menu')}${logoMarkup()}<span class="version">Inwestycje remontowe · ${C.VERSION}</span></div><div class="row topbar-actions"><a class="button" style="font-size:14px" href="/bill/?new=1&brand=robisie${selected?'&source='+encodeURIComponent(selected.id):''}" target="_blank" rel="noopener">Wystaw fakturę</a>${selected?btn('receipt-add','+ Dodaj wpłatę','primary quick-receipt'): ''}<span class="muted" id="save-state">${saveError?'Błąd zapisu — kopia zachowana na urządzeniu':writes.pending?'Zapisywanie…':dirty?'Oczekiwanie na automatyczny zapis':'Dane zapisane w bazie'}</span>${btn('logout','Wyloguj','logout')}</div></header><div class="shell"><nav class="${mobileOpen?'open':''}">${selected?btn('back','Wszystkie inwestycje')+'<p class="muted" style="padding:10px">'+esc(p().name)+'<br>'+esc(selected.contract_number)+'</p>':''}${side.map(([key,label])=>btn('nav',label,view===key?'active':'',`data-view="${key}"`)).join('')}${selected?btn('nav','Cennik',view==='catalog'?'active':'','data-view="catalog"')+btn('nav','Dojazdy',view==='trips'?'active':'','data-view="trips"'):''}</nav><main><div class="toolbar"><div><h1>${title()}</h1><p class="muted">${selected?esc(p().name)+' · '+esc(selected.contract_number):'Robisię — prowadzenie inwestycji'}</p></div><div class="actions">${selected?(view==='trips'?'':btn('print','Generuj PDF'))+undoButton():view==='dashboard'?btn('new-project','Nowa inwestycja','primary'):undoButton()}</div></div>${recoveryNotice()}<div id="content">${content()}</div>${selected?`<div class="savebar"><span class="muted">Zmiany zapisują się automatycznie. Możesz cofnąć ostatni zapis.</span>${undoButton()}</div>`:''}</main></div>`;
+function render(){closeStock();const side=selected?C.MODULES:[['dashboard','Inwestycje'],['stock','Towar'],['catalog','Cennik'],['settings','Dane wykonawcy']];
+ $('#app').innerHTML=`<header class="topbar"><div class="row">${btn('menu','Menu','mobile-menu')}${logoMarkup()}<span class="version">Inwestycje remontowe · ${C.VERSION}</span></div><div class="row topbar-actions"><a class="button" style="font-size:14px" href="/bill/?new=1&brand=robisie${selected?'&source='+encodeURIComponent(selected.id):''}" target="_blank" rel="noopener">Wystaw fakturę</a>${selected?btn('receipt-add','+ Dodaj wpłatę','primary quick-receipt'): ''}<span class="muted" id="save-state">${saveError?'Błąd zapisu — kopia zachowana na urządzeniu':writes.pending?'Zapisywanie…':dirty?'Oczekiwanie na automatyczny zapis':'Dane zapisane w bazie'}</span>${btn('logout','Wyloguj','logout')}</div></header><div class="shell"><nav class="${mobileOpen?'open':''}">${selected?btn('back','Wszystkie inwestycje')+'<p class="muted" style="padding:10px">'+esc(p().name)+'<br>'+esc(selected.contract_number)+'</p>':''}${side.map(([key,label])=>btn('nav',label,view===key?'active':'',`data-view="${key}"`)).join('')}${selected?btn('nav','Cennik',view==='catalog'?'active':'','data-view="catalog"')+btn('nav','Dojazdy',view==='trips'?'active':'','data-view="trips"'):''}</nav><main><div class="toolbar"><div><h1>${title()}</h1><p class="muted">${selected?esc(p().name)+' · '+esc(selected.contract_number):'Robisię — prowadzenie inwestycji'}</p></div><div class="actions">${selected?(view==='trips'?'':btn('print','Generuj PDF'))+undoButton():view==='dashboard'?btn('nav','Towar','',`data-view="stock"`)+btn('new-project','Nowa inwestycja','primary'):view==='stock'?'':undoButton()}</div></div>${recoveryNotice()}<div id="content">${content()}</div>${selected?`<div class="savebar"><span class="muted">Zmiany zapisują się automatycznie. Możesz cofnąć ostatni zapis.</span>${undoButton()}</div>`:''}</main></div>`;
+ if(view==='stock')void mountStockPanel();
 }
-function content(){switch(view){case'dashboard':return dashboard();case'trips':return tripsView();case'catalog':return catalogView();case'settings':return settingsView();case'overview':return overview();case'data':return dataView();case'rooms':return roomsView();case'offer':return linesView('offer');case'works':return linesView('works');case'summary':return summaryView();case'payments':return paymentsView();case'purchases':return purchasesView();case'journal':return journalView();case'contract':return contractView();case'handover':return handoverView();default:return '';}}
+function content(){switch(view){case'stock':return '<div id="robisie-stock-panel" class="robisie-stock"><p role="status">Ładowanie towarów…</p></div>';case'dashboard':return dashboard();case'trips':return tripsView();case'catalog':return catalogView();case'settings':return settingsView();case'overview':return overview();case'data':return dataView();case'rooms':return roomsView();case'offer':return linesView('offer');case'works':return linesView('works');case'summary':return summaryView();case'payments':return paymentsView();case'purchases':return purchasesView();case'journal':return journalView();case'contract':return contractView();case'handover':return handoverView();default:return '';}}
 const projectFilters=[['','Wszystkie'],['oferta','Oferta'],['przygotowanie','W przygotowaniu'],['prace','Realizowane'],['odbior','Do odbioru'],['zakonczona','Zakończone']];
 function projectOrder(a,b){const priority=Number(b.payload.status==='prace')-Number(a.payload.status==='prace');if(priority)return priority;const parts=row=>String(row.contract_number||'').match(/^UUR-RS\/(\d{4})\/(\d{1,2})\/(\d+)$/)?.slice(1).map(Number)||[0,0,0];const left=parts(a),right=parts(b);for(let i=0;i<3;i++){if(left[i]!==right[i])return right[i]-left[i];}return 0;}
 function filteredProjects(){const query=projectSearch.trim().toLocaleLowerCase('pl');return all.filter(x=>(!projectFilter||x.payload.status===projectFilter)&&JSON.stringify([x.payload.name,x.payload.investor,x.payload.address,x.contract_number]).toLocaleLowerCase('pl').includes(query)).sort(projectOrder);}

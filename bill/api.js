@@ -25,6 +25,12 @@ export function logout(){session=null;localStorage.removeItem(SESSION_KEY);}
 export const call=(body,options={})=>request("/functions/v1/cleanfleet-bill",{method:"POST",body:JSON.stringify(body),timeoutMs:90000,...options});
 
 export const ksefAssignments=()=>request('/rest/v1/rs_ksef_links?select=*');
+const stockRpc=(name,args={})=>request('/rest/v1/rpc/'+name,{method:'POST',body:JSON.stringify(args),timeoutMs:90000});
+export const ksefDocumentIndex=()=>stockRpc('rs_ksef_document_index');
+export const storeKsefMetadata=rows=>stockRpc('rs_ksef_store_metadata',{p_rows:rows});
+export const storeKsefXml=(number,xml)=>stockRpc('rs_ksef_store_xml',{p_number:number,p_xml:xml});
+export const ksefStock=()=>stockRpc('rs_ksef_stock');
+export const setKsefReturn=({number,index,quantity,revision})=>stockRpc('rs_ksef_set_return',{p_number:number,p_index:index,p_quantity:quantity,p_revision:revision});
 export const previewKsefPurchase=({xml})=>request('/rest/v1/rpc/rs_ksef_purchase_preview',{method:'POST',body:JSON.stringify({p_xml:xml}),timeoutMs:30000});
 export const ksefAllocationContext=number=>request('/rest/v1/rpc/rs_ksef_allocation_context',{method:'POST',body:JSON.stringify({p_number:number})});
 export const unassignKsef=({project,number,revision})=>request('/rest/v1/rpc/rs_unassign_ksef_purchase',{method:'POST',body:JSON.stringify({p_project:project,p_number:number,p_revision:revision}),timeoutMs:30000});

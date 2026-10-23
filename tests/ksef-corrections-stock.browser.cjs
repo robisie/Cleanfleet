@@ -20,6 +20,7 @@ const root=path.resolve(__dirname,'..');
   const xml='<Faktura></Faktura>',bytes=new TextEncoder().encode(xml);for(const r of [a,b])r.invoiceHash=btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))));
   const options={projects:[{id:'p1',name:'Inwestycja testowa',number:'UUR/1'}],index:async()=>docs,storeMetadata:async()=>{},storeXml:async()=>{},stock:async()=>window.stock,
    loadLinks:async()=>[],cfLinks:async()=>[],preview:async()=>({items:[item],gross:400,currency:'PLN',canSelect:true}),allocationContext:async()=>({links:[{kind:'purchases',project_id:'existing',project_name:'Poprzednia inwestycja',document:{selectedQuantities:[{index:1,quantity:2,gross:200}]}}],blocked:[]}),findPurchases:async()=>({revision:1,payload:{purchases:[]}}),assign:async args=>{window.writes.push(args);return {document:{referenceOnly:false}};},setReturn:async args=>{window.writes.push(args);window.stock[0]={...window.stock[0],manualReturned:args.quantity,returned:args.quantity,available:2-args.quantity,revision:1};}};
+  window.fixture.options=options;window.fixture.call=async args=>args.action==='ksef-list'?{invoices:[a,b],page:0,hasMore:false,ticket:'fixture'}:{content:btoa(xml)};
   window.mount=()=>K.mount(document.querySelector('#panel'),async args=>args.action==='ksef-list'?{invoices:args.dateType==='Issue'?[b]:[a,b],page:0,hasMore:false,ticket:'fixture'}:{content:btoa(xml)},options);
   K.focusInvoice('1','2026-04','purchases');window.mount();
  });
@@ -27,7 +28,7 @@ const root=path.resolve(__dirname,'..');
  assert.equal(await page.locator('.kf-invoice').count(),2);
  assert.match(await page.locator('.kf-invoice').first().innerText(),/KOR\/1/);assert.match(await page.locator('.kf-related').innerText(),/FV\/1/);assert.match(await page.locator('.kf-related').innerText(),/Poza wybranym okresem/);
  for(const width of [390,820,1440]){await page.setViewportSize({width,height:900});assert(await page.evaluate(()=>document.body.scrollWidth<=innerWidth+2),'group list overflow '+width);}
- await page.locator('[data-kf="stock"]').click();await page.waitForFunction(()=>document.querySelector('#kf-status')?.textContent.includes('Towar:'));
+ assert.equal(await page.locator('[data-kf="stock"]').count(),0);await page.evaluate(()=>{const {K,options,call}=window.fixture;K.unmount();const host=document.querySelector('#panel');host.className='robisie-stock';document.querySelector('link').href='/app/robisie/style.css';const css=document.createElement('link');css.rel='stylesheet';css.href='/app/robisie/stock.css';document.head.append(css);K.mountStock(host,call,options);});await page.waitForFunction(()=>document.querySelector('#kf-status')?.textContent.includes('Towar:'));
  for(const width of [390,820,1440]){await page.setViewportSize({width,height:900});assert(await page.evaluate(()=>document.body.scrollWidth<=innerWidth+2),'stock overflow '+width);}
  await page.locator('[data-kf="stock-assign"]').click();await page.locator('dialog[open] [name="project"]').selectOption('p1');
  await page.locator('[data-allocation-quantity="1"]').fill('1');await page.locator('dialog[open] [type="submit"]').click();

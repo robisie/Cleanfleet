@@ -26,6 +26,19 @@ test('Bill has only invoice tabs; Robisię mounts the standalone Towar view with
  for(let i=0;i<50&&n.testState().busy;i++)await new Promise(resolve=>setTimeout(resolve,1));
  assert.equal(loaded,true);assert.match(root.innerHTML,/Pozostało: 2/);assert.match(root.innerHTML,/data-kf="stock-assign"/);assert.ok(!root.innerHTML.includes('data-kf="kind"'));n.unmount();
 });
+test('one rejected XML does not hide saved goods or stop reading the next invoice',async()=>{
+ const {n,root}=await setup(),bytes=new TextEncoder().encode('<Faktura/>'),docs=await Promise.all([1,2].map(async i=>({metadata:{...row(i),invoiceHash:await D.digest(bytes)},hasPreview:false}))),attempts=[];
+ const goods=[{metadata:row(3),item:{index:1,name:'Zapisana farba',unit:'szt.',gross:100},capacity:1,assigned:0,returned:0,available:1}];
+ n.mountStock(root,async body=>body.action==='ksef-list'?{invoices:[],hasMore:false}:{content:Buffer.from(bytes).toString('base64')},{index:async()=>docs,storeMetadata:async()=>{},stock:async()=>goods,storeXml:async number=>{attempts.push(number);if(number===docs[0].metadata.ksefNumber)throw Error('XML nie zgadza się z metadanymi KSeF.');docs[1].hasPreview=true;}});
+ for(let i=0;i<100&&n.testState().busy;i++)await new Promise(resolve=>setTimeout(resolve,1));
+ assert.equal(attempts.length,2);assert.match(root.innerHTML,/Zapisana farba/);assert.match(root.innerHTML,/Problemy z dokumentami \(1\)/);assert.match(root.innerHTML,/FV\/1/);assert.ok(!root.innerHTML.includes('Brak pozostałych towarów.'));n.unmount();
+});
+test('unread corrections keep saved stock visible and block allocating uncertain quantities',async()=>{
+ const {n,root}=await setup(),bytes=new TextEncoder().encode('<Faktura/>'),metadata={...row(1),invoiceType:'Kor',invoiceHash:await D.digest(bytes)};
+ n.mountStock(root,async body=>body.action==='ksef-list'?{invoices:[],hasMore:false}:{content:Buffer.from(bytes).toString('base64')},{index:async()=>[{metadata,hasPreview:false}],storeMetadata:async()=>{},storeXml:async()=>{throw Error('Nie odczytano korekty');},stock:async()=>[{metadata:row(2),item:{index:1,name:'Zapisana farba',unit:'szt.',gross:100},capacity:1,assigned:0,returned:0,available:1}]});
+ for(let i=0;i<100&&n.testState().busy;i++)await new Promise(resolve=>setTimeout(resolve,1));
+ assert.match(root.innerHTML,/Zapisana farba/);assert.match(root.innerHTML,/Nie odczytano wszystkich korekt/);assert.match(root.innerHTML,/data-kf="stock-assign"[^>]*disabled/);n.unmount();
+});
 test('KSeF panel escapes metadata, merges pages and changes month without keeping old selection',async()=>{
  const {n,root}=await setup(),calls=[];n.setupTest(root,async body=>{calls.push(body);return {invoices:[row(body.page+1)],page:body.page,hasMore:body.page===0,ticket:'encrypted'};});
  await n.run(n.load);await n.run(signal=>n.load(signal,true));assert.equal(n.testState().state.rows.length,2);assert.equal(calls[1].page,1);assert.equal(calls[1].ticket,'encrypted');assert.match(root.innerHTML,/&lt;img src=x/);assert.ok(!root.innerHTML.includes('<img src=x'));

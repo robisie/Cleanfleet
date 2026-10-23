@@ -4,3 +4,4 @@ export function selectedAmount(preview,indices){
  return rows.filter(x=>ids.includes(x.index)).reduce((sum,x)=>sum+Math.round(Number(x.gross)*100),0)/100;
 }
 export const duplicatePurchases=(purchases,amount)=>purchases.filter(x=>Math.round(Number(x.amount)*100)===Math.round(amount*100));
+export {allocationMarkup,mountAllocation,quantitySelection,savedEntries} from '../app/robisie/ksef-allocation.js?v=1.0.70';

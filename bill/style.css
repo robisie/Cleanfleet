@@ -29,3 +29,6 @@ dialog.kf-assignment-modal{width:min(920px,calc(100vw - 32px));max-width:calc(10
 .bill-payment-state.manual_paid{background:#e9f6ee;color:#176145}
 .bill-bank-payments{font-size:.9em;margin-top:6px;max-width:650px}
 .bill-bank-payments div{padding:4px 0;border-top:1px solid #ddd}
+.ksef-allocation .allocation-item{display:grid;grid-template-columns:minmax(0,1fr) 145px 105px;gap:14px;padding:16px 0;border-bottom:1px solid #e1e5ea;align-items:center}
+.allocation-name{display:flex;gap:10px;align-items:flex-start}.allocation-name input{width:auto!important;margin-top:5px}.allocation-name span{min-width:0}.allocation-name small{display:block;color:#647184;margin-top:5px;font-weight:400}.allocation-quantity{font-size:13px}.allocation-quantity input{width:100%;margin-top:6px}.allocation-item.unavailable{background:#f1f3f5;color:#6b7280}.allocation-item.unavailable .allocation-name{opacity:.7}
+@media(max-width:650px){.ksef-allocation .allocation-item{grid-template-columns:minmax(0,1fr) 110px}.allocation-name{grid-column:1/-1}.allocation-item>[data-allocation-value]{text-align:right}.allocation-quantity{max-width:145px}}

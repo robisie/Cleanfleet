@@ -117,3 +117,11 @@ test('one-button preview needs confirmation for new money and returns to updated
   await ui.submit({fullSettlementDate:'2026-10-22',confirmSettlementMoney:'on'});assert.equal(db.revision,2);assert.equal(db.payload.receipts.length,5);assert.equal(Completion.summary(db.payload).open,false);assert.match(ui.node('#dialog').innerHTML,/Zamknięcie inwestycji/);assert.equal(db.finishCalls,undefined);assert.equal(db.earnings,undefined);
  }finally{ui.close();}
 });
+test('guided settlement returns to current balances after allocating earlier money, without finishing',async()=>{
+ const db=fixture();db.payload.purchases[0].amount=1000;db.payload.purchases[0].charge=1000;const ui=await open(db);
+ try{
+  await ui.click('settlement-open');assert.match(ui.node('#dialog').innerHTML,/1\. Sprawdź wpływy/);assert.match(ui.node('#dialog').innerHTML,/2\. Rozlicz zakupy/);assert.match(ui.node('#dialog').innerHTML,/3\. Rozlicz wykonaną robociznę/);
+  await ui.click('settlement-purchases');ui.node('#bulk-existing-0').value='1000';ui.node('#bulk-select-available').onclick();await ui.submit({});
+  assert.equal(db.payload.purchases[0].receiptPayments.a,1000);assert.match(ui.node('#dialog').innerHTML,/Rozlicz inwestycję/);assert.equal(db.payload.status,'przygotowanie');
+ }finally{ui.close();}
+});

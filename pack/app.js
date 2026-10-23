@@ -2,6 +2,7 @@ import {client,administrator,modules,applications} from './auth.js?v=120';
 import {mountTiles} from './tiles.js?v=113';
 const $=id=>document.getElementById(id),db=client(),tabs=new Map();
 let user=null,epoch=0,current='',frame=null,disposeTiles=null,leaving=false;
+const returnTabs=new Map();
 const workspaceKey='robisie-pack-workspace-v1';
 function saveWorkspace(){if(!user)return;try{sessionStorage.setItem(workspaceKey,JSON.stringify({version:1,userId:user.id,active:current,tabs:[...tabs.values()].map(({kind,name})=>({kind,name}))}));}catch(_){}}
 function forgetWorkspace(){try{sessionStorage.removeItem(workspaceKey);}catch(_){}}
@@ -29,7 +30,7 @@ function renderTabs(){
  $('openTabs').querySelector('.workspace-tab.active')?.scrollIntoView?.({block:'nearest',inline:'nearest'});
  if(focusedKey)$('workspaceTabs').querySelector('[data-tab-key="'+focusedKey+'"]')?.focus();
 }
-function clearModule(){forgetWorkspace();epoch++;for(const tab of tabs.values())tab.frame.remove();tabs.clear();frame=null;current='';$('frameHost').replaceChildren();$('workspace').hidden=true;$('dashboard').hidden=false;$('closeModule').hidden=true;$('moduleTitle').textContent='';renderTabs();}
+function clearModule(){forgetWorkspace();epoch++;for(const tab of tabs.values())tab.frame.remove();tabs.clear();returnTabs.clear();frame=null;current='';$('frameHost').replaceChildren();$('workspace').hidden=true;$('dashboard').hidden=false;$('closeModule').hidden=true;$('backContext').hidden=true;$('moduleTitle').textContent='';renderTabs();}
 function gate(message='Zaloguj się kontem administratora.'){user=null;disposeTiles?.();disposeTiles=null;clearModule();$('panel').hidden=true;$('login').hidden=false;$('loginForm').hidden=false;$('loginInfo').textContent=message;$('userEmail').textContent='';}
 async function verify(){
  const checking=epoch,allowed=await administrator(db);if(checking!==epoch)return false;
@@ -42,6 +43,7 @@ function activate(key,push=true){
  const tab=tabs.get(key);if(!tab||!user)return;current=key;frame=tab.frame;
  for(const [id,t] of tabs){t.frame.hidden=id!==key;t.frame.setAttribute('aria-hidden',String(id!==key));}
  $('dashboard').hidden=true;$('workspace').hidden=false;$('closeModule').hidden=true;$('moduleTitle').textContent=tab.title;$('moduleError').textContent='';renderTabs();
+ const source=tabs.get(returnTabs.get(key));$('backContext').hidden=!source;if(source)$('backContext').textContent='← Wróć do '+source.title;
  const button=[...$('workspaceTabs').querySelectorAll('[data-tab-key]')].find(el=>el.dataset.tabKey===key);button?.scrollIntoView?.({block:'nearest',inline:'nearest'});
  if(push)history.pushState(null,'',locationFor(tab));window.scrollTo({top:0,behavior:'auto'});
  tab.frame.contentWindow?.postMessage?.({type:'robisie-pack-activated'},location.origin);saveWorkspace();
@@ -64,7 +66,7 @@ async function openTarget(kind,name,push=true){
 }
 const openModule=(name,push=true)=>openTarget('module',name,push),openApplication=(name,push=true)=>openTarget('application',name,push);
 function closeTab(key){
- const tab=tabs.get(key);if(!tab)return;const keys=orderedTabKeys(),index=keys.indexOf(key);tab.frame.remove();tabs.delete(key);
+ const tab=tabs.get(key);if(!tab)return;const keys=orderedTabKeys(),index=keys.indexOf(key);tab.frame.remove();tabs.delete(key);returnTabs.delete(key);for(const [destination,source] of returnTabs)if(source===key)returnTabs.delete(destination);
  if(current===key){const next=keys[index-1]||keys[index+1];if(next)activate(next);else home();}else{renderTabs();saveWorkspace();}
 }
 function fitFrame(target){
@@ -86,27 +88,33 @@ function fitFrame(target){
    doc.robisiePackLayoutBound=true;
    const Observer=doc.defaultView?.MutationObserver;
    if(Observer)new Observer(fitChildren).observe(doc.documentElement,{childList:true,subtree:true});
-   doc.addEventListener('click',event=>{const a=event.target.closest('a[href]');if(!a||a.hasAttribute('download')||event.button>0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;const url=new URL(a.href,doc.location.href);if(url.origin!==location.origin)return;if(url.pathname==='/pack/'){event.preventDefault();home();}else if((url.pathname==='/bill/'||url.pathname==='/bill/index.html')&&a.dataset.action!=='stage-invoice'){event.preventDefault();event.stopImmediatePropagation();void openBillLink(url);}},true);
+   doc.addEventListener('click',event=>{const a=event.target.closest('a[href]');if(!a||a.hasAttribute('download')||event.button>0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;const url=new URL(a.href,doc.location.href);if(url.origin!==location.origin)return;if(url.pathname==='/pack/'){event.preventDefault();const destination=url.searchParams.get('module');if(destination&&Object.hasOwn(modules,destination)){const source=current;void openModule(destination).then(()=>{if(source&&source!==current){returnTabs.set(current,source);activate(current,false);}});}else home();}else if(applicationFor(url)&&a.dataset.action!=='stage-invoice'){event.preventDefault();event.stopImmediatePropagation();void openApplicationLink(url);}},true);
   }
  }catch(error){console.warn('Robisię Pack: nie udało się dopasować widoku aplikacji.',error);}
 }
-async function openBillLink(url){
- const existing=tabs.get('app:bill');
- if(!existing){const key=ensureTab('application','bill');tabs.get(key).frame.src=url.href;activate(key);return;}
- activate('app:bill');existing.frame.contentWindow?.postMessage({type:'robisie-pack-navigate',url:url.href},location.origin);
+function applicationFor(url){if(url.origin!==location.origin)return '';return {'/bill/':'bill','/bill/index.html':'bill','/app/robisie/':'robisie','/app/robisie/index.html':'robisie','/app/':'cleanfleet','/app/index.html':'cleanfleet'}[url.pathname]||'';}
+async function openApplicationLink(url){
+ const name=applicationFor(url);if(!name)return;
+ const source=current,key='app:'+name,existing=tabs.get(key);
+ if(!existing){ensureTab('application',name);tabs.get(key).frame.src=url.href;}
+ if(source&&source!==key){if(returnTabs.get(source)===key)returnTabs.delete(source);returnTabs.set(key,source);}
+ activate(key);
+ if(existing&&name!=='cleanfleet')existing.frame.contentWindow?.postMessage({type:'robisie-pack-navigate',url:url.href},location.origin);
 }
 function home(push=true){
  current='';frame=null;for(const tab of tabs.values())tab.frame.hidden=true;
  $('workspace').hidden=true;$('dashboard').hidden=false;$('closeModule').hidden=true;$('moduleTitle').textContent='';renderTabs();
+ $('backContext').hidden=true;
  if(push)history.pushState(null,'','/pack/');window.scrollTo({top:0,behavior:'auto'});saveWorkspace();
 }
 $('loginForm').onsubmit=async event=>{event.preventDefault();const button=$('signIn');button.disabled=true;$('loginError').textContent='';const password=$('password').value;$('password').value='';document.activeElement?.blur();try{const result=await db.auth.signInWithPassword({email:$('email').value.trim(),password});if(result.error)throw Error('Nieprawidłowy e-mail lub hasło.');if(await verify()){const url=new URL(location.href);if(url.searchParams.get('module'))await openModule(url.searchParams.get('module'));else if(url.searchParams.get('application'))await openApplication(url.searchParams.get('application'));}}catch(error){gate();$('loginError').textContent=error.message;}finally{button.disabled=false;}};
+$('backContext').onclick=()=>{const source=returnTabs.get(current);if(source&&tabs.has(source)){returnTabs.delete(current);if(returnTabs.get(source)===current)returnTabs.delete(source);activate(source);}};
 $('logout').onclick=async()=>{gate('Wylogowano.');const {error}=await db.auth.signOut();if(error)$('loginError').textContent='Nie udało się zakończyć sesji na serwerze. Spróbuj ponownie.';};
 document.querySelectorAll('[data-app]').forEach(b=>b.onclick=()=>openApplication(b.dataset.app));$('closeModule').onclick=()=>home();$('homeTab').onclick=()=>home();$('homeLogo').onclick=event=>{event.preventDefault();home();};document.querySelectorAll('[data-module]').forEach(b=>b.onclick=()=>openModule(b.dataset.module));
 $('workspaceTabs').onkeydown=event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||!event.target.matches('[role=tab]'))return;event.preventDefault();const items=[$('homeTab'),...$('workspaceTabs').querySelectorAll('[data-tab-key]')],index=items.indexOf(event.target),next=event.key==='Home'?0:event.key==='End'?items.length-1:(index+(event.key==='ArrowRight'?1:items.length-1))%items.length;const button=items[next],key=button.dataset.tabKey;if(key){const focus=()=>$('workspaceTabs').querySelector('[data-tab-key="'+key+'"]')?.focus();if(tabs.has(key)){activate(key);focus();}else void openApplication(key.slice(4)).then(focus);}else{home();$('homeTab').focus();}};
 window.addEventListener('message',event=>{
  if(event.origin!==location.origin||!user||leaving)return;const entry=[...tabs.entries()].find(([,t])=>event.source===t.frame.contentWindow);if(!entry)return;
- if(event.data?.type==='robisie-pack-open-url'){try{const url=new URL(event.data.url,location.href);if(url.origin===location.origin&&['/bill/','/bill/index.html'].includes(url.pathname))void openBillLink(url);}catch{}}
+ if(event.data?.type==='robisie-pack-open-url'){try{const url=new URL(event.data.url,location.href);if(applicationFor(url))void openApplicationLink(url);}catch{}}
  if(event.data?.type==='robisie-pack-close')closeTab(entry[0]);
  if(event.data?.type==='robisie-pack-home')home();
  if(event.data?.type==='robisie-pack-open'&&Object.hasOwn(modules,event.data.module))openModule(event.data.module);

@@ -176,3 +176,5 @@ CleanFleet v1.56.9: jawna opcja uwzględniania wpisów bez przypisanej spółki 
 CleanFleet v1.56.10 / Bill 1.0.14: faktura z wybranych aut ma osobną pozycję dla każdego wpisu: opis usługi + tablica, ilość 1 i cena prania. Suma i każda cena są kontrolowane względem bazy. Nowy tryb nie tworzy ani nie udostępnia osobnego załącznika; wykaz jest w fakturze PDF i XML KSeF. Ustawienia kolumn i podsumowań załącznika są ukryte w trybie Bill. Zachowane osobne wystawienie i wysyłka, wybór nieprzypisanych aut oraz powiązanie rozliczenia z listą prań.
 
 CleanFleet v1.56.15: przejście po utworzeniu szkicu faktury z aut oraz otwarcie faktury z rozliczenia aktywują zakładkę Bill w Pack. Widok i stan CleanFleet pozostają otwarte; uruchomienie poza Pack zachowuje bezpośrednie przejście do Bill.
+
+CleanFleet v1.56.16: podpowiedź ostatnio wybranej kategorii i firmy dla sprzedawcy z KSeF przy kolejnym imporcie kosztów. Wymaga potwierdzenia pozycji przed zapisem.

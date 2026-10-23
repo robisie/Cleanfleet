@@ -4,8 +4,11 @@ import {gus,lookupWithFallback} from './gus.js';
 import {lookupCompany} from './registry.js';
 import {stageInvoiceSeed,investmentInvoiceSeed} from '../../../app/robisie/billing.js';
 import {createClient} from 'npm:@supabase/supabase-js@2.57.4';
+import {openAccount} from '../pack-bank-mail/vault.js';
+import '../pack-bank-mail/engine.js';
+import {reconcileBillPayments} from '../_shared/bill-bank-match.js';
 import {createStateCodec,hash} from '../cleanfleet-ksef/core.js';
-import {normalize,newInvoice,party,invoiceXml,SELLER,today,validBank,correctionSeed} from './invoice.js';
+import {normalize,newInvoice,party,invoiceXml,invoiceAmount,SELLER,today,validBank,correctionSeed} from './invoice.js';
 import {ksefApi,authenticate,openSession,invoiceStatus,KsefError} from './ksef.js';
 const secret=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const db=createClient(Deno.env.get('SUPABASE_URL')!,secret,{auth:{persistSession:false,autoRefreshToken:false}});
@@ -17,6 +20,12 @@ const archive=createArchiveService({authorizeKsef:authKsef,secret,api,localSales
 const origins=['https://cleanfleet.pl','https://www.cleanfleet.pl'];
 function checked(r:any){if(r.error)throw Error(r.error.code==='23505'?'Ten NIP lub numer już istnieje.':r.error.message);return r.data;}
 async function invoice(id:string){if(!/^[0-9a-f-]{36}$/i.test(id||''))throw Error('Nieprawidłowy identyfikator.');const row=checked(await db.from('bill_invoices').select('*').eq('id',id).single());if(!row)throw Error('Nie znaleziono faktury.');return row;}
+async function reconcileVault(userId:string){
+ const vault=checked(await db.from('cf_payment_vaults').select('envelope').eq('user_id',userId).maybeSingle());
+ if(!vault?.envelope?.accountKey)return;
+ const {state}=await openAccount(vault.envelope);
+ await reconcileBillPayments(db,userId,state,(globalThis as any).Payments,invoiceAmount);
+}
 async function fleetAttachment(id:string){return checked(await db.from('bill_fleet_attachments').select('*').eq('invoice_id',id).maybeSingle());}
 async function canonicalFleet(id:string,payload:any){return guardFleetPayload(payload,await fleetAttachment(id));}
 async function canonicalCorrection(payload:any){if(!payload?.correction)return payload;const parent=await invoice(payload.correction.originalId),seed=correctionSeed(parent);return {...payload,source:seed.source,correction:{...seed.correction,mode:payload.correction.mode,reason:payload.correction.reason}};}
@@ -75,14 +84,25 @@ Deno.serve(async req=>{
   }
   if(body.action==='gus-check'){const key=await savedGusKey();if(!key)throw Error('Najpierw zapisz klucz produkcyjny GUS.');await gus.check(key);return json({message:'Połączenie z GUS działa. Klucz produkcyjny został zaakceptowany.'});}
   if(body.action==='gus-remove-key'){checked(await db.rpc('bill_update_settings',{p_fields:{gusKeyCiphertext:null}}));return json({ok:true});}
+  if(body.action==='payment-mark'){
+   const row=await invoice(String(body.id||''));
+   if(row.status==='draft'||row.payload?.correction||!row.number)throw Error('Oznaczenie płatności jest dostępne tylko dla wystawionej faktury.');
+   if(typeof body.paid!=='boolean')throw Error('Nieprawidłowy status płatności.');
+   const current=checked(await db.from('bill_payment_evidence').select('invoice_id').eq('invoice_id',row.id).maybeSingle());
+   const values={manual_paid:body.paid,updated_at:new Date().toISOString()};
+   let saved=current?await db.from('bill_payment_evidence').update(values).eq('invoice_id',row.id).select('*').single():await db.from('bill_payment_evidence').insert({invoice_id:row.id,...values}).select('*').single();
+   if(saved.error?.code==='23505')saved=await db.from('bill_payment_evidence').update(values).eq('invoice_id',row.id).select('*').single();
+   return json(checked(saved));
+  }
   if(body.action==='bootstrap'){
-   const [invoices,parties,settings,counters,config,projects,companies,billing]=await Promise.all([
+   await reconcileVault(userId);
+   const [invoices,parties,settings,counters,config,projects,companies,billing,payments]=await Promise.all([
     db.from('bill_invoices').select('id,number,payload,revision,status,ksef_number,ksef_session,ksef_reference,ksef_message,created_at,updated_at').order('created_at',{ascending:false}).limit(1000),
     db.from('bill_parties').select('*').order('updated_at',{ascending:false}).limit(1000),db.from('bill_settings').select('payload').single(),db.from('bill_counters').select('*'),
     db.from('cf_ksef_credentials').select('nip').eq('user_id',userId).eq('environment','production').maybeSingle(),
     db.from('rs_projects').select('id,contract_number,name:payload->>name').eq('owner_id',userId).order('created_at',{ascending:false}).limit(250),
-    db.from('companies').select('id,name,nip,address').eq('active',true),db.from('billing_companies').select('id,company_id,name,tax_id,address,currency').eq('active',true)]);
-   return json({invoices:checked(invoices),parties:checked(parties),settings:{bank:checked(settings)?.payload?.bank||'',gusConfigured:!!checked(settings)?.payload?.gusKeyCiphertext},counters:checked(counters),ksefConfigured:checked(config)?.nip===SELLER.nip,sources:{projects:checked(projects).map((r:any)=>({id:r.id,name:r.name,number:r.contract_number})),companies:checked(companies),billing:checked(billing)}});
+    db.from('companies').select('id,name,nip,address').eq('active',true),db.from('billing_companies').select('id,company_id,name,tax_id,address,currency').eq('active',true),db.from('bill_payment_evidence').select('invoice_id,manual_paid,bank_cents,bank_payments').limit(1000)]);
+   return json({invoices:checked(invoices),payments:checked(payments),parties:checked(parties),settings:{bank:checked(settings)?.payload?.bank||'',gusConfigured:!!checked(settings)?.payload?.gusKeyCiphertext},counters:checked(counters),ksefConfigured:checked(config)?.nip===SELLER.nip,sources:{projects:checked(projects).map((r:any)=>({id:r.id,name:r.name,number:r.contract_number})),companies:checked(companies),billing:checked(billing)}});
   }
   if(body.action==='source'){
    let buyer:any={},description='',source={app:body.app,id:body.id},currency='PLN';

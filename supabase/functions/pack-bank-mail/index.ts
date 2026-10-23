@@ -4,6 +4,8 @@ import {BANK_SENDER,BANK_SUBJECT,attachments,matchesBankMessage,selectableFolder
 import {createStateCodec} from './crypto.js';
 import {openAccount,seal} from './vault.js';
 import {bankPeriod,mergeStatement} from './import.mjs';
+import {reconcileBillPayments} from '../_shared/bill-bank-match.js';
+import {invoiceAmount} from '../cleanfleet-bill/invoice.js';
 import './engine.js';
 const P=(globalThis as any).Payments;
 const URL=Deno.env.get('SUPABASE_URL')!;
@@ -32,7 +34,7 @@ async function saveStatement(uid:string,batch:any){
     const next=mergeStatement(state,batch,P);
     const envelope={...await seal(next,key,row.envelope.salt),accountKey:row.envelope.accountKey};
     const saved=check(await db.from('cf_payment_vaults').update({envelope,revision:row.revision+1,updated_at:new Date().toISOString()}).eq('user_id',uid).eq('revision',row.revision).select('revision'));
-    if(saved.length)return;
+    if(saved.length){await reconcileBillPayments(db,uid,next,P,invoiceAmount);return;}
   }
   throw Error('Finanse były równocześnie edytowane. Import zostanie ponowiony.');
 }

@@ -9,7 +9,7 @@ test('Pack authorizes only a server-verified admin, never a stored role claim',a
 });
 function element(){return {hidden:false,value:'',textContent:'',innerHTML:'',dataset:{},children:[],classList:{add(){},remove(){},toggle(){}},append(...els){this.children.push(...els);},replaceChildren(){this.children=[];},setAttribute(){},remove(){this.removed=true;},contentWindow:{},querySelectorAll:()=>[],querySelector:()=>null};}
 async function panel({allowed=true,userExists=true,query='',storage}={}){
- const ids=Object.fromEntries(['login','panel','workspace','dashboard','frameHost','moduleTitle','moduleError','loginForm','loginInfo','loginError','userEmail','signIn','email','password','logout','closeModule','tiles','openTabs','workspaceTabs','homeTab','homeLogo'].map(k=>[k,element()])),events={};let authCallback;
+ const ids=Object.fromEntries(['login','panel','workspace','dashboard','frameHost','moduleTitle','moduleError','loginForm','loginInfo','loginError','userEmail','signIn','email','password','logout','closeModule','backContext','tiles','openTabs','workspaceTabs','homeTab','homeLogo'].map(k=>[k,element()])),events={};let authCallback;
  const db={auth:{getUser:async()=>({data:{user:userExists?{id:'u',email:'test@example.invalid'}:null}}),onAuthStateChange:fn=>authCallback=fn,signOut:async()=>({}),signInWithPassword:async()=>({})},rpc:async()=>({data:allowed})};
  const location={href:'https://cleanfleet.pl/pack/'+query,origin:'https://cleanfleet.pl'},window={addEventListener:(name,fn)=>events[name]=fn,scrollTo(){}};
  const c=vm.createContext({sessionStorage:storage,document:{getElementById:id=>ids[id],querySelectorAll:()=>[],createElement:()=>element(),addEventListener(){}},client:()=>db,administrator,modules,applications,mountTiles:()=>()=>{},location,URL,history:{replaceState(){},pushState(){}},window,console});
@@ -111,4 +111,14 @@ test('CleanFleet invoice messages preserve its frame and reuse Bill through a re
  send('https://cleanfleet.pl/bill/?invoice=fleet-draft&edit=1');const bill=p.ids.frameHost.children[1];assert.equal(source.src,original);assert.equal(source.hidden,true);assert.equal(bill.hidden,false);assert.equal(bill.src,'https://cleanfleet.pl/bill/?invoice=fleet-draft&edit=1');
  await p.c.window.testOpenApplication('cleanfleet');assert.equal(source.hidden,false);assert.equal(source.src,original);assert.equal(bill.hidden,true);
  const messages=[];bill.contentWindow.postMessage=(data,origin)=>messages.push({data,origin});send('https://cleanfleet.pl/bill/?invoice=existing');assert.equal(p.ids.frameHost.children.length,2);assert.equal(messages.find(m=>m.data.type==='robisie-pack-navigate').data.url,'https://cleanfleet.pl/bill/?invoice=existing');assert.equal(source.src,original);assert.equal(bill.hidden,false);
+});
+
+test('Bill payment link opens Robisię in its own tab and returns to Bill without replacing either frame',async()=>{
+ const p=await panel({query:'?application=bill'}),bill=p.ids.frameHost.children[0],original=bill.src;
+ p.events.message({origin:'https://cleanfleet.pl',source:bill.contentWindow,data:{type:'robisie-pack-open-url',url:'https://cleanfleet.pl/app/robisie/?project=p&invoice=i'}});
+ assert.equal(p.ids.frameHost.children.length,2);const robisie=p.ids.frameHost.children[1];assert.equal(robisie.src,'https://cleanfleet.pl/app/robisie/?project=p&invoice=i');assert.equal(bill.src,original);assert.equal(p.ids.backContext.hidden,false);
+ p.ids.backContext.onclick();assert.equal(bill.hidden,false);assert.equal(robisie.hidden,true);
+ const messages=[];robisie.contentWindow.postMessage=(data,origin)=>messages.push({data,origin});
+ p.events.message({origin:'https://cleanfleet.pl',source:bill.contentWindow,data:{type:'robisie-pack-open-url',url:'https://cleanfleet.pl/app/robisie/?project=p&invoice=j'}});
+ assert.equal(p.ids.frameHost.children.length,2);assert.equal(messages.find(m=>m.data.type==='robisie-pack-navigate').data.url,'https://cleanfleet.pl/app/robisie/?project=p&invoice=j');
 });

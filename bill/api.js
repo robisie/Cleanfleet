@@ -40,3 +40,12 @@ export const cleanfleetCostContext=number=>request('/rest/v1/rpc/cf_ksef_cost_co
 export const cleanfleetCompanies=()=>request('/rest/v1/rpc/cf_admin_companies_list',{method:'POST',body:'{}'});
 export const cleanfleetCostLinks=()=>request('/rest/v1/cf_purchases?source_ksef_number=not.is.null&select=source_ksef_number,source_ksef_index');
 export const saveCleanfleetCosts=({number,xml,entries,revision})=>request('/rest/v1/rpc/cf_save_ksef_costs',{method:'POST',body:JSON.stringify({p_number:number,p_xml:xml,p_entries:entries,p_revision:revision}),timeoutMs:30000});
+
+// Read-only, source-specific payment evidence. An invoice without a ledger stays unknown.
+export async function paymentEvidence(invoices){
+ const projects=[...new Set(invoices.filter(r=>r?.status!=='draft'&&r.payload?.source?.app==='robisie').map(r=>r.payload.source.id).filter(x=>/^[0-9a-f-]{36}$/i.test(x)))];
+ const fleet=[...new Set(invoices.filter(r=>r?.status!=='draft'&&r.payload?.source?.fleetId).map(r=>r.payload.source.fleetId).filter(x=>/^[0-9a-f-]{36}$/i.test(x)))];
+ const pages=(ids,table,columns)=>Promise.all(Array.from({length:Math.ceil(ids.length/50)},(_,page)=>request('/rest/v1/'+table+'?select='+columns+'&id=in.('+ids.slice(page*50,page*50+50).join(',')+')'))).then(rows=>rows.flat());
+ const [projectRows,fleetRows]=await Promise.all([pages(projects,'rs_projects','id,payload'),pages(fleet,'invoices','id,status')]);
+ return {projects:new Map(projectRows.map(r=>[r.id,r.payload])),fleet:new Map(fleetRows.map(r=>[r.id,r.status==='paid']))};
+}

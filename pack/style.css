@@ -52,3 +52,6 @@ body:has(#login:not([hidden])) .login-card{flex:none;width:100%;margin:auto}
 .workspace-tab-status{display:inline-flex;align-items:center;flex:none}
 .workspace-tab-status::before{content:"";display:block;flex:none;width:7px;height:7px;border-radius:50%;background:#2f8b57;border:1px solid #256343}
 .workspace-tab[data-state="closed"] .workspace-tab-status::before{background:transparent;border-color:#83938a}
+
+/* Context return stays reachable even when the source application is scrolled. */
+#backContext:not([hidden]){position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:max(16px,env(safe-area-inset-left));z-index:103;background:#275c48;color:white;border-color:#275c48;box-shadow:0 8px 28px #18312955;font-size:13px;font-weight:700;max-width:min(270px,70vw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

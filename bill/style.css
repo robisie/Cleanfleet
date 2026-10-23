@@ -18,3 +18,11 @@ dialog.kf-assignment-modal{width:min(920px,calc(100vw - 32px));max-width:calc(10
 @media(max-width:600px){.kf-purchase-item{grid-template-columns:24px minmax(0,1fr)}.kf-purchase-item>strong{grid-column:2}.kf-assignment-modal .modal-body,.kf-assignment-modal header,.kf-assignment-modal footer{padding:16px}}
 
 .kf-cost-menu{border:1px solid var(--border,#dce3e5);border-radius:9px;padding:10px;text-align:left}.kf-cost-menu summary{cursor:pointer;list-style:none;font-weight:650}.kf-cost-menu button{display:block;width:100%;margin-top:8px;text-align:left}
+
+/* KSeF delivery and receipt of money are independent states. */
+.invoice-entry{background:white;border:1px solid #d9dfe6;border-radius:12px;overflow:hidden}
+.invoice-entry .invoice-row{border:0;border-radius:0}
+.bill-payment-state{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 20px;border-top:1px solid #e2e6eb;font-size:13px;background:#f4f6f8;color:#586577}
+.bill-payment-state.paid{background:#eaf5ee;color:#23623a}.bill-payment-state.partial{background:#fff6e5;color:#835413}.bill-payment-state.unpaid{background:#fff0ef;color:#a82a36}
+.bill-payment-state button{min-height:38px;padding:5px 12px;background:white}
+.detail-payment-state{margin-bottom:18px}

@@ -116,3 +116,5 @@ Towar jest dostępny z głównego panelu Robisię (1.0.71), a nie z zakładek Bi
 
 
 Robisię 1.0.72 / Bill 1.0.33: wczytywanie Towaru pokazuje zapisany stan przed synchronizacją. Odrzucenie XML konkretnej faktury nie przerywa pozostałych importów. Błędy z numerami dokumentów są pokazane osobno; niepełne wyniki nie są oznaczane jako pusty magazyn. Nieodczytane korekty lub błąd historii blokują przypisywanie niezweryfikowanych ilości. Ta poprawka działa z dotychczasowymi funkcjami bazy i nie wymaga migracji.
+
+Robisię 1.0.73 / Bill 1.0.34: Towar pokazuje zakupy od najnowszej daty wystawienia, pozycje w ramach jednej faktury i jeden przycisk PDF na fakturę. Wyszukiwanie, sklep i status (wszystkie, na stanie, oddano) działają łącznie; oddano obejmuje pozycje z częściowym oraz pełnym zwrotem potwierdzonym korektą. Walidacja XML po SHA-256 jest w migracji `20261023133951_stock_xml_hash_validation.sql`, a pełne zwroty w odczycie Towaru w `20261023144500_stock_returned_visibility.sql`.

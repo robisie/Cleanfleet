@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {relatedGroups,historyRanges} from '../bill/ksef-relations.js';
-import {stockMarkup} from '../bill/stock.js';
+import {stockMarkup,stockStores} from '../bill/stock.js';
 const row=(id,date,type='Vat',seller='1111111111')=>({ksefNumber:id,invoiceNumber:id,issueDate:date,invoiceType:type,seller:{nip:seller,name:'Sklep'},grossAmount:100,currency:'PLN'});
 const a=row('original','2026-01-10'),b=row('correction','2026-04-10','Kor'),c=row('correction2','2026-06-10','Kor');
 const docs=[{metadata:a},{metadata:b,references:[{ksefNumber:a.ksefNumber}]},{metadata:c,references:[{ksefNumber:a.ksefNumber}]}];
@@ -33,4 +33,14 @@ test('history intervals cover every day including DST and leap days without gaps
 });
 test('stock markup escapes product and source, exposes available quantities, cost and actions',()=>{
  const html=stockMarkup([{metadata:a,item:{index:1,name:'<script>',unit:'szt.',gross:400},capacity:4,assigned:2,manualReturned:1,correctedReturned:1,returned:1,available:1}]);assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>'));assert.match(html,/Pozostało: 1/);assert.match(html,/100,00/);assert.match(html,/Przypisz do inwestycji/);assert.match(html,/Cofnij ręczny zwrot/);
+});
+test('stock sorts newest invoices, groups their items and combines shop and status filters',()=>{
+ const item=(metadata,index,available,returned)=>({metadata,item:{index,name:'Towar '+index,unit:'szt.',gross:100},capacity:1,assigned:0,returned,available});
+ const old={...a,invoiceNumber:'Starsza',issueDate:'2026-01-10',seller:{nip:'111',name:'A sklep'}},newer={...a,ksefNumber:'new',invoiceNumber:'Nowsza',issueDate:'2026-10-20',seller:{nip:'222',name:'B sklep'}};
+ const rows=[item(old,1,1,0),item(newer,1,1,1),item(newer,2,0,1)];
+ const html=stockMarkup(rows);assert.ok(html.indexOf('Nowsza')<html.indexOf('Starsza'));assert.equal((html.match(/class="kf-stock-invoice"/g)||[]).length,2);assert.equal((html.match(/Faktura PDF/g)||[]).length,2);
+ assert.deepEqual(stockStores(rows),[['111','A sklep'],['222','B sklep']]);
+ const filtered=stockMarkup(rows,'',{store:'222',status:'returned'});assert.match(filtered,/Towar 1/);assert.match(filtered,/Towar 2/);assert.doesNotMatch(filtered,/Starsza/);
+ const available=stockMarkup(rows,'',{store:'222',status:'available'});assert.match(available,/Towar 1/);assert.doesNotMatch(available,/Towar 2/);
+ assert.match(stockMarkup(rows,'',{store:'111',status:'returned'}),/Brak towarów pasujących do filtrów/);
 });

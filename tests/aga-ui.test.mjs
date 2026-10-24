@@ -24,7 +24,7 @@ test('annual tool preserves unknown receipt status, scopes settings writes, rend
  const form=t.node('.aga-form');form.values={date:'2026-01-01',amount:'2000',rate:'9',number:'FV/1',description:'Test <unsafe>',received:'unknown',note:'note'};
  t.fail(true);await form.onsubmit({preventDefault(){}});assert.match(t.node('.aga-status').textContent,/Nie zapisano.*RS_CONFLICT/);assert.match(t.node('#aga-form-host').innerHTML,/Edytuj/);
  t.fail(false);await form.onsubmit({preventDefault(){}});assert.equal(t.saves.at(-1).name,'rs_save_settings_fast');assert.equal(t.saves.at(-1).args.p_revision,3);assert.deepEqual(Object.keys(t.saves.at(-1).args.p_fields),['agaAnnual']);assert.equal(t.saves.at(-1).args.p_fields.agaAnnual.invoices[0].received,null);
- t.click('pdf');assert.equal(t.writes.length,1);assert.match(t.writes[0],/Test &lt;unsafe&gt;/);assert(!t.writes[0].includes('data-aga="edit-invoice"'));
+ t.click('pdf');assert.equal(t.writes.length,1);assert.match(t.writes[0],/Test &lt;unsafe&gt;/);assert.match(t.writes[0],/robisie-logo\.png/);assert.match(t.writes[0],/document-header/);assert.match(t.writes[0],/print-color-adjust:exact/);assert.match(t.writes[0],/thead\{display:table-header-group\}/);assert.match(t.writes[0],/<details class=\"aga-extra\" open>/);assert(!t.writes[0].includes('data-aga="edit-invoice"'));
  t.click('back');assert.equal(t.node('#cfEarningsOverlay').hidden,false);
 });
 test('authorization loss during load never renders private annual entries',async()=>{

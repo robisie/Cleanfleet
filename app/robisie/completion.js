@@ -9,13 +9,15 @@ const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 // A sales invoice alone is never money received. Keep material/work balances
 // separate: a material advance cannot silently settle labour.
 export function summary(project){
+ // Mixed settlements use one cash pool. The material-first split is analytical, not a new receipt.
  const t=C.totals(project),items=project.purchases||[];
  const materialCost=items.reduce((sum,item)=>sum+cents(Math.max(0,C.number(item.charge))),0);
- const materialReceived=cents(t.materials.advances),workCost=cents(Math.max(0,project.works?.length?C.round(t.works.done-t.workCredit):C.finalWorkAmount(project))),workReceived=cents(t.paid);
+ const pooled=project.mixedSettlement,receivedTotal=cents(t.materials.advances+t.paid);
+ const materialReceived=pooled?Math.min(materialCost,receivedTotal):cents(t.materials.advances),workCost=cents(Math.max(0,project.works?.length?C.round(t.works.done-t.workCredit):C.finalWorkAmount(project))),workReceived=pooled?receivedTotal-materialReceived:cents(t.paid);
  const materialBalance=materialCost-materialReceived,workBalance=workCost-workReceived;
- const unallocated=items.reduce((sum,item)=>sum+cents(C.purchasePayment(item).remaining),0);
+ const unallocated=pooled?0:items.reduce((sum,item)=>sum+cents(C.purchasePayment(item).remaining),0);
  return {materialCost:materialCost/100,materialReceived:materialReceived/100,materialBalance:materialBalance/100,workCost:workCost/100,workReceived:workReceived/100,workBalance:workBalance/100,unallocated:unallocated/100,
-  due:(Math.max(0,materialBalance)+Math.max(0,workBalance))/100,refund:(Math.max(0,-materialBalance)+Math.max(0,-workBalance))/100,
+  due:(pooled?Math.max(0,materialBalance+workBalance):Math.max(0,materialBalance)+Math.max(0,workBalance))/100,refund:(pooled?Math.max(0,-materialBalance-workBalance):Math.max(0,-materialBalance)+Math.max(0,-workBalance))/100,
   open:materialBalance!==0||workBalance!==0||unallocated>0,
   unfinished:(project.works||[]).filter(line=>line.included!==false&&!line.done&&C.number(line.qty)>0).length};
 }

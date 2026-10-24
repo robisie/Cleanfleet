@@ -50,6 +50,7 @@ async function cfShowEarnings(host=null,allowed=()=>cfIsAdmin()&&Boolean(window.
       <div class="cf-earnings-head">
         <h2>Moje zarobki</h2>
         <div class="cf-earnings-head-actions">
+          <button class="btn btn-outline" id="cfEarningAgaBtn" type="button">Aga - rozliczenie</button>
           <button class="btn btn-outline" id="cfEarningSummaryBtn" type="button">Podsumowanie</button>
           <button class="btn btn-outline" id="cfEarningImportBtn" type="button">Importuj z XLSX</button>
           <button class="btn btn-outline" id="cfEarningRulesBtn" type="button" disabled>Reguły</button>
@@ -971,6 +972,7 @@ async function cfShowEarnings(host=null,allowed=()=>cfIsAdmin()&&Boolean(window.
     });
   }
 
+  document.getElementById('cfEarningAgaBtn')?.addEventListener('click',()=>window.CFAga?.open(root,allowed));
   document.getElementById('cfEarningSummaryBtn')?.addEventListener('click',cfOpenEarningsSummary);
   document.getElementById('cfEarningRulesBtn')?.addEventListener('click',cfOpenEarningRules);
   document.getElementById('cfEarningImportBtn')?.addEventListener('click',()=>{

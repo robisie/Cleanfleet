@@ -1,10 +1,11 @@
-import {relatedGroups,historyRanges,isCorrection,decodeXml} from './ksef-relations.js?v=1.0.37';
-import {stockMarkup,stockStores,stockSummaryMarkup,returnDialog,useDialog,invoiceDestinationDialog} from './stock.js?v=1.0.37';
-import {selectedAmount,duplicatePurchases,allocationMarkup,mountAllocation,savedEntries} from './purchase-import.js?v=1.0.37';
-import {esc,today} from './core.js?v=1.0.37';
-import {monthDates,counterparty,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.37';
-import {hint,remember} from './cost-suggestions.js?v=1.0.37';
-import {wholeInvoiceFree,similarInvoiceCandidates,supplierSuggestionDialog} from './stock-suggestions.js?v=1.0.37';
+import {costCorrectionDialog} from './cost-correction.js?v=1.0.38';
+import {relatedGroups,historyRanges,isCorrection,decodeXml} from './ksef-relations.js?v=1.0.38';
+import {stockMarkup,stockStores,stockSummaryMarkup,returnDialog,useDialog,invoiceDestinationDialog} from './stock.js?v=1.0.38';
+import {selectedAmount,duplicatePurchases,allocationMarkup,mountAllocation,savedEntries} from './purchase-import.js?v=1.0.38';
+import {esc,today} from './core.js?v=1.0.38';
+import {monthDates,counterparty,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.38';
+import {hint,remember} from './cost-suggestions.js?v=1.0.38';
+import {wholeInvoiceFree,similarInvoiceCandidates,supplierSuggestionDialog} from './stock-suggestions.js?v=1.0.38';
 const e=esc;
 let integration={},assignments=[],cfLinks=[],documents=[],stockRows=[],historySyncedAt=0;
 const invoice=number=>state.rows.find(r=>r.ksefNumber===number)||documents.find(d=>d.metadata.ksefNumber===number)?.metadata;
@@ -185,6 +186,15 @@ async function assignInvestment(number,signal){
  const bytes=await singleBytes(row,signal);check(signal);
  const xml=new TextDecoder(bytes[0]===255&&bytes[1]===254?'utf-16le':bytes[0]===254&&bytes[1]===255?'utf-16be':'utf-8',{fatal:true}).decode(bytes);
  const details=state.kind==='purchases'&&integration.preview?await integration.preview({xml}):null;check(signal);
+ if(state.kind==='purchases'&&row.currency==='PLN'&&Number(details?.gross)<0&&isCorrection(row)&&integration.correctCostContext&&integration.applyCostCorrection){
+  await integration.storeMetadata([row]);await integration.storeXml(number,xml);check(signal);
+  const context=await integration.correctCostContext(number);check(signal);
+  const choice=await costCorrectionDialog(row,context,signal);if(!choice)return;check(signal);
+  const result=await integration.applyCostCorrection({number,...choice});assignments=await integration.loadLinks();
+  state.purchaseTarget={project:choice.project,number};
+  progress('Odliczono korektę od kosztów zakupu: '+new Intl.NumberFormat('pl-PL',{style:'currency',currency:'PLN'}).format(choice.amount)+'. Odśwież inwestycję w Robisię.');
+  return result;
+ }
  if(details&&integration.cfLinks){cfLinks=await integration.cfLinks();details.blocked=cfLinks.filter(x=>x.source_ksef_number===number).map(x=>x.source_ksef_index);}
  const referenceOnly=state.kind==='purchases'&&(row.currency!=='PLN'||row.grossAmount<0||/^Kor/i.test(row.invoiceType||''));
  const context=state.kind==='purchases'&&!referenceOnly&&integration.allocationContext?await integration.allocationContext(number):null;
@@ -265,6 +275,6 @@ async function paymentDemand(number,signal){
  const projectId=link?.project_id||(original?.payload?.source?.app==='robisie'?original.payload.source.id:null);
  if(projectId&&!integration.findPurchases)throw Error('Nie można sprawdzić zapisanych wpłat inwestora.');
  const loadProject=projectId?async()=>(await integration.findPurchases(projectId)).payload:null;
- const {showKsefDemand}=await import('./ksef-demand.js?v=1.0.37');check(signal);
+ const {showKsefDemand}=await import('./ksef-demand.js?v=1.0.38');check(signal);
  const saved=await showKsefDemand({xml,metadata:row,original,link,loadProject,defaultBank:integration.bank||'',signal});if(saved)progress('Wezwanie do zapłaty jest gotowe.');
 }

@@ -1,3 +1,4 @@
+import * as CostCorrection from '../bill/cost-correction.js';
 import * as SupplierSuggestions from '../bill/stock-suggestions.js';
 import * as Relations from '../bill/ksef-relations.js';
 import * as Stock from '../bill/stock.js';
@@ -11,13 +12,13 @@ import * as C from '../bill/core.js';
 import * as D from '../bill/ksef-data.js';
 import * as Import from '../bill/purchase-import.js';
 const Zip=createRequire(import.meta.url)('../app/vendor/jszip-3.10.1.min.js');
-async function setup(){
+async function setup(correctionChoice){
  const nodes=new Map(),blobUrls=new Map(),node=key=>{if(!nodes.has(key))nodes.set(key,{textContent:'',value:'',innerHTML:'',dataset:{}});return nodes.get(key);};
  const root={innerHTML:'',querySelector:node,querySelectorAll:()=>[]};let count=0;
  const context=vm.createContext({console,crypto,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,Blob,File,Map,Set,AbortController,DOMException,atob,btoa,setTimeout,clearTimeout,URL:{createObjectURL:blob=>{const key='blob:'+(count++);blobUrls.set(key,blob);return key;},revokeObjectURL:key=>blobUrls.delete(key)},window:{JSZip:Zip,CFKsefRenderer:{generateInvoice:async()=>new Blob(['%PDF-1.7 fixture'])}},DOMParser:class{parseFromString(){return {doctype:null,documentElement:{localName:'Faktura'},getElementsByTagName:()=>[]};}},document:{}});
  const code=await readFile(new URL('../bill/ksef.js',import.meta.url),'utf8');
  const m=new vm.SourceTextModule(code+`\nexport function setupTest(node,call,rows=[],kind='purchases'){root=node;api=call;state=initial();state.kind=kind;state.loaded=true;state.rows=rows;state.query={kind:state.kind,from:state.from,to:state.to,dateType:state.dateType,sort:'Desc'};state.selected=new Set(rows.map(r=>r.ksefNumber));draw();}export {run,load,downloadSelected};export async function testAssignment(options,project,number,known=[],duplicateChoice){if(duplicateChoice!==undefined)chooseDuplicate=async()=>duplicateChoice;integration=options;assignments=known;chooseInvestment=async()=>project;await run(signal=>assignInvestment(number,signal));return message;}export async function testDemand(options,number){integration=options;await run(signal=>paymentDemand(number,signal));return message;}export async function testSupplierSuggestions(options,rows,source,selected,target={kind:'firmowe',label:'Koszty firmowe'}){integration=options;stockRows=rows;chooseSupplierInvoices=async(candidates,label,signal,unavailable)=>typeof selected==='function'?selected(candidates,label,signal,unavailable):selected;await run(signal=>suggestSupplierInvoices(source,target,signal));return {message,rows:stockRows};}export function testState(){return {state,ready,message,busy:!!controller};}`,{context});
- await m.link(spec=>{const values=spec.includes('ksef-relations')?Relations:spec.includes('stock.js')?Stock:spec.includes('stock-suggestions')?SupplierSuggestions:spec.includes('cost-suggestions')?Suggestions:spec.includes('purchase-import')?Import:spec.includes('ksef-data')?D:C;return new vm.SyntheticModule(Object.keys(values),function(){for(const[k,v]of Object.entries(values))this.setExport(k,v);},{context});});await m.evaluate();return {n:m.namespace,root,blobUrls,node};
+ await m.link(spec=>{const values=spec.includes('cost-correction')?(correctionChoice!==undefined?{costCorrectionDialog:async()=>correctionChoice}:CostCorrection):spec.includes('ksef-relations')?Relations:spec.includes('stock.js')?Stock:spec.includes('stock-suggestions')?SupplierSuggestions:spec.includes('cost-suggestions')?Suggestions:spec.includes('purchase-import')?Import:spec.includes('ksef-data')?D:C;return new vm.SyntheticModule(Object.keys(values),function(){for(const[k,v]of Object.entries(values))this.setExport(k,v);},{context});});await m.evaluate();return {n:m.namespace,root,blobUrls,node};
 }
 const number=i=>'6351861297-20261016-123456789ABC-'+String(i).padStart(2,'0');
 const row=i=>({ksefNumber:number(i),invoiceNumber:'FV/'+i,issueDate:'2026-10-16',seller:{nip:'6351861297',name:'<img src=x onerror=alert(1)>'},buyer:{name:'Nabywca'},grossAmount:100,currency:'PLN'});
@@ -150,4 +151,13 @@ test('demand action belongs to sales invoices and rejects XML with an invalid KS
  assert.match(n.testState().message,/skrótem/);assert.deepEqual(calls,[]);
  n.setupTest(root,async()=>({}),[entry]);assert.ok(!root.innerHTML.includes('data-kf="demand"'));
  await n.testDemand({},entry.ksefNumber);assert.match(n.testState().message,/sprzedażową/);
+});
+
+test('negative purchase correction uses verified XML and dedicated cost RPC; cancel writes no cost',async()=>{
+ for(const choice of [{project:'p',amount:120,revision:7},null]){
+  const {n,root}=await setup(choice),bytes=new TextEncoder().encode('<Faktura>korekta</Faktura>'),entry={...row(10),invoiceType:'Kor',grossAmount:-200,invoiceHash:await D.digest(bytes)},calls=[];
+  n.setupTest(root,async()=>({content:Buffer.from(bytes).toString('base64')}),[entry]);
+  const options={projects:[{id:'p',name:'Test'}],preview:async()=>({gross:-200,items:[],currency:'PLN'}),loadLinks:async()=>[],storeMetadata:async()=>calls.push('metadata'),storeXml:async(number,xml)=>{assert.equal(xml,'<Faktura>korekta</Faktura>');calls.push('xml');},correctCostContext:async()=>({remaining:200,projects:[{id:'p'}]}),applyCostCorrection:async args=>{assert.equal(args.amount,120);assert.equal(args.project,'p');assert.equal(args.revision,7);calls.push('cost');return {project:{}};},assign:async()=>assert.fail('Correction must not use the reference-only path')};
+  await n.testAssignment(options,'p',entry.ksefNumber);assert.deepEqual(calls,choice?['metadata','xml','cost']:['metadata','xml']);
+ }
 });

@@ -1,4 +1,4 @@
-import {esc} from './core.js?v=1.0.37';
+import {esc} from './core.js?v=1.0.38';
 
 const number=value=>Number.isFinite(Number(value))?Number(value):0;
 const qty=value=>new Intl.NumberFormat('pl-PL',{maximumFractionDigits:6}).format(value);
@@ -11,10 +11,10 @@ const quantities=row=>{
  return {purchased:number(row.capacity),assigned:number(row.assigned),available:number(row.available),returned:number(row.returned),auto,company,cleanfleet,robisie:row.projectAssigned==null?Math.max(0,number(row.assigned)-auto-company-cleanfleet):number(row.projectAssigned)};
 };
 const bucket=()=>({amounts:new Map(),units:new Map(),invoices:new Set(),positions:0});
-function add(target,row,quantity){
+function add(target,row,quantity,cents=value(row,quantity)){
  if(quantity<=0)return;
  const code=currency(row),u=unit(row);
- target.amounts.set(code,(target.amounts.get(code)||0)+value(row,quantity));
+ target.amounts.set(code,(target.amounts.get(code)||0)+cents);
  target.units.set(u,(target.units.get(u)||0)+quantity);
  target.invoices.add(row.metadata.ksefNumber);target.positions++;
 }
@@ -26,14 +26,15 @@ export function stockSummaryData(rows){
  const byUnit=new Map(),stores=new Map();
  for(const row of rows){
   const q=quantities(row),u=unit(row);
+  const cost=key=>row.projectCost!=null&&['robisie','assigned'].includes(key)?(key==='assigned'?value(row,q.assigned)-value(row,q.robisie):0)+Math.round(number(row.projectCost)*100):value(row,q[key]);
   if(!byUnit.has(u))byUnit.set(u,{purchased:0,assigned:0,returned:0,available:0,amounts:new Map()});
   const item=byUnit.get(u);
-  for(const key of Object.keys(totals))add(totals[key],row,q[key]);
+  for(const key of Object.keys(totals))add(totals[key],row,q[key],cost(key));
   for(const key of ['purchased','assigned','returned','available'])item[key]+=q[key];
   if(q.available>0)item.amounts.set(currency(row),(item.amounts.get(currency(row))||0)+value(row,q.available));
   const seller=row.metadata.seller||{},key=seller.nip||seller.name||'Nieznany sklep';
   if(!stores.has(key))stores.set(key,{name:seller.name||seller.nip||'Nieznany sklep',nip:seller.nip||'',purchased:bucket(),assigned:bucket(),returned:bucket(),available:bucket()});
-  for(const field of ['purchased','assigned','returned','available'])add(stores.get(key)[field],row,q[field]);
+  for(const field of ['purchased','assigned','returned','available'])add(stores.get(key)[field],row,q[field],cost(field));
  }
  return {totals,byUnit,stores};
 }
@@ -58,6 +59,6 @@ export function stockSummaryMarkup(rows,{incomplete=false}={}){
   <h3>Zakupy według sklepów i wystawców</h3>
   <div class="kf-summary-table-wrap"><table class="kf-summary-table"><thead><tr><th>Sklep / wystawca</th><th>Faktury</th><th>Zakupy razem</th><th>Przypisane koszty</th><th>Zwrócono</th><th>Na stanie</th></tr></thead><tbody>${[...stores.values()].sort((a,b)=>a.name.localeCompare(b.name,'pl')).map(store=>`<tr><th>${esc(store.name)}${store.nip?`<small>NIP: ${esc(store.nip)}</small>`:''}</th><td>${store.purchased.invoices.size}</td>${['purchased','assigned','returned','available'].map(key=>`<td class="kf-summary-money">${amounts(store[key].amounts)}</td>`).join('')}</tr>`).join('')||'<tr><td colspan="6">Brak zakupów.</td></tr>'}</tbody></table></div>
   <details class="kf-summary-details"><summary>Co zostało w magazynie — ${available.length} pozycji</summary><div class="kf-summary-table-wrap"><table class="kf-summary-table"><thead><tr><th>Towar</th><th>Sklep / faktura</th><th>Ilość na stanie</th><th>Cena za jednostkę</th><th>Wartość na stanie</th></tr></thead><tbody>${available.map(row=>`<tr><th>${esc(row.item.name)}</th><td>${esc(row.metadata.seller?.name||row.metadata.seller?.nip||'—')}<small>${esc(row.metadata.invoiceNumber)} · ${esc(row.metadata.issueDate||'')}</small></td><td>${qty(number(row.available))} ${esc(unit(row))}</td><td>${esc(money(value(row,1),currency(row)))}</td><td><strong>${esc(money(value(row,row.available),currency(row)))}</strong></td></tr>`).join('')||'<tr><td colspan="5">Magazyn jest pusty.</td></tr>'}</tbody></table></div></details>
-  <p class="muted kf-summary-note">Kwoty brutto według cen zakupu. Częściowe ilości wyceniane proporcjonalnie, z zaokrągleniem do groszy. Zwrot ręczny i potwierdzająca go korekta są liczone raz. Różne waluty pokazujemy osobno. Korekty samej ceny wymagają sprawdzenia dokumentu.</p>
+  <p class="muted kf-summary-note">Kwoty brutto według cen zakupu. Koszty Robisię uwzględniają odliczone korekty i zapisane kwoty zakupów w inwestycjach. Częściowe ilości wyceniane proporcjonalnie, z zaokrągleniem do groszy. Zwrot ręczny i potwierdzająca go korekta są liczone raz. Różne waluty pokazujemy osobno.</p>
  </section>`;
 }

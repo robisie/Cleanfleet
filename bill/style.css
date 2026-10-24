@@ -35,3 +35,5 @@ dialog.kf-assignment-modal{width:min(920px,calc(100vw - 32px));max-width:calc(10
 
 /* Related documents remain a single readable group on phones and desktop. */
 .kf-invoice.kf-related{margin-left:24px;border-left:3px solid #b7bb35;background:#fafbee}.kf-invoice.kf-related .kf-open strong{font-size:.95em}.stock-item{grid-template-columns:minmax(0,1fr) auto}.stock-item .kf-open{cursor:default}.stock-item .kf-value{grid-column:auto;flex-direction:column}.kf-related+.kf-invoice:not(.kf-related){margin-top:18px}.kf-open small{overflow-wrap:anywhere}@media(max-width:650px){.kf-invoice.kf-related{margin-left:12px}.stock-item{grid-template-columns:1fr}.stock-item .kf-value{align-items:flex-start;text-align:left}}
+
+.invoice-entry.invoice-related{margin-left:28px;border-left:4px solid #a5b07d;background:#fafbf7}.invoice-related .invoice-row{background:#fafbf7}@media(max-width:600px){.invoice-entry.invoice-related{margin-left:14px}}

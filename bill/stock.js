@@ -1,4 +1,4 @@
-import {esc} from './core.js?v=1.0.37';
+import {esc} from './core.js?v=1.0.38';
 const qty=n=>new Intl.NumberFormat('pl-PL',{maximumFractionDigits:6}).format(n);
 const money=(n,currency)=>new Intl.NumberFormat('pl-PL',{style:'currency',currency}).format(n);
 const storeKey=row=>row.metadata.seller?.nip||row.metadata.seller?.name||'';
@@ -22,7 +22,7 @@ export function returnDialog(row,signal){return new Promise(resolve=>{
  dialog.querySelector('[data-cancel]').onclick=cancel;dialog.oncancel=event=>{event.preventDefault();cancel();};dialog.querySelector('form').onsubmit=event=>{event.preventDefault();const n=Number(new FormData(event.target).get('quantity'));if(Number.isFinite(n)&&n>0&&n<=row.available&&n===Math.round(n*1e6)/1e6)finish(n);};signal.addEventListener('abort',cancel,{once:true});document.body.append(dialog);dialog.showModal();
 });}
 
-export {stockSummaryMarkup} from './stock-summary.js?v=1.0.37';
+export {stockSummaryMarkup} from './stock-summary.js?v=1.0.38';
 export function useDialog(row,category,signal){return new Promise(resolve=>{
  const label=category==='auto'?'Auto':'Koszty firmowe',previous=Number(row.uses?.[category]?.quantity||0),maximum=Number(row.available)+previous;
  const dialog=document.createElement('dialog');dialog.className='scroll-modal';dialog.innerHTML=`<form><header><h2>Przypisz: ${label}</h2></header><div class="modal-body"><p>${esc(row.item.name)} · ${esc(row.metadata.invoiceNumber)}</p><p>Przypisano już: ${qty(previous)} ${esc(row.item.unit)}. Dostępne do zwiększenia: ${qty(row.available)} ${esc(row.item.unit)}.</p><label class="field">Łączna przypisana ilość<input name="quantity" type="number" inputmode="decimal" required min="0" max="${maximum}" step="0.000001" value="${previous||row.available}"></label><p class="muted">Wpisz 0, aby cofnąć to przypisanie. Ta ilość nie będzie już dostępna dla innych celów.</p></div><footer><button type="button" data-cancel>Anuluj</button><button type="submit" class="primary">Zapisz przypisanie</button></footer></form>`;

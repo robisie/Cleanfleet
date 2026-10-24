@@ -1,4 +1,4 @@
-import * as C from './core.js?v=1.0.68';
+import * as C from './core.js?v=1.0.78';
 import * as I from './invoices.js?v=1.0.68';
 
 export const eligible=row=>!!row?.number&&row.status!=='draft'&&row.originKind!=='purchases'&&!row.referenceOnly&&!row.payload?.correction&&row.payload?.currency==='PLN';

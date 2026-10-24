@@ -31,6 +31,8 @@ export function stockIntegration(rows,onChange=()=>{}){return {
  storeMetadata:rows=>stockRpc('rs_ksef_store_metadata',{p_rows:rows}),
  storeXml:(number,xml)=>stockRpc('rs_ksef_store_xml',{p_number:number,p_xml:xml}),
  stock:()=>stockRpc('rs_ksef_stock'),
+ correctCostContext:number=>stockRpc('rs_ksef_cost_correction_context',{p_number:number}),
+ applyCostCorrection:async({project,number,amount,revision})=>{const result=await stockRpc('rs_apply_ksef_cost_correction',{p_project:project,p_number:number,p_amount:amount,p_revision:revision});await onChange(result.project);return result;},
  setReturn:({number,index,quantity,revision})=>stockRpc('rs_ksef_set_return',{p_number:number,p_index:index,p_quantity:quantity,p_revision:revision}),
  setUse:({number,index,category,quantity,revision})=>stockRpc('rs_ksef_set_use',{p_number:number,p_index:index,p_category:category,p_quantity:quantity,p_revision:revision}),
  setInvoiceUse:({number,category,indices})=>stockRpc('rs_ksef_set_invoice_use',{p_number:number,p_category:category,p_expected_indices:indices}),

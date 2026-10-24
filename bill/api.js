@@ -54,3 +54,20 @@ export async function paymentEvidence(invoices){
  const [projectRows,fleetRows]=await Promise.all([pages(projects,'rs_projects','id,payload'),pages(fleet,'invoices','id,status')]);
  return {projects:new Map(projectRows.map(r=>[r.id,r.payload])),fleet:new Map(fleetRows.map(r=>[r.id,r.status==='paid']))};
 }
+
+export const correctCostContext=number=>stockRpc('rs_ksef_cost_correction_context',{p_number:number});
+export const applyCostCorrection=({project,number,amount,revision})=>stockRpc('rs_apply_ksef_cost_correction',{p_project:project,p_number:number,p_amount:amount,p_revision:revision});
+export async function invoiceFamilies(rows){
+ const all=new Map(rows.map(row=>[row.id,row]));
+ for(let page=0;page<100;page++){
+  const corrections=await request('/rest/v1/bill_invoices?select=id,number,payload,revision,status,ksef_number,ksef_session,ksef_reference,ksef_message,created_at,updated_at&payload->correction=not.is.null&order=created_at.desc&limit=1000&offset='+page*1000,{timeoutMs:90000});
+  for(const row of corrections)all.set(row.id,row);if(corrections.length<1000)break;
+  if(page===99)throw Error('Nie pobrano pełnej historii korekt.');
+ }
+ for(let round=0;round<100;round++){
+  const missing=[...new Set([...all.values()].map(r=>r.payload?.correction?.originalId).filter(id=>id&&!all.has(id)))];
+  if(!missing.length)return [...all.values()];
+  for(const id of missing){if(!/^[0-9a-f-]{36}$/i.test(id))throw Error('Nieprawidłowe powiązanie korekty.');all.set(id,await call({action:'document',id}));}
+ }
+ throw Error('Nie udało się odtworzyć powiązań korekt.');
+}

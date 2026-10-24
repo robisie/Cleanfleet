@@ -1,10 +1,10 @@
 (function(){
 'use strict';
-let root=null,session='',connected=null,items=[],controller=null,generation=0;
+let root=null,session='',connected=null,items=[],controller=null,generation=0,prepared=null;
 const el=id=>root?.querySelector('#cfMail'+id);
 function status(text){if(el('Status') && el('Status').textContent!==text)el('Status').textContent=text;}
 function stop(){generation++;controller?.abort();controller=null;busy(false);}
-function clear(){items=[];el('Results')?.replaceChildren();if(el('Download'))el('Download').hidden=true;}
+function clear(){prepared=null;items=[];el('Results')?.replaceChildren();if(el('Download'))el('Download').hidden=true;}
 function busy(value){if(!root)return;root.querySelectorAll('input,textarea,button').forEach(node=>{if(node.id!=='cfMailCancel')node.disabled=value;});el('Cancel').hidden=!value;}
 function dates(){const month=document.getElementById('cfAccountingMonth')?.value;if(!/^\d{4}-\d{2}$/.test(month || ''))return;el('From').value=month+'-01';const [y,m]=month.split('-').map(Number);el('To').value=new Date(Date.UTC(y,m,7)).toISOString().slice(0,10);}
 function monthChanged(){if(!root)return;stop();clear();dates();status(connected?'Miesiąc zmieniony. Wyszukaj załączniki ponownie.':'Wpisz dane i kliknij Zapisz.');}
@@ -27,9 +27,10 @@ async function preparedAttachment(item,signal,report=()=>{}){
  if(signal?.aborted)throw new DOMException('Anulowano','AbortError');
  return blob;
 }
-async function run(operation){stop();controller=new AbortController();const current=generation;busy(true);try{await operation(current);}catch(error){if(current===generation && error.name!=='AbortError')status(error.message);}finally{if(current===generation){controller=null;busy(false);}}}
+async function run(operation){stop();controller=new AbortController();const current=generation;busy(true);try{await operation(current);return current===generation;}catch(error){if(current===generation && error.name!=='AbortError')status(error.message);return false;}finally{if(current===generation){controller=null;busy(false);}}}
 function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
 function render(){const target=el('Results');target.replaceChildren();items.forEach((item,index)=>{const label=document.createElement('label');label.style.cssText='display:block;padding:10px 0;border-bottom:1px solid #ddd;overflow-wrap:anywhere';const check=document.createElement('input');check.type='checkbox';check.checked=true;check.dataset.index=String(index);label.append(check,document.createTextNode(' '+item.filename+' · '+item.received));const detail=document.createElement('small');detail.style.display='block';detail.textContent=item.sender+' — '+item.subject;label.append(detail);target.append(label);});el('Download').hidden=!items.length;}
+async function search(){return run(async current=>{if(!connected)throw new Error('Najpierw zapisz dane poczty.');if(el('Email').value.trim().toLowerCase()!==connected.email || el('Senders').value.trim()!==connected.senders.join(', ') || el('Folder').value.trim()!==connected.folder)throw new Error('Dane połączenia zmieniono. Kliknij Zapisz.');clear();status('Wyszukiwanie wiadomości…');const value=await request({action:'list',from:el('From').value,to:el('To').value});if(current!==generation)return;items=value.attachments;render();status('Wiadomości: '+value.messageCount+'. Załączniki: '+items.length+'. Zaznacz pliki do pobrania.');});}
 function mount(overlay){
  const target=overlay.querySelector('#cfMailMount');if(!target || root===target)return;root=target;
  root.innerHTML=`<div class="cf-accounting-source-top"><div><h2>Poczta o2</h2><p>Załączniki otrzymywane od banku.</p></div><span class="cf-accounting-status">IMAP</span></div>
@@ -43,22 +44,28 @@ function mount(overlay){
  }));
  el('FolderList').addEventListener('change',()=>{if(el('FolderList').value){el('Folder').value=el('FolderList').value;clear();status('Folder wybrany. Kliknij Zapisz.');}});
  el('Password').addEventListener('focus',()=>{if(el('Password').dataset.saved==='true')el('Password').select();});
- root.addEventListener('input',event=>{if(event.target.id==='cfMailPassword')event.target.dataset.saved='false';});
+ root.addEventListener('change',()=>{prepared=null;});
+ root.addEventListener('input',event=>{prepared=null;if(event.target.id==='cfMailPassword')event.target.dataset.saved='false';});
  el('Form').addEventListener('submit',event=>{event.preventDefault();run(async current=>{status('Łączenie z o2…');const value=await request({action:'save',email:el('Email').value,senders:el('Senders').value,folder:el('Folder').value,password:el('Password').dataset.saved==='true'?'':el('Password').value,useSavedPassword:el('Password').dataset.saved==='true'});if(current!==generation)return;session=value.session;connected=value;el('Email').value=value.email;el('Senders').value=value.senders.join(', ');el('Folder').value=value.folder;el('Password').value='************';el('Password').dataset.saved='true';clear();status('Dane poczty zapisane. Wyszukaj załączniki.');});});
- el('Search').addEventListener('click',()=>run(async current=>{if(!connected)throw new Error('Najpierw zapisz dane poczty.');if(el('Email').value.trim().toLowerCase()!==connected.email || el('Senders').value.trim()!==connected.senders.join(', ') || el('Folder').value.trim()!==connected.folder)throw new Error('Dane połączenia zmieniono. Kliknij Zapisz.');clear();status('Wyszukiwanie wiadomości…');const value=await request({action:'list',from:el('From').value,to:el('To').value});if(current!==generation)return;items=value.attachments;render();status('Wiadomości: '+value.messageCount+'. Załączniki: '+items.length+'. Zaznacz pliki do pobrania.');}));
+ el('Search').addEventListener('click',search);
  el('Download').addEventListener('click',()=>run(async current=>{const selected=Array.from(el('Results').querySelectorAll('input:checked')).map(node=>items[Number(node.dataset.index)]);if(!selected.length)throw new Error('Zaznacz załączniki.');if(selected.reduce((sum,item)=>sum+item.size,0)>100*1024*1024)throw new Error('Wybrane załączniki przekraczają 100 MB. Pobierz je w mniejszych paczkach.');if(!window.JSZip)throw new Error('Biblioteka ZIP niedostępna. Odśwież stronę.');const zip=new window.JSZip();let total=0;for(let index=0;index<selected.length;index++){const item=selected[index];status('Pobieranie '+(index+1)+' z '+selected.length+': '+item.filename);const blob=await preparedAttachment(item,controller.signal,status);if(current!==generation)return;total+=blob.size;if(total>100*1024*1024)throw new Error('Paczka przekracza 100 MB.');zip.file(item.received+'_'+String(index+1).padStart(3,'0')+'_'+item.filename,await blob.arrayBuffer());}status('Przygotowanie ZIP…');const blob=await zip.generateAsync({type:'blob',compression:'STORE'});if(current!==generation)return;download(blob,'Poczta-'+document.getElementById('cfAccountingMonth').value+'.zip');status('Pobrano ZIP z '+selected.length+' załącznikami.');}));
  el('Cancel').addEventListener('click',()=>{stop();status('Anulowano.');});
  ['From','To'].forEach(id=>el(id).addEventListener('change',()=>{stop();clear();status('Daty zmienione. Wyszukaj załączniki ponownie.');}));
  dates();
 }
-function open(){if(!root)return;if(!el('From').value)dates();if(connected)return;run(async current=>{status('Odczytywanie zapisanych danych poczty…');const value=await request({action:'config'});if(current!==generation)return;if(!value.configured){if(el('Settings'))el('Settings').open=true;status('Rozwiń dane logowania, wpisz dane i kliknij Zapisz.');return;}connected=value;el('Email').value=value.email;el('Senders').value=value.senders.join(', ');el('Folder').value=value.folder;el('Password').value='************';el('Password').dataset.saved='true';status('Dane poczty są zapisane. Wyszukaj załączniki.');});}
-function close(){stop();if(el('PdfPassword'))el('PdfPassword').value='';const password=el('Password');if(password && password.dataset.saved!=='true')password.value='';}
+function open(){if(!root)return;if(!el('From').value)dates();if(connected)return Promise.resolve(true);return run(async current=>{status('Odczytywanie zapisanych danych poczty…');const value=await request({action:'config'});if(current!==generation)return;if(!value.configured){if(el('Settings'))el('Settings').open=true;status('Rozwiń dane logowania, wpisz dane i kliknij Zapisz.');return;}connected=value;el('Email').value=value.email;el('Senders').value=value.senders.join(', ');el('Folder').value=value.folder;el('Password').value='************';el('Password').dataset.saved='true';status('Dane poczty są zapisane. Wyszukaj załączniki.');});}
+function close(){prepared=null;stop();if(el('PdfPassword'))el('PdfPassword').value='';const password=el('Password');if(password && password.dataset.saved!=='true')password.value='';}
 function reset(){stop();if(el('PdfPassword'))el('PdfPassword').value='';session='';connected=null;clear();if(root){el('Form').reset();el('FolderList').replaceChildren();el('FolderChoice').hidden=true;el('FolderChoice').style.display='none';el('Password').dataset.saved='false';status('Wpisz dane i kliknij Zapisz.');}}
+function selectedItems(){return Array.from(el('Results')?.querySelectorAll('input:checked')||[]).map(node=>items[Number(node.dataset.index)]).filter(Boolean);}
+function selectionKey(){return JSON.stringify([generation,selectedItems().map(item=>item.ticket)]);}
+async function prepareFiles(signal,report){prepared=null;const key=selectionKey(),files=await exportFiles(signal,report);if(signal.aborted||key!==selectionKey())throw new DOMException('Anulowano','AbortError');prepared={key,files};return files;}
 async function exportFiles(signal,report=()=>{}){
+ if(signal.aborted)throw new DOMException('Anulowano','AbortError');
+ if(prepared?.key===selectionKey())return prepared.files;
  if(controller)throw new Error('Poczta wykonuje inną operację. Poczekaj na jej zakończenie.');
  const current=generation;controller=new AbortController();const abort=()=>controller?.abort();signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort();busy(true);
  try{
-  const selected=Array.from(el('Results')?.querySelectorAll('input:checked') || []).map(node=>items[Number(node.dataset.index)]).filter(Boolean);
+  const selected=selectedItems();
   if(selected.reduce((sum,item)=>sum+item.size,0)>100*1024*1024)throw new Error('Zaznaczone załączniki poczty przekraczają limit 100 MB.');
   if(current!==generation || signal.aborted)throw new DOMException('Anulowano','AbortError');const files=[];let size=0;
   for(const [index,item] of selected.entries()){
@@ -68,6 +75,6 @@ async function exportFiles(signal,report=()=>{}){
   status('Pobrano '+files.length+' załączników do paczki miesięcznej.');return files;
  }finally{signal.removeEventListener('abort',abort);if(current===generation){controller=null;busy(false);}}
 }
-window.CFAccountingMail={mount,open,close,reset,monthChanged,exportFiles,isBusy:()=>Boolean(controller)};
+window.CFAccountingMail={mount,open,close,reset,monthChanged,search,prepareFiles,exportFiles,getState:()=>({found:items.length,selected:selectedItems().length,prepared:prepared?.key===selectionKey()}),isBusy:()=>Boolean(controller)};
 })();
 

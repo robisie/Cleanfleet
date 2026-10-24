@@ -1,9 +1,9 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import vm from 'node:vm';import * as Core from '../app/aga-core.js';
-async function setup({delayed=false}={}){
+async function setup({delayed=false,taxes=[]}={}){
  const nodes=new Map(),writes=[],saves=[];let allowed=true,fail=false,release;
  function node(key){if(nodes.has(key))return nodes.get(key);const n={innerHTML:'',textContent:'',isConnected:true,hidden:false,handlers:{},dataset:{},values:{},querySelector:node,querySelectorAll:()=>[],addEventListener:(kind,fn)=>n.handlers[kind]=fn,append(el){this.child=el},remove(){n.isConnected=false},scrollIntoView(){}};nodes.set(key,n);return n;}
  const host=node('host');host.querySelector=s=>s==='#cfAgaOverlay'?(host.child?.isConnected?host.child:null):node(s);
- const stored={owner_id:'owner',revision:3,payload:{agaAnnual:{invoices:[{id:'i',date:'2026-01-01',amount:1000,rate:9,received:null}],taxes:[],projectId:'project'}}};
+ const stored={owner_id:'owner',revision:3,payload:{agaAnnual:{invoices:[{id:'i',date:'2026-01-01',amount:1000,rate:9,received:null}],taxes,projectId:'project'}}};
  const db={
   auth:{getUser:async()=>({data:{user:{id:'owner'}}})},
   from:()=>({select:()=>({eq:(key,value)=>{
@@ -28,5 +28,20 @@ test('annual tool preserves unknown receipt status, scopes settings writes, rend
  t.click('back');assert.equal(t.node('#cfEarningsOverlay').hidden,false);
 });
 test('authorization loss during load never renders private annual entries',async()=>{
- const t=await setup({delayed:true});await new Promise(r=>setImmediate(r));t.deny();t.release();await t.pending;assert(!t.node('root').innerHTML.includes('1000'));assert.equal(t.saves.length,0);
+ const t=await setup({delayed:true});await new Promise(r=>setImmediate(r));t.deny();t.release();await t.pending;assert(!t.node('root').innerHTML.includes(Core.money(1000)));assert.equal(t.saves.length,0);
+});
+
+test('four primary cards show invoice total, 9 percent, paid tax and exact remainder in UI and PDF',async()=>{
+ const t=await setup({taxes:[{id:'tax',period:'2026-01',date:'2026-02-10',amount:40}]});
+ for(const html of [t.node('root').innerHTML,(t.click('pdf'),t.writes[0])]){
+  const cards=html.split('aria-label="Najważniejsze kwoty rozliczenia">')[1].split('</div><p>')[0];
+  assert.equal((cards.match(/class="aga-metric"/g)||[]).length,4);
+  for(const label of ['Suma wystawionych faktur','Suma podatku 9%','Zapłacony podatek','Pozostało po zapłacie podatku'])assert(cards.includes(label));
+  for(const value of [1000,90,40,50])assert(cards.includes('<strong>'+Core.money(value)+'</strong>'));
+  assert(cards.includes(Core.money(90)+' − '+Core.money(40)));
+ }
+});
+test('remainder stays numeric without payments and preserves negative balances',async()=>{
+ const empty=await setup();assert(empty.node('root').innerHTML.includes('Brak wpisanych wpłat podatku'));assert(empty.node('root').innerHTML.includes('<strong>'+Core.money(90)+'</strong>'));
+ const over=await setup({taxes:[{id:'tax',period:'2026-01',date:'2026-02-10',amount:120}]});assert(over.node('root').innerHTML.includes('<strong>'+Core.money(-30)+'</strong>'));
 });

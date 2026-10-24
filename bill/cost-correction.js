@@ -1,0 +1,16 @@
+import {esc} from './core.js?v=1.0.38';
+const money=n=>new Intl.NumberFormat('pl-PL',{style:'currency',currency:'PLN'}).format(n);
+export function costCorrectionDialog(row,context,signal){return new Promise(resolve=>{
+ if(signal.aborted){resolve(null);return;}
+ const targets=context.projects||[];
+ if(Number(context.remaining)<=0)throw Error('Ta korekta została już w całości odliczona od kosztów.');
+ if(!targets.length)throw Error('Najpierw przypisz fakturę źródłową do inwestycji. Nie znaleziono zakupu, którego koszt można obniżyć.');
+ const dialog=document.createElement('dialog');dialog.className='scroll-modal kf-assignment-modal';
+ dialog.innerHTML=`<form><header><h2>Odlicz korektę od kosztów</h2></header><div class="modal-body"><p><strong>${esc(row.invoiceNumber)}</strong> · zmiana ${money(-Number(context.total))}</p><p>Pozostało do odliczenia: <strong>${money(Number(context.remaining))}</strong></p><label class="field">Inwestycja i korygowany zakup<select name="project" required>${targets.map(p=>`<option value="${esc(p.id)}">${esc(p.name)} · ${esc(p.number)} · ${esc(p.invoiceNumber)}</option>`).join('')}</select></label><p data-source></p><p class="notice" data-partial hidden>Zakup jest częściowo przypisany do tej inwestycji. Kwota jest wstępnie podzielona proporcjonalnie — sprawdź, które pozycje obejmuje korekta, i potwierdź właściwą kwotę.</p><label class="field">O ile obniżyć koszt (zł)<input type="number" name="amount" min="0.01" step="0.01" inputmode="decimal" required></label><p data-result aria-live="polite"></p><p class="muted">Korekta pomniejszy zakup i koszt inwestora. Zapisane wpłaty pozostaną w historii; ewentualna nadpłata będzie widoczna w rozliczeniu.</p></div><footer><button type="button" data-cancel>Anuluj</button><button class="primary" type="submit">Odlicz od kosztów</button></footer></form>`;
+ const select=dialog.querySelector('[name="project"]'),amount=dialog.querySelector('[name="amount"]'),submit=dialog.querySelector('[type="submit"]');
+ const target=()=>targets.find(p=>p.id===select.value),update=()=>{const p=target(),n=Number(amount.value),max=Math.min(Number(p.cost),Number(context.remaining));submit.disabled=!Number.isFinite(n)||n<=0||n>max||Math.abs(n*100-Math.round(n*100))>1e-6;dialog.querySelector('[data-result]').textContent=submit.disabled?'Podaj kwotę od 0,01 zł do '+money(max)+'.':'Koszt zakupu po korekcie: '+money(Number(p.cost)-n);};
+ const render=()=>{const p=target();amount.max=Math.min(Number(p.cost),Number(context.remaining));amount.value=Number(p.suggested).toFixed(2);dialog.querySelector('[data-source]').textContent='Faktura źródłowa: '+p.invoiceNumber+' · koszt w inwestycji: '+money(Number(p.cost));dialog.querySelector('[data-partial]').hidden=!p.partial;update();};
+ const finish=value=>{signal.removeEventListener('abort',cancel);dialog.close();dialog.remove();resolve(value);},cancel=()=>finish(null);
+ select.onchange=render;amount.oninput=update;dialog.querySelector('[data-cancel]').onclick=cancel;dialog.oncancel=e=>{e.preventDefault();cancel();};dialog.querySelector('form').onsubmit=e=>{e.preventDefault();update();if(!submit.disabled)finish({project:select.value,amount:Number(amount.value),revision:target().revision});};
+ signal.addEventListener('abort',cancel,{once:true});document.body.append(dialog);dialog.showModal();render();
+});}

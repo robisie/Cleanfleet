@@ -1,4 +1,4 @@
-export const VERSION='1.0.77';
+export const VERSION='1.0.78';
 export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['contract','Umowa'],['rooms','Pomieszczenia'],['offer','Oferta wstępna'],['works','Kalkulacja końcowa'],['payments','Etapy i płatności'],['journal','Dziennik prac'],['handover','Odbiór inwestycji'],['summary','Zestawienie prac'],['purchases','Zakupy i materiały']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -44,15 +44,15 @@ export function workTotals(lines,discount=0,settlement){const raw=lines.reduce((
 export const invoicePurchasePaid=item=>round(Object.values(item.invoicePayments||{}).reduce((s,n)=>s+number(n),0));
 export const receiptPurchasePaid=item=>round(Object.values(item.receiptPayments||{}).reduce((s,n)=>s+number(n),0));
 export function purchasePayment(item){
- const explicit=item.paidAmount!=null||item.receiptPayments!=null,amount=Math.max(0,number(item.amount)),charge=Math.max(0,number(item.charge)),limit=explicit?charge:amount;
- const basePaid=item.paid?(explicit?Math.min(limit,Math.max(0,number(item.paidAmount))):amount):0;
- const paid=Math.min(limit,basePaid+invoicePurchasePaid(item)+receiptPurchasePaid(item));
- const ratio=limit?paid/limit:(item.paid&&!explicit?1:0);
- return {paid,charged:explicit?charge:charge*ratio,remaining:round(limit-paid),state:ratio>=1?'full':paid>0?'partial':'unpaid'};
+ const corrected=!!item.ksefCorrections?.length,explicit=item.paidAmount!=null||item.receiptPayments!=null,amount=Math.max(0,number(corrected?item.correctionPaidBaseline??item.amount:item.amount)),charge=Math.max(0,number(item.charge)),limit=explicit?charge:amount;
+ const basePaid=item.paid?(explicit?(corrected?Math.max(0,number(item.paidAmount)):Math.min(limit,Math.max(0,number(item.paidAmount)))):amount):0;
+ const actual=basePaid+invoicePurchasePaid(item)+receiptPurchasePaid(item),paid=corrected?actual:Math.min(limit,actual);
+ const ratio=limit?paid/limit:(corrected||item.paid&&!explicit?1:0);
+ return {paid,charged:explicit?charge:charge*Math.min(1,ratio),remaining:round(Math.max(0,(corrected?charge:limit)-paid)),state:ratio>=1?'full':paid>0?'partial':'unpaid',...(corrected?{overpaid:round(Math.max(0,paid-charge))}:{})};
 }
 export function purchasePaymentLabel(item){
  const payment=purchasePayment(item);
- return `${payment.state==='full'?'Rozliczono z inwestorem w całości':payment.state==='partial'?'Częściowo rozliczono z inwestorem':'Nierozliczony z inwestorem'}: ${money(payment.paid)} · Pozostało: ${money(payment.remaining)}`;
+ return `${payment.state==='full'?'Rozliczono z inwestorem w całości':payment.state==='partial'?'Częściowo rozliczono z inwestorem':'Nierozliczony z inwestorem'}: ${money(payment.paid)} · Pozostało: ${money(payment.remaining)}${payment.overpaid>0?' · Nadpłata po korekcie: '+money(payment.overpaid):''}`;
 }
 export function effectiveReceipts(p){
  const invoiceReceipts=(p.invoiceSettlements||[]).flatMap(r=>(r.allocations||[]).filter(a=>a.paid>0).map(a=>({id:'invoice:'+r.id+':'+a.key,invoiceId:r.id,date:a.date||r.date,kind:['purchase','materials'].includes(a.kind)?'materials':'work',stageId:a.kind==='stage'?a.id:'',amount:a.paid,note:'Wpłata z faktury '+r.number})));
@@ -76,7 +76,7 @@ export function receiptRows(p){
 }
 export function purchaseTotals(p){
  const items=p.purchases||[],payments=items.map(purchasePayment);
- const spent=round(items.reduce((s,x)=>s+(x.paidAmount!=null?number(x.amount):purchasePayment(x).paid),0));
+ const spent=round(items.reduce((s,x)=>s+(x.paidAmount!=null||x.ksefCorrections?.length?number(x.amount):purchasePayment(x).paid),0));
  const charged=round(payments.reduce((s,x)=>s+x.charged,0));
  const outstanding=round(payments.reduce((s,x)=>s+x.remaining,0));
  const advances=round(effectiveReceipts(p).filter(x=>x.kind==='materials').reduce((s,x)=>s+number(x.amount),0));

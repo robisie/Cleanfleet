@@ -14,6 +14,10 @@ test('summary values partial allocations, returns once and remaining goods in ev
  const html=stockSummaryMarkup([row]);for(const label of ['Koszty firmowe','Auto','CleanFleet','Robisię · inwestycje','Na stanie','Zwrócono','Stan ilościowy','Sklep / wystawca'])assert.ok(html.includes(label),label);
  assert.match(html,/Co zostało w magazynie — 1 pozycji/);
 });
+test('warehouse summary uses actual corrected investment costs in cards and shop totals',()=>{
+ const row=item('a',1,{assigned:10,available:0,projectAssigned:10,projectCost:80});
+ const data=stockSummaryData([row]);assert.equal(data.totals.robisie.amounts.get('PLN'),8000);assert.equal(data.totals.assigned.amounts.get('PLN'),8000);assert.equal([...data.stores.values()][0].assigned.amounts.get('PLN'),8000);
+});
 test('summary keeps distinct currencies and units, counts invoices once and shows conflicts',()=>{
  const rows=[item('a',1),item('a',2,{item:{index:2,name:'<script>','unit':'m2',gross:50}}),item('b',1,{metadata:metadata('b','555',{currency:'EUR'}),conflict:true,warning:'Sprawdź korektę'})];
  const {totals,byUnit}=stockSummaryData(rows);assert.equal(totals.purchased.invoices.size,2);assert.equal(totals.available.positions,3);assert.equal(totals.available.amounts.get('PLN'),15000);assert.equal(totals.available.amounts.get('EUR'),10000);assert.equal(byUnit.get('szt.').available,20);assert.equal(byUnit.get('m²').available,10);

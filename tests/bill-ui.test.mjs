@@ -1,3 +1,4 @@
+import * as Groups from '../bill/invoice-groups.js';
 import * as Payment from '../bill/payment-status.js';
 import * as Demand from '../bill/payment-demand.js';
 import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {readFile} from 'node:fs/promises';import * as C from '../bill/core.js';
@@ -6,7 +7,7 @@ test('billing gates access, escapes contractor text, and shares monthly numberin
  const context=vm.createContext({console,crypto,URL,URLSearchParams,structuredClone,location:{search:'?brand=robisie'},setTimeout:()=>0,clearTimeout(){},window:{addEventListener(){},confirm:()=>false},document:{querySelector:node,querySelectorAll:()=>[],addEventListener(){},body:{style:{}}}});
  const source=await readFile(new URL('../bill/app.js',import.meta.url),'utf8');
  const m=new vm.SourceTextModule(source+`\nexport function testView(v,row){data={invoices:row?[row]:[],parties:[],settings:{},counters:[{period:'2026-10',last_number:2}],sources:{projects:[],companies:[],billing:[]},ksefConfigured:true};view=v;selected=row;editor=row;render();} export {nextNumber,partyFromValues};`,{context});
- await m.link(async spec=>{const values=spec.includes('payment-status')?Payment:spec.includes('payment-demand')?Demand:spec.startsWith('./core')?C:spec.startsWith('./api')?{restoreSession:()=>null}: {preview:()=>{},previewHtml:()=>{}};return new vm.SyntheticModule(Object.keys(values),function(){for(const [k,v] of Object.entries(values))this.setExport(k,v);},{context});});await m.evaluate();
+ await m.link(async spec=>{const values=spec.includes('invoice-groups')?Groups:spec.includes('payment-status')?Payment:spec.includes('payment-demand')?Demand:spec.startsWith('./core')?C:spec.startsWith('./api')?{restoreSession:()=>null}: {preview:()=>{},previewHtml:()=>{}};return new vm.SyntheticModule(Object.keys(values),function(){for(const [k,v] of Object.entries(values))this.setExport(k,v);},{context});});await m.evaluate();
  assert.match(node('#app').innerHTML,/Zaloguj się/);
  const p=C.newInvoice('robisie');p.payment='cash';p.buyer.name='<img src=x onerror=alert(1)>';p.lines[0].price='2900';const row={id:'10000000-0000-4000-8000-000000000001',number:null,revision:0,payload:p,status:'draft'};
  m.namespace.testView('invoices',row);assert.ok(!node('#app').innerHTML.includes('<img src=x'));assert.match(node('#app').innerHTML,/&lt;img src=x/);

@@ -1,4 +1,4 @@
-import * as C from './core.js?v=1.0.68';
+import * as C from './core.js?v=1.0.78';
 import {paginateContract} from './pdf-layout.js?v=1.0.68';
 
 export const MODULES=[

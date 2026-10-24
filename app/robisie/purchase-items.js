@@ -1,4 +1,4 @@
-import {round,number} from './core.js?v=1.0.68';
+import {round,number} from './core.js?v=1.0.78';
 import {savedEntries} from './ksef-allocation.js?v=1.0.70';
 export function cachedPreview(link){
  const items=link.items;if(!Array.isArray(items)||!items.length||!items.every(x=>Number.isInteger(x.index)&&x.index>0))return null;

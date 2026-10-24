@@ -29,7 +29,7 @@ test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów
  assert.ok(results.find(([key])=>key==='payments')[1].includes('stage='+stageId));
  const linked=module.namespace.testStageInvoices([{id:'invoice-id',number:'A3/10/2026',status:'issued',payload:{currency:'PLN',lines:[{qty:'1',price:'120.00'}],source:{app:'robisie',id:row.id,stageId}}}]);assert.ok(linked.includes('/bill/?invoice=invoice-id'));assert.ok(linked.includes('A3/10/2026'));assert.ok(!linked.includes('stage='+stageId));
  assert.ok(module.namespace.testStageInvoices([{id:'draft-id',payload:{source:{stageId}}}]).includes('Kontynuuj szkic'));module.namespace.testStageInvoices([]);
- assert.equal(results.length,13);for(const [key,html] of results){assert.ok(html.length>50,key);assert.ok(!html.includes('undefined'),key);assert.ok(!html.includes('NaN'),key);}
+ assert.equal(results.length,14);for(const [key,html] of results){assert.ok(html.length>50,key);assert.ok(!html.includes('undefined'),key);assert.ok(!html.includes('NaN'),key);}
  assert.ok(results.find(([key])=>key==='overview')[1].includes('WYM-RS/2026/10/001'));
  assert.ok(results.find(([key])=>key==='contract')[1].includes('OFE-RS/2026/10/001/V1'));
  assert.equal(catalog.length,102); // Arithmetic inputs update actual quotation quantities, prices and discounts.

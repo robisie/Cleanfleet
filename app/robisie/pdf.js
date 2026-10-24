@@ -1,7 +1,8 @@
-import * as C from './core.js?v=1.0.78';
+import * as C from './core.js?v=1.0.80';
 import {paginateContract} from './pdf-layout.js?v=1.0.68';
 
 export const MODULES=[
+ ['ledger','Wspólne rozliczenie'],
  ['data','Dane inwestora i wykaz dokumentów'],['contract','Umowa'],
  ['rooms','Wykaz i wymiary pomieszczeń'],['offer','Oferta wstępna'],
  ['works','Kalkulacja końcowa'],['summary','Podsumowanie prac i powierzchni'],
@@ -42,6 +43,7 @@ function documentNumbers(project){const p=project.payload;return [
 ];}
 function body(key,project,settings,offer){
  const p=project.payload,t=C.totals(p),company=settings.company||{};
+ if(key==='ledger'){const s=C.settlementTotals(p);return totals([['Wspólne saldo',money(s.balance)],['Wpłaty przed potrąceniami',money(s.plus)],['Prace i wydatki',money(s.expenses)],['Potrącenia',money(s.withheld)]])+table(['Kategoria','Plus','Minus'],s.groups.map(g=>row([g.category,money(g.plus),money(g.minus)])))+table(['Data','Opis','Kategoria','Plus','Minus','Saldo wspólne'],s.rows.map(r=>row([r.date||r.dateHint||'Data do uzupełnienia',r.description+(r.needsExplanation?' — do wyjaśnienia':''),r.category,r.plus?money(r.plus):'—',r.minus?money(r.minus):'—',money(r.balance)])))+'<p>Datowane pozycje są chronologiczne. Pozostałe zachowują kolejność źródłową. Saldo obejmuje wszystkie kategorie.</p>'; }
  if(key==='data')return `<h3>Inwestor i miejsce realizacji</h3>${facts([['Imię i nazwisko',p.investor],['Adres zamieszkania',p.investorAddress],['Telefon',p.phone],['E-mail',p.email],['Adres inwestycji',p.address],['Planowany termin',`${p.startDate||'do ustalenia'} — ${p.endDate||'do ustalenia'}`]])}<h3>Wykonawca</h3>${facts([['Nazwa',company.name],['Adres',company.address],['NIP',company.nip],['Reprezentant',company.representative]])}<h3>Wykaz dokumentów</h3>${table(['Dokument','Numer'],documentNumbers(project).map(row))}`;
  if(key==='contract')return contractMarkup(p.contractText||C.contractTemplate(project,settings));
  if(key==='rooms')return `${table(['Pomieszczenie','Dł. (m)','Szer. (m)','Wys. (m)','Podłoga (m²)','Sufit (m²)','Ściany (m²)'],p.rooms.map(r=>{const a=C.roomArea(r);return row([r.name,C.measurement(r.length),C.measurement(r.width),C.measurement(r.height),C.measurement(a.floor),C.measurement(a.ceiling),C.measurement(a.walls)]);} ))}${p.rooms.filter(r=>r.parts?.length>1||r.openings||r.sharedWalls).map(r=>`<h3>${esc(r.name)} — szczegóły pomiarów</h3>${r.parts?.length>1?table(['Część','Długość (m)','Szerokość (m)','Wysokość (m)'],r.parts.map((a,i)=>row([i+1,C.measurement(a.length),C.measurement(a.width),C.measurement(a.height)]))):''}${facts([['Odliczenie okien i drzwi',C.measurement(r.openings)+' m²'],['Odliczenie wspólnych ścian',C.measurement(r.sharedWalls)+' m²']])}`).join('')}${totals([['Łączna powierzchnia podłóg',C.measurement(p.rooms.reduce((s,r)=>s+C.roomArea(r).floor,0))+' m²'],['Łączna powierzchnia ścian',C.measurement(p.rooms.reduce((s,r)=>s+C.roomArea(r).walls,0))+' m²']])}`;

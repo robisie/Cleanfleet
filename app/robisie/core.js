@@ -1,5 +1,5 @@
-export const VERSION='1.0.79';
-export const MODULES=[['overview','Panel inwestycji'],['data','Dane inwestycji'],['contract','Umowa'],['rooms','Pomieszczenia'],['offer','Oferta wstępna'],['works','Kalkulacja końcowa'],['payments','Etapy i płatności'],['journal','Dziennik prac'],['handover','Odbiór inwestycji'],['summary','Zestawienie prac'],['purchases','Zakupy i materiały']];
+export const VERSION='1.0.80';
+export const MODULES=[['overview','Panel inwestycji'],['ledger','Wspólne rozliczenie'],['data','Dane inwestycji'],['contract','Umowa'],['rooms','Pomieszczenia'],['offer','Oferta wstępna'],['works','Kalkulacja końcowa'],['payments','Etapy i płatności'],['journal','Dziennik prac'],['handover','Odbiór inwestycji'],['summary','Zestawienie prac'],['purchases','Zakupy i materiały']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
 export function number(v){const n=Number(String(v??'').replace(',','.'));return Number.isFinite(n)?n:0;}
@@ -71,7 +71,7 @@ export function receiptRows(p){
  return rows.map(r=>{
   const parts=r.parts||[r],kinds=new Set(parts.map(x=>x.kind));
   const labels=[...new Set(parts.map(x=>x.kind==='materials'?'Materiały':p.stages?.find(s=>s.id===x.stageId)?.name||'Rozliczenie końcowe'))];
-  return {...r,kindLabel:kinds.size>1?'Materiały i prace':r.kind==='materials'?'Zaliczka na materiały':'Za prace',stageLabel:labels.join(', ')};
+  return {...r,kindLabel:p.mixedSettlement?'Wspólna pula':kinds.size>1?'Materiały i prace':r.kind==='materials'?'Zaliczka na materiały':'Za prace',stageLabel:labels.join(', ')};
  });
 }
 export function purchaseTotals(p){
@@ -79,7 +79,7 @@ export function purchaseTotals(p){
  const spent=round(items.reduce((s,x)=>s+(x.paidAmount!=null||x.ksefCorrections?.length?number(x.amount):purchasePayment(x).paid),0));
  const charged=round(payments.reduce((s,x)=>s+x.charged,0));
  const outstanding=round(payments.reduce((s,x)=>s+x.remaining,0));
- const advances=round(effectiveReceipts(p).filter(x=>x.kind==='materials').reduce((s,x)=>s+number(x.amount),0));
+ const advances=p.mixedSettlement?round(Math.min(charged,Math.max(0,effectiveReceipts(p).reduce((s,x)=>s+number(x.amount),0)))):round(effectiveReceipts(p).filter(x=>x.kind==='materials').reduce((s,x)=>s+number(x.amount),0));
  return {spent,charged,outstanding,advances,actualBalance:round(advances-spent),balance:round(advances-charged),difference:round(charged-spent)};
 }
 export const acceptedAmount=offer=>offer.agreedAmount!=null?round(offer.agreedAmount):workTotals(offer.lines,offer.discount).after;
@@ -112,7 +112,7 @@ export function totals(p){
  const offer=workTotals(p.offer||[],p.discount,p.sourceCalculation?.offer),works=workTotals(p.works||[],p.workDiscount??p.discount,p.sourceCalculation?.works),materials=purchaseTotals(p);
  const accepted=activeOffer(p);
  const agreed=accepted?acceptedAmount(accepted):offer.after,workCredit=round(p.workCredit);
- const paid=round(effectiveReceipts(p).filter(x=>x.kind!=='materials').reduce((s,x)=>s+number(x.amount),0));
+ const paid=p.mixedSettlement?round(effectiveReceipts(p).reduce((s,x)=>s+number(x.amount),0)-materials.advances):round(effectiveReceipts(p).filter(x=>x.kind!=='materials').reduce((s,x)=>s+number(x.amount),0));
  return {offer,works,materials,agreed,paid,workCredit,remaining:round(p.calculationPrecision==='source'?((works.sourceAmountApplied?works.done:(p.works||[]).filter(l=>l.done).reduce((s,l)=>s+calculationValue(l),0)*(1-number(p.workDiscount??p.discount)/100))+(p.purchases||[]).reduce((s,x)=>s+purchasePayment(x).charged,0)-effectiveReceipts(p).reduce((s,x)=>s+number(x.amount),0)-workCredit):works.done+materials.charged-paid-materials.advances-workCredit),workRemaining:round(works.done-paid-workCredit),change:round(works.after-agreed)};
 }
 export function aggregate(lines){const map=new Map();for(const l of lines){if(l.included===false)continue;const key=l.serviceId+'|'+l.name+'|'+l.unit;const row=map.get(key)||{name:l.name,category:l.category,unit:l.unit,qty:0,value:0};row.qty+=number(l.qty);row.value=round(row.value+lineValue(l));map.set(key,row);}return [...map.values()].sort((a,b)=>a.category.localeCompare(b.category,'pl')||a.name.localeCompare(b.name,'pl'));}
@@ -211,4 +211,30 @@ export function roomWorkAmount(project,roomId){
  const all=project.works||[],rows=all.filter(l=>(l.roomId||'')===roomId),full=workTotals(all,project.workDiscount??project.discount,project.sourceCalculation?.works);
  if(full.sourceAmountApplied){const raw=all.reduce((s,l)=>s+calculationValue(l),0);return round(raw?full.after*rows.reduce((s,l)=>s+calculationValue(l),0)/raw:0);}
  return workTotals(rows,project.workDiscount??project.discount).after;
+}
+
+// Shared settlement reads the native project entries; it never stores a second copy.
+export function settlementRows(project){
+ const rows=[],t=totals(project),factor=1-number(project.workDiscount??project.discount)/100;
+ const add=(item,kind,amount,category,description,id=item.id)=>rows.push({id:String(id??kind+':'+rows.length),kind,date:item.date||item.workDate||'',dateHint:item.dateHint||'',sequence:number(item.sourceSequence)||999999,category,description,plus:amount>0?round(amount):0,minus:amount<0?round(-amount):0,needsExplanation:!!item.needsExplanation});
+ const done=(project.works||[]).filter(l=>l.done&&l.included!==false),weights=done.map(line=>Math.max(0,calculationValue(line)*factor)),weightTotal=weights.reduce((sum,n)=>sum+n,0);let workSum=0;
+ done.forEach((line,index)=>{const amount=index===done.length-1?round(t.works.done-workSum):round(weightTotal?t.works.done*weights[index]/weightTotal:0);workSum=round(workSum+amount);add(line,'works',-amount,line.settlementCategory||line.category||'Robocizna',line.name);});
+ for(const item of project.purchases||[])add(item,'purchases',-purchasePayment(item).charged,item.settlementCategory||'Materiały i zakupy',item.description);
+ for(const item of effectiveReceipts(project)){
+  const withheld=Math.max(0,number(item.settlementWithheld));
+  add(item,item.invoiceId||item.purchaseId?'linked':'receipts',number(item.amount)+withheld,item.settlementCategory||(item.kind==='materials'?'Zaliczki materiałowe':'Wpłaty'),item.note||'Wpłata');
+  if(withheld)add(item,'receipts',-withheld,'Potrącenia',`Potrącenie ${number(item.settlementRate)}% — ${item.note||'wpłata'}`,item.id+':withheld');
+ }
+ if(t.workCredit)add({id:'work-credit'},'credit',t.workCredit,'Obniżki','Uzgodniona obniżka za prace');
+ rows.sort((a,b)=>a.date&&b.date?a.date.localeCompare(b.date)||a.sequence-b.sequence:a.date?-1:b.date?1:a.sequence-b.sequence||a.id.localeCompare(b.id));
+ let balance=0;return rows.map(row=>({...row,balance:balance=round(balance+row.plus-row.minus)}));
+}
+export function settlementTotals(project){
+ const rows=settlementRows(project),groups=new Map();let plus=0,minus=0,withheld=0;
+ for(const row of rows){plus=round(plus+row.plus);minus=round(minus+row.minus);if(row.id.endsWith(':withheld'))withheld=round(withheld+row.minus);const group=groups.get(row.category)||{category:row.category,plus:0,minus:0,count:0};group.plus=round(group.plus+row.plus);group.minus=round(group.minus+row.minus);group.count++;groups.set(row.category,group);}
+ return {rows,groups:[...groups.values()],plus,minus,withheld,expenses:round(minus-withheld),balance:round(plus-minus),undated:rows.filter(r=>!r.date).length,unexplained:rows.filter(r=>r.needsExplanation).length};
+}
+export function settlementReceipt(data,previous={}){
+ const gross=round(number(data.gross)),rate=number(data.rate||0);if(gross<=0||rate<0||rate>=100)throw Error('Podaj dodatnią wpłatę i potrącenie od 0 do mniej niż 100%.');
+ const withheld=round(gross*rate/100);return {...previous,id:previous.id||uid(),date:data.date||'',kind:data.kind==='materials'?'materials':'work',stageId:previous.stageId||'',amount:round(gross-withheld),settlementWithheld:withheld,settlementRate:rate,settlementCategory:String(data.category||'Wpłaty').trim(),note:String(data.description||'Wpłata').trim(),dateHint:data.date?'':previous.dateHint||'',needsExplanation:!!data.needsExplanation};
 }

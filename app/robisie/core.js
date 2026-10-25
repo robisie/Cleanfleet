@@ -1,4 +1,4 @@
-export const VERSION='1.0.80';
+export const VERSION='1.0.81';
 export const MODULES=[['overview','Panel inwestycji'],['ledger','Wspólne rozliczenie'],['data','Dane inwestycji'],['contract','Umowa'],['rooms','Pomieszczenia'],['offer','Oferta wstępna'],['works','Kalkulacja końcowa'],['payments','Etapy i płatności'],['journal','Dziennik prac'],['handover','Odbiór inwestycji'],['summary','Zestawienie prac'],['purchases','Zakupy i materiały']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());

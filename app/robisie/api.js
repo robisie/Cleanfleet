@@ -112,3 +112,13 @@ export async function savePurchaseAllocation(project,payload,link,entries,xml){
   throw error;
  }
 }
+
+// Read-only owner-scoped summary; paginate both sources instead of truncating a year.
+export async function earningsSummaryData(){
+ const owner=session?.user?.id;if(!owner)throw Error('Zaloguj się ponownie.');
+ async function pages(path){const rows=[];for(let offset=0;;offset+=500){if(session?.user?.id!==owner)throw Error('Sesja zmieniła się.');const page=await request(path+'&limit=500&offset='+offset);if(session?.user?.id!==owner)throw Error('Sesja zmieniła się.');rows.push(...page);if(page.length<500)return rows;}}
+ const own=encodeURIComponent(owner),[projects,earnings]=await Promise.all([
+  pages('/rest/v1/rs_projects?select=id,contract_number,payload&owner_id=eq.'+own+'&order=id.asc'),
+  pages('/rest/v1/cf_earnings?select=id,source_robisie_project_id,work_date,total_amount,my_amount,employee_amount,employee_paid&created_by=eq.'+own+'&source_robisie_project_id=not.is.null&order=id.asc')
+ ]);return {projects,earnings};
+}

@@ -25,6 +25,11 @@ function cfBuildEarningPreset(name,rows,rules){
     employee_name:last?.employee_name||'',employee_percent:percent,hasPrevious:!!last};
 }
 
+function cfEarningWorkerBreakdown(rows,unpaidOnly=false){
+  const grouped=new Map();for(const row of rows){if(unpaidOnly&&row.employee_paid)continue;const amount=Math.round(Number(row.employee_amount||0)*100);if(!Number.isSafeInteger(amount)||amount<=0)continue;const name=String(row.employee_name||'').trim().replace(/\s+/g,' ')||'Bez wskazanego pracownika',key=name.toLocaleLowerCase('pl');if(!grouped.has(key))grouped.set(key,{name,cents:0,count:0});const entry=grouped.get(key);entry.cents+=amount;entry.count++;}
+  return [...grouped.values()].sort((a,b)=>b.cents-a.cents||a.name.localeCompare(b.name,'pl'));
+}
+
 function cfEarningsMoney(v){
   return new Intl.NumberFormat('pl-PL',{style:'currency',currency:'PLN'}).format(Number(v)||0);
 }
@@ -83,8 +88,8 @@ async function cfShowEarnings(host=null,allowed=()=>cfIsAdmin()&&Boolean(window.
       <div class="cf-earning-summary">
         <div><span>Łączna kwota</span><strong id="cfEarningTotal">0,00 zł</strong></div>
         <div class="cf-earning-summary-mine"><span>Moja część</span><strong id="cfEarningMine">0,00 zł</strong></div>
-        <div class="cf-earning-summary-employee"><span>Dla pracowników</span><strong id="cfEarningEmployees">0,00 zł</strong></div>
-        <div><span>Do wypłaty</span><strong id="cfEarningUnpaid">0,00 zł</strong></div>
+        <div class="cf-earning-summary-employee cf-earning-worker-card"><details id="cfEmployeeBreakdown"><summary><span>Dla pracowników</span><strong id="cfEarningEmployees">0,00 zł</strong><small>Kliknij — podział na osoby</small></summary><div class="cf-earning-worker-popover" id="cfEmployeeBreakdownBody"></div></details></div>
+        <div class="cf-earning-worker-card"><details id="cfUnpaidBreakdown"><summary><span>Do wypłaty</span><strong id="cfEarningUnpaid">0,00 zł</strong><small>Kliknij — podział na osoby</small></summary><div class="cf-earning-worker-popover" id="cfUnpaidBreakdownBody"></div></details></div>
       </div>
 
       <div id="cfEarningsList" class="cf-earnings-list"></div>
@@ -97,6 +102,10 @@ async function cfShowEarnings(host=null,allowed=()=>cfIsAdmin()&&Boolean(window.
   overlay.addEventListener('click',e=>{if(e.target===overlay) close();});
 
   const state={rows:[],rules:[],contractors:[],presetRows:[]};
+  const workerBubbles=[document.getElementById('cfEmployeeBreakdown'),document.getElementById('cfUnpaidBreakdown')];
+  workerBubbles.forEach(bubble=>{bubble.addEventListener('toggle',()=>{if(bubble.open)workerBubbles.filter(other=>other!==bubble).forEach(other=>other.open=false);});bubble.addEventListener('keydown',event=>{if(event.key==='Escape'){bubble.open=false;bubble.querySelector('summary').focus();}});});
+  overlay.addEventListener('click',event=>workerBubbles.forEach(bubble=>{if(!bubble.contains(event.target))bubble.open=false;}));
+
 
   async function loadRows(){
     if(!allowed())return;
@@ -180,13 +189,16 @@ async function cfShowEarnings(host=null,allowed=()=>cfIsAdmin()&&Boolean(window.
     const rows=filtered();
     const total=rows.reduce((s,r)=>s+Number(r.total_amount||0),0);
     const mine=rows.reduce((s,r)=>s+Number(r.my_amount||0),0);
-    const emp=rows.reduce((s,r)=>s+Number(r.employee_amount||0),0);
-    const unpaid=rows.reduce((s,r)=>s+(!r.employee_paid?Number(r.employee_amount||0):0),0);
+    const workers=cfEarningWorkerBreakdown(rows),pendingWorkers=cfEarningWorkerBreakdown(rows,true);
+    const emp=workers.reduce((s,r)=>s+r.cents,0)/100,unpaid=pendingWorkers.reduce((s,r)=>s+r.cents,0)/100;
 
     document.getElementById('cfEarningTotal').textContent=cfEarningsMoney(total);
     document.getElementById('cfEarningMine').textContent=cfEarningsMoney(mine);
     document.getElementById('cfEarningEmployees').textContent=cfEarningsMoney(emp);
     document.getElementById('cfEarningUnpaid').textContent=cfEarningsMoney(unpaid);
+    const workerHtml=(entries,onlyPending)=>`<b>${onlyPending?'Do wypłaty według pracowników':'Podział dla pracowników'}</b><p>Według aktualnych filtrów listy.</p>${entries.length?entries.map(entry=>`<div class="cf-earning-worker-line"><span>${escapeHtml(entry.name)}</span><strong>${cfEarningsMoney(entry.cents/100)}</strong></div>`).join(''):'<p>Brak kwot dla pracowników.</p>'}<div class="cf-earning-worker-line cf-earning-worker-total"><span>Razem</span><strong>${cfEarningsMoney(entries.reduce((sum,entry)=>sum+entry.cents,0)/100)}</strong></div>`;
+    document.getElementById('cfEmployeeBreakdownBody').innerHTML=workerHtml(workers,false);
+    document.getElementById('cfUnpaidBreakdownBody').innerHTML=workerHtml(pendingWorkers,true);
 
     const list=document.getElementById('cfEarningsList');
     if(!rows.length){

@@ -111,7 +111,7 @@
       <div class="cf-rem-range-actions"><button type="button" class="cf-rem-range-btn" data-close>Anuluj</button><button type="button" class="cf-rem-range-btn primary" data-save>Zapisz</button></div>
     </div>`;
     document.getElementById('cfReminderRangeOverlay')?.remove();document.body.appendChild(host);
-    const close=()=>host.remove();host.querySelectorAll('[data-close]').forEach(b=>b.onclick=close);host.addEventListener('click',e=>{if(e.target===host)close()});
+    let saving=false;const close=()=>{if(!saving)host.remove();};host.querySelectorAll('[data-close]').forEach(b=>b.onclick=close);host.addEventListener('click',e=>{if(e.target===host)close()});
     const modeEl=host.querySelector('#cfrMode'),payEl=host.querySelector('#cfrPayment'),mailEl=host.querySelector('#cfrMailEnabled');
     modeEl.onchange=()=>host.querySelector('#cfrCustomWrap').style.display=modeEl.value==='custom'?'grid':'none';
     const syncPaymentVisibility=()=>{
@@ -168,7 +168,9 @@
       close();toast('Dane z faktury zostały zastosowane.');if(typeof onSaved==='function')await onSaved();
     });
 
+    const batch=!reminder&&window.CFReminderBatch?window.CFReminderBatch.attach(host,{getDb:db,toast}):null;
     host.querySelector('[data-save]').onclick=async()=>{
+      if(saving)return;saving=true;batch?.cancelPending();try{
       const title=host.querySelector('#cfrTitle').value.trim();
       const startAt=iso(host.querySelector('#cfrStartDate').value,host.querySelector('#cfrStartTime').value);
       const endAt=iso(host.querySelector('#cfrEndDate').value,host.querySelector('#cfrEndTime').value);
@@ -208,6 +210,10 @@
       const saveLabel=saveBtn.textContent;
       saveBtn.disabled=true;
       try{
+        if(batch?.active()){
+          const rows=batch.prepare(payload);await batch.save(client,rows);host.remove();toast('Dodano przypomnienia: '+rows.length+'.');
+          if(typeof onSaved==='function')try{await onSaved();}catch(refreshError){console.error('Reminder refresh:',refreshError);toast('Przypomnienia zapisane. Odśwież kalendarz.');}return;
+        }
         const q=reminder?.id
           ? client.from('cf_reminders').update(payload).eq('id',reminder.id).select('id').single()
           : client.from('cf_reminders').insert(payload).select('id').single();
@@ -274,7 +280,7 @@
           }
         }
 
-        close();
+        host.remove();
         if(typeof onSaved==='function')await onSaved();
 
         if(!useMail){
@@ -294,10 +300,11 @@
         }
       }catch(err){
         console.error('CleanFleet reminder range:',err);
-        toast('Nie udało się zapisać przypomnienia.');
+        toast(batch?.active()?(err.message||'Nie udało się zapisać przypomnień.'):'Nie udało się zapisać przypomnienia.');
         saveBtn.disabled=false;
         saveBtn.textContent=saveLabel;
       }
+      }finally{saving=false;}
     };
   }
 

@@ -47,9 +47,9 @@ test('completed earnings group by source and manual contractor with consistent t
 test('eight wallet cards reconcile gross earnings, cash, full costs and employees exactly once',()=>{
  const s=state(),d=data();s.wallet.plans['project:p']={employee:20000};s.wallet.expenses=[{id:'cost',date:today,name:'Cost',amount:15000,paid:true}];
  const a=W.summary(d,s,P,today);assert.equal(a.earnedGross,60000);assert.equal(a.employeeTotal,10000);assert(a.earnedKnown&&a.employeeKnown);assert.equal(a.base,a.earnedGross+a.cash-a.expenseTotal-a.employeeTotal);assert.equal(a.base,55000);assert.equal(a.withCF,69000);assert.equal(a.withRobisie,125000);assert.equal(a.withAll,139000);
- // Extra outstanding wages are shown in the employee card and deducted once.
+ // Earlier-month outstanding wages do not belong to the current monthly result.
  d.earnings.push({id:'old',work_date:'2026-09-30',total_amount:30,my_amount:10,employee_amount:20,employee_paid:false});
- const b=W.summary(d,s,P,today);assert.equal(b.earnedGross,60000);assert.equal(b.employeeTotal,12000);assert.equal(b.base,53000);assert.equal(b.withAll,137000);
+ const b=W.summary(d,s,P,today);assert.equal(b.earnedGross,60000);assert.equal(b.employeeTotal,10000);assert.equal(b.base,55000);assert.equal(b.withAll,139000);
  d.earnings[0].employee_amount=null;const c=W.summary(d,s,P,today);assert(c.earnedKnown);assert(!c.employeeKnown);assert(!c.baseKnown);assert(!c.allKnown);
 });
 
@@ -65,4 +65,16 @@ test('monthly Robisie selection validates and survives encrypted save without ch
  const s=state();for(const value of [[],null,{'2026-13':['p']},{'2026-10':'p'},{'2026-10':[1]},{'2026-10':['p','p']}])assert.throws(()=>W.validateWallet({...s.wallet,robisieSelection:value}));
  const legacy={...W.defaults()};delete legacy.robisieSelection;assert.equal(W.validateWallet(legacy),legacy);
  const salt=newSalt(),key=await keyFor('selection-test',salt),encoded=await seal(s,key,salt),restored=await open(encoded,key);assert.deepEqual(restored.wallet.robisieSelection,{'2026-10':['p']});
+});
+
+test('employee card and popup exclude previous, future and undated wages, including misleading linked entry dates',()=>{
+ const s=state(),d={projects:[project('active')],completedWashes:[],linkedWashes:[{id:'old-wash',wash_date:'2026-09-30',cost:100,currency:'PLN'}],earnings:[
+ {id:'current',work_date:today,contractor:'Browar',total_amount:100,my_amount:60,employee_amount:40,employee_name:'Tata',employee_paid:false},
+ {id:'old',work_date:'2026-09-30',total_amount:100,my_amount:50,employee_amount:50,employee_name:'Tata',employee_paid:false},
+ {id:'future',work_date:'2026-11-01',total_amount:100,my_amount:50,employee_amount:50,employee_name:'Tata',employee_paid:false},
+ {id:'missing',work_date:null,total_amount:100,my_amount:null,employee_amount:null,employee_name:'Tata',employee_paid:false},
+ {id:'linked',source_wash_record_id:'old-wash',work_date:today,total_amount:100,my_amount:50,employee_amount:50,employee_name:'Tata',employee_paid:false},
+ {id:'extra',source_robisie_project_id:'active',work_date:today,total_amount:100,my_amount:70,employee_amount:30,employee_name:'Melania',employee_paid:false}
+ ]};const result=W.summary(d,s,P,today),groups=W.employeeBreakdown(result.done);
+ assert.equal(result.employeeTotal,7000);assert(result.employeeKnown);assert.equal(groups.find(r=>r.name==='Tata').amount,4000);assert.equal(groups.find(r=>r.name==='Melania').amount,3000);assert(groups.flatMap(g=>g.rows).every(r=>r.date.startsWith('2026-10')));assert.equal(result.done.priorWorkerDue,3000);assert.equal(result.workerDue,7000);
 });

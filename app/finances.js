@@ -42,7 +42,8 @@
    earnings.hidden=tab!=='earnings';trips.hidden=tab!=='trips';aga.hidden=tab!=='aga';priv.hidden=!['payments','incomes','cash','wallet'].includes(tab);
    if(['payments','incomes','cash','wallet'].includes(tab)){priv.setAttribute('role','tabpanel');priv.setAttribute('aria-labelledby','cfFinanceTab-'+tab);api().select(tab);}
    if(tab==='earnings'&&!earningsMounted){earningsMounted=true;const opening=epoch;try{await window.cfFinanceEarningsBridge.open(earnings,()=>unlocked&&epoch===opening&&admin());}catch(error){if(unlocked&&epoch===opening){earningsMounted=false;status.textContent=error.message||'Nie udało się pobrać zarobków.';}}}
-   if(tab==='aga'&&!agaMounted){agaMounted=true;const opening=epoch;try{if(!window.CFAga)await import('/pack/aga.js?v=20261025-2');if(!unlocked||epoch!==opening||!admin())return;const controller=await window.CFAga.open(aga,()=>unlocked&&epoch===opening&&admin(),{tab:true,getCashBalance:()=>unlocked&&epoch===opening&&admin()?api()?.cashBalance?.()??null:null});if(unlocked&&epoch===opening)agaController=controller;}catch(error){if(unlocked&&epoch===opening){agaMounted=false;status.textContent=error.message||'Nie udało się wczytać rozliczenia.';}}}
+   const agaWasMounted=agaMounted;if(tab==='aga'&&!agaMounted){agaMounted=true;const opening=epoch;try{if(!window.CFAga)await import('/pack/aga.js?v=20261025-3');if(!unlocked||epoch!==opening||!admin())return;const controller=await window.CFAga.open(aga,()=>unlocked&&epoch===opening&&admin(),{tab:true,getCashBalance:()=>unlocked&&epoch===opening&&admin()?api()?.cashBalance?.()??null:null});if(unlocked&&epoch===opening)agaController=controller;}catch(error){if(unlocked&&epoch===opening){agaMounted=false;status.textContent=error.message||'Nie udało się wczytać rozliczenia.';}}}
+   if(tab==='aga'&&agaWasMounted)void agaController?.reload?.();
    if(tab==='trips'&&!tripMounted){tripMounted=true;window.cfShowDojazdy({host:trips,allowed:()=>unlocked&&admin()});}
   }
   function pageHide(event){if(event.persisted&&document.documentElement.classList.contains('robisie-pack-frame'))return;close();}
@@ -53,13 +54,13 @@
    if(event.data?.type==='cf-finances-close')close();
   }
   function pointer(event){if(overlay.contains(event.target))activity();}
-  function visibility(){if(unlocked)activity(true);}
+  function visibility(){if(unlocked){activity(true);if(!document.hidden&&selected==='aga')void agaController?.reload?.();}}
   function keyboard(event){if(!overlay.isConnected)return;activity();if(event.key==='Escape'&&!earnings.querySelector('.overlay:not(#cfEarningsOverlay)')){event.preventDefault();event.stopImmediatePropagation();close();}else if(event.key==='Tab'){const elements=[...overlay.querySelectorAll('button,input,select,a,iframe')].filter(el=>!el.disabled&&el.getClientRects().length);const first=elements[0],last=elements.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last&&last.tagName!=='IFRAME'){event.preventDefault();first?.focus();}}}
   window.addEventListener('pagehide',pageHide);window.addEventListener('message',message);document.addEventListener('keydown',keyboard,true);document.addEventListener('pointerdown',pointer,true);document.addEventListener('scroll',pointer,true);document.addEventListener('visibilitychange',visibility);
   overlay.querySelector('[data-close]').onclick=close;lockButton.onclick=lock;nav.querySelectorAll('[data-tab]').forEach(button=>button.onclick=()=>select(button.dataset.tab));
   nav.onkeydown=event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const buttons=[...nav.querySelectorAll('button')],index=buttons.findIndex(b=>b.dataset.tab===selected),next=event.key==='Home'?0:event.key==='End'?buttons.length-1:(index+(event.key==='ArrowRight'?1:buttons.length-1))%buttons.length;select(buttons[next].dataset.tab);buttons[next].focus();};
   const subscription=window.cfBackupBridge.getClient()?.auth?.onAuthStateChange?.((event)=>{if(event==='SIGNED_OUT')close();});const unsubscribe=()=>subscription?.data?.subscription?.unsubscribe();
-  current={close,lock,isUnlocked:()=>unlocked};overlay.querySelector('[data-close]').focus({preventScroll:true});
+  current={close,lock,isUnlocked:()=>unlocked,refreshAga:()=>{if(unlocked&&selected==='aga')return agaController?.reload?.();}};overlay.querySelector('[data-close]').focus({preventScroll:true});
  }
- window.CFFinance={open,close:()=>current?.close(),lock:()=>current?.lock(),isUnlocked:()=>Boolean(current?.isUnlocked()),maybeOpen(){if(new URL(location.href).searchParams.get('finances')==='1'&&admin()){const url=new URL(location.href);url.searchParams.delete('finances');history.replaceState(history.state,'',url);setTimeout(open,0);}}};
+ window.CFFinance={open,refreshAga:()=>current?.refreshAga?.(),close:()=>current?.close(),lock:()=>current?.lock(),isUnlocked:()=>Boolean(current?.isUnlocked()),maybeOpen(){if(new URL(location.href).searchParams.get('finances')==='1'&&admin()){const url=new URL(location.href);url.searchParams.delete('finances');history.replaceState(history.state,'',url);setTimeout(open,0);}}};
 })();

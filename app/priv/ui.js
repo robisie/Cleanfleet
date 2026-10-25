@@ -1,4 +1,4 @@
-import {validateWallet} from './wallet-core.js?v=4';
+import {validateWallet} from './wallet-core.js?v=5';
 import {cashAmount,cashBalance,validateCash} from './cash.js?v=112';
 import {keyFor,newSalt,seal,open,checkEnvelope,newAccountKey,openAccount} from './vault.js?v=110';
 const P=window.Payments,$=id=>document.getElementById(id),escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -7,7 +7,7 @@ let db,user,state,key,salt,envelope,revision=0,busy=false,generation=0,lockTimer
 const financeEmbedded=window.parent!==window&&new URL(location.href).searchParams.get('finance')==='1';
 const financeNotify=type=>{if(financeEmbedded)window.parent.postMessage({type},location.origin);};
 let cashRefresh=null,walletController=null,walletOpening=0;
-async function showWallet(){const host=$('financeWalletPane'),epoch=generation,opening=++walletOpening;if(walletController){walletController.reload();return;}try{const module=await import('./wallet.js?v=4');if(!key||!state||epoch!==generation||opening!==walletOpening||host.hidden)return;walletController=module.mount(host,{getState:()=>state,persist,db,owner:user.id,allowed:()=>!!key&&!!state&&epoch===generation,P,today,activity});}catch(e){if(key&&epoch===generation)host.textContent='Nie udało się wczytać portfela: '+e.message;}}
+async function showWallet(){const host=$('financeWalletPane'),epoch=generation,opening=++walletOpening;if(walletController){walletController.reload();return;}try{const module=await import('./wallet.js?v=5');if(!key||!state||epoch!==generation||opening!==walletOpening||host.hidden)return;walletController=module.mount(host,{getState:()=>state,persist,db,owner:user.id,allowed:()=>!!key&&!!state&&epoch===generation,P,today,activity});}catch(e){if(key&&epoch===generation)host.textContent='Nie udało się wczytać portfela: '+e.message;}}
 const empty=()=>({version:1,rules:[],transactions:[],imports:[],cash:[],incomes:[]});
 const monthNames=['Sty','Lut','Mar','Kwi','Maj','Cze','Lip','Sie','Wrz','Paź','Lis','Gru'];
 function validate(s){if(s?.version!==1||!Array.isArray(s.rules)||!Array.isArray(s.transactions)||!Array.isArray(s.imports))throw Error('Nieprawidłowe dane kopii.');s.incomes=s.incomes===undefined?[]:s.incomes;if(!Array.isArray(s.incomes))throw Error('Nieprawidłowa historia wpływów.');for(const t of [...s.transactions,...s.incomes])if(!P.date(t.date)||!Number.isSafeInteger(t.amount)||t.amount<=0||!['PLN','EUR','USD','GBP'].includes(t.currency))throw Error('Kopia zawiera nieprawidłowe przelewy.');for(const t of s.incomes)if(t.salary!==undefined&&typeof t.salary!=='boolean')throw Error('Nieprawidłowe przypisanie wynagrodzenia.');s.cash=validateCash(s.cash===undefined?[]:s.cash);s.wallet=validateWallet(s.wallet);return s;}

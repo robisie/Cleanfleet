@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import vm from 'node:vm';import * as Core from '../app/aga-core.js';
-async function setup({delayed=false,taxes=[]}={}){
+async function setup({delayed=false,taxes=[],cash=null}={}){
  const nodes=new Map(),writes=[],saves=[];let allowed=true,fail=false,release;
- function node(key){if(nodes.has(key))return nodes.get(key);const n={innerHTML:'',textContent:'',isConnected:true,hidden:false,handlers:{},dataset:{},values:{},querySelector:node,querySelectorAll:()=>[],addEventListener:(kind,fn)=>n.handlers[kind]=fn,append(el){this.child=el},remove(){n.isConnected=false},scrollIntoView(){}};nodes.set(key,n);return n;}
+ function node(key){if(nodes.has(key))return nodes.get(key);const n={innerHTML:'',textContent:'',value:'',isConnected:true,hidden:false,handlers:{},dataset:{},values:{},querySelector:node,querySelectorAll:()=>[],addEventListener:(kind,fn)=>n.handlers[kind]=fn,append(el){this.child=el},remove(){n.isConnected=false},scrollIntoView(){}};nodes.set(key,n);return n;}
  const host=node('host');host.querySelector=s=>s==='#cfAgaOverlay'?(host.child?.isConnected?host.child:null):node(s);
  const stored={owner_id:'owner',revision:3,payload:{agaAnnual:{invoices:[{id:'i',date:'2026-01-01',amount:1000,rate:9,received:null}],taxes,projectId:'project'}}};
  const db={
@@ -13,8 +13,8 @@ async function setup({delayed=false,taxes=[]}={}){
   rpc:async(name,args)=>{saves.push({name,args});if(fail)return {error:{message:'RS_CONFLICT'}};return {data:{revision:4}}}
  };
  const context=vm.createContext({AgaCore:Core,structuredClone,console,confirm:()=>true,FormData:class extends Map{constructor(f){super(Object.entries(f.values))}},document:{createElement:()=>node('root')},window:{cfIsAdmin:()=>true,cfBackupBridge:{getClient:()=>db},open:()=>({document:{write:html=>writes.push(html),close(){}}})}});
- let source=await fs.readFile(new URL('../pack/aga.js',import.meta.url),'utf8');source=source.replace("await import('/app/aga-core.js?v=20261024-1')",'globalThis.AgaCore');vm.runInContext(source,context);
- const pending=context.window.CFAga.open(host,()=>allowed);if(!delayed)await pending;
+ let source=await fs.readFile(new URL('../pack/aga.js',import.meta.url),'utf8');source=source.replace("await import('/app/aga-core.js?v=20261025-1')",'globalThis.AgaCore');vm.runInContext(source,context);
+ const pending=context.window.CFAga.open(host,()=>allowed,{getCashBalance:()=>cash});if(!delayed)await pending;
  const click=(action,id)=>node('root').handlers.click({target:{dataset:{id},closest:()=>({dataset:{aga:action}})}});
  return {nodes,node,host,writes,saves,pending,click,deny:()=>allowed=false,fail:v=>fail=v,release:()=>release()};
 }
@@ -57,4 +57,11 @@ test('quarterly tax is never subtracted separately from each month',async()=>{
  const t=await setup({taxes:[{id:'quarter',period:'2026-Q1',date:'2026-04-10',amount:40}]});
  const months=[...t.node('root').innerHTML.matchAll(/<details class="aga-month"[^>]*>([\s\S]*?)<\/details>/g)];
  for(const m of months.slice(0,3)){assert(m[1].includes('podatek kwartalny'));assert(m[1].includes('W kwartale'));assert(!m[1].includes('data-id="quarter"'));assert(m[1].includes('<td class="aga-balance">—'));}
+});
+
+test('invoice form suggests gross from cash after 9 percent without changing cash or auto-saving',async()=>{
+ const t=await setup({cash:91000});t.click('new-invoice');assert.match(t.node('#aga-cash-hint').innerHTML,/910,00/);assert.match(t.node('#aga-cash-hint').innerHTML,/1000,00|1.?000,00/);assert.equal(t.saves.length,0);
+ t.node('[data-use-cash]').onclick();assert.equal(t.node('[name=amount]').value,'1000');assert.equal(t.node('[name=rate]').value,'9');assert.match(t.node('#aga-invoice-preview').textContent,/910,00/);assert.equal(t.saves.length,0);
+ t.node('[name=amount]').value='2000';t.node('[name=amount]').oninput();assert.match(t.node('#aga-invoice-preview').textContent,/1820,00|1.?820,00/);
+ const missing=await setup();missing.click('new-invoice');assert.match(missing.node('#aga-cash-hint').innerHTML,/niedostępna/);assert.equal(missing.saves.length,0);
 });

@@ -43,3 +43,12 @@ test('completed earnings group by source and manual contractor with consistent t
  const d={projects:[p],completedWashes:[{id:'w',company_id:'c',wash_date:today,cost:100,currency:'PLN'}],companies:[{id:'c',short_name:'TVM'}],rules:[{contractor:'TVM',employee_percent:20}],earnings:[{id:'a',contractor:'Browar',description:'Sprzątanie',work_date:today,total_amount:100,my_amount:80,employee_amount:20},{id:'b',contractor:'browar',description:'Mycie',work_date:today,total_amount:50,my_amount:40,employee_amount:10},{id:'c',contractor:'Inny',work_date:today,total_amount:50,my_amount:null,employee_amount:null}]};
  const done=W.realized(d,s,today),groups=W.completedGroups(done.rows);assert.deepEqual(groups.map(g=>g.name),['Robisię','CleanFleet','Browar','Inny']);assert.equal(groups[2].rows.length,2);assert.equal(groups[2].net,12000);assert.equal(groups[3].unknown,1);assert.equal(groups.reduce((n,g)=>n+g.net,0),done.total);
 });
+
+test('eight wallet cards reconcile gross earnings, cash, full costs and employees exactly once',()=>{
+ const s=state(),d=data();s.wallet.plans['project:p']={employee:20000};s.wallet.expenses=[{id:'cost',date:today,name:'Cost',amount:15000,paid:true}];
+ const a=W.summary(d,s,P,today);assert.equal(a.earnedGross,60000);assert.equal(a.employeeTotal,10000);assert(a.earnedKnown&&a.employeeKnown);assert.equal(a.base,a.earnedGross+a.cash-a.expenseTotal-a.employeeTotal);assert.equal(a.base,55000);assert.equal(a.withCF,69000);assert.equal(a.withRobisie,105000);assert.equal(a.withAll,119000);
+ // Extra outstanding wages are shown in the employee card and deducted once.
+ d.earnings.push({id:'old',work_date:'2026-09-30',total_amount:30,my_amount:10,employee_amount:20,employee_paid:false});
+ const b=W.summary(d,s,P,today);assert.equal(b.earnedGross,60000);assert.equal(b.employeeTotal,12000);assert.equal(b.base,53000);assert.equal(b.withAll,117000);
+ d.earnings[0].employee_amount=null;const c=W.summary(d,s,P,today);assert(c.earnedKnown);assert(!c.employeeKnown);assert(!c.baseKnown);assert(!c.allKnown);
+});

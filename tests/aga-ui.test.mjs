@@ -45,3 +45,16 @@ test('remainder stays numeric without payments and preserves negative balances',
  const empty=await setup();assert(empty.node('root').innerHTML.includes('Brak wpisanych wpłat podatku'));assert(empty.node('root').innerHTML.includes('<strong>'+Core.money(90)+'</strong>'));
  const over=await setup({taxes:[{id:'tax',period:'2026-01',date:'2026-02-10',amount:120}]});assert(over.node('root').innerHTML.includes('<strong>'+Core.money(-30)+'</strong>'));
 });
+
+test('monthly ledger groups invoice and tax rows together, highlights the correct remainder and prints all months',async()=>{
+ const t=await setup({taxes:[{id:'tax',period:'2026-01',date:'2026-02-10',amount:40}]});
+ const html=t.node('root').innerHTML,months=[...html.matchAll(/<details class="aga-month"[^>]*>([\s\S]*?)<\/details>/g)];assert.equal(months.length,12);
+ const january=months[0][1];assert(january.includes('Styczeń 2026'));assert(january.includes('01.01.2026'));assert(january.includes('10.02.2026'));assert(january.includes('Wpłata podatku'));assert(january.includes('data-id="i"'));assert(january.includes('data-id="tax"'));assert(january.includes('Suma miesiąca'));assert(january.includes('<td class="aga-balance">'+Core.money(50)));
+ assert(!months[1][1].includes('data-id="tax"'));assert.equal(html.split('data-id="i"').length-1,1);assert(!html.includes('<h3>Faktury</h3>'));
+ t.click('pdf');assert.equal((t.writes[0].match(/<details class="aga-month" open>/g)||[]).length,12);assert(!t.writes[0].includes('data-id="i"'));
+});
+test('quarterly tax is never subtracted separately from each month',async()=>{
+ const t=await setup({taxes:[{id:'quarter',period:'2026-Q1',date:'2026-04-10',amount:40}]});
+ const months=[...t.node('root').innerHTML.matchAll(/<details class="aga-month"[^>]*>([\s\S]*?)<\/details>/g)];
+ for(const m of months.slice(0,3)){assert(m[1].includes('podatek kwartalny'));assert(m[1].includes('W kwartale'));assert(!m[1].includes('data-id="quarter"'));assert(m[1].includes('<td class="aga-balance">—'));}
+});

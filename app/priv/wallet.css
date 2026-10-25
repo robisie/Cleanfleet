@@ -5,3 +5,5 @@
 .wallet-table .wallet-money{font-variant-numeric:tabular-nums;white-space:nowrap}.wallet-table .wallet-money small{white-space:normal;max-width:170px}
 
 .wallet-completed-group{border:1px solid #dae4de;background:#fff;border-radius:12px;padding:16px;margin:10px 0}.wallet-completed-group>summary{margin:0;line-height:1.5}.wallet-completed-group .wallet-table{margin-bottom:0}
+
+.wallet-table input[type="checkbox"]{min-width:0;width:20px;height:20px;accent-color:#275c48;vertical-align:middle}

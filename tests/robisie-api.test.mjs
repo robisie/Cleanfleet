@@ -86,3 +86,11 @@ test('combined KSeF item and payment save uses the settlement transaction',async
 test('purchase source recovery reads only purchase invoices assigned to the current investment',async()=>{
  let url;const a=await api(async u=>{url=u;return response([]);});await a.purchaseKsefLinks('project-id');assert.ok(url.includes('rs_ksef_links?select=*'));assert.ok(url.includes('kind=eq.purchases'));assert.ok(url.includes('project_id=eq.project-id'));
 });
+
+test('earnings summary reads only the owner and linked Robisie entries and paginates past 500 rows',async()=>{
+ const calls=[];const a=await api(async(url,options)=>{calls.push({url,method:options.method||'GET'});return response(url.includes('rs_projects')&&!url.includes('offset=500')?Array.from({length:500},(_,i)=>({id:String(i)})):url.includes('cf_earnings')?[{id:'e',source_robisie_project_id:'p'}]:[]);},{access_token:'test',expires_at:9999999999,user:{id:'owner'}});
+ const data=await a.earningsSummaryData();assert.equal(data.projects.length,500);assert.equal(data.earnings.length,1);assert(calls.some(c=>c.url.includes('offset=500')));assert(calls.every(c=>c.method==='GET'));assert(calls.filter(c=>c.url.includes('rs_projects')).every(c=>c.url.includes('owner_id=eq.owner')));assert(calls.filter(c=>c.url.includes('cf_earnings')).every(c=>c.url.includes('created_by=eq.owner')&&c.url.includes('source_robisie_project_id=not.is.null')));
+});
+test('summary discards data if session ends during its read',async()=>{
+ const releases=[];const a=await api(async()=>{await new Promise(r=>releases.push(r));return response([]);},{access_token:'test',expires_at:9999999999,user:{id:'owner'}});const pending=a.earningsSummaryData();a.logout();releases.forEach(r=>r());await assert.rejects(pending,/Sesja zmieniła/);
+});

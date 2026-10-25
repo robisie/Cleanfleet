@@ -19,3 +19,12 @@ test('monthly projections use previous-month value without creating reminders or
 test('missing previous month remains unknown; unconfirmed candidate is not a current amount',()=>{const r=rem('r','Leasing','11',null,{mail_candidate:{amount:555,currency:'PLN'}});assert.equal(merge([r])[0].amount,null);assert(merge([r])[0].unknown);const s=state();assert.equal(W.summary({reminders:[r],earnings:[],projects:[],washes:[]},s,P,today).baseKnown,false);});
 test('Warsaw dates and year boundaries determine months; foreign watched payments never merge into PLN reminders',()=>{assert.equal(reminderDay('2026-10-31T23:30:00Z'),'2026-11-01');const r={...rem('a','Księgowa','08',null),due_at:'2027-01-08T09:00:00Z'},p={...old(r,99),due_at:'2026-12-08T09:00:00Z'};assert.equal(mergeReminderExpenses({reminders:[r,p]},state(),P,'2027-01-01',[])[0].amount,9900);const s=state();s.rules=[{...rule('eur','BNP Paribas'),currency:'EUR'}];const rows=merge([rem('b','BNP Paribas','13',100)],s);assert.equal(rows.length,2);assert(rows.some(r=>r.id==='eur'&&r.unknown));});
 test('explicit matches and exclusions are validated in the existing wallet state',()=>{const w={...W.defaults(),reminderLinks:{key:'rule'},excludedReminders:['key']};assert.equal(W.validateWallet(w),w);assert.throws(()=>W.validateWallet({...w,reminderLinks:{key:42}}));assert.throws(()=>W.validateWallet({...w,excludedReminders:'wrong'}));});
+
+test('paid and partially paid obligations retain full and paid amounts separately from forecast balance',()=>{
+ const r=rem('a','Księgowa','08',908.64,{paid_at:'2026-11-08',mail_invoice_enabled:true,mail_scan_status:'applied'});
+ let row=merge([r])[0];assert.equal(row.fullAmount,90864);assert.equal(row.paidAmount,90864);assert.equal(row.amount,0);assert.equal(row.settled,true);
+ const s=state();s.rules=[rule('bnp','BNP Paribas',40000)];s.transactions=[{id:'t',date:'2026-11-01',amount:20000,currency:'PLN',assignment:'bnp',month:'2026-11'}];
+ row=merge([rem('b','BNP Paribas','13',500)],s)[0];assert.equal(row.fullAmount,50000);assert.equal(row.paidAmount,20000);assert.equal(row.amount,30000);assert.equal(row.settled,false);
+ const a=rem('estimate','Karta paliwowa','24',null);row=merge([a,old(a,664.06)])[0];assert.equal(row.fullAmount,66406);assert.equal(row.paidAmount,0);assert.equal(row.amount,66406);assert(row.estimated);
+ row=merge([rem('unknown','Księgowa','08',null,{paid_at:'2026-11-08'})])[0];assert.equal(row.fullAmount,null);assert.equal(row.paidAmount,null);assert.equal(row.amount,0);assert(row.settled);
+});

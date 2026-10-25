@@ -1,3 +1,4 @@
+import * as Shopping from './shopping.js?v=1.0.82';
 import * as C from './core.js?v=1.0.80';
 import {paginateContract} from './pdf-layout.js?v=1.0.68';
 
@@ -8,7 +9,7 @@ export const MODULES=[
  ['works','Kalkulacja końcowa'],['summary','Podsumowanie prac i powierzchni'],
  ['payments','Etapy prac i rozliczenia'],['journal','Dziennik prac remontowych'],
  ['handover','Protokół zdawczo-odbiorczy'],['purchases','Zakupy i rozliczenie materiałów'],
- ['catalog','Cennik usług']
+ ['shopping','Do kupienia'],['catalog','Cennik usług']
 ];
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=C.money,q=C.quantity,date=v=>esc(v||'—');
@@ -35,6 +36,12 @@ function purchasesTable(items){
   return `<tr>${values.map((value,i)=>`<td class="${columns[i]}">${value}</td>`).join('')}</tr>`;
  }).join(''):`<tr><td colspan="7" class="empty">Brak zapisanych pozycji.</td></tr>`}</tbody></table>`;
 }
+function shoppingTable(project){
+ const items=Shopping.rows(project.payload).filter(item=>item.remaining>0),groups=new Map();
+ for(const item of items){const shop=item.shop||'Sklep nieokreślony';if(!groups.has(shop))groups.set(shop,[]);groups.get(shop).push(item);}
+ if(!items.length)return '<p class="empty">Wszystkie zakupy są odhaczone. Brak pozycji do kupienia.</p>';
+ return '<p class="note">Lista pozostałych zakupów. Przy zakupach częściowych podano tylko ilość pozostałą do kupienia.</p>'+[...groups].sort((a,b)=>a[0].localeCompare(b[0],'pl')).map(([shop,rows])=>`<h3>${esc(shop)}</h3>${table(['Kupione','Co kupić','Ilość','Jedn.'],rows.map(item=>`<tr><td><span class="shopping-tick" aria-label="Miejsce na zaznaczenie zakupu"></span></td><td>${esc(item.name)}</td><td>${esc(new Intl.NumberFormat('pl-PL',{maximumFractionDigits:6}).format(item.remaining))}</td><td>${esc(item.unit||'—')}</td></tr>`),'shopping-table')}`).join('');
+}
 function documentNumbers(project){const p=project.payload;return [
  ['Umowa',project.contract_number],['Wymiary pomieszczeń',C.attachment(project,'WYM')],
  ['Oferta',C.attachment(project,'OFE',C.activeOffer(p)?.version||1)],
@@ -53,11 +60,12 @@ function body(key,project,settings,offer){
  if(key==='payments')return `<h3>Etapy prac</h3>${table(['Etap i zakres','Udział','Kwota','Termin','Faktura','Wpłaty'],p.stages.map(s=>row([s.name+' — '+s.description,q(s.percent)+'%',money(t.agreed*C.number(s.percent)/100),s.due||'—',s.invoice||'—',money(C.effectiveReceipts(p).filter(r=>r.kind==='work'&&r.stageId===s.id).reduce((sum,r)=>sum+C.number(r.amount),0))])),'stages')}<h3>Wpłaty</h3>${table(['Data','Rodzaj','Etap','Kwota','Opis'],C.receiptRows(p).map(r=>row([r.date,r.kindLabel,r.stageLabel,money(r.amount),r.note])))}${totals([['Wartość całego zlecenia',money(t.works.after)],['Należność za wykonane prace',money(t.works.done)], [t.workRemaining<0?'Zaliczka na dalsze prace':'Pozostało za wykonane prace',money(Math.abs(t.workRemaining))],['Wpłaty za prace',money(t.paid)],...(t.workCredit?[['Uzgodniona obniżka za prace',money(t.workCredit)]]:[]),['Koszt materiałów przypisany inwestorowi',money(t.materials.charged)],['Zakupy bez przypisanej wpłaty',money(t.materials.outstanding)],['Zaliczki materiałowe',money(t.materials.advances)],['Pozostałe rozliczenie',money(t.remaining)]])}`;
  if(key==='journal')return `${table(['Data','Pomieszczenie','Prace i ustalenia','Inwestor','Wykonawca'],p.journal.map(x=>row([x.date,roomName(p,x.roomId),x.description,x.investorConfirmed?'Potwierdzono':'Podpis: ……………',x.contractorConfirmed?'Potwierdzono':'Podpis: ……………'])),'journal-table')}${signatures(['Wykonawca','Inwestor'])}`;
  if(key==='handover')return `${facts([['Data odbioru',p.handover.date],['Inwestor',p.investor],['Odbiorca',p.handover.receiver||p.investor],['Wykonawca',company.name],['Adres prac',p.address],['Termin realizacji',`${p.startDate||'—'} — ${p.endDate||'—'}`],['Akceptacja inwestora',p.handover.accepted?'Prace zaakceptowane':'Prace niezaakceptowane']])}<h3>Zakres wykonanych prac</h3>${linesTable(p,p.works.filter(l=>l.done))}<h3>Uwagi do odbioru</h3><p class="multiline">${esc(p.handover.notes||'Brak uwag.')}</p>${signatures(['Wykonawca','Odbiorca','Inwestor'])}`;
+ if(key==='shopping')return shoppingTable(project);
  if(key==='purchases')return `${purchasesTable(p.purchases)}<p class="note">Kwoty opłacone przez inwestora przy zakupach są automatycznie uwzględniane w zaliczkach na materiały.</p>${totals([['Rzeczywiste opłacone zakupy',money(t.materials.spent)],['Koszt przypisany inwestorowi',money(t.materials.charged)],['Zakupy bez przypisanej wpłaty',money(t.materials.outstanding)],['Zaliczki inwestora',money(t.materials.advances)],['Saldo materiałowe',money(t.materials.balance)]])}`;
  if(key==='catalog'){const groups=new Map();for(const x of settings.catalog){if(!groups.has(x.category))groups.set(x.category,[]);groups.get(x.category).push(x);}return `<p>Podwyższenie ceny bazowej: ${q(settings.markup)}%.</p>${[...groups].map(([category,items])=>`<h3>${esc(category)}</h3>${table(['Usługa','Jednostka','Cena bazowa','Cena po podwyższeniu'],items.map(x=>row([x.name,x.unit||'do ustalenia',money(x.base),money(x.base*(1+C.number(settings.markup)/100))])),'catalog-table')}`).join('')}`;}
  return '';
 }
-function identifier(key,project,offer){return ({data:project.contract_number,contract:project.contract_number,rooms:C.attachment(project,'WYM'),offer:C.attachment(project,'OFE',offer?.version||C.activeOffer(project.payload)?.version||1),works:C.attachment(project,'KAL-K'),payments:C.attachment(project,'ROZ'),journal:C.attachment(project,'DZR'),handover:C.attachment(project,'PZO'),purchases:C.attachment(project,'ZRM')})[key]||project.contract_number;}
+function identifier(key,project,offer){return ({data:project.contract_number,contract:project.contract_number,rooms:C.attachment(project,'WYM'),offer:C.attachment(project,'OFE',offer?.version||C.activeOffer(project.payload)?.version||1),works:C.attachment(project,'KAL-K'),payments:C.attachment(project,'ROZ'),journal:C.attachment(project,'DZR'),handover:C.attachment(project,'PZO'),shopping:C.attachment(project,'ZAK'),purchases:C.attachment(project,'ZRM')})[key]||project.contract_number;}
 export function buildDocument(project,settings,{modules=MODULES.map(([key])=>key),logoUrl='./assets/robisie-logo.png',offer}={}){
  const chosen=MODULES.filter(([key])=>modules.includes(key));
  if(!chosen.length)throw new Error('Wybierz przynajmniej jedną część dokumentu.');
@@ -69,6 +77,7 @@ export function buildDocument(project,settings,{modules=MODULES.map(([key])=>key
  .contract-page{display:flex;flex-direction:column;width:210mm;max-width:none;height:297mm;padding:15mm 14mm 17mm;overflow:visible}.contract-page>.document-header,.contract-page>.contract,.contract-page>.contract-signatures{flex-shrink:0}.contract-page>.contract{display:flow-root}.contract-signatures{display:flex;gap:12mm;margin-top:auto;padding-top:16mm;break-inside:avoid;font:10pt Arial;text-align:center}.contract-signatures>div{flex:1;min-width:0}.contract-signatures p{margin:0 0 2mm;white-space:pre-wrap}.contract-signatures span{display:block}.contract-page .document-header img{width:54mm}.contract-page .heading h1{font-size:19pt}@media print{.contract-page{width:auto;height:265mm;padding:0;margin:0;break-inside:avoid}}
 
  /* Materials have an independent A4 layout; other document tables keep their styles. */
+ .shopping-table th:first-child{width:13%}.shopping-table th:nth-child(2){width:59%}.shopping-table th:nth-child(3){width:16%}.shopping-table th:last-child{width:12%}.shopping-table td:nth-child(3){text-align:right;font-variant-numeric:tabular-nums}.shopping-tick{display:block;width:4mm;height:4mm;border:1px solid #51595f;margin:0 auto}.shopping-table td{padding:2.5mm 2mm}
  .purchases-table{font-size:8pt;line-height:1.35;table-layout:fixed}
  .purchases-table th,.purchases-table td{padding:1.6mm 1.1mm;overflow-wrap:normal;word-break:normal;hyphens:none;white-space:normal}
  .purchases-table td.purchase-date,.purchases-table td.purchase-document,.purchases-table td.purchase-money{white-space:nowrap}

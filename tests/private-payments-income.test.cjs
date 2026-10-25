@@ -33,7 +33,7 @@ test('imports keep all credits without rules, deduplicate overlapping PDFs and r
 test('out-of-range credit saves safely without full-month confirmation',()=>{const b={hash:'a',range:{from:'2026-02-01',to:'2026-02-28'},warnings:[],transactions:[],incomes:[credit]},c=importContext([b]),s={imports:[],incomes:[],transactions:[],rules:[]};c.appendImport(s,[b],[]);assert.equal(s.imports[0].complete,false);assert.equal(s.incomes.length,1);assert.match(c.importProblems(b)[0],/2026-01-10.*2026-02-01/);});
 test('legacy vaults migrate safely; income and exclusions survive encryption, backup, and PIN change',async()=>{
  const {validateCash}=await import('../app/priv/cash.js'),v=await import('../app/priv/vault.js');
- const c=vm.createContext({P,validateCash});vm.runInContext(ui.slice(ui.indexOf('function validate(s)'),ui.indexOf('\nfunction notice(')),c);
+ const {validateWallet}=await import('../app/priv/wallet-core.js');const c=vm.createContext({P,validateCash,validateWallet});vm.runInContext(ui.slice(ui.indexOf('function validate(s)'),ui.indexOf('\nfunction notice(')),c);
  const old={version:1,rules:[],transactions:[],imports:[]};c.validate(old);assert.equal(old.incomes.length,0);assert.equal(old.cash.length,0);
  const state={...old,incomes:[{...credit,excluded:true}]},salt=v.newSalt(),key=await v.keyFor('test-income-pin',salt),encrypted=await v.seal(c.validate(state),key,salt);assert(!JSON.stringify(encrypted).includes('Nadawca'));
  const restored=c.validate(await v.open(JSON.parse(JSON.stringify(encrypted)),key));assert.deepEqual(restored.incomes,state.incomes);

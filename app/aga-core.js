@@ -5,6 +5,13 @@ export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'
 export function amount(value){const n=Number(String(value??'').replace(',','.'));if(!Number.isFinite(n))throw Error('Nieprawidłowa liczba.');return round(n);}
 export function validDate(value){return /^\d{4}-\d{2}-\d{2}$/.test(value)&&!isNaN(Date.parse(value))&&new Date(value+'T12:00:00Z').toISOString().slice(0,10)===value;}
 export function invoice(data,previous={}){const gross=amount(data.amount),rate=amount(data.rate);if(!validDate(data.date)||gross<=0||rate<0||rate>=100)throw Error('Uzupełnij datę, dodatnią kwotę i potrącenie od 0 do mniej niż 100%.');return {...previous,id:previous.id||crypto.randomUUID(),date:data.date,amount:gross,rate,description:String(data.description||'').trim(),number:String(data.number||'').trim(),received:data.received==null?null:!!data.received,note:String(data.note||'').trim()};}
+// Cash is the amount left after the invoice's fixed 9% reserve, not its gross value.
+export function invoiceFromCash(netCents){
+ if(!Number.isSafeInteger(netCents)||netCents<=0)throw Error('Do podpowiedzi potrzebne jest dodatnie saldo gotówki.');
+ const center=Math.round(netCents/0.91);if(!Number.isSafeInteger(center)||!Number.isSafeInteger(center*9))throw Error('Kwota jest zbyt duża.');
+ for(let gross=center-3;gross<=center+3;gross++){if(gross<=0)continue;const value=gross/100,reserve=round(value*9/100),net=round(value-reserve);if(Math.round(net*100)===netCents)return {amount:value,reserve,net,rate:9};}
+ throw Error('Nie udało się dopasować kwoty faktury.');
+}
 export function monthsFor(period){const match=/^(\d{4})-(?:(0[1-9]|1[0-2])|Q([1-4]))$/.exec(period||'');if(!match)throw Error('Wybierz miesiąc lub kwartał podatku.');const start=match[2]?Number(match[2]):(Number(match[3])-1)*3+1;return Array.from({length:match[2]?1:3},(_,i)=>match[1]+'-'+String(start+i).padStart(2,'0'));}
 export function tax(data,previous={},taxes=[]){const value=amount(data.amount),months=monthsFor(data.period);if(value<0||(!validDate(data.date)&&!(previous.id&&!previous.date&&!data.date)))throw Error('Podaj datę i podatek nie mniejszy od zera.');if(taxes.some(row=>row.id!==previous.id&&monthsFor(row.period).some(m=>months.includes(m))))throw Error('Ten okres podatku jest już rozliczany innym wpisem. Edytuj istniejący wpis lub wybierz inny okres.');return {...previous,id:previous.id||crypto.randomUUID(),period:data.period,date:data.date,amount:value,note:String(data.note||'').trim()};}
 export function annualSummary(data,year){

@@ -27,7 +27,7 @@ test('completed lists are grouped by contractor and every group starts collapsed
 
 test('wallet shows exactly two ordered rows of four components and four results',async()=>{
  const h=host(),s={rules:[],transactions:[],cash:[],wallet:defaults()};mount(h,{getState:()=>s,persist:async()=>{},db:database(),owner:'owner',allowed:()=>true,P,today:()=> '2026-10-25'});await tick();
- const components=[...h.innerHTML.matchAll(/<div class="wallet-card [^"]*"><small>(.*?)<\/small>/g)].map(m=>m[1]),results=[...h.innerHTML.matchAll(/<div class="wallet-result"><h3>(.*?)<\/h3>/g)].map(m=>m[1]);
+ const components=[...h.innerHTML.matchAll(/<div class="wallet-card [^"]*"><details[^>]*><summary[^>]*><small>(.*?)<\/small>/g)].map(m=>m[1]),results=[...h.innerHTML.matchAll(/<div class="wallet-result"><details[^>]*><summary[^>]*><h3>(.*?)<\/h3>/g)].map(m=>m[1]);
  assert.deepEqual(components,['Zarobiłem','Mam w gotówce','Koszty','Pracownicy']);assert.deepEqual(results,['Wynik teraz','Wynik + CleanFleet','Wynik + Robisię','Suma wszystkiego']);assert.match(h.innerHTML,/Zarobiłem \+ mam w gotówce − koszty − pracownicy/);
 });
 

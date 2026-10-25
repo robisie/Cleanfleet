@@ -49,14 +49,14 @@ test('remainder stays numeric without payments and preserves negative balances',
 test('monthly ledger groups invoice and tax rows together, highlights the correct remainder and prints all months',async()=>{
  const t=await setup({taxes:[{id:'tax',period:'2026-01',date:'2026-02-10',amount:40}]});
  const html=t.node('root').innerHTML,months=[...html.matchAll(/<details class="aga-month"[^>]*>([\s\S]*?)<\/details>/g)];assert.equal(months.length,12);
- const january=months[0][1];assert(january.includes('Styczeń 2026'));assert(january.includes('01.01.2026'));assert(january.includes('10.02.2026'));assert(january.includes('Wpłata podatku'));assert(january.includes('data-id="i"'));assert(january.includes('data-id="tax"'));assert(january.includes('Suma miesiąca'));assert(january.includes('<td class="aga-balance">'+Core.money(50)));
- assert(!months[1][1].includes('data-id="tax"'));assert.equal(html.split('data-id="i"').length-1,1);assert(!html.includes('<h3>Faktury</h3>'));
+ const january=months.find(m=>m[1].includes('Styczeń 2026'))[1];assert.equal((html.match(/<details class="aga-month" open>/g)||[]).length,0);const current=Core.today().slice(0,7);assert(months[0][1].includes(['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'][Number(current.slice(5))-1]));assert(january.includes('Styczeń 2026'));assert(january.includes('01.01.2026'));assert(january.includes('10.02.2026'));assert(january.includes('Wpłata podatku'));assert(january.includes('data-id="i"'));assert(january.includes('data-id="tax"'));assert(january.includes('Suma miesiąca'));assert(january.includes('<td class="aga-balance">'+Core.money(50)));
+ assert(!months.find(m=>m[1].includes('Luty 2026'))[1].includes('data-id="tax"'));assert.equal(html.split('data-id="i"').length-1,1);assert(!html.includes('<h3>Faktury</h3>'));
  t.click('pdf');assert.equal((t.writes[0].match(/<details class="aga-month" open>/g)||[]).length,12);assert(!t.writes[0].includes('data-id="i"'));
 });
 test('quarterly tax is never subtracted separately from each month',async()=>{
  const t=await setup({taxes:[{id:'quarter',period:'2026-Q1',date:'2026-04-10',amount:40}]});
  const months=[...t.node('root').innerHTML.matchAll(/<details class="aga-month"[^>]*>([\s\S]*?)<\/details>/g)];
- for(const m of months.slice(0,3)){assert(m[1].includes('podatek kwartalny'));assert(m[1].includes('W kwartale'));assert(!m[1].includes('data-id="quarter"'));assert(m[1].includes('<td class="aga-balance">—'));}
+ for(const m of months.filter(m=>['Styczeń 2026','Luty 2026','Marzec 2026'].some(name=>m[1].includes(name)))){assert(m[1].includes('podatek kwartalny'));assert(m[1].includes('W kwartale'));assert(!m[1].includes('data-id="quarter"'));assert(m[1].includes('<td class="aga-balance">—'));}
 });
 
 test('invoice form suggests gross from cash after 9 percent without changing cash or auto-saving',async()=>{

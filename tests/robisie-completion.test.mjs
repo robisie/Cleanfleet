@@ -1,3 +1,4 @@
+import * as Shopping from '../app/robisie/shopping.js';
 import * as Completion from '../app/robisie/completion.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,7 +22,7 @@ async function open(db){
  }};
  const context=vm.createContext({console,crypto,structuredClone,URL,FormData:class extends Map{constructor(fields){super(Object.entries(fields));}getAll(key){const value=this.get(key);return Array.isArray(value)?value:value?[value]:[];}},setTimeout(fn,ms){const timer=setTimeout(fn,ms);timers.push(timer);return timer;},clearTimeout,confirm:()=>accept,fetch:async()=>({ok:true,json:async()=>[]}),window:{location:{href:'https://test.local/app/robisie/'},scrollY:0,scrollTo(){},addEventListener(){}},document:{body:{style:{}},documentElement:{style:{}},querySelector:node,querySelectorAll:()=>[],addEventListener(type,fn){events.set(type,fn);}}});
  const mod=new vm.SourceTextModule(source+`\nexport {receiptDialog};export const data=()=>selected;export function setup(row){all=[structuredClone(row)];selected=structuredClone(row);config={revision:1,payload:{catalog:[],company:{}}};configBaseline=structuredClone(config);view='payments';projectDirty=settingsDirty=dirty=false;render();}`,{context});
- await mod.link(spec=>{const values=spec.includes('completion.js')?Completion:spec.includes('purchase-settlement-form')?PurchaseSettlementForm:spec.includes('purchase-settlement')?PurchaseSettlement:spec.includes('invoices')?BI:spec.includes('autosave')?Auto:spec.includes('core')?C:spec.includes('pdf')?PDF:api;return new vm.SyntheticModule(Object.keys(values),function(){for(const [key,value]of Object.entries(values))this.setExport(key,value);},{context});});
+ await mod.link(spec=>{const values=spec.includes('shopping.js')?Shopping:spec.includes('completion.js')?Completion:spec.includes('purchase-settlement-form')?PurchaseSettlementForm:spec.includes('purchase-settlement')?PurchaseSettlement:spec.includes('invoices')?BI:spec.includes('autosave')?Auto:spec.includes('core')?C:spec.includes('pdf')?PDF:api;return new vm.SyntheticModule(Object.keys(values),function(){for(const [key,value]of Object.entries(values))this.setExport(key,value);},{context});});
  await mod.evaluate();await new Promise(resolve=>setImmediate(resolve));mod.namespace.setup(db);
  return {app:mod.namespace,node,accept(value){accept=value;},async click(action,id,extra={}){await events.get('click')({preventDefault(){},target:{closest:()=>({dataset:{action,id,...extra},isConnected:true})}});},async submit(fields){await node('#modal-form').onsubmit({preventDefault(){},target:fields});},close(){timers.forEach(clearTimeout);}};
 }

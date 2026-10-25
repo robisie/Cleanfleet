@@ -1,3 +1,4 @@
+import * as Shopping from '../app/robisie/shopping.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
@@ -18,7 +19,7 @@ async function setup(){
  export const panelState=()=>({selected,view});export {overviewTasks,overviewEvents,loadStageInvoices};
  export function stubActions(push){purchaseDialog=async id=>push(['purchase',id]);receiptDialog=id=>push(['receipt',id]);settlePurchasesDialog=async()=>push(['settle']);completionDialog=async()=>push(['finish']);pdfDialog=()=>push(['pdf']);journalDialog=id=>push(['journal',id]);tripDialog=id=>push(['trip',id]);settlementDialog=async()=>push(['settlement']);}
  `,{context});
- await module.link(spec=>{const values=spec.includes('core.js')?C:spec.includes('autosave')?Auto:spec.includes('invoices.js')?BI:spec.includes('completion.js')?Completion:spec.includes('api.js')?api:{};return new vm.SyntheticModule(Object.keys(values),function(){for(const [key,value]of Object.entries(values))this.setExport(key,value);},{context});});await module.evaluate();await new Promise(resolve=>setImmediate(resolve));module.namespace.stubActions(value=>calls.push(value));
+ await module.link(spec=>{const values=spec.includes('shopping.js')?Shopping:spec.includes('core.js')?C:spec.includes('autosave')?Auto:spec.includes('invoices.js')?BI:spec.includes('completion.js')?Completion:spec.includes('api.js')?api:{};return new vm.SyntheticModule(Object.keys(values),function(){for(const [key,value]of Object.entries(values))this.setExport(key,value);},{context});});await module.evaluate();await new Promise(resolve=>setImmediate(resolve));module.namespace.stubActions(value=>calls.push(value));
  const row={id:'project',contract_number:'UUR-RS/2026/10/001',revision:1,payload:C.newProject('Test','Inwestor')};
  return {n:module.namespace,node,row,messages,calls,setReader:reader=>readStages=reader,click:async(action,extra={})=>{const b={dataset:{action,...extra},isConnected:true,href:'https://cleanfleet.pl/bill/?new=1&brand=robisie&source=project'};await listeners.get('click')({preventDefault(){},target:{closest:()=>b}});}};
 }

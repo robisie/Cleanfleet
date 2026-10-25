@@ -99,7 +99,7 @@ async function cfShowEarnings(host=null,allowed=()=>cfIsAdmin()&&Boolean(window.
   const overlay=document.getElementById('cfEarningsOverlay');
   const close=()=>{root.innerHTML='';};
   overlay.querySelector('[data-close]')?.addEventListener('click',close);
-  overlay.addEventListener('click',e=>{if(e.target===overlay) close();});
+  overlay.addEventListener('click',e=>{if(!host&&e.target===overlay) close();});
 
   const state={rows:[],rules:[],contractors:[],presetRows:[]};
   const workerBubbles=[document.getElementById('cfEmployeeBreakdown'),document.getElementById('cfUnpaidBreakdown')];

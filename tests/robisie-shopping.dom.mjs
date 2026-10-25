@@ -1,3 +1,4 @@
+import * as PDF from '../app/robisie/pdf.js';
 // Run with SHOPPING_DOM_MODULE pointing to an installed happy-dom module (20.8.4).
 // Uses a synthetic API and DOM, never connects to a production account.
 import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {readFile} from 'node:fs/promises';
@@ -5,13 +6,14 @@ import * as C from '../app/robisie/core.js';import * as Shopping from '../app/ro
 const {Window}=await import(process.env.SHOPPING_DOM_MODULE||'happy-dom');
 async function setup(){
  const window=new Window({url:'https://example.test/app/robisie/'});window.document.body.innerHTML='<div id="app"></div><dialog id="dialog"></dialog><div id="toast"></div>';window.scrollTo=()=>{};window.document.querySelector('#dialog').showModal=function(){this.open=true;};window.document.querySelector('#dialog').close=function(){this.open=false;};
+ const previews=[];window.open=()=>({document:{write:html=>previews.push(html),close(){}}});
  const db={id:'project',contract_number:'UUR-RS/2026/10/001',revision:1,payload:C.newProject('Shopping test','Investor')},writes=[];let failing=false;
  const api={restoreSession:()=>null,getSession:()=>({user:{id:'owner'}}),project:async()=>structuredClone(db),saveProject:async(row,payload)=>{if(failing)throw Error('Offline test');assert.equal(row.id,db.id);assert.equal(row.revision,db.revision);writes.push(structuredClone(payload));db.payload=structuredClone(payload);db.revision++;return structuredClone(db);}};
  const timers=new Set(),context=vm.createContext({console,crypto,structuredClone,URL,window,document:window.document,location:window.location,FormData:window.FormData,confirm:()=>true,localStorage:window.localStorage,setTimeout:(fn,ms)=>{const id=setTimeout(fn,ms);timers.add(id);return id},clearTimeout,fetch:async()=>({ok:true,json:async()=>[]})});
- const source=await readFile(new URL('../app/robisie/app.js',import.meta.url),'utf8'),module=new vm.SourceTextModule(source+`\nexport function configure(row){selected=structuredClone(row);all=[structuredClone(row)];config={payload:{catalog:[],company:{},shops:[]},revision:1};configBaseline=structuredClone(config);view='shopping';projectDirty=settingsDirty=dirty=false;render();}export {shoppingDialog,shoppingMatchDialog,flushChanges,undoChanges,refreshLinkedInvestment};export const data=()=>selected;`,{context});
- await module.link(spec=>{const values=spec.includes('shopping.js')?Shopping:spec.includes('autosave')?Auto:spec.includes('core.js')?C:spec.includes('api.js')?api:{};return new vm.SyntheticModule(Object.keys(values),function(){for(const [k,v]of Object.entries(values))this.setExport(k,v)},{context})});await module.evaluate();await new Promise(r=>setImmediate(r));module.namespace.configure(db);
+ const source=await readFile(new URL('../app/robisie/app.js',import.meta.url),'utf8'),module=new vm.SourceTextModule(source+`\nexport function configure(row){selected=structuredClone(row);all=[structuredClone(row)];config={payload:{catalog:[],company:{},shops:[]},revision:1};configBaseline=structuredClone(config);view='shopping';projectDirty=settingsDirty=dirty=false;render();}export {pdfDialog,shoppingDialog,shoppingMatchDialog,flushChanges,undoChanges,refreshLinkedInvestment};export const data=()=>selected;`,{context});
+ await module.link(spec=>{const values=spec.includes('shopping.js')?Shopping:spec.includes('autosave')?Auto:spec.includes('core.js')?C:spec.includes('api.js')?api:spec.includes('pdf.js')?PDF:{};return new vm.SyntheticModule(Object.keys(values),function(){for(const [k,v]of Object.entries(values))this.setExport(k,v)},{context})});await module.evaluate();await new Promise(r=>setImmediate(r));module.namespace.configure(db);
  const $=s=>window.document.querySelector(s),fill=(name,value)=>{$(`[name="${name}"]`).value=String(value)},submit=()=>$('#modal-form').onsubmit({preventDefault(){},target:$('#modal-form')});
- return {n:module.namespace,db,writes,$,fill,submit,window,fail:()=>failing=true,close:async()=>{for(const id of timers)clearTimeout(id);await window.happyDOM.abort()}};
+ return {n:module.namespace,db,writes,previews,$,fill,submit,window,fail:()=>failing=true,close:async()=>{for(const id of timers)clearTimeout(id);await window.happyDOM.abort()}};
 }
 test('shopping forms persist, match real rendered selectors, escape names and preserve cost totals',async()=>{
  const t=await setup();try{
@@ -33,5 +35,13 @@ test('rendered checkbox records and undoes a purchase through the normal save qu
  // Default remaining-only filter hides bought rows; switching to All makes undo available.
  await new Promise(r=>setImmediate(r));assert.equal(t.$('.shopping-item'),null);t.$('#shopping-filter').value='all';t.$('#shopping-filter').dispatchEvent(new t.window.Event('change',{bubbles:true}));assert(t.$('[data-action="shopping-check"]').checked);
  t.$('[data-action="shopping-check"]').click();for(let i=0;i<20&&t.db.payload.shoppingList[0].boughtQuantity;i++)await new Promise(r=>setImmediate(r));assert.equal(t.db.payload.shoppingList[0].boughtQuantity,0);assert.equal(t.db.payload.purchases.length,0);
+ }finally{await t.close()}
+});
+
+test('shopping PDF is selected in the document chooser and its direct button prints remaining purchases',async()=>{
+ const t=await setup();try{
+ t.n.pdfDialog();const boxes=[...t.$('#modal-form').querySelectorAll('[name="pdfModule"]')];assert.deepEqual(boxes.filter(b=>b.checked).map(b=>b.value),['shopping']);t.$('#dialog').close();
+ t.n.shoppingDialog();t.fill('name','Grunt do kupienia');t.fill('quantity',3);await t.submit();
+ t.$('[data-action="shopping-print"]').click();for(let i=0;i<20&&!t.previews.length;i++)await new Promise(r=>setImmediate(r));assert.equal(t.previews.length,1);assert(t.previews[0].includes('data-module="shopping"'));assert(t.previews[0].includes('Grunt do kupienia'));assert(!t.previews[0].includes('data-module="contract"'));
  }finally{await t.close()}
 });

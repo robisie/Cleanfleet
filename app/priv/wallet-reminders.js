@@ -1,0 +1,34 @@
+// Read-only reminder obligations. Amounts returned here are PLN grosze.
+const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ł/g,'l').replace(/Ł/g,'L').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const number=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))&&Number(v)>=0?Math.round(Number(v)*100):null;
+export function reminderDay(value){if(!value)return '';const d=new Date(value);return Number.isFinite(+d)?new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(d):'';}
+const due=r=>reminderDay(r.due_at||r.mail_anchor_due_at);
+const anchor=r=>reminderDay(r.mail_anchor_due_at||r.due_at);
+const base=r=>[norm(r.title),norm(r.payee),norm(r.vehicle_plate)].join('|');
+function slot(r){const day=anchor(r);if(!day)return '';const [y,m,d]=day.split('-').map(Number);return d===new Date(Date.UTC(y,m,0)).getUTCDate()?'end':String(d);}
+export const reminderKey=r=>base(r)+'|'+slot(r);
+export function estimateCategory(r){const s=norm([r.title,r.payee].join(' '));if(/\bksieg/.test(s))return 'accountant';if(/\bbnp\b|\bparibas\b/.test(s))return 'bnp';if(/\bleasing|\bleaselink\b|\blease link\b/.test(s))return 'leasing';if(/\bfleet\b|\bflota\b|\bpaliw/.test(s))return 'fuel';return '';}
+function amountInfo(r,history,previous){if(number(r.amount)!==null)return {amount:number(r.amount),estimated:false,reference:due(r),note:r.mail_invoice_enabled&&r.mail_scan_status==='applied'?'Kwota z bieżącego maila':'Kwota z przypomnienia'};
+ if(!estimateCategory(r))return {amount:null,estimated:false,note:'Brak potwierdzonej kwoty — bez automatycznego szacowania'};
+ const old=history.filter(h=>due(h).startsWith(previous)&&reminderKey(h)===reminderKey(r)&&number(h.amount)!==null).sort((a,b)=>due(b).localeCompare(due(a))||String(b.id).localeCompare(String(a.id)));
+ if(!old.length)return {amount:null,estimated:false,note:'Brak kwoty z poprzedniego miesiąca'};
+ const latest=due(old[0]),same=old.filter(h=>due(h)===latest);if(new Set(same.map(h=>number(h.amount))).size>1)return {amount:null,estimated:false,note:'Różne historyczne kwoty — wymaga sprawdzenia'};
+ return {amount:number(old[0].amount),estimated:true,reference:latest,note:'Szacunkowo — kwota z '+previous};
+}
+function sameInvoice(a,b){return a.invoice_number&&b.invoice_number&&norm(a.invoice_number)===norm(b.invoice_number)&&base(a)===base(b);}
+function candidates(r,rules,P){const names=[r.title,r.payee].map(norm).filter(s=>s.length>=4&&!['abonament miesieczny','faktura za paliwo','rata','platnosc'].includes(s));const exact=rules.filter(rule=>[rule.name,rule.recipient,...(rule.aliases||[])].map(norm).some(s=>names.includes(s)));if(exact.length)return exact;const category=estimateCategory(r);return category?rules.filter(rule=>estimateCategory({title:rule.name,payee:rule.recipient})===category):[];}
+export function mergeReminderExpenses(data,state,P,today,existing){
+ const month=today.slice(0,7),previous=P.monthShift(month,-1),history=(data.reminders||[]).filter(r=>r.is_payment&&['active','snoozed','done'].includes(r.status)&&due(r)),wallet=state.wallet||{},links=wallet.reminderLinks||{},excluded=new Set(wallet.excludedReminders||[]),rules=(state.rules||[]).filter(rule=>rule.currency==='PLN'),current=history.filter(r=>due(r).startsWith(month));
+ // A recurring eligible reminder can still be awaiting completion in the previous month.
+ for(const r of history.filter(r=>due(r).startsWith(previous)&&r.recurrence==='monthly'&&estimateCategory(r))){if(current.some(c=>reminderKey(c)===reminderKey(r)))continue;const key=reminderKey(r);if(excluded.has(key))continue;const day=slot(r),last=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5)),0)).getUTCDate(),at=month+'-'+String(day==='end'?last:Math.min(Number(day),last)).padStart(2,'0');current.push({...r,id:'projection:'+key,due_at:at+'T12:00:00Z',mail_anchor_due_at:at+'T12:00:00Z',amount:null,invoice_number:null,status:'active',paid_at:null,projected:true});}
+ const unique=[];for(const r of current){const earlier=unique.findIndex(x=>x.id===r.id||sameInvoice(x,r));if(earlier<0)unique.push(r);else if(r.paid_at&&!unique[earlier].paid_at)unique[earlier]=r;}
+ const groups=new Map(),ambiguous=[];for(const r of unique){const key=reminderKey(r);if(excluded.has(key))continue;const info=amountInfo(r,history,previous),possible=candidates(r,rules,P),manual=links[key],linked=manual==='none'?null:manual?rules.find(rule=>rule.id===manual):possible.length===1?possible[0]:null;
+ // Multiple eligible rules or a stale explicit link require a user choice, never a guessed merge.
+ const conflict=manual&&manual!=='none'&&!linked||!manual&&possible.length>1;if(conflict){ambiguous.push({id:'reminder:'+r.id,source:'reminder',name:r.title||r.payee||'Przypomnienie',date:due(r),amount:r.paid_at?0:null,unknown:!r.paid_at,currency:'PLN',estimated:info.estimated,note:'Niejednoznaczne powiązanie z Moimi płatnościami — wybierz poniżej',links:[{key,name:r.title||r.payee,selected:manual||'',options:rules}],reminderIds:[r.id]});continue;}
+ if(linked&&(wallet.excludedRules||[]).includes(linked.id))continue;const groupKey=linked?'rule:'+linked.id:'reminder:'+key;if(!groups.has(groupKey))groups.set(groupKey,{rule:linked,items:[]});groups.get(groupKey).items.push({r,key,info});}
+ const replaced=new Set(),result=[];for(const [groupKey,group]of groups){const {rule,items}=group;if(rule)replaced.add(rule.id);const allPaid=items.every(x=>!!x.r.paid_at),known=items.every(x=>x.info.amount!==null),gross=items.reduce((n,x)=>n+(x.info.amount??0),0),paidReminders=items.filter(x=>x.r.paid_at).reduce((n,x)=>n+(x.info.amount??0),0);let bankPaid=0;
+ if(rule&&rule.currency==='PLN'){const payment=P.status({...state,transactions:(state.transactions||[]).filter(t=>t.currency==='PLN')},rule,P.monthShift(month,rule.offset),today);bankPaid=payment.total;}
+ const unknown=!allPaid&&!known,amount=allPaid?0:unknown?null:Math.max(0,gross-Math.max(paidReminders,bankPaid)),estimated=items.some(x=>x.info.estimated&&!x.r.paid_at),name=rule?.name||items[0].r.title||items[0].r.payee||'Przypomnienie',notes=[...new Set(items.map(x=>x.info.note))];
+ result.push({id:groupKey,source:'reminder',name:name+(items.length>1?' · '+items.length+' przypomnienia':''),date:items.map(x=>due(x.r)).sort()[0],amount,unknown,currency:'PLN',estimated,paid:allPaid,note:notes.join(' · ')+(rule?' · Połączone z Moimi płatnościami; zapłaty liczone raz':''),reminderIds:items.map(x=>x.r.id),links:items.map(x=>({key:x.key,name:x.r.title||x.r.payee,selected:links[x.key]||'',options:rules})),details:items.map(x=>({name:x.r.title||x.r.payee,date:due(x.r),amount:x.info.amount,paid:!!x.r.paid_at,estimated:x.info.estimated}))});}
+ return [...existing.filter(r=>r.source!=='rule'||!replaced.has(r.id)),...result,...ambiguous].sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name,'pl'));
+}

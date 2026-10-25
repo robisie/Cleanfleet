@@ -1,4 +1,4 @@
-import {mergeReminderExpenses} from './wallet-reminders.js?v=4';
+import {mergeReminderExpenses} from './wallet-reminders.js?v=5';
 import * as C from '../robisie/core.js?v=1.0.81';
 import {summary as completion} from '../robisie/completion.js?v=1.0.80';
 import {cashBalance} from './cash.js?v=112';

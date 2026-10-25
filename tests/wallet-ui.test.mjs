@@ -17,7 +17,7 @@ test('wallet shows reminder estimates and saves an explicit payment link in the 
 test('wallet monthly cost table shows full invoice value without payment status or payment actions',async()=>{
  const h=host(),s={rules:[],transactions:[],cash:[],wallet:defaults()},reminders=[{id:'paid',title:'Kasia księgowa',payee:'Abonament miesięczny',is_payment:true,status:'done',amount:908.64,due_at:'2026-10-14T09:00:00Z',paid_at:'2026-10-14T10:00:00Z',mail_invoice_enabled:true,mail_scan_status:'applied'}];
  mount(h,{getState:()=>s,persist:async()=>{},db:database({reminders}),owner:'owner',allowed:()=>true,P,today:()=> '2026-10-25'});await tick();
- assert.match(h.innerHTML,/<th>Koszt miesiąca<\/th>/);assert.match(h.innerHTML,/908,64/);assert.doesNotMatch(h.innerHTML,/<th>Zapłacono|<th>Do zapłaty|wallet-paid|data-expense-paid/);assert.match(h.innerHTML,/niezależnie od ich zapłaty/);
+ assert.match(h.innerHTML,/<th>Koszt miesiąca<\/th>/);assert.match(h.innerHTML,/908,64/);assert.doesNotMatch(h.innerHTML,/<th>Zapłacono|<th>Do zapłaty|wallet-paid|data-expense-paid/);assert.match(h.innerHTML,/niezależnie od ich zapłaty/);assert.match(h.innerHTML,/<details class="wallet-link-settings"><summary>Zmień powiązanie/);assert.doesNotMatch(h.innerHTML,/<details class="wallet-link-settings" open>/);
 });
 test('completed lists are grouped by contractor and every group starts collapsed',async()=>{
  const h=host(),s={rules:[],transactions:[],cash:[],wallet:defaults()},earnings=[{id:'1',contractor:'Browar',description:'Sprzątanie',work_date:'2026-10-20',total_amount:100,my_amount:80,employee_amount:20},{id:'2',contractor:'Browar',description:'Mycie',work_date:'2026-10-21',total_amount:50,my_amount:40,employee_amount:10},{id:'3',contractor:'Ktoś <test>',work_date:'2026-10-22',total_amount:50,my_amount:50,employee_amount:0}];
@@ -29,4 +29,9 @@ test('wallet shows exactly two ordered rows of four components and four results'
  const h=host(),s={rules:[],transactions:[],cash:[],wallet:defaults()};mount(h,{getState:()=>s,persist:async()=>{},db:database(),owner:'owner',allowed:()=>true,P,today:()=> '2026-10-25'});await tick();
  const components=[...h.innerHTML.matchAll(/<div class="wallet-card [^"]*"><small>(.*?)<\/small>/g)].map(m=>m[1]),results=[...h.innerHTML.matchAll(/<div class="wallet-result"><h3>(.*?)<\/h3>/g)].map(m=>m[1]);
  assert.deepEqual(components,['Zarobiłem','Mam w gotówce','Koszty','Pracownicy']);assert.deepEqual(results,['Wynik teraz','Wynik + CleanFleet','Wynik + Robisię','Suma wszystkiego']);assert.match(h.innerHTML,/Zarobiłem \+ mam w gotówce − koszty − pracownicy/);
+});
+
+test('only ambiguous reminder mappings expand their settings automatically',async()=>{
+ const h=host(),rules=['one','two'].map(id=>({id,name:'BNP Paribas',recipient:'BNP Paribas',currency:'PLN',expected:10000,day:13,start:'2026-01',offset:0})),s={rules,transactions:[],cash:[],wallet:defaults()},reminders=[{id:'r',title:'BNP Paribas',payee:'BNP Paribas',amount:100,due_at:'2026-10-13T09:00:00Z',is_payment:true,status:'active'}];
+ mount(h,{getState:()=>s,persist:async()=>{},db:database({reminders}),owner:'owner',allowed:()=>true,P,today:()=> '2026-10-25'});await tick();assert.match(h.innerHTML,/<details class="wallet-link-settings" open><summary>Wybierz powiązanie/);assert.match(h.innerHTML,/data-reminder-link/);
 });

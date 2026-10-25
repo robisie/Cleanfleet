@@ -65,7 +65,7 @@
     disposeActive=close;
     if(!host)document.addEventListener('keydown',key,true);
     overlay.querySelector('header button').onclick=close;
-    overlay.onclick=event=>{if(event.target===overlay)close();};
+    overlay.onclick=event=>{if(!host&&event.target===overlay)close();};
     function render(){
       list.replaceChildren();
       points.forEach((point,index)=>{

@@ -6,7 +6,7 @@ const load=src=>new Promise((resolve,reject)=>{const s=document.createElement('s
 try{
  user=await administrator(db);if(!user)throw Error('Zaloguj się w Robisię Pack jako administrator.');live=true;
  db.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT'||session&&session.user.id!==user.id)deny('Sesja administratora została zakończona.');});
- for(const src of ['/app/calendar-engine.js?v=20260917-4','/app/weather-engine.js?v=20260917-1','/app/reminder-form-v1251.js?v=20261004-15415','/pack/calendar-view.js?v=120','/app/calendar-touch-v1251.js?v=20260917-3','/app/calendar-reminder-edit-v1261.js?v=20260917-1','/app/calendar-ageing-dnd-v1270.js?v=20260917-2']){if(!live)break;await load(src);}
+ for(const src of ['/app/calendar-engine.js?v=20260917-4','/app/weather-engine.js?v=20260917-1','/app/reminder-batch.js?v=1','/app/reminder-form-v1251.js?v=20261025-1','/pack/calendar-view.js?v=120','/app/calendar-touch-v1251.js?v=20260917-3','/app/calendar-reminder-edit-v1261.js?v=20260917-1','/app/calendar-ageing-dnd-v1270.js?v=20260917-2']){if(!live)break;await load(src);}
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&live)administrator(db).then(u=>{if(!u||u.id!==user.id)deny('Sesja została zakończona.');}).catch(e=>deny(e.message));});
 }catch(error){deny(error.message);}
 window.addEventListener('message',e=>{if(e.origin===location.origin&&e.source===parent&&e.data?.type==='robisie-pack-activated'&&live)document.getElementById('refresh')?.click();});

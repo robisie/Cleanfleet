@@ -2,4 +2,6 @@
 
 .wallet-table .wallet-estimate{display:inline-block;color:#765612;background:#fff1bf;padding:4px 8px;border-radius:6px;font-weight:700}.wallet-table label select{max-width:280px;min-width:170px}.wallet-table details{margin:8px 0}
 
-.wallet-table .wallet-money{font-variant-numeric:tabular-nums;white-space:nowrap}.wallet-table .wallet-money small{white-space:normal;max-width:170px}.wallet-table .wallet-paid{color:#275c48;font-weight:700}
+.wallet-table .wallet-money{font-variant-numeric:tabular-nums;white-space:nowrap}.wallet-table .wallet-money small{white-space:normal;max-width:170px}
+
+.wallet-completed-group{border:1px solid #dae4de;background:#fff;border-radius:12px;padding:16px;margin:10px 0}.wallet-completed-group>summary{margin:0;line-height:1.5}.wallet-completed-group .wallet-table{margin-bottom:0}

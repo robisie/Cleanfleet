@@ -13,3 +13,9 @@ test('wallet shows reminder estimates and saves an explicit payment link in the 
  const reminders=[{id:'now',title:'Księgowa',payee:'Księgowa',due_at:'2026-11-08T09:00:00Z',amount:null,status:'active',is_payment:true,recurrence:'monthly'},{id:'old',title:'Księgowa',payee:'Księgowa',due_at:'2026-10-08T09:00:00Z',amount:123.45,status:'done',paid_at:'2026-10-10',is_payment:true,recurrence:'monthly'}];
  const {reminderKey}=await import('../app/priv/wallet-reminders.js');const select={dataset:{reminderLink:reminderKey(reminders[0])},value:'rule'};h.querySelectorAll=q=>q==='[data-reminder-link]'?[select]:[];mount(h,{getState:()=>s,persist:async next=>{saved=next;s=next;},db:database({reminders}),owner:'owner',allowed:()=>true,P,today:()=> '2026-11-01'});await tick();assert.match(h.innerHTML,/Kwota szacunkowa/);assert.match(h.innerHTML,/kwota z 2026-10/);await select.onchange();await tick();assert.equal(saved.wallet.reminderLinks[select.dataset.reminderLink],'rule');assert.equal(saved.rules[0].expected,10000);
 });
+
+test('paid reminder displays original invoice amount and paid status instead of only a zero balance',async()=>{
+ const h=host(),s={rules:[],transactions:[],cash:[],wallet:defaults()},reminders=[{id:'paid',title:'Kasia księgowa',payee:'Abonament miesięczny',is_payment:true,status:'done',amount:908.64,due_at:'2026-10-14T09:00:00Z',paid_at:'2026-10-14T10:00:00Z',mail_invoice_enabled:true,mail_scan_status:'applied'}];
+ mount(h,{getState:()=>s,persist:async()=>{},db:database({reminders}),owner:'owner',allowed:()=>true,P,today:()=> '2026-10-25'});await tick();
+ assert.match(h.innerHTML,/<th>Kwota zobowiązania<\/th><th>Zapłacono<\/th><th>Do zapłaty<\/th>/);assert.equal((h.innerHTML.match(/908,64/g)||[]).length,2);assert.match(h.innerHTML,/wallet-paid.*?Zapłacone/);assert.match(h.innerHTML,/Do prognozy odejmujemy tylko kolumnę/);
+});

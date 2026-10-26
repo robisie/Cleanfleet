@@ -1,4 +1,4 @@
-import {mountTodayBadges} from './today-badges.js?v=1';
+import {mountTodayBadges} from './today-badges.js?v=2';
 import {client,administrator,modules,applications} from './auth.js?v=120';
 import {mountTiles} from './tiles.js?v=113';
 const $=id=>document.getElementById(id),db=client(),tabs=new Map();

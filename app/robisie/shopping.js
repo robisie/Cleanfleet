@@ -40,7 +40,7 @@ export function score(item,line){
  const shop=normalize(item.shop),store=normalize(line.shop),same=shop&&store&&(store.includes(shop)||shop.includes(store));return product*.8+(same ? .2 : 0);
 }
 export function suggestions(project){
- const sources=purchaseLines(project),items=rows(project);return items.flatMap(item=>item.linked>=item.quantity?[]:sources.filter(line=>available(project,line)>0).map(line=>({item,line,score:score(item,line)})).filter(r=>r.score>=.3).sort((a,b)=>b.score-a.score).slice(0,3));
+ const sources=purchaseLines(project),items=rows(project);return items.flatMap(item=>item.linked>=item.quantity?[]:sources.filter(line=>available(project,line)>0&&!(item.rejectedLinks||[]).some(r=>key(r.purchaseId,r.index)===line.key)).map(line=>({item,line,score:score(item,line)})).filter(r=>r.score>=.3).sort((a,b)=>b.score-a.score).slice(0,3));
 }
 export function saveItem(project,values,id,makeId=()=>crypto.randomUUID()){
  const next=structuredClone(project),old=list(next).find(x=>x.id===id),name=String(values.name||'').trim(),quantity=num(values.quantity===''||values.quantity==null?1:values.quantity),bought=num(values.boughtQuantity||0),date=String(values.boughtDate||'');
@@ -57,8 +57,16 @@ export function link(project,id,sourceKey,quantity){
  if(!item||!line||!(n>0)||n!==qty(n)||n>available(next,line)+1e-8||n>item.quantity-row.linked+1e-8)throw Error('Nieprawidłowa lub niedostępna ilość. Odśwież listę i sprawdź przypisanie faktury.');
  if(item.unit&&unit(item.unit)!==unit(line.unit))throw Error('Jednostki różnią się. Ustaw zgodną jednostkę na liście; ilości nie są przeliczane automatycznie.');
  if(!item.unit)item.unit=line.unit;
+ item.rejectedLinks=(item.rejectedLinks||[]).filter(r=>key(r.purchaseId,r.index)!==sourceKey);
  const existing=item.links?.find(l=>l.purchaseId===line.purchaseId&&l.index===line.index);if(existing)existing.quantity=qty(existing.quantity+n);else(item.links||=[]).push({purchaseId:line.purchaseId,index:line.index,quantity:n,snapshot:structuredClone(line)});return next;
 }
-export function unlink(project,id,purchaseId,index){const next=structuredClone(project),item=list(next).find(x=>x.id===id);if(!item)throw Error('Nie znaleziono pozycji.');item.links=(item.links||[]).filter(l=>l.purchaseId!==purchaseId||l.index!==Number(index));return next;}
+export function rejectSuggestion(project,id,sourceKey){
+ const next=structuredClone(project),item=list(next).find(x=>x.id===id),line=purchaseLines(next).find(x=>x.key===sourceKey);
+ if(!item||!line)throw Error('Nie znaleziono propozycji. Odśwież listę.');
+ if(!(item.rejectedLinks||[]).some(r=>key(r.purchaseId,r.index)===sourceKey))(item.rejectedLinks||=[]).push({purchaseId:line.purchaseId,index:line.index});
+ return next;
+}
+export function restoreSuggestions(project){const next=structuredClone(project);for(const item of list(next))item.rejectedLinks=[];return next;}
+export function unlink(project,id,purchaseId,index,{reject=false}={}){const next=structuredClone(project),item=list(next).find(x=>x.id===id);if(!item)throw Error('Nie znaleziono pozycji.');const linked=(item.links||[]).some(l=>l.purchaseId===purchaseId&&l.index===Number(index));item.links=(item.links||[]).filter(l=>l.purchaseId!==purchaseId||l.index!==Number(index));if(reject&&linked&&!(item.rejectedLinks||[]).some(r=>r.purchaseId===purchaseId&&r.index===Number(index)))(item.rejectedLinks||=[]).push({purchaseId,index:Number(index)});return next;}
 export function remove(project,id){const next=structuredClone(project);next.shoppingList=list(next).filter(i=>i.id!==id);return next;}
 export function totals(project){const items=rows(project);return {needed:items.filter(x=>x.state==='needed').length,partial:items.filter(x=>x.state==='partial').length,bought:items.filter(x=>x.state==='bought').length,amount:round(items.reduce((s,r)=>s+(r.amount||0),0)),unknown:items.filter(x=>x.linked>0&&x.amount==null).length,invalid:items.filter(x=>x.invalid).length};}

@@ -45,3 +45,17 @@ test('shopping PDF is selected in the document chooser and its direct button pri
  t.$('[data-action="shopping-print"]').click();for(let i=0;i<20&&!t.previews.length;i++)await new Promise(r=>setImmediate(r));assert.equal(t.previews.length,1);assert(t.previews[0].includes('data-module="shopping"'));assert(t.previews[0].includes('Grunt do kupienia'));assert(!t.previews[0].includes('data-module="contract"'));
  }finally{await t.close()}
 });
+test('To nie to dismisses the selected proposal, survives refresh and exposes mistaken-link removal outside details',async()=>{
+ const t=await setup();try{
+ t.db.payload.shoppingList=[{id:'need',name:'Płyta OSB',originalName:'Płyta OSB',shop:'Leroy',quantity:2,unit:'szt.',boughtQuantity:0,links:[]}];
+ t.db.payload.purchases=['one','two'].map(id=>({id,sourceKsefNumber:'KSEF-'+id,date:'2026-10-25',invoice:'FV/'+id,shop:'Leroy Merlin',amount:20,charge:20,invoiceItems:[{index:1,name:'Płyta OSB '+id,quantity:2,unit:'szt.',gross:20}]}));t.n.configure(t.db);const before=C.totals(t.db.payload),lines=Shopping.purchaseLines(t.db.payload);
+ t.n.shoppingMatchDialog('need',lines[0].key);t.$('#shopping-source').value=lines[1].key;t.$('#shopping-source').onchange();t.$('#shopping-reject-current').click();
+ for(let i=0;i<30&&!t.db.payload.shoppingList[0].rejectedLinks?.length;i++)await new Promise(r=>setImmediate(r));await new Promise(r=>setImmediate(r));
+ assert(!t.$('#dialog').open);assert.deepEqual(t.db.payload.shoppingList[0].rejectedLinks,[{purchaseId:'two',index:1}]);assert(![...t.$('.shopping-page').querySelectorAll('.shopping-proposal [data-source]')].some(b=>b.dataset.source===lines[1].key));
+ t.n.configure(t.db);assert.equal(Shopping.suggestions(t.db.payload).length,1);assert.deepEqual(C.totals(t.db.payload),before);
+ t.$('[data-action="shopping-restore"]').click();for(let i=0;i<30&&t.db.payload.shoppingList[0].rejectedLinks.length;i++)await new Promise(r=>setImmediate(r));await new Promise(r=>setImmediate(r));assert.equal(Shopping.suggestions(t.db.payload).length,2);
+ t.n.shoppingMatchDialog('need',lines[0].key);await t.submit();t.$('#shopping-filter').value='all';t.$('#shopping-filter').dispatchEvent(new t.window.Event('change',{bubbles:true}));
+ const unlink=t.$('.shopping-unlink-actions [data-action="shopping-unlink"]');assert(unlink);assert.equal(unlink.closest('details'),null);assert.equal(unlink.textContent,'Usuń powiązanie');unlink.click();
+ for(let i=0;i<30&&t.db.payload.shoppingList[0].links.length;i++)await new Promise(r=>setImmediate(r));assert.equal(t.db.payload.shoppingList[0].links.length,0);assert.equal(Shopping.rows(t.db.payload)[0].name,'Płyta OSB');assert.deepEqual(C.totals(t.db.payload),before);assert.equal(t.db.payload.purchases.length,2);assert(!Shopping.suggestions(t.db.payload).some(m=>m.line.purchaseId==='one'));
+ }finally{await t.close()}
+});

@@ -33,3 +33,15 @@ test('validation rejects incompatible units, overbuying, invalid input and links
  let p=add({purchases:[purchase()]});assert.throws(()=>S.saveItem(p,{name:'Test',quantity:0}));assert.throws(()=>S.saveItem(p,{name:'Test',quantity:1,boughtQuantity:2}));assert.throws(()=>S.link({shoppingList:p.shoppingList,purchases:[]},'item-0',S.purchaseLines(p)[0].key,1));
  const line=S.purchaseLines(p)[0];p.shoppingList[0].unit='m2';assert.throws(()=>S.link(p,'item-0',line.key,1),/Jednostki/);p.shoppingList[0].unit='szt.';p=S.link(p,'item-0',line.key,3);assert.throws(()=>S.saveItem(p,{...p.shoppingList[0],quantity:2},'item-0'),/Ilość/);
 });
+test('rejections persist per shopping item and invoice line, can be restored, and never change costs',()=>{
+ let p=add({purchases:[purchase('one'),purchase('two')]});p=add(p);const before=C.totals(p),[one,two]=S.purchaseLines(p),original=structuredClone(p);
+ p=S.rejectSuggestion(p,'item-0',one.key);p=S.rejectSuggestion(p,'item-0',one.key);assert.equal(p.shoppingList[0].rejectedLinks.length,1);assert.equal(original.shoppingList[0].rejectedLinks,undefined);
+ p=JSON.parse(JSON.stringify(p));assert(!S.suggestions(p).some(s=>s.item.id==='item-0'&&s.line.key===one.key));assert(S.suggestions(p).some(s=>s.item.id==='item-1'&&s.line.key===one.key));assert(S.suggestions(p).some(s=>s.item.id==='item-0'&&s.line.key===two.key));assert.deepEqual(C.totals(p),before);
+ p=S.restoreSuggestions(p);assert(S.suggestions(p).some(s=>s.item.id==='item-0'&&s.line.key===one.key));
+ p=S.rejectSuggestion(p,'item-0',one.key);p=S.link(p,'item-0',one.key,1);assert.equal(p.shoppingList[0].rejectedLinks.length,0);assert.equal(S.rows(p)[0].linked,1);
+});
+test('removing a mistaken link restores source capacity and original shopping data without clearing manual purchases',()=>{
+ let p=add({purchases:[purchase()]},6),line=S.purchaseLines(p)[0];const before=C.totals(p);p=S.link(p,'item-0',line.key,6);p=S.unlink(p,'item-0','purchase',1,{reject:true});
+ assert.equal(S.rows(p)[0].name,'Płyta OSB');assert.equal(S.rows(p)[0].remaining,6);assert.equal(S.rows(p)[0].amount,null);assert.equal(S.available(p,line),6);assert.equal(S.suggestions(p).length,0);assert.deepEqual(C.totals(p),before);
+ p=S.toggle(p,'item-0','2026-10-25');p=S.link(p,'item-0',line.key,6);p=S.unlink(p,'item-0','purchase',1,{reject:true});assert.equal(S.rows(p)[0].state,'bought');assert.equal(S.rows(p)[0].date,'2026-10-25');assert.equal(S.rows(p)[0].linked,0);
+});

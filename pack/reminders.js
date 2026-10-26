@@ -198,10 +198,11 @@ async function cfShowReminders(){
     list.innerHTML=`<div class="cf-reminder-list">${filtered.map(r=>{
       const at=cfReminderEffectiveAt(r);
       const bucket=cfReminderBucket(r,now);
+      const needsReview=r.mail_invoice_enabled&&r.mail_scan_status==='needs_review';
       const company=(cfCompanies||[]).find(c=>String(c.id)===String(r.company_id));
       const meta=[
         cfReminderCategoryLabel(r.category),
-        r.is_payment && r.amount!=null ? cfReminderMoney(r.amount) : '',
+        r.is_payment && !needsReview && r.amount!=null ? cfReminderMoney(r.amount) : '',
         r.payee||'',
         r.invoice_number ? `Faktura: ${r.invoice_number}` : '',
         r.mail_invoice_enabled ? (({waiting:'Poczta: oczekiwanie na fakturę',applied:'Poczta: dane z faktury',needs_review:'Poczta: faktura do sprawdzenia',error:'Poczta: błąd sprawdzania',missing:'Brak faktury — kwota niepotwierdzona'})[r.mail_scan_status]||'Poczta: automatyczny odczyt') : '',
@@ -219,7 +220,7 @@ async function cfShowReminders(){
             </div>
             <h3>${escapeHtml(r.title)}</h3>
           </div>
-          ${r.is_payment && r.amount!=null?`<strong class="cf-reminder-amount">${escapeHtml(cfReminderMoney(r.amount))}</strong>`:''}
+          ${needsReview?`<button type="button" class="btn btn-solid cf-reminder-review" data-reminder-review="${escapeHtml(r.id)}">Potwierdź dane</button>`:r.is_payment && r.amount!=null?`<strong class="cf-reminder-amount">${escapeHtml(cfReminderMoney(r.amount))}</strong>`:''}
         </div>
         <div class="cf-reminder-when">${bucket==='overdue'?'⚠️ ':''}Przypomnienie: ${escapeHtml(cfReminderFmtDateTime(at))}${r.status==='snoozed'?' · odłożone':''}${recurrence?' · '+escapeHtml(recurrence):''}</div>
         ${r.due_at?`<div class="cf-reminder-due">Termin: <strong>${escapeHtml(cfReminderFmtDateTime(r.due_at))}</strong></div>`:''}
@@ -239,6 +240,12 @@ async function cfShowReminders(){
     list.querySelectorAll('[data-reminder-done]').forEach(b=>b.addEventListener('click',()=>completeReminder(b.dataset.reminderDone,false)));
     list.querySelectorAll('[data-reminder-paid]').forEach(b=>b.addEventListener('click',()=>completeReminder(b.dataset.reminderPaid,true)));
     list.querySelectorAll('[data-reminder-snooze]').forEach(b=>b.addEventListener('click',()=>snoozeReminder(b.dataset.reminderSnooze)));
+    list.querySelectorAll('[data-reminder-review]').forEach(b=>b.addEventListener('click',async()=>{
+      await cfOpenReminderForm(rows.find(r=>String(r.id)===String(b.dataset.reminderReview)),load);
+      const confirm=document.getElementById('cfrMailApplyCandidate');
+      confirm?.scrollIntoView?.({block:'center'});
+      confirm?.focus?.({preventScroll:true});
+    }));
     list.querySelectorAll('[data-reminder-edit]').forEach(b=>b.addEventListener('click',()=>cfOpenReminderForm(rows.find(r=>String(r.id)===String(b.dataset.reminderEdit)),load)));
     list.querySelectorAll('[data-reminder-delete]').forEach(b=>b.addEventListener('click',()=>deleteReminder(b.dataset.reminderDelete)));
   };

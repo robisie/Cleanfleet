@@ -55,3 +55,7 @@ body:has(#login:not([hidden])) .login-card{flex:none;width:100%;margin:auto}
 
 /* Context return stays reachable even when the source application is scrolled. */
 #backContext:not([hidden]){position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:max(16px,env(safe-area-inset-left));z-index:103;background:#275c48;color:white;border-color:#275c48;box-shadow:0 8px 28px #18312955;font-size:13px;font-weight:700;max-width:min(270px,70vw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Today's counts stay clear of the drag handle and do not intercept taps. */
+.tile-today-count{position:absolute;top:13px;right:48px;display:inline-flex;align-items:center;justify-content:center;min-width:25px;height:25px;padding:0 6px;border-radius:999px;background:#c82636;color:#fff;font:750 13px/1 system-ui,sans-serif;box-shadow:0 2px 5px #65121a25;pointer-events:none;font-variant-numeric:tabular-nums}.tile-today-count[hidden]{display:none}
+@media(max-width:599px){.tile-today-count{top:12px;right:43px;min-width:23px;height:23px;font-size:12px}}

@@ -1,7 +1,8 @@
+import {mountTodayBadges} from './today-badges.js?v=1';
 import {client,administrator,modules,applications} from './auth.js?v=120';
 import {mountTiles} from './tiles.js?v=113';
 const $=id=>document.getElementById(id),db=client(),tabs=new Map();
-let user=null,epoch=0,current='',frame=null,disposeTiles=null,leaving=false;
+let user=null,epoch=0,current='',frame=null,disposeTiles=null,leaving=false,tileBadges=null;
 const returnTabs=new Map();
 const workspaceKey='robisie-pack-workspace-v1';
 function saveWorkspace(){if(!user)return;try{sessionStorage.setItem(workspaceKey,JSON.stringify({version:1,userId:user.id,active:current,tabs:[...tabs.values()].map(({kind,name})=>({kind,name}))}));}catch(_){}}
@@ -31,11 +32,11 @@ function renderTabs(){
  if(focusedKey)$('workspaceTabs').querySelector('[data-tab-key="'+focusedKey+'"]')?.focus();
 }
 function clearModule(){forgetWorkspace();epoch++;for(const tab of tabs.values())tab.frame.remove();tabs.clear();returnTabs.clear();frame=null;current='';$('frameHost').replaceChildren();$('workspace').hidden=true;$('dashboard').hidden=false;$('closeModule').hidden=true;$('backContext').hidden=true;$('moduleTitle').textContent='';renderTabs();}
-function gate(message='Zaloguj się kontem administratora.'){user=null;disposeTiles?.();disposeTiles=null;clearModule();$('panel').hidden=true;$('login').hidden=false;$('loginForm').hidden=false;$('loginInfo').textContent=message;$('userEmail').textContent='';}
+function gate(message='Zaloguj się kontem administratora.'){tileBadges?.dispose();tileBadges=null;user=null;disposeTiles?.();disposeTiles=null;clearModule();$('panel').hidden=true;$('login').hidden=false;$('loginForm').hidden=false;$('loginInfo').textContent=message;$('userEmail').textContent='';}
 async function verify(){
  const checking=epoch,allowed=await administrator(db);if(checking!==epoch)return false;
  if(!allowed){gate();return false;}if(user&&user.id!==allowed.id)clearModule();
- if(!user||user.id!==allowed.id){disposeTiles?.();disposeTiles=mountTiles($('tiles'),allowed.id);}
+ if(!user||user.id!==allowed.id){disposeTiles?.();disposeTiles=mountTiles($('tiles'),allowed.id);tileBadges?.dispose();tileBadges=mountTodayBadges(db,allowed.id,document);}else tileBadges?.resume();
  user=allowed;$('login').hidden=true;$('panel').hidden=false;$('userEmail').textContent=user.email||'';renderTabs();return true;
 }
 function locationFor(tab){return '/pack/?'+(tab.kind==='application'?'application=':'module=')+encodeURIComponent(tab.name);}
@@ -102,6 +103,7 @@ async function openApplicationLink(url){
  if(existing&&name!=='cleanfleet')existing.frame.contentWindow?.postMessage({type:'robisie-pack-navigate',url:url.href},location.origin);
 }
 function home(push=true){
+ void tileBadges?.refresh();
  current='';frame=null;for(const tab of tabs.values())tab.frame.hidden=true;
  $('workspace').hidden=true;$('dashboard').hidden=false;$('closeModule').hidden=true;$('moduleTitle').textContent='';renderTabs();
  $('backContext').hidden=true;
@@ -122,7 +124,8 @@ window.addEventListener('message',event=>{
 });
 db.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT'||user&&session&&session.user.id!==user.id)gate('Sesja została zakończona. Zaloguj się ponownie.');});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&user)verify().catch(error=>gate(error.message));});
-window.addEventListener('pagehide',()=>{saveWorkspace();leaving=true;});
+window.addEventListener('focus',()=>{if(user&&!leaving)void tileBadges?.refresh();});
+window.addEventListener('pagehide',()=>{saveWorkspace();leaving=true;tileBadges?.pause();});
 window.addEventListener('pageshow',event=>{leaving=false;if(event.persisted&&user){$('panel').hidden=true;verify().catch(error=>gate(error.message));}});
 window.addEventListener('resize',()=>{$('openTabs').querySelector('.workspace-tab.active')?.scrollIntoView?.({block:'nearest',inline:'nearest'});});
 window.addEventListener('popstate',()=>{const url=new URL(location.href),module=url.searchParams.get('module'),app=url.searchParams.get('application');if(module)openModule(module,false);else if(app)openApplication(app,false);else home(false);});

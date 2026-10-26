@@ -9,12 +9,12 @@ test('Pack authorizes only a server-verified admin, never a stored role claim',a
 });
 function element(){return {hidden:false,value:'',textContent:'',innerHTML:'',dataset:{},children:[],classList:{add(){},remove(){},toggle(){}},append(...els){this.children.push(...els);},replaceChildren(){this.children=[];},setAttribute(){},remove(){this.removed=true;},contentWindow:{},querySelectorAll:()=>[],querySelector:()=>null};}
 async function panel({allowed=true,userExists=true,query='',storage}={}){
- const ids=Object.fromEntries(['login','panel','workspace','dashboard','frameHost','moduleTitle','moduleError','loginForm','loginInfo','loginError','userEmail','signIn','email','password','logout','closeModule','backContext','tiles','openTabs','workspaceTabs','homeTab','homeLogo'].map(k=>[k,element()])),events={};let authCallback;
+ const ids=Object.fromEntries(['login','panel','workspace','dashboard','frameHost','moduleTitle','moduleError','loginForm','loginInfo','loginError','userEmail','signIn','email','password','logout','closeModule','backContext','tiles','openTabs','workspaceTabs','homeTab','homeLogo'].map(k=>[k,element()])),events={},badgeCalls=[];let authCallback;
  const db={auth:{getUser:async()=>({data:{user:userExists?{id:'u',email:'test@example.invalid'}:null}}),onAuthStateChange:fn=>authCallback=fn,signOut:async()=>({}),signInWithPassword:async()=>({})},rpc:async()=>({data:allowed})};
  const location={href:'https://cleanfleet.pl/pack/'+query,origin:'https://cleanfleet.pl'},window={addEventListener:(name,fn)=>events[name]=fn,scrollTo(){}};
- const c=vm.createContext({sessionStorage:storage,document:{getElementById:id=>ids[id],querySelectorAll:()=>[],createElement:()=>element(),addEventListener(){}},client:()=>db,administrator,modules,applications,mountTiles:()=>()=>{},location,URL,history:{replaceState(){},pushState(){}},window,console});
+ const c=vm.createContext({sessionStorage:storage,document:{getElementById:id=>ids[id],querySelectorAll:()=>[],createElement:()=>element(),addEventListener(){}},client:()=>db,administrator,modules,applications,mountTiles:()=>()=>{},mountTodayBadges:(db,owner)=>{badgeCalls.push(['mount',owner]);return {refresh(){badgeCalls.push(['refresh'])},resume(){badgeCalls.push(['resume'])},pause(){badgeCalls.push(['pause'])},dispose(){badgeCalls.push(['dispose'])}}},location,URL,history:{replaceState(){},pushState(){}},window,console});
  await vm.runInContext('(async()=>{'+read('pack/app.js').replace(/^import .*\n/gm,'')+';window.testOpenModule=openModule;window.testOpenApplication=openApplication;window.testCloseTab=closeTab;window.testHome=home;})()',c);
- return {db,ids,events,signOut:()=>authCallback('SIGNED_OUT'),open:async name=>{await vm.runInContext('0',c);},c};
+ return {db,ids,events,badgeCalls,signOut:()=>authCallback('SIGNED_OUT'),open:async name=>{await vm.runInContext('0',c);},c};
 }
 test('signed-out and employee sessions show gate without creating any module frame',async()=>{
  for(const options of [{allowed:false},{userExists:false}]){const p=await panel({...options,query:'?module=finances'});assert.equal(p.ids.panel.hidden,true);assert.equal(p.ids.login.hidden,false);assert.equal(p.ids.frameHost.children.length,0);}
@@ -121,4 +121,9 @@ test('Bill payment link opens Robisię in its own tab and returns to Bill withou
  const messages=[];robisie.contentWindow.postMessage=(data,origin)=>messages.push({data,origin});
  p.events.message({origin:'https://cleanfleet.pl',source:bill.contentWindow,data:{type:'robisie-pack-open-url',url:'https://cleanfleet.pl/app/robisie/?project=p&invoice=j'}});
  assert.equal(p.ids.frameHost.children.length,2);assert.equal(messages.find(m=>m.data.type==='robisie-pack-navigate').data.url,'https://cleanfleet.pl/app/robisie/?project=p&invoice=j');
+});
+
+test('today badge lifecycle follows verified login, return to dashboard and logout',async()=>{
+ const p=await panel();assert.deepEqual(p.badgeCalls[0],['mount','u']);p.badgeCalls.length=0;p.c.window.testHome();assert(p.badgeCalls.some(([name])=>name==='refresh'));p.signOut();assert(p.badgeCalls.some(([name])=>name==='dispose'));
+ const anonymous=await panel({userExists:false});assert.equal(anonymous.badgeCalls.length,0);
 });

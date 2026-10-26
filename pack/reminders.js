@@ -96,6 +96,32 @@ async function cfRefreshReminderTileCount(){
   }
 }
 
+// Invoice actions use the saved company list, so new clients need no code changes.
+function cfReminderInvoiceTarget(r,companies=cfCompanies||[]){
+ const norm=value=>String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ł/g,'l').replace(/[^a-z0-9]+/g,' ').trim();
+ const title=norm(r.title),text=norm([r.title,r.notes].join(' '));
+ if(r.is_payment||!(r.category==='invoice'||/wystaw\w*.*faktur|faktur\w*.*wystaw/.test(title)))return null;
+ if(/\brobi\s?sie\b/.test(text))return {app:'robisie',url:'/app/robisie/'};
+ const saved=r.company_id&&companies.find(c=>String(c.id)===String(r.company_id));
+ const matches=companies.filter(c=>[c.short_name,c.name].some(name=>{const n=norm(name);return n.length>=3&&(' '+text+' ').includes(' '+n+' ');}));
+ if(saved||matches.length===1||/\bclean\s?fleet\b/.test(text))return {app:'cleanfleet',url:'/app/'};
+ return {app:null};
+}
+function cfReminderOpenInvoice(r){
+ if(!cfIsAdmin()||!r)return;
+ const target=cfReminderInvoiceTarget(r);if(!target)return;
+ const open=url=>{if(window.parent!==window)window.parent.postMessage({type:'robisie-pack-open-url',url:new URL(url,location.origin).href},location.origin);else location.href=url;};
+ if(target.url){open(target.url);return;}
+ const overlay=document.createElement('div');overlay.className='overlay';overlay.style.zIndex='10050';
+ overlay.innerHTML='<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="cfInvoiceTargetTitle" style="max-width:480px"><button type="button" class="close" data-cancel aria-label="Zamknij">&times;</button><h2 id="cfInvoiceTargetTitle">Gdzie wystawić fakturę?</h2><p>Wybierz aplikację dla tego przypomnienia.</p><div class="sheet-actions"><button type="button" class="btn btn-solid" data-app="cleanfleet">CleanFleet</button><button type="button" class="btn btn-solid" data-app="robisie">Robisię</button></div></div>';
+ const previous=document.activeElement,close=()=>{overlay.remove();previous?.focus?.();};
+ overlay.querySelector('[data-cancel]').onclick=close;
+ overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+ overlay.addEventListener('keydown',e=>{if(e.key==='Escape')close();});
+ overlay.querySelectorAll('[data-app]').forEach(b=>b.onclick=()=>{const url=b.dataset.app==='robisie'?'/app/robisie/':'/app/';close();open(url);});
+ document.body.append(overlay);overlay.querySelector('[data-app]').focus();
+}
+
 async function cfShowReminders(){
   if(!cfIsAdmin()) return;
   const root=document.getElementById('modalRoot');
@@ -198,6 +224,7 @@ async function cfShowReminders(){
     list.innerHTML=`<div class="cf-reminder-list">${filtered.map(r=>{
       const at=cfReminderEffectiveAt(r);
       const bucket=cfReminderBucket(r,now);
+      const invoiceTarget=cfReminderInvoiceTarget(r);
       const needsReview=r.mail_invoice_enabled&&r.mail_scan_status==='needs_review';
       const company=(cfCompanies||[]).find(c=>String(c.id)===String(r.company_id));
       const meta=[
@@ -227,6 +254,7 @@ async function cfShowReminders(){
         ${meta?`<div class="cf-reminder-meta">${escapeHtml(meta)}</div>`:''}
         ${r.notes?`<div class="cf-reminder-notes">${escapeHtml(r.notes)}</div>`:''}
         <div class="cf-reminder-actions">
+          ${invoiceTarget?`<button type="button" class="btn btn-solid" data-reminder-invoice="${escapeHtml(r.id)}">Wystaw fakturę</button>`:''}
           ${activeTab!=='done' ? (r.is_payment
             ? `<button type="button" class="btn btn-solid" data-reminder-paid="${r.id}">✓ Opłacone</button>`
             : `<button type="button" class="btn btn-solid" data-reminder-done="${r.id}">✓ Wykonane</button>`) : ''}
@@ -237,6 +265,7 @@ async function cfShowReminders(){
       </article>`;
     }).join('')}</div>`;
 
+    list.querySelectorAll('[data-reminder-invoice]').forEach(b=>b.addEventListener('click',()=>cfReminderOpenInvoice(rows.find(r=>String(r.id)===String(b.dataset.reminderInvoice)))));
     list.querySelectorAll('[data-reminder-done]').forEach(b=>b.addEventListener('click',()=>completeReminder(b.dataset.reminderDone,false)));
     list.querySelectorAll('[data-reminder-paid]').forEach(b=>b.addEventListener('click',()=>completeReminder(b.dataset.reminderPaid,true)));
     list.querySelectorAll('[data-reminder-snooze]').forEach(b=>b.addEventListener('click',()=>snoozeReminder(b.dataset.reminderSnooze)));

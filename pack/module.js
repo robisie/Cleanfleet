@@ -12,7 +12,7 @@ const close=()=>{live=false;window.CFFinance?.close();window.cfFinanceEarningsBr
 function deny(message){live=false;observer?.disconnect();window.CFFinance?.close();window.CFAccountingMail?.reset();document.getElementById('modalRoot').replaceChildren();const status=document.getElementById('moduleStatus');status.hidden=false;status.textContent=message;send('robisie-pack-denied',{message});}
 function load(src){return new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.onload=resolve;script.onerror=()=>reject(Error('Nie udało się wczytać modułu. Odśwież Robisię Pack.'));document.head.append(script);});}
 const scripts={
- reminders:['/pack/reminders.js?v=122','/app/reminder-fix.js?v=120','/app/reminder-batch.js?v=1','/app/reminder-form-v1251.js?v=20261025-1'],
+ reminders:['/pack/reminders.js?v=123','/app/reminder-fix.js?v=120','/app/reminder-batch.js?v=1','/app/reminder-form-v1251.js?v=20261025-1'],
  finances:['/app/vendor/xlsx-0.18.5.full.min.js','/app/period-picker.js?v=1532','/app/exchange-rate.js?v=1531','/pack/aga.js?v=20261025-4','/pack/earnings.js?v=104','/app/dojazdy.js?v=20261025-1','/app/finances.js?v=20261025-13'],
  taxes:['/app/taxes-v1310.js?v=20260918-6'],
  website:['/app/period-picker.js?v=1532','/pack/website-stats.js?v=100'],

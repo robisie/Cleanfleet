@@ -10,7 +10,7 @@ const enc=new TextEncoder();
 const MAX=8*1024*1024;
 const TZ='Europe/Warsaw';
 
-function json(v:any,s=200){return new Response(JSON.stringify(v),{status:s,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}})}
+const origins=['https://cleanfleet.pl','https://www.cleanfleet.pl'];
 function clean(v:any,n=300){return String(v??'').trim().slice(0,n)}
 function norm(v:any){return clean(v,500).normalize('NFKC').toLocaleLowerCase('pl-PL')}
 function b64(bytes:Uint8Array){let out='';for(let i=0;i<bytes.length;i+=0x8000)out+=String.fromCharCode(...bytes.subarray(i,Math.min(bytes.length,i+0x8000)));return btoa(out)}
@@ -27,6 +27,11 @@ function outputText(v:any){return typeof v?.output_text==='string'?v.output_text
 async function analyze(bytes:Uint8Array,filename:string,ctx:any){const prompt=['Odczytaj fakturę PDF dla przypomnienia płatności.','Zwróć wyłącznie JSON: {"is_invoice":true,"matches_reminder":true,"invoice_number":"...","reference_number":"...","amount":123.45,"currency":"PLN","invoice_date":"YYYY-MM-DD","due_date":"YYYY-MM-DD","seller":"...","confidence":"high|medium|low"}','amount = końcowa kwota do zapłaty; due_date = termin płatności; invoice_date = data wystawienia. invoice_number to właściwy numer faktury/dokumentu. Jeżeli dokument ma pola „Numer dokumentu” i „Numer referencyjny”, invoice_number MUSI być wartością z „Numer dokumentu”, a reference_number z „Numer referencyjny”. Nigdy nie podstawiaj numeru referencyjnego, numeru klienta, zamówienia ani polecenia zapłaty jako invoice_number. Nie zgaduj.','Kontekst: '+JSON.stringify(ctx)].join('\n');const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:'Bearer '+OPENAI,'Content-Type':'application/json'},signal:AbortSignal.timeout(60000),body:JSON.stringify({model:'gpt-5.6-luna',reasoning:{effort:'none'},input:[{role:'user',content:[{type:'input_text',text:prompt},{type:'input_file',filename,file_data:'data:application/pdf;base64,'+b64(bytes)}]}],max_output_tokens:320})});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(r.status===429?'Brak dostępnego limitu OpenAI API.':'Nie udało się odczytać PDF.');const raw=outputText(j).trim();let p:any;try{p=JSON.parse(raw)}catch{const m=raw.match(/\{[\s\S]*\}/);p=m?JSON.parse(m[0]):null}if(!p)throw new Error('Nie udało się odczytać danych faktury.');const amount=Number(p.amount);return{is_invoice:p.is_invoice===true,matches_reminder:p.matches_reminder===true,invoice_number:clean(p.invoice_number,120)||null,reference_number:clean(p.reference_number,120)||null,amount:Number.isFinite(amount)&&amount>=0?Math.round(amount*100)/100:null,currency:clean(p.currency,8).toUpperCase()||null,invoice_date:dateOk(p.invoice_date),due_date:dateOk(p.due_date),seller:clean(p.seller,160)||null,confidence:['high','medium','low'].includes(p.confidence)?p.confidence:'low'}}
 
 Deno.serve(async req=>{
+  const origin=req.headers.get('Origin')||'';
+  const headers={'Access-Control-Allow-Origin':origins.includes(origin)?origin:origins[0],'Access-Control-Allow-Headers':'authorization,apikey,content-type,x-client-info','Access-Control-Allow-Methods':'POST,OPTIONS','Cache-Control':'no-store','Vary':'Origin'};
+  const json=(v:any,s=200)=>new Response(JSON.stringify(v),{status:s,headers:{...headers,'Content-Type':'application/json'}});
+  if(origin&&!origins.includes(origin))return json({error:'Niedozwolone źródło.'},403);
+  if(req.method==='OPTIONS')return new Response(null,{status:204,headers});
   if(req.method!=='POST')return json({error:'Method not allowed'},405);
   try{
     const token=req.headers.get('authorization')?.match(/^Bearer (.+)$/i)?.[1];

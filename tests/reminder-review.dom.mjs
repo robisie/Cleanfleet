@@ -17,5 +17,17 @@ test('review replaces amount, opens candidate without saving, confirmed amount r
  assert.ok([...document.querySelectorAll('.cf-reminder-amount')].some(e=>e.textContent.includes('123')));
  buttons[0].click();await new Promise(r=>setImmediate(r));assert.equal(opened[0],row);assert.equal(row.mail_scan_status,'needs_review');assert.equal(document.activeElement.id,'cfrMailApplyCandidate');
  row.mail_scan_status='applied';row.amount=908.64;await refresh();assert.equal(document.querySelector('[data-reminder-review="review"]'),null);assert.ok([...document.querySelectorAll('.cf-reminder-amount')].some(e=>e.textContent.includes('908,64')));
- window.happyDOM.abort();
+ await window.happyDOM.abort();
+});
+
+test('invoice card action uses the existing Pack application tab bridge without completing a reminder',async()=>{
+ const window=new Window({url:'https://cleanfleet.pl/pack/module.html?module=reminders'}),document=window.document;document.body.innerHTML='<div id="modalRoot"></div>';const sent=[];
+ const parent={postMessage:(message,origin)=>sent.push({message,origin})};Object.defineProperty(window,'parent',{value:parent});
+ const row={id:'invoice-task',title:'Wystawić fakturę dla dowolnej firmy',company_id:'company',status:'active',category:'invoice',remind_at:'2020-01-01T09:00:00Z'};
+ const context=vm.createContext({window,document,location:window.location,URL,console,Date,Intl,cfIsAdmin:()=>true,cfCompanies:[{id:'company',name:'Dowolna firma'}],cfCompanyDisplayName:c=>c.name,escapeHtml:String,cfSupabase:{from:()=>({select:()=>({order:async()=>({data:[row],error:null})})})}});
+ vm.runInContext(await readFile(new URL('../pack/reminders.js',import.meta.url),'utf8'),context);await context.cfShowReminders();document.querySelector('[data-reminder-tab="overdue"]').click();
+ const action=document.querySelector('[data-reminder-invoice]');assert.equal(action.textContent,'Wystaw fakturę');action.click();
+ assert.equal(sent.length,1);assert.equal(sent[0].message.type,'robisie-pack-open-url');assert.equal(sent[0].message.url,'https://cleanfleet.pl/app/');assert.equal(sent[0].origin,'https://cleanfleet.pl');assert.equal(row.status,'active');
+ row.company_id=null;row.title='Wystawić fakturę';context.cfReminderOpenInvoice(row);assert.equal(sent.length,1);document.querySelector('[data-app="robisie"]').click();assert.equal(sent[1].message.url,'https://cleanfleet.pl/app/robisie/');
+ await window.happyDOM.abort();
 });

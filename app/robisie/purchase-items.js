@@ -1,5 +1,5 @@
 import {round,number} from './core.js?v=1.0.78';
-import {savedEntries} from './ksef-allocation.js?v=1.0.70';
+import {savedEntries} from './ksef-allocation.js?v=1.0.90';
 export function cachedPreview(link){
  const items=link.items;if(!Array.isArray(items)||!items.length||!items.every(x=>Number.isInteger(x.index)&&x.index>0))return null;
  const gross=Number(link.document.grossAmount),currency=link.document.payload.currency;
@@ -35,4 +35,4 @@ export function restoreSource(project,id,links,projectId){
  if(split)Object.assign(purchase,{selectedKsefQuantities:savedEntries(link,preview.items),allocatedInvoiceAmount:selection.total});
  return next;
 }
-export {allocationMarkup,mountAllocation,quantitySelection,savedEntries} from './ksef-allocation.js?v=1.0.70';
+export {allocationMarkup,mountAllocation,quantitySelection,savedEntries} from './ksef-allocation.js?v=1.0.90';

@@ -19,3 +19,14 @@ test('receipt dialog submits reviewed rows, exposes server errors beside save an
  await form.onsubmit({preventDefault(){}});assert.equal(await done,'PARAGON-test');assert.equal(writes,2);assert.equal(document.querySelector('dialog'),null);
  await window.happyDOM.abort();
 });
+
+test('project import preserves the whole receipt and sends only selected quantities',async()=>{
+ const window=new Window();globalThis.document=window.document;globalThis.FormData=window.FormData;
+ window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};window.HTMLDialogElement.prototype.close=function(){this.open=false;};
+ const candidate={...data,total:30,items:[...data.items,{name:'Pędzel',quantity:1,unit:'szt.',gross:5}]};let saved;
+ const done=openReceiptImport({selectForProject:true,scan:async()=>candidate,save:async value=>{saved=value;return 'PARAGON-selected';}});
+ const dialog=document.querySelector('dialog'),form=dialog.querySelector('form');const bytes=new Uint8Array(120);bytes.set([0x89,0x50,0x4e]);const transfer=new window.DataTransfer();transfer.items.add(new window.File([bytes],'paragon.png'));form.elements.scan.files=transfer.files;
+ await dialog.querySelector('[data-read]').onclick();for(const input of form.querySelectorAll('[step]'))input.setAttribute('step','any');
+ const rows=dialog.querySelectorAll('[data-receipt-line]');rows[1].querySelector('[data-receipt-pick]').checked=false;form.onchange();rows[0].querySelector('[name="assignQuantity"]').value='1';
+ await form.onsubmit({preventDefault(){}});assert.equal(await done,'PARAGON-selected');assert.equal(saved.data.items.length,2);assert.deepEqual(saved.entries,[{index:1,quantity:1}]);await window.happyDOM.abort();
+});

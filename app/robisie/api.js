@@ -126,3 +126,5 @@ export async function earningsSummaryData(){
   pages('/rest/v1/cf_earnings?select=id,source_robisie_project_id,work_date,total_amount,my_amount,employee_amount,employee_paid&created_by=eq.'+own+'&source_robisie_project_id=not.is.null&order=id.asc')
  ]);return {projects,earnings};
 }
+
+export const importProjectReceipt=({hash,data,project,revision})=>stockRpc('rs_receipt_import_project',{p_hash:hash,p_data:data,p_project:project,p_revision:revision});

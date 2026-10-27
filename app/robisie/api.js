@@ -31,6 +31,10 @@ export function stockIntegration(rows,onChange=()=>{}){return {
  storeMetadata:rows=>stockRpc('rs_ksef_store_metadata',{p_rows:rows}),
  storeXml:(number,xml)=>stockRpc('rs_ksef_store_xml',{p_number:number,p_xml:xml}),
  stock:()=>stockRpc('rs_ksef_stock'),
+ scanReceipt:({file,signal})=>request('/functions/v1/robisie-receipt-scan',{method:'POST',body:JSON.stringify(file),timeoutMs:120000,signal}),
+ saveReceipt:({hash,data})=>stockRpc('rs_receipt_save',{p_hash:hash,p_data:data}),
+ assignReceipt:async({number,project,entries,revision})=>{const result=await stockRpc('rs_receipt_assign_project',{p_number:number,p_project:project,p_entries:entries,p_revision:revision});await onChange(result.project);return result;},
+ assignReceiptCleanfleet:({number,indices})=>stockRpc('rs_receipt_assign_cleanfleet',{p_number:number,p_indices:indices}),
  correctCostContext:number=>stockRpc('rs_ksef_cost_correction_context',{p_number:number}),
  applyCostCorrection:async({project,number,amount,revision})=>{const result=await stockRpc('rs_apply_ksef_cost_correction',{p_project:project,p_number:number,p_amount:amount,p_revision:revision});await onChange(result.project);return result;},
  setReturn:({number,index,quantity,revision})=>stockRpc('rs_ksef_set_return',{p_number:number,p_index:index,p_quantity:quantity,p_revision:revision}),
@@ -76,7 +80,7 @@ export const projectEarnings=id=>request('/rest/v1/cf_earnings?select=id,my_amou
 
 export async function stageInvoices(id){
  const [bill,linked]=await Promise.all([request('/functions/v1/cleanfleet-bill',{method:'POST',body:JSON.stringify({action:'search',sourceApp:'robisie',sourceId:id})}),request('/rest/v1/rs_ksef_links?select=document&project_id=eq.'+encodeURIComponent(id))]);
- const rows=[...bill];for(const entry of linked){const row=entry.document;if(!rows.some(x=>x.id===row.id||(x.ksef_number&&x.ksef_number===row.ksef_number)))rows.push(row);}return rows;
+ const rows=[...bill];for(const entry of linked){const row=entry.document;if(row.sourceReceipt)continue;if(!rows.some(x=>x.id===row.id||(x.ksef_number&&x.ksef_number===row.ksef_number)))rows.push(row);}return rows;
 }
 
 export const project=id=>request('/rest/v1/rs_projects?select=*&id=eq.'+encodeURIComponent(id)).then(rows=>rows[0]);

@@ -9,7 +9,7 @@ const list=project=>Array.isArray(project.shoppingList)?project.shoppingList:[];
 export function purchaseLines(project){
  const rows=[];
  for(const purchase of project.purchases||[]){
-  if(!purchase.sourceKsefNumber&&purchase.documentType!=='invoice')continue;
+  if(!purchase.sourceKsefNumber&&!purchase.sourceReceiptId&&purchase.documentType!=='invoice')continue;
   if(purchase.ksefCorrections?.length)continue; // A corrected quantity needs review against the original document.
   for(const [position,item] of (Array.isArray(purchase.invoiceItems)?purchase.invoiceItems:[]).entries()){
    const index=Number.isInteger(item.index)?item.index:position+1,selected=purchase.selectedKsefQuantities?.find(e=>e.index===index);

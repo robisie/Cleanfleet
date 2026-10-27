@@ -3,7 +3,7 @@ import {relatedGroups,historyRanges,isCorrection,decodeXml} from './ksef-relatio
 import {stockMarkup,stockStores,stockSummaryMarkup,returnDialog,useDialog,invoiceDestinationDialog} from './stock.js?v=1.0.39';
 import {selectedAmount,duplicatePurchases,allocationMarkup,mountAllocation,savedEntries} from './purchase-import.js?v=1.0.38';
 import {esc,today} from './core.js?v=1.0.38';
-import {openReceiptImport} from './receipt-import.js?v=1.0.39';
+import {openReceiptImport} from './receipt-import.js?v=1.0.41';
 import {monthDates,counterparty,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.38';
 import {hint,remember} from './cost-suggestions.js?v=1.0.38';
 import {wholeInvoiceFree,similarInvoiceCandidates,supplierSuggestionDialog} from './stock-suggestions.js?v=1.0.38';

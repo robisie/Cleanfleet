@@ -94,3 +94,10 @@ test('earnings summary reads only the owner and linked Robisie entries and pagin
 test('summary discards data if session ends during its read',async()=>{
  const releases=[];const a=await api(async()=>{await new Promise(r=>releases.push(r));return response([]);},{access_token:'test',expires_at:9999999999,user:{id:'owner'}});const pending=a.earningsSummaryData();a.logout();releases.forEach(r=>r());await assert.rejects(pending,/Sesja zmieniła/);
 });
+test('receipt import and later row changes use receipt RPCs without requesting KSeF XML',async()=>{
+ const calls=[];const row={id:'p',revision:3,payload:{purchases:[]}};
+ const a=await api(async(url,options)=>{calls.push({url,args:JSON.parse(options.body)});return response(url.endsWith('/rs_receipt_update_allocation')?row:{project:row});});
+ const entries=[{index:2,quantity:1}];await a.importProjectReceipt({hash:'hash',data:{items:[]},entries,project:'p',revision:1});
+ const result=await a.savePurchaseAllocation({id:'p',revision:2},row.payload,{ksef_number:'PARAGON-1',document:{sourceReceipt:true}},entries,null);
+ assert.equal(result.revision,3);assert.match(calls[0].url,/rs_receipt_import_selected$/);assert.equal(calls[0].args.p_entries[0].index,2);assert.match(calls[1].url,/rs_receipt_update_allocation$/);assert.equal(calls.length,2);assert.equal(calls[1].args.p_number,'PARAGON-1');
+});

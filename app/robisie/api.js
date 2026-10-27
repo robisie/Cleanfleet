@@ -107,6 +107,7 @@ export async function savePurchaseKsef(project,payload,link,indices,xml,endpoint
 }
 
 export async function savePurchaseAllocation(project,payload,link,entries,xml){
+ if(link.document.sourceReceipt)return stockRpc('rs_receipt_update_allocation',{p_project:project.id,p_number:link.ksef_number,p_entries:entries,p_revision:project.revision,p_expected_document:link.document,p_payload:payload});
  const args={p_project:project.id,p_number:link.ksef_number,p_xml:xml,p_entries:entries,p_revision:project.revision,p_expected_document:link.document,p_payload:payload};
  try{const result=await request('/rest/v1/rpc/rs_allocate_ksef_purchase',{method:'POST',body:JSON.stringify(args),timeoutMs:30000});return result.project;}
  catch(error){
@@ -127,4 +128,4 @@ export async function earningsSummaryData(){
  ]);return {projects,earnings};
 }
 
-export const importProjectReceipt=({hash,data,project,revision})=>stockRpc('rs_receipt_import_project',{p_hash:hash,p_data:data,p_project:project,p_revision:revision});
+export const importProjectReceipt=({hash,data,entries,project,revision})=>stockRpc('rs_receipt_import_selected',{p_hash:hash,p_data:data,p_project:project,p_entries:entries,p_revision:revision});

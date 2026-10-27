@@ -3,14 +3,14 @@ import {relatedGroups,historyRanges,isCorrection,decodeXml} from './ksef-relatio
 import {stockMarkup,stockStores,stockSummaryMarkup,returnDialog,useDialog,invoiceDestinationDialog} from './stock.js?v=1.0.39';
 import {selectedAmount,duplicatePurchases,allocationMarkup,mountAllocation,savedEntries} from './purchase-import.js?v=1.0.38';
 import {esc,today} from './core.js?v=1.0.38';
-import {openReceiptImport} from './receipt-import.js?v=1.0.41';
+import {openReceiptImport} from './receipt-import.js?v=1.0.42';
 import {monthDates,counterparty,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.38';
 import {hint,remember} from './cost-suggestions.js?v=1.0.38';
 import {wholeInvoiceFree,similarInvoiceCandidates,supplierSuggestionDialog} from './stock-suggestions.js?v=1.0.38';
 const e=esc;
 let integration={},assignments=[],cfLinks=[],documents=[],stockRows=[],historySyncedAt=0;
 const invoice=number=>state.rows.find(r=>r.ksefNumber===number)||documents.find(d=>d.metadata.ksefNumber===number)?.metadata;
-function initial(){const month=today().slice(0,7);return {month,...monthDates(month),kind:'purchases',dateType:'Issue',sort:'Desc',q:'',stockSearch:'',stockStore:'',stockStatus:'available',stockSummary:false,rows:[],selected:new Set(),loaded:false,hasMore:false,isTruncated:false,page:0,ticket:'',ticketAt:0,query:null,listError:false,partial:false,partialWarning:''};}
+function initial(){const month=today().slice(0,7);return {month,...monthDates(month),kind:'purchases',dateType:'Issue',sort:'Desc',q:'',stockSearch:'',stockStore:'',stockStatus:'all',stockSummary:false,rows:[],selected:new Set(),loaded:false,hasMore:false,isTruncated:false,page:0,ticket:'',ticketAt:0,query:null,listError:false,partial:false,partialWarning:''};}
 let state=initial(),root=null,api=null,controller=null,message='',ready=null,cache=null;
 const scripts=new Map(),singles=new Map();let singleSize=0;
 function script(src,test){if(test())return Promise.resolve();if(!scripts.has(src))scripts.set(src,new Promise((resolve,reject)=>{const tag=document.createElement('script');tag.src=src;tag.onload=()=>test()?resolve():reject(Error('Brak generatora pliku.'));tag.onerror=()=>reject(Error('Nie udało się załadować generatora. Odśwież stronę.'));document.head.append(tag);}).catch(error=>{scripts.delete(src);throw error;}));return scripts.get(src);}
@@ -82,7 +82,7 @@ async function loadStock(signal){
   try{const bytes=await singleBytes(d.metadata,signal);await integration.storeXml(d.metadata.ksefNumber,decodeXml(bytes));check(signal);}
   catch(error){if(signal.aborted)throw error;state.stockErrors.push({number:d.metadata.invoiceNumber||d.metadata.ksefNumber,message:error.message});}
  }
- documents=await integration.index();stockRows=await integration.stock();state.stockComplete=state.stockErrors.length===0;progress('Magazyn: '+stockRows.length+' pozycji z wczytanych faktur.'+(state.stockErrors.length?' Nie wczytano części dokumentów — szczegóły poniżej.':''));
+ documents=await integration.index();stockRows=await integration.stock();state.stockComplete=state.stockErrors.length===0;progress('Magazyn: '+stockRows.length+' pozycji z faktur i paragonów.'+(state.stockErrors.length?' Nie wczytano części dokumentów — szczegóły poniżej.':''));
 }
 async function assignWholeInvoice(number,signal){
  const initial=stockRows.filter(r=>r.metadata.ksefNumber===number);

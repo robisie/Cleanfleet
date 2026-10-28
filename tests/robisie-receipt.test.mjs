@@ -21,3 +21,10 @@ test('magazyn pokazuje paragon i ceny bez przycisku faktury KSeF',()=>{
  assert.match(html,/Przypisz cały paragon/);
  assert.doesNotMatch(html,/data-kf="preview"/);
 });
+test('stock hides fully allocated rows and shows released quantities',()=>{
+ const metadata={source:'nip-receipt',ksefNumber:'PARAGON-test',invoiceNumber:'R/1',issueDate:'2026-10-27',currency:'PLN',seller:{name:'Sklep'}};
+ const row={metadata,item:{index:1,name:'Farba testowa',quantity:2,unit:'szt.',gross:20},capacity:2,assigned:2,available:0,returned:0,uses:{}};
+ assert.doesNotMatch(stockMarkup([row]),/Farba testowa/);
+ assert.match(stockMarkup([{...row,assigned:1,available:1}]),/Farba testowa/);
+ assert.match(stockMarkup([{...row,assigned:0,available:2}]),/Farba testowa/);
+});

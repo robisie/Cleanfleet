@@ -32,3 +32,10 @@ test('existing imported receipt reopens all lines, deselection changes cost and 
   await t.submit();assert.equal(t.writes.length,1);assert.equal(t.writes[0].length,1);assert.equal(t.db.payload.purchases[0].amount,20);assert.equal(t.db.payload.purchases[0].sourceReceiptId,'PARAGON-test');
  }finally{await t.close()}
 });
+test('receipt removal offers an explicit detach action and removes the investment cost',async()=>{
+ const t=await setup();try{
+  await t.n.purchaseDialog('purchase');
+  const button=t.$('[data-action="delete"]');assert.equal(button.textContent,'Odłącz paragon');assert.match(button.dataset.confirm,/Dokument paragonu pozostanie/);
+  await button.onclick();assert.equal(t.db.payload.purchases.length,0);
+ }finally{await t.close()}
+});

@@ -58,7 +58,7 @@ test('Bill has only invoice tabs; Robisię mounts the standalone Towar view with
  assert.equal(loaded,true);assert.match(root.innerHTML,/Pozostało: 2/);assert.match(root.innerHTML,/data-kf="stock-assign"/);assert.ok(!root.innerHTML.includes('data-kf="kind"'));n.unmount();
 });
 test('Towar filters shops and returned stock without fetching the list again',async()=>{
- const {n,root,node}=await setup(),a={...row(1),seller:{nip:'111',name:'Pierwszy'}},b={...row(2),seller:{nip:'222',name:'Drugi'}},goods=[{metadata:a,item:{index:1,name:'Nowy produkt',unit:'szt.',gross:100},capacity:1,assigned:0,returned:0,available:1},{metadata:b,item:{index:1,name:'Oddany produkt',unit:'szt.',gross:100},capacity:1,assigned:0,returned:1,available:0}];let reads=0;
+ const {n,root,node}=await setup(),a={...row(1),seller:{nip:'111',name:'Pierwszy'}},b={...row(2),seller:{nip:'222',name:'Drugi'}},goods=[{metadata:a,item:{index:1,name:'Nowy produkt',unit:'szt.',gross:100},capacity:1,assigned:0,returned:0,available:1},{metadata:b,item:{index:1,name:'Oddany produkt',unit:'szt.',gross:100},capacity:2,assigned:0,returned:1,available:1}];let reads=0;
  n.mountStock(root,async()=>({invoices:[],hasMore:false}),{index:async()=>[],storeMetadata:async()=>{},stock:async()=>{reads++;return goods;}});
  for(let i=0;i<50&&n.testState().busy;i++)await new Promise(resolve=>setTimeout(resolve,1));
  assert.match(root.innerHTML,/Wszystkie sklepy/);assert.match(root.innerHTML,/Na stanie/);assert.match(root.innerHTML,/Oddano/);

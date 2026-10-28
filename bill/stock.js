@@ -11,7 +11,7 @@ export function stockStores(rows){
 }
 export function stockMarkup(rows,q='',{blocked=false,incomplete=false,store='',status='all'}={}){
  const search=q.trim().toLocaleLowerCase('pl');
- const found=rows.filter(r=>(!store||storeKey(r)===store)&&(status!=='available'||Number(r.available)>0)&&(status!=='returned'||Number(r.returned)>0)&&[r.metadata.invoiceNumber,r.metadata.ksefNumber,r.item.name,r.metadata.seller?.name,r.metadata.seller?.nip].join(' ').toLocaleLowerCase('pl').includes(search));
+ const found=rows.filter(r=>Number(r.available)>0&&(!store||storeKey(r)===store)&&(status!=='available'||Number(r.available)>0)&&(status!=='returned'||Number(r.returned)>0)&&[r.metadata.invoiceNumber,r.metadata.ksefNumber,r.item.name,r.metadata.seller?.name,r.metadata.seller?.nip].join(' ').toLocaleLowerCase('pl').includes(search));
  const groups=new Map();
  for(const row of found){const key=row.metadata.ksefNumber;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(row);}
  const ordered=[...groups.values()].sort(([a],[b])=>String(b.metadata.issueDate||'').localeCompare(String(a.metadata.issueDate||''))||String(b.metadata.ksefNumber).localeCompare(String(a.metadata.ksefNumber)));

@@ -1,5 +1,12 @@
 export function monthDates(month){if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month||''))throw Error('Wybierz miesiąc.');const [y,m]=month.split('-').map(Number);return {from:month+'-01',to:month+'-'+String(new Date(Date.UTC(y,m,0)).getUTCDate()).padStart(2,'0')};}
 export const counterparty=(row,kind)=>kind==='sales'?{name:row.buyer?.name||'Nabywca bez nazwy',id:row.buyer?.identifier?.value||''}:{name:row.seller?.name||'Sprzedawca bez nazwy',id:row.seller?.nip||''};
+export function invoicePdfName(row,kind='purchases',usedNames=new Set()){
+ const part=(value,fallback,max)=>{const text=String(value||fallback).normalize('NFC').replace(/[<>:"/\\|?*\u0000-\u001f\u007f]/g,'-').replace(/\s+/g,' ').trim().replace(/^[. ]+|[. ]+$/g,'');let result='',bytes=0;for(const char of text){bytes+=new TextEncoder().encode(char).length;if(bytes>max)break;result+=char;}return result.replace(/[. ]+$/g,'')||fallback;};
+ const name=part(counterparty(row,kind).name,'Kontrahent',100),date=part(row.issueDate,'brak-daty',10),number=part(row.invoiceNumber||row.ksefNumber,'bez-numeru',90),base=name+' - '+date+' - '+number;
+ let filename=base+'.pdf',index=2;
+ while(usedNames.has(filename.toLocaleLowerCase('pl')))filename=base+' ('+(index++)+').pdf';
+ usedNames.add(filename.toLocaleLowerCase('pl'));return filename;
+}
 export function visibleInvoices(rows,{q='',kind='purchases',sort='Desc',dateType='Issue'}={}){
  const key={Issue:'issueDate',Invoicing:'invoicingDate',PermanentStorage:'permanentStorageDate'}[dateType]||'issueDate';
  return rows.filter(r=>{const p=counterparty(r,kind);return [p.name,p.id,r.invoiceNumber,r.ksefNumber].join(' ').toLocaleLowerCase('pl').includes(q.trim().toLocaleLowerCase('pl'));}).sort((a,b)=>{if(sort==='party')return counterparty(a,kind).name.localeCompare(counterparty(b,kind).name,'pl')||a.ksefNumber.localeCompare(b.ksefNumber);if(sort==='amount')return String(a.currency).localeCompare(String(b.currency))||Number(b.grossAmount)-Number(a.grossAmount)||a.ksefNumber.localeCompare(b.ksefNumber);return (sort==='Asc'?1:-1)*(String(a[key]||'').localeCompare(String(b[key]||''))||a.ksefNumber.localeCompare(b.ksefNumber));});

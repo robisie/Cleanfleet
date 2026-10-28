@@ -104,6 +104,14 @@ Deno.serve(async req=>{
     db.from('companies').select('id,name,nip,address').eq('active',true),db.from('billing_companies').select('id,company_id,name,tax_id,address,currency').eq('active',true),db.from('bill_payment_evidence').select('invoice_id,manual_paid,bank_cents,bank_payments').limit(1000)]);
    return json({invoices:checked(invoices),payments:checked(payments),parties:checked(parties),settings:{bank:checked(settings)?.payload?.bank||'',gusConfigured:!!checked(settings)?.payload?.gusKeyCiphertext},counters:checked(counters),ksefConfigured:checked(config)?.nip===SELLER.nip,sources:{projects:checked(projects).map((r:any)=>({id:r.id,name:r.name,number:r.contract_number})),companies:checked(companies),billing:checked(billing)}});
   }
+  if(body.action==='correction-history'){
+   const page=body.page;
+   if(!Number.isSafeInteger(page)||page<0||page>=100)throw Error('Nieprawidłowa strona historii korekt.');
+   return json(checked(await db.from('bill_invoices')
+    .select('id,number,payload,revision,status,ksef_number,ksef_session,ksef_reference,ksef_message,created_at,updated_at')
+    .not('payload->correction','is',null)
+    .order('created_at',{ascending:false}).range(page*1000,page*1000+999)));
+  }
   if(body.action==='source'){
    let buyer:any={},description='',source={app:body.app,id:body.id},currency='PLN';
    if(body.app==='robisie'){

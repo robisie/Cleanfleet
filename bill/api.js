@@ -60,7 +60,7 @@ export const applyCostCorrection=({project,number,amount,revision})=>stockRpc('r
 export async function invoiceFamilies(rows){
  const all=new Map(rows.map(row=>[row.id,row]));
  for(let page=0;page<100;page++){
-  const corrections=await request('/rest/v1/bill_invoices?select=id,number,payload,revision,status,ksef_number,ksef_session,ksef_reference,ksef_message,created_at,updated_at&payload->correction=not.is.null&order=created_at.desc&limit=1000&offset='+page*1000,{timeoutMs:90000});
+  const corrections=await call({action:'correction-history',page});
   for(const row of corrections)all.set(row.id,row);if(corrections.length<1000)break;
   if(page===99)throw Error('Nie pobrano pełnej historii korekt.');
  }

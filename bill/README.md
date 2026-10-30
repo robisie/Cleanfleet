@@ -129,3 +129,10 @@ Wystawione wcześniej dokumenty bez pola VAT zachowują historyczne ZW. Korekta 
 Zaimportowana faktura zewnętrzna (`source.app=external`, status `issued`) zachowuje numer i daty; dostępna jest korekta bez wymyślania przyjęcia do KSeF. Oryginału nie można ponownie wysłać. Korekta z brakiem numeru KSeF oryginału korzysta z `NrKSeFN=1`; dla oryginałów przyjętych do KSeF zachowuje prawdziwy numer. Korekta nadal wymaga osobnego wystawienia i osobnej wysyłki. Dane importu muszą pochodzić z dokumentu i być sprawdzone pod kątem duplikatu.
 
 Bill 1.0.51: status KSeF oryginału zewnętrznego wymaga numeru KSeF albo wyraźnego potwierdzenia wystawienia poza KSeF. Sam napis OFFLINE nie jest takim potwierdzeniem. Brak ustalenia statusu blokuje wysyłkę korekty przed autoryzacją KSeF, ale pozwala ją przygotować i wystawić lokalnie. Status uzupełnia się w szczegółach zaimportowanej faktury.
+
+### Archiwum sprzedaży 2026 z KSeF (1.0.52)
+Import istniejących dokumentów zachowuje oryginalny XML, numer KSeF, daty, kontrahentów, pozycje, waluty i historyczny VAT. Dokument przyjęty w KSeF ma status „Przyjęta w KSeF”; import nie tworzy ponownej wysyłki. UPO jest dostępne tylko dla dokumentu z zachowaną sesją wysyłki Bill. Dla faktur wystawionych poza Bill pozostają XML, weryfikacja KSeF, PDF i korekta.
+
+Brak formy płatności w historycznym XML zachowujemy jako `unspecified` — nie zgadujemy gotówki ani przelewu. To ustawienie jest dozwolone wyłącznie dla dokumentu zewnętrznego i jego korekty. Oryginalne oznaczenia płatności pozostają w XML i metadanych; import nie wpisuje potwierdzeń zapłaty do ewidencji Bill.
+
+`scripts/prepare-ksef-sales-import.py` przygotowuje prywatne dane z wcześniej pobranych metadanych i zweryfikowanych XML-i. Sprawdza wystawcę, okres, SHA-256, tożsamość i kwoty, pomija istniejące numery KSeF i blokuje konflikt numeru. Nie wysyła faktur ani nie zapisuje danych do bazy. Nowa korekta zewnętrzna wymaga jawnego odtworzenia powiązania; istniejące powiązania nie są przepisywane. Przy przygotowaniu bieżącego zasobu obie korekty były już poprawnie zapisane w Bill.

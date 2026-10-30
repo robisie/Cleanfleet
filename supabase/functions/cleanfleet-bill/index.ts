@@ -8,7 +8,7 @@ import {openAccount} from '../pack-bank-mail/vault.js';
 import '../pack-bank-mail/engine.js';
 import {reconcileBillPayments} from '../_shared/bill-bank-match.js';
 import {createStateCodec,hash} from '../cleanfleet-ksef/core.js';
-import {normalize,newInvoice,party,invoiceXml,invoiceAmount,SELLER,today,validBank,correctionSeed} from './invoice.js';
+import {normalize,newInvoice,party,invoiceXml,invoiceAmount,SELLER,today,validBank,correctionSeed,storedPayload} from './invoice.js';
 import {ksefApi,authenticate,openSession,invoiceStatus,KsefError} from './ksef.js';
 const secret=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const db=createClient(Deno.env.get('SUPABASE_URL')!,secret,{auth:{persistSession:false,autoRefreshToken:false}});
@@ -169,7 +169,8 @@ Deno.serve(async req=>{
    let row=await invoice(body.id);
    if(row.status==='draft')throw Error('Najpierw wystaw fakturę i sprawdź PDF. Wysyłka do KSeF jest osobną operacją.');
    if(row.status!=='issued')return json(row);
-   const payload=normalize(await canonicalFleet(row.id,await canonicalCorrection(row.payload)));
+   if(row.payload.source?.app==='external'&&!row.payload.correction)throw Error('Zaimportowana faktura zachowuje oryginał. Z tego miejsca można wysłać wyłącznie jej korektę.');
+   const payload=normalize(await canonicalFleet(row.id,await canonicalCorrection(storedPayload(row))));
    if(payload.issueDate!==today())throw Error('Dla wysyłki online ustaw dzisiejszą datę wystawienia.');
    const auth=await authKsef(userId);
    const attempt=crypto.randomUUID();

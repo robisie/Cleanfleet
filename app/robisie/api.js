@@ -31,6 +31,7 @@ export function stockIntegration(rows,onChange=()=>{}){return {
  storeMetadata:rows=>stockRpc('rs_ksef_store_metadata',{p_rows:rows}),
  storeXml:(number,xml)=>stockRpc('rs_ksef_store_xml',{p_number:number,p_xml:xml}),
  stock:()=>stockRpc('rs_ksef_stock'),
+ receiptDocument:number=>request('/rest/v1/rs_ksef_documents?select=metadata,preview&ksef_number=eq.'+encodeURIComponent(number)+'&limit=1').then(rows=>{if(rows[0]?.metadata?.source!=='nip-receipt')throw Error('Nie znaleziono zapisanych danych paragonu.');return rows[0];}),
  scanReceipt:({file,signal})=>request('/functions/v1/robisie-receipt-scan',{method:'POST',body:JSON.stringify(file),timeoutMs:120000,signal}),
  saveReceipt:({hash,data})=>stockRpc('rs_receipt_save',{p_hash:hash,p_data:data}),
  assignReceipt:async({number,project,entries,revision})=>{const result=await stockRpc('rs_receipt_assign_project',{p_number:number,p_project:project,p_entries:entries,p_revision:revision});await onChange(result.project);return result;},

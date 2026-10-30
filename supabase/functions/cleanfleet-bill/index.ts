@@ -8,7 +8,7 @@ import {openAccount} from '../pack-bank-mail/vault.js';
 import '../pack-bank-mail/engine.js';
 import {reconcileBillPayments} from '../_shared/bill-bank-match.js';
 import {createStateCodec,hash} from '../cleanfleet-ksef/core.js';
-import {normalize,newInvoice,party,invoiceXml,invoiceAmount,SELLER,today,validBank,correctionSeed,storedPayload,externalReference} from './invoice.js';
+import {normalize,newInvoice,party,invoiceXml,invoiceAmount,advanceAllocation,SELLER,today,validBank,correctionSeed,storedPayload,externalReference} from './invoice.js';
 import {ksefApi,authenticate,openSession,invoiceStatus,KsefError} from './ksef.js';
 const secret=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const db=createClient(Deno.env.get('SUPABASE_URL')!,secret,{auth:{persistSession:false,autoRefreshToken:false}});
@@ -29,6 +29,20 @@ async function reconcileVault(userId:string){
 async function fleetAttachment(id:string){return checked(await db.from('bill_fleet_attachments').select('*').eq('invoice_id',id).maybeSingle());}
 async function canonicalFleet(id:string,payload:any){return guardFleetPayload(payload,await fleetAttachment(id));}
 async function canonicalCorrection(payload:any){if(!payload?.correction)return payload;const parent=await invoice(payload.correction.originalId),seed=correctionSeed(parent);return {...payload,source:seed.source,correction:{...seed.correction,mode:payload.correction.mode,reason:payload.correction.reason}};}
+async function canonicalFinal(payload:any,userId:string,currentId?:string){
+ if(payload?.documentType!=='final')return payload;
+ if(!Array.isArray(payload.advances)||!payload.advances.length||payload.advances.length>30)throw Error('Wybierz wcześniejsze faktury zaliczkowe.');
+ const ids=payload.advances.map((a:any)=>a.id);
+ if(new Set(ids).size!==ids.length)throw Error('Zaliczka została wybrana więcej niż raz.');
+ const advances=[];
+ for(const id of ids){const row=await invoice(id);if(row.creator_id!==userId||row.status!=='accepted'||!row.ksef_number||row.payload.documentType!=='advance')throw Error('Faktura zaliczkowa musi być wcześniej przyjęta w KSeF.');advances.push({id:row.id,number:row.number,ksefNumber:row.ksef_number,amount:row.payload.advanceAmount,lines:advanceAllocation(row.payload)});}
+ const first=(await invoice(ids[0])).payload;
+ if(payload.currency!==first.currency||JSON.stringify(payload.buyer)!==JSON.stringify(first.buyer)||JSON.stringify(payload.lines)!==JSON.stringify(first.lines)||String(payload.globalDiscount||'0')!==String(first.globalDiscount||'0')||payload.orderNumber!==first.orderNumber||payload.contractNumber!==first.contractNumber)throw Error('Faktura końcowa musi zachować nabywcę, pozycje, rabat i zamówienie z zaliczki.');
+ for(const id of ids.slice(1)){const other=(await invoice(id)).payload;if(other.currency!==first.currency||JSON.stringify(other.buyer)!==JSON.stringify(first.buyer)||JSON.stringify(other.lines)!==JSON.stringify(first.lines)||String(other.globalDiscount||'0')!==String(first.globalDiscount||'0')||other.orderNumber!==first.orderNumber||other.contractNumber!==first.contractNumber)throw Error('Wybrane zaliczki dotyczą różnych zamówień.');}
+ const existing=checked(await db.from('bill_invoices').select('id,payload').eq('creator_id',userId).eq('payload->>documentType','final').in('status',['issued','pending','sending','uncertain','accepted']).limit(1000));
+ if(existing.some((r:any)=>r.id!==currentId&&r.payload.advances?.some((a:any)=>ids.includes(a.id))))throw Error('Ta zaliczka jest już rozliczona na innej fakturze końcowej.');
+ return {...payload,advances};
+}
 async function authKsef(userId:string){
  const saved=checked(await db.from('cf_ksef_credentials').select('nip,ciphertext').eq('user_id',userId).eq('environment','production').maybeSingle());
  if(!saved||saved.nip!==SELLER.nip)throw Error('Brak zapisanej konfiguracji KSeF dla Twojego konta. Zapisz token w CleanFleet → Dokumenty księgowe → KSeF.');
@@ -73,7 +87,7 @@ Deno.serve(async req=>{
   }
   if(body.action==='issue-only'){
    let row=await invoice(body.id);if(row.status!=='draft')return json(row);
-   const payload=normalize(await canonicalFleet(row.id,await canonicalCorrection(row.payload)));
+   const payload=normalize(await canonicalFinal(await canonicalFleet(row.id,await canonicalCorrection(row.payload)),userId,row.id));
    row=checked(await db.rpc('bill_issue_prepared',{p_id:row.id,p_revision:body.revision,p_payload:payload}));
    return json(row);
   }
@@ -179,7 +193,7 @@ Deno.serve(async req=>{
    if(row.status==='draft')throw Error('Najpierw wystaw fakturę i sprawdź PDF. Wysyłka do KSeF jest osobną operacją.');
    if(row.status!=='issued')return json(row);
    if(row.payload.source?.app==='external'&&!row.payload.correction)throw Error('Zaimportowana faktura zachowuje oryginał. Z tego miejsca można wysłać wyłącznie jej korektę.');
-   const payload=normalize(await canonicalFleet(row.id,await canonicalCorrection(storedPayload(row))));
+   const payload=normalize(await canonicalFinal(await canonicalFleet(row.id,await canonicalCorrection(storedPayload(row))),userId,row.id));
    if(payload.issueDate!==today())throw Error('Dla wysyłki online ustaw dzisiejszą datę wystawienia.');
    if(payload.correction){const parent=await invoice(payload.correction.originalId);if(parent.payload.source?.app==='external'&&!parent.payload.correction&&!parent.ksef_number&&parent.payload.source.externalKsefStatus!=='outside')throw Error('Uzupełnij status KSeF faktury źródłowej: wpisz jej numer KSeF albo potwierdź wystawienie poza KSeF w szczegółach oryginału.');}
    const auth=await authKsef(userId);

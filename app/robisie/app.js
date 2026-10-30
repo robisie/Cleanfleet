@@ -8,7 +8,7 @@ import * as PurchasePaymentForm from './purchase-payment-form.js?v=1.0.80';
 import * as PurchaseItems from './purchase-items.js?v=1.0.90';
 import * as BI from './invoices.js?v=1.0.80';
 import * as Auto from './autosave.js?v=1.0.80';
-import * as C from './core.js?v=1.0.93';
+import * as C from './core.js?v=1.0.94';
 import * as API from './api.js?v=1.0.93';
 import * as PDF from './pdf.js?v=1.0.84';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

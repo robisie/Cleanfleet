@@ -1,10 +1,10 @@
-import {openKsefProgress} from './ksef-progress.js?v=1.0.44';
+import {openKsefProgress} from './ksef-progress.js?v=1.0.51';
 import {costCorrectionDialog} from './cost-correction.js?v=1.0.38';
 import {relatedGroups,historyRanges,isCorrection,decodeXml} from './ksef-relations.js?v=1.0.38';
-import {stockMarkup,stockStores,stockSummaryMarkup,returnDialog,useDialog,invoiceDestinationDialog} from './stock.js?v=1.0.50';
+import {stockMarkup,stockStores,stockSummaryMarkup,returnDialog,useDialog,invoiceDestinationDialog} from './stock.js?v=1.0.51';
 import {selectedAmount,duplicatePurchases,allocationMarkup,mountAllocation,savedEntries} from './purchase-import.js?v=1.0.38';
 import {esc,today} from './core.js?v=1.0.38';
-import {openReceiptImport} from './receipt-import.js?v=1.0.42';
+import {openReceiptImport} from './receipt-import.js?v=1.0.51';
 import {monthDates,counterparty,invoicePdfName,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.46';
 import {hint,remember} from './cost-suggestions.js?v=1.0.38';
 import {wholeInvoiceFree,similarInvoiceCandidates,supplierSuggestionDialog} from './stock-suggestions.js?v=1.0.38';
@@ -37,7 +37,7 @@ function draw(){if(!root)return;const busy=!!controller;root.innerHTML=`${integr
  if(busy)for(const node of root.querySelectorAll('button,input,select'))if(node.dataset.kf!=='cancel')node.disabled=true;
 }
 function invalidate(){state.rows=[];state.selected.clear();state.loaded=false;state.hasMore=false;state.isTruncated=false;state.page=0;state.query=null;state.listError=false;state.partial=false;state.partialWarning='';cache=null;clearReady();}
-async function run(fn,popup=false){if(controller)return;const own=new AbortController();controller=own;draw();const overlay=!integration.stockOnly&&(popup||[load,syncHistory,downloadSelected].includes(fn))?openKsefProgress(()=>own.abort()):null;if(overlay)progressPopup=overlay;try{await fn(own.signal);}catch(error){if(controller!==own)return;if(own.signal.aborted)progress('Anulowano. Możesz ponowić operację.');else progress(error.message||'Nie udało się pobrać faktur.');}finally{overlay?.close();if(progressPopup===overlay)progressPopup=null;if(controller===own){controller=null;draw();}}}
+async function run(fn,popup=false){if(controller)return;const own=new AbortController();controller=own;draw();const overlay=(integration.stockOnly||popup||[load,loadStock,syncHistory,downloadSelected].includes(fn))?openKsefProgress(()=>own.abort(),integration.stockOnly?{title:'Ładowanie magazynu',message:'Wczytywanie dokumentów i stanów…',description:'Poczekaj na pobranie faktur, korekt i przypisań.'}:{}):null;if(overlay)progressPopup=overlay;try{await fn(own.signal);}catch(error){if(controller!==own)return;if(own.signal.aborted)progress('Anulowano. Możesz ponowić operację.');else progress(error.message||'Nie udało się pobrać faktur.');}finally{overlay?.close();if(progressPopup===overlay)progressPopup=null;if(controller===own){controller=null;draw();}}}
 function ticket(){return state.ticket&&Date.now()-state.ticketAt<9*60000?{ticket:state.ticket}:{};}
 async function historyPage(from,to,signal,dateType='PermanentStorage'){
  for(let page=0;page<40;page++){

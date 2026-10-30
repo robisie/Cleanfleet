@@ -1,4 +1,4 @@
-import {openReceiptImport} from '../../bill/receipt-import.js?v=1.0.42';
+import {openReceiptImport} from '../../bill/receipt-import.js?v=1.0.51';
 import * as Shopping from './shopping.js?v=1.0.87';
 import * as Completion from './completion.js?v=1.0.80';
 import * as PurchaseSettlement from './purchase-settlement.js?v=1.0.80';
@@ -8,8 +8,8 @@ import * as PurchasePaymentForm from './purchase-payment-form.js?v=1.0.80';
 import * as PurchaseItems from './purchase-items.js?v=1.0.90';
 import * as BI from './invoices.js?v=1.0.80';
 import * as Auto from './autosave.js?v=1.0.80';
-import * as C from './core.js?v=1.0.94';
-import * as API from './api.js?v=1.0.93';
+import * as C from './core.js?v=1.0.95';
+import * as API from './api.js?v=1.0.95';
 import * as PDF from './pdf.js?v=1.0.84';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let all=[],selected=null,view='dashboard',catalog=[],config=null,dirty=false,busy=false,lineFilter='',shopFilter=null,projectFilter='',projectSearch='',summarySort={key:'category',direction:1},mobileOpen=false,configBaseline=null;
@@ -19,7 +19,7 @@ let stockPanel=null,stockMountGeneration=0;
 function closeStock(){stockMountGeneration++;stockPanel?.unmount();}
 async function mountStockPanel(){
  const host=$('#robisie-stock-panel'),generation=++stockMountGeneration;
- try{const module=await import('../../bill/ksef.js?v=1.0.50');if(generation!==stockMountGeneration||view!=='stock'||$('#robisie-stock-panel')!==host)return;stockPanel=module;module.mountStock(host,API.ksefCall,API.stockIntegration(all,row=>{const updated={...row,payload:C.captureCatalog(config.payload,row.payload)};all=all.map(r=>r.id===row.id?updated:r);if(selected?.id===row.id&&!dirty)selected=structuredClone(updated);}));}
+ try{const module=await import('../../bill/ksef.js?v=1.0.51');if(generation!==stockMountGeneration||view!=='stock'||$('#robisie-stock-panel')!==host)return;stockPanel=module;module.mountStock(host,API.ksefCall,API.stockIntegration(all,row=>{const updated={...row,payload:C.captureCatalog(config.payload,row.payload)};all=all.map(r=>r.id===row.id?updated:r);if(selected?.id===row.id&&!dirty)selected=structuredClone(updated);}));}
  catch(error){if(generation===stockMountGeneration&&view==='stock')host.textContent='Nie udało się wczytać towarów: '+error.message;}
 }
 let earningsGeneration=0,earningsModule=null,earningsRows=null,earningsError='',earningsYear=C.today().slice(0,4),earningsMonth='';
@@ -628,7 +628,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-acti
  if(a==='shopping-print'){await flushChanges();printDoc('shopping');return;}
  if(a==='shopping-refresh'){await refreshLinkedInvestment();render();return;}
  if(a==='purchase-shop'){shopFilter=b.dataset.all==='true'?null:b.dataset.shop;render();return;}
- if(a==='purchase-receipt-scan'){b.disabled=true;try{const projectId=selected.id,revision=selected.revision,integration=API.stockIntegration(all);await openReceiptImport({saveLabel:'Zapisz i przypisz wybrane pozycje',selectForProject:true,scan:integration.scanReceipt,save:async({hash,data,entries})=>{const result=await API.importProjectReceipt({hash,data,entries,project:projectId,revision});const row={...result.project,payload:C.captureCatalog(config.payload,result.project.payload)};all=all.map(r=>r.id===row.id?row:r);if(selected?.id===projectId){selected=structuredClone(row);drafts.remove('project:'+row.id);shopFilter=null;}return result.number;}});render();}finally{b.disabled=false;}return;}
+ if(a==='purchase-receipt-scan'){b.disabled=true;try{const projectId=selected.id,integration=API.stockIntegration(all);await openReceiptImport({saveLabel:'Zapisz i przypisz wybrane pozycje',selectForProject:true,scan:integration.scanReceipt,save:async({hash,data,entries})=>{const result=await API.importProjectReceipt({hash,data,entries,project:projectId,revision:all.find(r=>r.id===projectId).revision});const row={...result.project,payload:C.captureCatalog(config.payload,result.project.payload)};all=all.map(r=>r.id===row.id?row:r);if(selected?.id===projectId){selected=structuredClone(row);drafts.remove('project:'+row.id);shopFilter=null;}return result.number;}});render();}finally{b.disabled=false;}return;}
  if(a==='purchase-add'||a==='purchase-edit'){b.disabled=true;await purchaseDialog(id);return;}
  if(a==='stage-add'||a==='stage-edit'){stageDialog(id);return;}
  if(a==='journal-add'||a==='journal-edit'){journalDialog(id);return;}

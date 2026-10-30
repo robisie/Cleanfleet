@@ -28,3 +28,11 @@ test('stock hides fully allocated rows and shows released quantities',()=>{
  assert.match(stockMarkup([{...row,assigned:1,available:1}]),/Farba testowa/);
  assert.match(stockMarkup([{...row,assigned:0,available:2}]),/Farba testowa/);
 });
+test('document color considers allocated rows even when filters hide them',()=>{
+ const metadata={ksefNumber:'DOC',invoiceNumber:'F/1',issueDate:'2026-10-30',currency:'PLN',seller:{name:'Sklep'}};
+ const free={metadata,item:{index:1,name:'Farba',quantity:1,unit:'szt.',gross:20},capacity:1,available:1,assigned:0,returned:0};
+ assert.match(stockMarkup([free]),/class="kf-stock-invoice stock-unassigned"/);
+ const hidden={...free,item:{...free.item,index:2,name:'Inny towar'},available:0,assigned:1};
+ assert.doesNotMatch(stockMarkup([free,hidden],'Farba'),/stock-unassigned/);
+ assert.match(stockMarkup([free,{...hidden,available:1,assigned:0}],'Farba'),/stock-unassigned/);
+});

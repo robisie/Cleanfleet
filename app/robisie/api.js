@@ -5,18 +5,29 @@ let session=null,refreshing=null;
 export const getSession=()=>session;
 export function restoreSession(){try{session=JSON.parse(localStorage.getItem(SESSION_KEY));}catch{session=null;}return session;}
 function setSession(s){if(!s.expires_at&&s.expires_in)s.expires_at=Math.floor(Date.now()/1000)+s.expires_in;session=s;localStorage.setItem(SESSION_KEY,JSON.stringify(s));}
+// One delayed modal covers concurrent slow requests; fast autosaves do not flash.
+const pendingRequests=new Map();let requestProgressTimer=null,requestProgressDialog=null,requestOverflow=null;
+function requestProgress(path){
+ if(typeof document==='undefined'||!document.body)return ()=>{};
+ const token=Symbol(),label=path.includes('receipt-scan')?'Odczytywanie paragonów…':path.includes('ksef')||path.includes('cleanfleet-bill')?'Wczytywanie faktur i przypisań…':/save|allocate|assign|set_|create|delete|import/.test(path)?'Zapisywanie danych…':'Wczytywanie danych Robisię…';pendingRequests.set(token,label);
+ if(!requestProgressTimer&&!requestProgressDialog)requestProgressTimer=setTimeout(()=>{requestProgressTimer=null;if(!pendingRequests.size||document.querySelector('.kf-progress-dialog[open]'))return;
+  requestProgressDialog=document.createElement('dialog');requestProgressDialog.className='kf-progress-dialog rs-request-progress';requestProgressDialog.setAttribute('aria-label','Przetwarzanie danych');requestProgressDialog.innerHTML='<div class="kf-progress-content"><span class="kf-progress-spinner" aria-hidden="true"></span><h2>Proszę czekać</h2><p role="status" aria-live="polite"></p></div>';requestProgressDialog.querySelector('p').textContent=[...new Set(pendingRequests.values())].join('\n');requestProgressDialog.oncancel=e=>e.preventDefault();requestOverflow=document.body.style.overflow;document.body.style.overflow='hidden';document.body.append(requestProgressDialog);requestProgressDialog.showModal();
+ },700);
+ return ()=>{pendingRequests.delete(token);if(pendingRequests.size){if(requestProgressDialog)requestProgressDialog.querySelector('p').textContent=[...new Set(pendingRequests.values())].join('\n');return;}clearTimeout(requestProgressTimer);requestProgressTimer=null;if(requestProgressDialog){requestProgressDialog.close();requestProgressDialog.remove();requestProgressDialog=null;document.body.style.overflow=requestOverflow;requestOverflow=null;}};
+}
 async function request(path,options={},auth=true){
  if(auth&&session?.expires_at&&session.expires_at*1000<Date.now()+30000){
   if(!refreshing)refreshing=request('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:JSON.stringify({refresh_token:session.refresh_token})},false).then(setSession).finally(()=>{refreshing=null;});
   await refreshing;
  }
  const {timeoutMs=15000,signal:externalSignal,...init}=options,controller=new AbortController();let timer;const abort=()=>controller.abort();if(externalSignal?.aborted)controller.abort();externalSignal?.addEventListener('abort',abort,{once:true});
+ const finishProgress=requestProgress(path);
  try{return await Promise.race([(async()=>{
   const res=await fetch(URL+path,{...init,signal:controller.signal,headers:{apikey:KEY,'Content-Type':'application/json',...(auth&&session?.access_token?{Authorization:'Bearer '+session.access_token}:{}),...init.headers}});
   const raw=await res.text();let data;try{data=raw?JSON.parse(raw):null;}catch{throw new Error('Nieprawidłowa odpowiedź serwera.');}
-  if(!res.ok){const error=new Error(data?.message||data?.error_description||'Nie udało się zapisać danych.');error.code=data?.code;throw error;}
+  if(!res.ok){const error=new Error(data?.message||data?.error_description||data?.error||'Nie udało się zapisać danych.');error.code=data?.code;throw error;}
   return data;
- })(),new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();const error=new Error('Połączenie trwa zbyt długo. Zmiany zachowano na urządzeniu.');error.code='RS_NETWORK_TIMEOUT';reject(error);},timeoutMs);})]);}finally{clearTimeout(timer);externalSignal?.removeEventListener('abort',abort);}
+ })(),new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();const error=new Error('Połączenie trwa zbyt długo. Zmiany zachowano na urządzeniu.');error.code='RS_NETWORK_TIMEOUT';reject(error);},timeoutMs);})]);}finally{finishProgress();clearTimeout(timer);externalSignal?.removeEventListener('abort',abort);}
 }
 export async function login(email,password){const s=await request('/auth/v1/token?grant_type=password',{method:'POST',body:JSON.stringify({email,password})},false);setSession(s);return s;}
 export function logout(){session=null;localStorage.removeItem(SESSION_KEY);}

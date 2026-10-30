@@ -30,3 +30,16 @@ test('project import preserves the whole receipt and sends only selected quantit
  const rows=dialog.querySelectorAll('[data-receipt-line]');rows[1].querySelector('[data-receipt-pick]').checked=false;form.onchange();rows[0].querySelector('[name="assignQuantity"]').value='1';
  await form.onsubmit({preventDefault(){}});assert.equal(await done,'PARAGON-selected');assert.equal(saved.data.items.length,2);assert.deepEqual(saved.entries,[{index:1,quantity:1}]);await window.happyDOM.abort();
 });
+test('batch reviews receipts independently, retries failures, skips and preserves saved documents on close',async()=>{
+ const window=new Window();globalThis.document=window.document;globalThis.FormData=window.FormData;
+ window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};window.HTMLDialogElement.prototype.close=function(){this.open=false;};
+ const receipts=[1,2,3,4].map(n=>({...structuredClone(data),number:'TEST/'+n,pages:[n]})),writes=[];let fail=true;
+ const done=openReceiptImport({scan:async()=>({receipts}),save:async value=>{if(value.data.number==='TEST/2'&&fail){fail=false;throw Error('Ponów zapis');}writes.push(value);return 'SAVED-'+value.data.number;}});
+ const dialog=document.querySelector('.kf-receipt-dialog'),form=dialog.querySelector('form');const bytes=new Uint8Array(120);bytes.set([0x25,0x50,0x44,0x46]);const transfer=new window.DataTransfer();transfer.items.add(new window.File([bytes],'wiele.pdf'));form.elements.scan.files=transfer.files;
+ await dialog.querySelector('[data-read]').onclick();assert.match(dialog.querySelector('[data-step]').textContent,/1 z 4/);assert.equal(document.querySelector('.kf-progress-dialog'),null);
+ const submit=async()=>{for(const input of form.querySelectorAll('[step]'))input.setAttribute('step','any');await form.onsubmit({preventDefault(){}});};
+ await submit();assert.equal(writes.length,1);assert.equal(form.elements.number.value,'TEST/2');
+ await submit();assert.match(dialog.querySelector('[data-status]').textContent,/Ponów/);assert.equal(form.elements.number.value,'TEST/2');
+ await submit();assert.equal(writes.length,2);assert.notEqual(writes[0].hash,writes[1].hash);assert.match(writes[0].hash,/^[a-f0-9]{64}$/);
+ dialog.querySelector('[data-skip]').click();assert.equal(form.elements.number.value,'TEST/4');dialog.querySelector('[data-cancel]').click();assert.equal(await done,'SAVED-TEST/2');assert.equal(writes.length,2);assert.equal(document.querySelector('dialog'),null);await window.happyDOM.abort();
+});

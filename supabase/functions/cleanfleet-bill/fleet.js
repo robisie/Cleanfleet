@@ -1,4 +1,16 @@
 // Service-only bridge. Never trusts browser amounts or attachment rows.
+export async function fleetPaymentEvidence(db,ids){
+ if(!Array.isArray(ids)||ids.length>50||ids.some(id=>typeof id!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)))throw Error('Nieprawidłowy wybór faktur CleanFleet.');
+ if(!ids.length)return [];
+ const links=await db.from('bill_fleet_attachments').select('invoice_id,cf_invoice_id').in('invoice_id',[...new Set(ids)]);
+ if(links.error)throw Error(links.error.message);
+ const linkedIds=[...new Set((links.data||[]).map(row=>row.cf_invoice_id).filter(Boolean))];
+ if(!linkedIds.length)return [];
+ const result=await db.from('invoices').select('id,status').in('id',linkedIds);
+ if(result.error)throw Error(result.error.message);
+ const invoices=new Map((result.data||[]).map(row=>[row.id,row]));
+ return (links.data||[]).filter(row=>invoices.has(row.cf_invoice_id)).map(row=>({invoice_id:row.invoice_id,paid:invoices.get(row.cf_invoice_id).status==='paid'}));
+}
 export function fleetParty(company,billing){
  const c=billing||company,nip=String((billing?c.tax_id:c.nip)||'').replace(/[\s-]/g,'');
  const country=/^DE/i.test(nip)?'DE':'PL';let address=String(c.address||'').replace(/,?\s*Niemcy\s*$/i,''),city='';

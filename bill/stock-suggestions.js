@@ -2,7 +2,7 @@ import {esc} from './core.js?v=1.0.37';
 
 const nip=seller=>String(seller?.nip||'').toUpperCase().replace(/^PL[\s-]*/,'').replace(/[^A-Z0-9]/g,'');
 const name=seller=>String(seller?.name||'').trim().replace(/\s+/g,' ').toLocaleLowerCase('pl');
-export const wholeInvoiceFree=rows=>rows.length>0&&rows.every(row=>Number(row.capacity)>0&&Number(row.available)===Number(row.capacity)&&!Number(row.assigned)&&!Number(row.returned)&&!row.conflict);
+export const wholeInvoiceFree=rows=>rows.length>0&&rows.every(row=>!row.hidden&&Number(row.capacity)>0&&Number(row.available)===Number(row.capacity)&&!Number(row.assigned)&&!Number(row.returned)&&!row.conflict);
 export function similarInvoiceCandidates(rows,sourceNumber){
  const source=rows.find(row=>row.metadata.ksefNumber===sourceNumber)?.metadata;
  if(!source)return {candidates:[],unavailable:0};

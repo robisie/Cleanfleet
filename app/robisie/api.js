@@ -25,7 +25,7 @@ async function request(path,options={},auth=true){
  try{return await Promise.race([(async()=>{
   const res=await fetch(URL+path,{...init,signal:controller.signal,headers:{apikey:KEY,'Content-Type':'application/json',...(auth&&session?.access_token?{Authorization:'Bearer '+session.access_token}:{}),...init.headers}});
   const raw=await res.text();let data;try{data=raw?JSON.parse(raw):null;}catch{throw new Error('Nieprawidłowa odpowiedź serwera.');}
-  if(!res.ok){const error=new Error(data?.message||data?.error_description||data?.error||'Nie udało się zapisać danych.');error.code=data?.code;throw error;}
+  if(!res.ok){const error=new Error(data?.message||data?.error_description||data?.error||'Nie udało się zapisać danych.');error.code=data?.code;error.status=res.status;error.retryable=data?.retryable===true;error.retryAfter=Number(data?.retryAfter)||0;throw error;}
   return data;
  })(),new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();const error=new Error('Połączenie trwa zbyt długo. Zmiany zachowano na urządzeniu.');error.code='RS_NETWORK_TIMEOUT';reject(error);},timeoutMs);})]);}finally{finishProgress();clearTimeout(timer);externalSignal?.removeEventListener('abort',abort);}
 }
@@ -41,7 +41,8 @@ export function stockIntegration(rows,onChange=()=>{}){return {
  index:()=>stockRpc('rs_ksef_document_index'),
  storeMetadata:rows=>stockRpc('rs_ksef_store_metadata',{p_rows:rows}),
  storeXml:(number,xml)=>stockRpc('rs_ksef_store_xml',{p_number:number,p_xml:xml}),
- stock:()=>stockRpc('rs_ksef_stock'),
+ stock:async()=>{const [rows,hidden]=await Promise.all([stockRpc('rs_ksef_stock'),request('/rest/v1/rs_stock_hidden?select=ksef_number,item_index')]);const keys=new Set(hidden.map(r=>JSON.stringify([r.ksef_number,r.item_index])));return rows.map(r=>({...r,hidden:keys.has(JSON.stringify([r.metadata.ksefNumber,r.item.index]))}));},
+ setHidden:({number,index,hidden})=>stockRpc('rs_ksef_set_hidden',{p_number:number,p_index:index,p_hidden:hidden}),
  receiptDocument:number=>request('/rest/v1/rs_ksef_documents?select=metadata,preview&ksef_number=eq.'+encodeURIComponent(number)+'&limit=1').then(rows=>{if(rows[0]?.metadata?.source!=='nip-receipt')throw Error('Nie znaleziono zapisanych danych paragonu.');return rows[0];}),
  scanReceipt:({file,signal})=>request('/functions/v1/robisie-receipt-scan',{method:'POST',body:JSON.stringify(file),timeoutMs:120000,signal}),
  saveReceipt:({hash,data})=>stockRpc('rs_receipt_save',{p_hash:hash,p_data:data}),

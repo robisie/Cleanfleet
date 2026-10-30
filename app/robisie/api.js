@@ -49,6 +49,7 @@ export function stockIntegration(rows,onChange=()=>{}){return {
  scanReceipt:({file,signal})=>request('/functions/v1/robisie-receipt-scan',{method:'POST',body:JSON.stringify(file),timeoutMs:120000,signal}),
  saveReceipt:({hash,data})=>stockRpc('rs_receipt_save',{p_hash:hash,p_data:data}),
  assignReceipt:async({number,project,entries,revision})=>{const result=await stockRpc('rs_receipt_assign_project',{p_number:number,p_project:project,p_entries:entries,p_revision:revision});await onChange(result.project);return result;},
+ assignReceiptRemaining:({number,category,entries})=>stockRpc('rs_receipt_assign_remaining',{p_number:number,p_category:category,p_entries:entries}),
  assignReceiptCleanfleet:({number,indices})=>stockRpc('rs_receipt_assign_cleanfleet',{p_number:number,p_indices:indices}),
  correctCostContext:number=>stockRpc('rs_ksef_cost_correction_context',{p_number:number}),
  applyCostCorrection:async({project,number,amount,revision})=>{const result=await stockRpc('rs_apply_ksef_cost_correction',{p_project:project,p_number:number,p_amount:amount,p_revision:revision});await onChange(result.project);return result;},

@@ -1,10 +1,10 @@
-# Bill 1.0.15
+# Bill 1.0.57
 
 Admin-only invoicing at `/bill/`. Uses the existing CleanFleet Supabase login, with a separate browser session key. No signup and no direct browser access to billing tables. The server checks the current user and administrator role for every operation.
 
 Both brands share seller NIP 6351861297 and an atomic monthly `A[n]/MM/YYYY` counter. October 2026 starts after A2. Logos are chosen by `?brand=cleanfleet` / `?brand=robisie`, and can be changed before issue. `?new=1` opens a new draft. Robisię may add `&source=<investment UUID>` to prefill investor details. Source applications are read only: Bill does not mark work paid or change their ledgers.
 
-The first version handles ordinary domestic VAT-exempt sales invoices in PLN/EUR, buyer/optional separate recipient, payment details, notes, and browser Print/Save PDF with the selected logo. Invoice positions and amounts are reviewed in Bill. Installment invoices, advance/final invoice settlement, corrections, foreign buyer identifiers and offline24/certificate signing are not implemented in this version. The issue date for online submission must be the current Polish date. Purchase-invoice import is deferred as requested.
+The editor handles ordinary invoices, corrections, received advances and final settlement of accepted KSeF advances. Prices are entered gross; each line has its own VAT rate (23%, 8%, 5%, domestic 0%, 0% WDT, ZW or EU-services NP) and a percentage discount may be applied across every line. Taxable VAT in EUR is blocked until a PLN VAT conversion rate is implemented. An optional received payment records amount, cash/transfer and date and appears on PDF and FA(3); when omitted it is absent from the PDF. Order and contract references are optional on ordinary invoices and required as at least one reference on advances. The advance lists the full order and the amount received; a final invoice selects accepted KSeF advances for the same buyer and order and deducts them by tax rate. Corrections of advance and final documents are not yet supported. Online sending still requires today's Polish issue date; offline24/certificate signing is not implemented.
 
 ## Backend
 

@@ -18,7 +18,7 @@ test('magazyn pokazuje paragon i ceny bez przycisku faktury KSeF',()=>{
  assert.match(html,/Paragon · AB\/123/);
  assert.match(html,/Farba/);assert.match(html,/Pędzel/);
  assert.match(html,/20,00\s*zł/);
- assert.match(html,/Przypisz cały paragon/);
+ assert.match(html,/Przypisz cały paragon/);assert.match(html,/data-kf="receipt-preview"/);assert.match(html,/Podgląd PDF/);
  assert.doesNotMatch(html,/data-kf="preview"/);
 });
 test('stock hides fully allocated rows and shows released quantities',()=>{

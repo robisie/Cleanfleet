@@ -1,4 +1,4 @@
-import {fleetParty,fleetOptions,guardFleetPayload,fleetView} from './fleet.js';
+import {fleetParty,fleetOptions,guardFleetPayload,fleetView,fleetPaymentEvidence} from './fleet.js';
 import {createArchiveService,acceptedBillMetadata} from './archive.js';
 import {gus,lookupWithFallback} from './gus.js';
 import {lookupCompany} from './registry.js';
@@ -62,6 +62,7 @@ Deno.serve(async req=>{
    const payload={...newInvoice('cleanfleet'),buyer:fleetParty(company,billing),bank:settings?.payload?.bank||'',lines:[{name:description,unit:'szt.',qty:'1',price:'0.00'}]};
    return json(checked(await db.rpc('bill_create_fleet_draft',{p_id:body.id,p_user:userId,p_company:body.companyId,p_billing:body.billingCompanyId||null,p_period:body.period,p_ids:body.recordIds,p_payload:payload,p_options:fleetOptions(body.options),p_expected:body.expectedCents})));
   }
+  if(body.action==='fleet-payments')return json(await fleetPaymentEvidence(db,body.ids));
   if(body.action==='fleet-list'){
    const rows=checked(await db.from('bill_invoices').select('id,number,status,payload,created_at').eq('payload->source->>app','cleanfleet').eq('payload->source->>id',body.companyId).order('created_at',{ascending:false}).limit(100));
    return json(rows.filter((r:any)=>r.payload.source?.fleetId===r.id).map((r:any)=>({id:r.id,number:r.number,status:r.status,description:r.payload.source?.fleetLayout==='vehicle-lines'?String(r.payload.lines?.[0]?.name||'').replace(/ — [^—]+$/,''):r.payload.lines?.[0]?.name})));

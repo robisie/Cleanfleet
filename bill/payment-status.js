@@ -2,6 +2,7 @@
 export function paymentStatus(invoice,source,mark=null){
  const total=Math.max(0,Math.round(Number(source?.total ?? 0)*100));
  if(invoice.status==='draft'||invoice.payload?.correction)return {state:'unknown',received:0,remaining:0};
+ if(source?.kind==='cleanfleet'&&source.paid&&Number.isFinite(total))return {state:'paid',received:total/100,remaining:0};
  const invoiceTotal=source?.total??mark?.total;
  const due=Math.max(0,Math.round(Number(invoiceTotal)*100));
  const bankCents=Number(mark?.bank_cents);

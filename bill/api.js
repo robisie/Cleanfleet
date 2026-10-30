@@ -51,8 +51,8 @@ export async function paymentEvidence(invoices){
  const projects=[...new Set(invoices.filter(r=>r?.status!=='draft'&&r.payload?.source?.app==='robisie').map(r=>r.payload.source.id).filter(x=>/^[0-9a-f-]{36}$/i.test(x)))];
  const fleet=[...new Set(invoices.filter(r=>r?.status!=='draft'&&r.payload?.source?.fleetId).map(r=>r.payload.source.fleetId).filter(x=>/^[0-9a-f-]{36}$/i.test(x)))];
  const pages=(ids,table,columns)=>Promise.all(Array.from({length:Math.ceil(ids.length/50)},(_,page)=>request('/rest/v1/'+table+'?select='+columns+'&id=in.('+ids.slice(page*50,page*50+50).join(',')+')'))).then(rows=>rows.flat());
- const [projectRows,fleetRows]=await Promise.all([pages(projects,'rs_projects','id,payload'),pages(fleet,'invoices','id,status')]);
- return {projects:new Map(projectRows.map(r=>[r.id,r.payload])),fleet:new Map(fleetRows.map(r=>[r.id,r.status==='paid']))};
+ const [projectRows,fleetPages]=await Promise.all([pages(projects,'rs_projects','id,payload'),Promise.all(Array.from({length:Math.ceil(fleet.length/50)},(_,page)=>call({action:'fleet-payments',ids:fleet.slice(page*50,page*50+50)})))]);
+ return {projects:new Map(projectRows.map(r=>[r.id,r.payload])),fleet:new Map(fleetPages.flat().map(r=>[r.invoice_id,r.paid===true]))};
 }
 
 export const correctCostContext=number=>stockRpc('rs_ksef_cost_correction_context',{p_number:number});

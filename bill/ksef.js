@@ -2,7 +2,7 @@ import {changedMetadata,mergeMetadata,validCheckpoint,checkpointFresh,checkpoint
 import {openKsefProgress} from './ksef-progress.js?v=1.0.51';
 import {costCorrectionDialog} from './cost-correction.js?v=1.0.38';
 import {relatedGroups,historyRanges,isCorrection,decodeXml} from './ksef-relations.js?v=1.0.38';
-import {stockMarkup,stockStores,stockSummaryMarkup,returnDialog,useDialog,invoiceDestinationDialog,remainingReceiptRows} from './stock.js?v=1.0.54';
+import {stockMarkup,stockStores,stockSummaryMarkup,returnDialog,useDialog,invoiceDestinationDialog,remainingReceiptRows} from './stock.js?v=1.0.55';
 import {selectedAmount,duplicatePurchases,allocationMarkup,mountAllocation,savedEntries} from './purchase-import.js?v=1.0.38';
 import {esc,today} from './core.js?v=1.0.38';
 import {openReceiptImport} from './receipt-import.js?v=1.0.51';

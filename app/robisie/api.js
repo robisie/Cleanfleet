@@ -39,6 +39,8 @@ export function stockIntegration(rows,onChange=()=>{}){return {
  userId:getSession()?.user?.id,
  projects:rows.map(r=>({id:r.id,name:r.payload.name,number:r.contract_number})),
  index:()=>stockRpc('rs_ksef_document_index'),
+ historyState:()=>stockRpc('rs_ksef_history_state'),
+ markHistory:to=>stockRpc('rs_ksef_mark_history',{p_to:to}),
  storeMetadata:rows=>stockRpc('rs_ksef_store_metadata',{p_rows:rows}),
  storeXml:(number,xml)=>stockRpc('rs_ksef_store_xml',{p_number:number,p_xml:xml}),
  stock:async()=>{const [rows,hidden]=await Promise.all([stockRpc('rs_ksef_stock'),request('/rest/v1/rs_stock_hidden?select=ksef_number,item_index')]);const keys=new Set(hidden.map(r=>JSON.stringify([r.ksef_number,r.item_index])));return rows.map(r=>({...r,hidden:keys.has(JSON.stringify([r.metadata.ksefNumber,r.item.index]))}));},

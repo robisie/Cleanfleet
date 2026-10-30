@@ -15,11 +15,13 @@ test('Towar uses Robisię session for inventory reads, returns and project alloc
  await integration.setInvoiceUse({number:'ksef',category:'firmowe',indices:[1,2]});
  const link=await integration.assign({project:'p',number:'ksef',xml:'verified',entries:[{index:1,quantity:1}],projectRevision:1});
  assert.equal(link.ksef_number,'ksef');assert.equal(changed[0].revision,2);
- assert.ok(calls[0].url.endsWith('/rs_ksef_stock'));assert.deepEqual(calls[1].args,{p_number:'ksef',p_index:1,p_quantity:2,p_revision:3});
- assert.ok(calls[2].url.endsWith('/rs_ksef_set_use'));assert.deepEqual(calls[2].args,{p_number:'ksef',p_index:1,p_category:'auto',p_quantity:1.5,p_revision:0});
- assert.ok(calls[3].url.endsWith('/rs_ksef_set_invoice_use'));assert.deepEqual(calls[3].args,{p_number:'ksef',p_category:'firmowe',p_expected_indices:[1,2]});
- assert.equal(calls[4].args.p_project,'p');assert.equal(calls[4].args.p_entries[0].quantity,1);
+ const rpcCalls=calls.filter(c=>c.url.includes('/rpc/'));
+ assert.ok(rpcCalls[0].url.endsWith('/rs_ksef_stock'));assert.deepEqual(rpcCalls[1].args,{p_number:'ksef',p_index:1,p_quantity:2,p_revision:3});
+ assert.ok(rpcCalls[2].url.endsWith('/rs_ksef_set_use'));assert.deepEqual(rpcCalls[2].args,{p_number:'ksef',p_index:1,p_category:'auto',p_quantity:1.5,p_revision:0});
+ assert.ok(rpcCalls[3].url.endsWith('/rs_ksef_set_invoice_use'));assert.deepEqual(rpcCalls[3].args,{p_number:'ksef',p_category:'firmowe',p_expected_indices:[1,2]});
+ assert.equal(rpcCalls[4].args.p_project,'p');assert.equal(rpcCalls[4].args.p_entries[0].quantity,1);
  assert.equal(typeof integration.cfContext,'function');assert.equal(typeof integration.cfCompanies,'function');assert.equal(typeof integration.cfSave,'function');
+ await integration.historyState();await integration.markHistory('2026-10-30');assert.ok(calls.some(c=>c.url.endsWith('/rs_ksef_history_state')));assert.deepEqual(calls.find(c=>c.url.endsWith('/rs_ksef_mark_history')).args,{p_to:'2026-10-30'});
  assert.ok(calls.every(c=>c.headers.Authorization==='Bearer test'));
 });
 test('leaving Towar cancels a KSeF request using the Robisię transport',async()=>{

@@ -8,7 +8,7 @@ import {openAccount} from '../pack-bank-mail/vault.js';
 import '../pack-bank-mail/engine.js';
 import {reconcileBillPayments} from '../_shared/bill-bank-match.js';
 import {createStateCodec,hash} from '../cleanfleet-ksef/core.js';
-import {normalize,newInvoice,party,invoiceXml,invoiceAmount,SELLER,today,validBank,correctionSeed,storedPayload} from './invoice.js';
+import {normalize,newInvoice,party,invoiceXml,invoiceAmount,SELLER,today,validBank,correctionSeed,storedPayload,externalReference} from './invoice.js';
 import {ksefApi,authenticate,openSession,invoiceStatus,KsefError} from './ksef.js';
 const secret=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const db=createClient(Deno.env.get('SUPABASE_URL')!,secret,{auth:{persistSession:false,autoRefreshToken:false}});
@@ -144,6 +144,15 @@ Deno.serve(async req=>{
    else result=await db.from('bill_parties').insert({payload}).select().single();
    const row=checked(result);if(!row)throw Error('Kontrahent został zmieniony. Odśwież listę.');return json(row);
   }
+  if(body.action==='external-ksef-reference'){
+   const row=await invoice(body.id);
+   if(row.status!=='issued'||row.payload.source?.app!=='external'||row.payload.correction)throw Error('Ta operacja dotyczy wyłącznie oryginału faktury zewnętrznej.');
+   const children=checked(await db.from('bill_invoices').select('id,status').eq('payload->correction->>originalId',row.id));
+   if(children.some((r:any)=>!['draft','issued','rejected'].includes(r.status)))throw Error('Korekta była już wysyłana. Nie można zmienić jej odwołania.');
+   const ref=externalReference(body),payload={...row.payload,source:{...row.payload.source,externalKsefStatus:ref.status}};
+   const saved=checked(await db.from('bill_invoices').update({payload,ksef_number:ref.ksefNumber,revision:row.revision+1,updated_at:new Date().toISOString()}).eq('id',row.id).eq('revision',body.revision).select().maybeSingle());
+   if(!saved)throw Error('Faktura zmieniła się na innym urządzeniu. Odśwież dane.');return json(saved);
+  }
   if(body.action==='start-correction'){
    const parent=await invoice(body.id),payload=correctionSeed(parent);
    const find=()=>db.from('bill_invoices').select('*').eq('payload->correction->>originalId',parent.id).neq('status','rejected').maybeSingle();
@@ -172,6 +181,7 @@ Deno.serve(async req=>{
    if(row.payload.source?.app==='external'&&!row.payload.correction)throw Error('Zaimportowana faktura zachowuje oryginał. Z tego miejsca można wysłać wyłącznie jej korektę.');
    const payload=normalize(await canonicalFleet(row.id,await canonicalCorrection(storedPayload(row))));
    if(payload.issueDate!==today())throw Error('Dla wysyłki online ustaw dzisiejszą datę wystawienia.');
+   if(payload.correction){const parent=await invoice(payload.correction.originalId);if(parent.payload.source?.app==='external'&&!parent.payload.correction&&!parent.ksef_number&&parent.payload.source.externalKsefStatus!=='outside')throw Error('Uzupełnij status KSeF faktury źródłowej: wpisz jej numer KSeF albo potwierdź wystawienie poza KSeF w szczegółach oryginału.');}
    const auth=await authKsef(userId);
    const attempt=crypto.randomUUID();
    const lock=checked(await db.from('bill_invoices').update({payload,status:'sending',send_attempt:attempt,ksef_session:null,ksef_reference:null,updated_at:new Date().toISOString()}).eq('id',row.id).eq('status','issued').select().maybeSingle());

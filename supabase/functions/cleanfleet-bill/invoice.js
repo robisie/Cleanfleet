@@ -1,4 +1,4 @@
-export const VERSION='1.0.50';
+export const VERSION='1.0.51';
 export const SELLER={name:'ROBISIĘ-FER SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ',nip:'6351861297',address:'UL. RTM. WITOLDA PILECKIEGO 18',city:'43-190 MIKOŁÓW',country:'PL'};
 export const EXEMPTION='Zwolnienie na podstawie art. 113 ust. 1 lub 9 ustawy o VAT';
 export const EU_COUNTRIES=[['PL','Polska'],['DE','Niemcy'],['AT','Austria'],['BE','Belgia'],['BG','Bułgaria'],['HR','Chorwacja'],['CY','Cypr'],['CZ','Czechy'],['DK','Dania'],['EE','Estonia'],['FI','Finlandia'],['FR','Francja'],['GR','Grecja'],['ES','Hiszpania'],['NL','Holandia'],['IE','Irlandia'],['LT','Litwa'],['LU','Luksemburg'],['LV','Łotwa'],['MT','Malta'],['PT','Portugalia'],['RO','Rumunia'],['SK','Słowacja'],['SI','Słowenia'],['SE','Szwecja'],['HU','Węgry'],['IT','Włochy']];
@@ -8,6 +8,12 @@ export const vatLabel=p=>p.vatTreatment==='eu-services'?'NP':'ZW';
 export const vatNotice=p=>p.vatTreatment==='eu-services'?'Odwrotne obciążenie / reverse charge':EXEMPTION;
 // Existing issued documents predate explicit VAT treatment and must retain their original ZW.
 export const storedPayload=row=>({...row.payload,vatTreatment:row.payload.vatTreatment||(row.number&&row.status!=='draft'?'exempt':defaultVat(row.payload.buyer))});
+export function externalReference(input){
+ const ksefNumber=String(input.ksefNumber||'').trim().toUpperCase(),outsideKsef=input.outsideKsef===true;
+ if(outsideKsef&&ksefNumber)throw Error('Wybierz fakturę poza KSeF albo podaj jej numer KSeF.');
+ if(!outsideKsef&&!/^\d{10}-\d{8}-[A-F\d]{12}-[A-F\d]{2}$/.test(ksefNumber))throw Error('Podaj poprawny numer KSeF albo potwierdź wystawienie poza KSeF.');
+ return {ksefNumber:ksefNumber||null,status:outsideKsef?'outside':'ksef'};
+}
 export const canCorrect=row=>!!row.number&&((row.status==='accepted'&&!!row.ksef_number)||(row.status==='issued'&&row.payload?.source?.app==='external'&&!row.payload?.correction));
 export const logos={cleanfleet:'/assets/cleanfleet-logo.png',robisie:'/app/robisie/assets/robisie-logo.png'};
 export const labels={draft:'Szkic',issued:'Do wysłania',sending:'Wysyłanie',pending:'Oczekuje w KSeF',accepted:'Przyjęta w KSeF',rejected:'Odrzucona',uncertain:'Sprawdź wysyłkę'};

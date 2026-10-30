@@ -1,0 +1,8 @@
+// KSeF documents are immutable; corrections arrive as separate numbers.
+const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,key==='invoiceType'?String(value[key]||'').toUpperCase():canonical(value[key])])):value;
+export const sameMetadata=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
+export function changedMetadata(rows,documents){const known=new Map(documents.map(d=>[d.metadata.ksefNumber,d.metadata]));return rows.filter(row=>!sameMetadata(known.get(row.ksefNumber),row));}
+export function mergeMetadata(rows,documents){const known=new Map(documents.map(d=>[d.metadata.ksefNumber,d]));for(const metadata of rows){const old=known.get(metadata.ksefNumber),sameHash=old&&old.metadata.invoiceHash===metadata.invoiceHash;known.set(metadata.ksefNumber,{...old,metadata,hasPreview:!!old?.hasPreview&&!!sameHash,references:sameHash?old.references||[]:[]});}return [...known.values()];}
+export function validCheckpoint(value,end){return value&&/^20\d{2}-\d{2}-\d{2}$/.test(value.to||'')&&value.to<=end&&Number.isFinite(Date.parse(value.to+'T12:00:00Z'));}
+export function checkpointFresh(value,end,now=Date.now()){const at=typeof value?.checkedAt==='number'?value.checkedAt:Date.parse(value?.checkedAt);return !!validCheckpoint(value,end)&&value.to===end&&Number.isFinite(at)&&at<=now&&now-at<5*60000;}
+export function checkpointStart(value,start,end){if(!validCheckpoint(value,end))return start;const overlap=new Date(Date.parse(value.to+'T12:00:00Z')-2*86400000).toISOString().slice(0,10);return overlap>start?overlap:start;}

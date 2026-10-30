@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import * as C from '../bill/core.js';
+import {documentHtml} from '../bill/pdf.js';
+globalThis.location={origin:'https://cleanfleet.pl'};
+const row=()=>({id:'10000000-0000-4000-8000-000000000001',status:'accepted',number:'A1/7/2026',ksef_number:'6351861297-20260724-123456789ABC-AB',payload:{...C.newInvoice('robisie'),issueDate:'2026-07-24',saleDate:'2026-07-24',dueDate:'2026-08-04',payment:'unspecified',bank:'',vatTreatment:'exempt',source:{app:'external',id:'ksef:original'},buyer:{kind:'person',name:'Jan Przykładowy',nip:'',country:'PL',address:'Testowa 1',city:'43-190 Mikołów'},lines:[{name:'Usługi remontowe',qty:'1',unit:'szt.',price:'1850.00'}]}});
+test('missing historical payment method stays unspecified through import and data correction',async()=>{const r=row();assert.equal(C.normalize(r.payload).payment,'unspecified');const p=C.correctionSeed(r);p.buyer.address='Testowa 2';const normalized=C.normalize(p);assert.equal(normalized.payment,'unspecified');assert.equal(C.invoiceAmount(normalized),0);const xml=C.invoiceXml({number:'KA9/10/2026',payload:normalized});assert.doesNotMatch(xml,/undefined|FormaPlatnosci|<Platnosc>/);assert.equal(C.total(r.payload),185000);const copy={...r,status:'issued'};const html=await documentHtml(copy);assert.match(html,/nie podano w oryginale/);assert.doesNotMatch(html,/undefined/);});
+test('new ordinary invoices cannot silently omit payment method',()=>{const p=row().payload;p.source=null;assert.throws(()=>C.normalize(p),/Brak sposobu/);});
+test('positive correction retains optional payment form rather than inventing one',()=>{const p=C.correctionSeed(row());p.correction.mode='amount';p.lines[0].price='1900';const xml=C.invoiceXml({number:'KA9/10/2026',payload:p});assert.match(xml,/<Platnosc>/);assert.doesNotMatch(xml,/FormaPlatnosci|undefined/);});
+test('accepted imported invoices display KSeF acceptance; UPO requires an original submission session',()=>{const ui=readFileSync(new URL('../bill/app.js',import.meta.url),'utf8');assert.doesNotMatch(ui,/\?'Zaimportowana':C.labels/);assert.match(ui,/r.ksef_session\?button\('upo'/);});

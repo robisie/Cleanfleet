@@ -2,7 +2,7 @@ import {changedMetadata,mergeMetadata,validCheckpoint,checkpointFresh,checkpoint
 import {openKsefProgress} from './ksef-progress.js?v=1.0.51';
 import {costCorrectionDialog} from './cost-correction.js?v=1.0.38';
 import {relatedGroups,historyRanges,isCorrection,decodeXml} from './ksef-relations.js?v=1.0.38';
-import {stockMarkup,stockStores,stockSummaryMarkup,returnDialog,useDialog,invoiceDestinationDialog} from './stock.js?v=1.0.52';
+import {stockMarkup,stockStores,stockSummaryMarkup,returnDialog,useDialog,invoiceDestinationDialog,remainingReceiptRows} from './stock.js?v=1.0.54';
 import {selectedAmount,duplicatePurchases,allocationMarkup,mountAllocation,savedEntries} from './purchase-import.js?v=1.0.38';
 import {esc,today} from './core.js?v=1.0.38';
 import {openReceiptImport} from './receipt-import.js?v=1.0.51';
@@ -175,15 +175,15 @@ async function receiptProjectDialog(rows,signal){return new Promise(resolve=>{
  const finish=value=>{signal.removeEventListener('abort',cancel);dialog.close();dialog.remove();resolve(value);},cancel=()=>finish(null);dialog.querySelector('[data-cancel]').onclick=cancel;dialog.oncancel=ev=>{ev.preventDefault();cancel();};dialog.querySelector('form').onsubmit=ev=>{ev.preventDefault();const fd=new FormData(ev.target),entries=rows.map(r=>({index:r.item.index,quantity:Number(fd.get('qty-'+r.item.index))})).filter(x=>x.quantity>0);if(!entries.length||entries.some(x=>!Number.isFinite(x.quantity)))return;finish({project:fd.get('project'),entries});};signal.addEventListener('abort',cancel,{once:true});document.body.append(dialog);dialog.showModal();
  });}
  async function assignReceiptProject(number,index,signal){
-  stockRows=await integration.stock();check(signal);const rows=stockRows.filter(r=>r.metadata.ksefNumber===number&&r.available>0&&(index===0||r.item.index===index));if(!rows.length)throw Error('Pozycja paragonu jest już przypisana. Odśwież magazyn.');
+  stockRows=await integration.stock();check(signal);const rows=remainingReceiptRows(stockRows,number).filter(r=>index===0||r.item.index===index);if(!rows.length)throw Error('Pozycja paragonu jest już przypisana. Odśwież magazyn.');
   const choice=await receiptProjectDialog(rows,signal);if(!choice)return;check(signal);const project=await integration.findPurchases(choice.project);check(signal);await integration.assignReceipt({number,project:choice.project,entries:choice.entries,revision:project.revision});stockRows=await integration.stock();progress('Zapisano '+choice.entries.length+' pozycji paragonu jako koszt inwestycji.');
  }
+ function chooseReceiptDestination(rows,signal){return invoiceDestinationDialog(rows,signal,{remaining:true});}
  async function assignReceiptInvoice(number,signal){
-  stockRows=await integration.stock();check(signal);const rows=stockRows.filter(r=>r.metadata.ksefNumber===number);if(!wholeInvoiceFree(rows))throw Error('Część paragonu jest już przypisana lub zwrócona. Wybierz pojedyncze pozycje.');const destination=await invoiceDestinationDialog(rows,signal);if(!destination)return;
+  stockRows=await integration.stock();check(signal);const rows=remainingReceiptRows(stockRows,number);if(!rows.length)throw Error('Na tym paragonie nie ma już dostępnych pozycji.');const destination=await chooseReceiptDestination(rows,signal);if(!destination)return;
   if(destination==='investment')return assignReceiptProject(number,0,signal);
-  if(destination==='cleanfleet')await integration.assignReceiptCleanfleet({number,indices:rows.map(r=>r.item.index)});
-  else await integration.setInvoiceUse({number,category:destination,indices:rows.map(r=>r.item.index)});
-  stockRows=await integration.stock();progress('Przypisano cały paragon: '+({auto:'Auto',firmowe:'Koszty firmowe',cleanfleet:'CleanFleet'}[destination])+'.');
+  await integration.assignReceiptRemaining({number,category:destination,entries:rows.map(r=>({index:r.item.index,quantity:Number(r.available)}))});
+  stockRows=await integration.stock();check(signal);progress('Przypisano dostępne pozycje paragonu: '+({auto:'Auto',firmowe:'Koszty firmowe',cleanfleet:'CleanFleet'}[destination])+'. Zwrócone pozycje pozostają w „Oddano”.');
  }
  async function classifyStock(number,index,category,signal){
  const row=stockRows.find(r=>r.metadata.ksefNumber===number&&r.item.index===index);if(!row||!['auto','firmowe','cleanfleet'].includes(category))throw Error('Odśwież Magazyn.');

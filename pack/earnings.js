@@ -5,7 +5,7 @@ async function cfShowEarningsGate(){
  if(cfIsAdmin())window.CFFinance?.open();
 }
 window.cfFinanceEarningsBridge={
- async open(host,allowed){if(!cfIsAdmin()||!window.CFFinance?.isUnlocked()||!allowed())return;cfEarningsUnlocked=true;await cfShowEarnings(host,allowed);},
+ async open(host,allowed){if(!cfIsAdmin()||!window.CFFinance?.isUnlocked()||!allowed())return;cfEarningsUnlocked=true;return await cfShowEarnings(host,allowed);},
  lock(){cfEarningsUnlocked=false;}
 };
 
@@ -139,7 +139,9 @@ async function cfShowEarnings(host=null,allowed=()=>cfIsAdmin()&&Boolean(window.
       state.presetRows=(data||[]).filter(r=>!r.source_wash_record_id);
     }
     const contractors=cfEarningContractors();
-    document.getElementById('cfEarningContractor').innerHTML='<option value="">Wszyscy kontrahenci</option>'+contractors.map(x=>`<option>${escapeHtml(x)}</option>`).join('');
+    const contractorSelect=document.getElementById('cfEarningContractor'),selectedContractor=contractorSelect.value;
+    contractorSelect.innerHTML='<option value="">Wszyscy kontrahenci</option>'+contractors.map(x=>`<option>${escapeHtml(x)}</option>`).join('');
+    contractorSelect.value=contractors.includes(selectedContractor)?selectedContractor:'';
     document.getElementById('cfEarningRulesBtn').disabled=false;
     document.getElementById('cfEarningAddBtn').disabled=false;
     if(error) throw error;
@@ -1129,5 +1131,11 @@ async function cfShowEarnings(host=null,allowed=()=>cfIsAdmin()&&Boolean(window.
     }
   };
   await loadRows();
+  let refreshing=null;
+  return {reload(){
+    if(!allowed()||!overlay.isConnected||root.querySelector('.overlay:not(#cfEarningsOverlay)'))return;
+    if(!refreshing)refreshing=loadRows().finally(()=>{refreshing=null;});
+    return refreshing;
+  }};
 }
 

@@ -14,3 +14,5 @@ for(const failure of ['conversionError','linkedError','earningError'])test(`rule
 test('normal read retains history and suggestions from rules and old earnings',async()=>{const s=setup();await s.c.loadRows();assert.equal(s.state.rows.length,1);assert.deepEqual(Array.from(s.c.cfEarningContractors()),['Aga','TVM']);assert.equal(s.renderCount(),1);});
 test('failed rule read never enables actions with an empty list',async()=>{const s=setup({ruleError:true});await assert.rejects(s.c.loadRows());assert.equal(s.elements.cfEarningRulesBtn.disabled,true);assert.equal(s.elements.cfEarningAddBtn.disabled,true);});
 test('locked finance pane never loads private metadata',async()=>{const s=setup({locked:true});await s.c.loadRows();assert.equal(s.state.rules.length,0);assert.equal(s.elements.cfEarningAddBtn.disabled,true);});
+
+test('refresh preserves the selected contractor',async()=>{const s=setup();s.elements.cfEarningContractor.value='TVM';await s.c.loadRows();assert.equal(s.elements.cfEarningContractor.value,'TVM');});

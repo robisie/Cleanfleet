@@ -116,6 +116,8 @@
       .cf-completion-services-wrap{margin-top:18px}
       .cf-completion-services-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
       .cf-completion-services-head strong{font-size:13px}
+      .cf-completion-extra{display:flex;align-items:center;gap:9px;margin:0 0 10px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#f8f7f3;font-size:13px;font-weight:700;cursor:pointer}
+      .cf-completion-extra input{width:19px;height:19px;margin:0;accent-color:var(--green-ink)}
       .cf-completion-services{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
       .cf-completion-service{display:flex;align-items:flex-start;gap:9px;padding:11px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer}
       .cf-completion-service:has(input:checked){border-color:var(--green-ink);background:var(--green-bg,#f3f6df)}
@@ -263,6 +265,15 @@
     });
   }
 
+  function applyServiceSelection(inputs,changed,allowExtra){
+    if(!changed.checked)return;
+    if(changed.dataset.exclusive==='1'){
+      inputs.forEach(other=>{if(other!==changed&&(!allowExtra||other.dataset.exclusive==='1'))other.checked=false;});
+    }else if(!allowExtra){
+      inputs.forEach(other=>{if(other.dataset.exclusive==='1')other.checked=false;});
+    }
+  }
+
   async function openCompletion(target,onSaved){
     if(opening)return;
     if(!canComplete()){toast('Brak uprawnień do zakończenia prania.');return;}
@@ -330,6 +341,7 @@
             <strong>Zakres wykonanych prac</strong>
             ${isAdmin()?'<button class="btn btn-outline" id="cfCompleteCatalogBtn" type="button">Cennik usług</button>':''}
           </div>
+          <label class="cf-completion-extra"><input type="checkbox" id="cfCompleteExtraService" ${savedIds.size>1&&catalog.some(item=>item.exclusive&&savedIds.has(String(item.id)))?'checked':''}><span>Usługa dodatkowa — pozwól dodać pozycję do kompleksowego sprzątania</span></label>
           <div class="cf-completion-services" id="cfCompleteServices"></div>
         </div>
 
@@ -357,6 +369,7 @@
       overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
 
       const servicesEl=overlay.querySelector('#cfCompleteServices');
+      const extraServiceEl=overlay.querySelector('#cfCompleteExtraService');
       const costEl=overlay.querySelector('#cfCompleteCost');
       const costHint=overlay.querySelector('#cfCompleteCostHint');
       costEl.previousElementSibling.textContent=`Kwota ${bulk?'za jedno auto ':''}(${currency})`;
@@ -389,15 +402,7 @@
           </label>`;
         }).join('');
         servicesEl.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.addEventListener('change',()=>{
-          if(cb.checked){
-            if(cb.dataset.exclusive==='1'){
-              servicesEl.querySelectorAll('input[type="checkbox"]').forEach(other=>{
-                if(other!==cb)other.checked=false;
-              });
-            }else{
-              servicesEl.querySelectorAll('input[type="checkbox"][data-exclusive="1"]').forEach(other=>{other.checked=false;});
-            }
-          }
+          applyServiceSelection([...servicesEl.querySelectorAll('input[type="checkbox"]')],cb,extraServiceEl.checked);
           if(!manualTouched)costEl.value=(Math.round(selectedTotal()*100)/100).toFixed(2);
           syncCostHint();
         }));
@@ -427,6 +432,15 @@
       };
 
       renderServices(false);
+      extraServiceEl.addEventListener('change',()=>{
+        if(!extraServiceEl.checked){
+          const checked=[...servicesEl.querySelectorAll('input[type="checkbox"]:checked')];
+          const exclusive=checked.find(cb=>cb.dataset.exclusive==='1');
+          if(exclusive)checked.forEach(cb=>{if(cb!==exclusive)cb.checked=false;});
+        }
+        if(!manualTouched)costEl.value=(Math.round(selectedTotal()*100)/100).toFixed(2);
+        syncCostHint();
+      });
       {
         const initialServicesTotal=Math.round(selectedTotal()*100)/100;
         if(initialServicesTotal>0 || !(Number(row.cost)>0)) costEl.value=initialServicesTotal.toFixed(2);

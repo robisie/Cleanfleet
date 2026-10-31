@@ -5,8 +5,8 @@ const path=require('node:path');
 const vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'../app/wash-completion-v13072.js'),'utf8');
 const context=vm.createContext({window:{},document:{addEventListener(){}}});
-vm.runInContext(source.replace('  window.cfOpenWashCompletion=openCompletion;','  window.helpers={parseDuration,hoursLabel,durationMinutes};\n  window.cfOpenWashCompletion=openCompletion;'),context);
-const {parseDuration,hoursLabel,durationMinutes}=context.window.helpers;
+vm.runInContext(source.replace('  window.cfOpenWashCompletion=openCompletion;','  window.helpers={parseDuration,hoursLabel,durationMinutes,applyServiceSelection};\n  window.cfOpenWashCompletion=openCompletion;'),context);
+const {parseDuration,hoursLabel,durationMinutes,applyServiceSelection}=context.window.helpers;
 test('duration supports hours with a Polish decimal comma and hours:minutes',()=>{
  for(const value of ['1,5','1.5','1:30',' 1:30 '])assert.equal(parseDuration(value),1.5);
  assert.equal(parseDuration('0:45'),0.75);
@@ -25,4 +25,16 @@ test('allocation preview retains seconds instead of rounding down to whole minut
  assert.equal(hoursLabel(1/8),'7 min 30 s');
  assert.equal(hoursLabel(1.5),'1 godz. 30 min');
  assert.equal(hoursLabel(null),'—');
+});
+test('additional service keeps comprehensive service and adds its priceable selection',()=>{
+ const full={checked:true,dataset:{exclusive:'1'}},extra={checked:true,dataset:{exclusive:'0'}},secondFull={checked:false,dataset:{exclusive:'1'}};
+ applyServiceSelection([full,extra],extra,false);
+ assert.equal(full.checked,false);
+ full.checked=true;
+ applyServiceSelection([full,extra],extra,true);
+ assert.equal(full.checked,true);
+ secondFull.checked=true;
+ applyServiceSelection([full,extra,secondFull],secondFull,true);
+ assert.equal(full.checked,false);
+ assert.equal(extra.checked,true);
 });

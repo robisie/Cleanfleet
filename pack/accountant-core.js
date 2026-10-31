@@ -16,8 +16,7 @@ export function documents(data,state){
  for(const r of data.purchases||[]){const m=r.metadata||r;if(m.ksefNumber||m.key)put(metadataRow(m,'purchases',m.source==='nip-receipt'?'Paragon z NIP':'Zapisane KSeF'));}
  for(const [year,archive]of Object.entries(state.archives))for(const kind of ['sales','purchases'])for(const m of archive[kind]||[]){const row=metadataRow(m,kind,'KSeF'),old=map.get(row.key);put(old?.billId?{...row,date:old.date,billId:old.billId,fullFinal:old.fullFinal,gross:old.fullFinal?old.gross:row.gross,net:old.fullFinal?old.net:row.net??old.net,source:'Bill + KSeF'}:row);}
  for(const r of data.costs||[]){if(!map.has('purchases:'+norm(r.ksef_number)))put(metadataRow({ksefNumber:r.ksef_number,invoiceNumber:r.invoice_number,issueDate:r.purchase_date,seller:{name:r.supplier},currency:r.preview?.currency||'PLN',grossAmount:r.preview?.gross,invoiceType:'Vat'},'purchases','Koszty CleanFleet'));}
- // Unlinked manual purchases need review: they may already have a KSeF invoice.
- for(const r of data.unlinked||[])if(!r.source_ksef_number)put({key:'purchases:cf:'+r.id,kind:'purchases',number:r.name||'Koszt CleanFleet',party:r.supplier||'',nip:'',date:r.purchase_date,currency:'PLN',gross:cents(r.amount),net:null,type:'Manual',source:'Koszt CleanFleet bez powiązania',special:true});
+ // Legacy shopping-list entries are not accounting documents.
  for(const r of state.manual)put({key:'manual:'+r.id,kind:r.kind,number:r.name,party:r.note||'Wpis ręczny',date:r.date,currency:'PLN',gross:r.amount,net:r.amount,type:'Manual',source:'Dodano ręcznie',special:false});
  return [...map.values()].map(r=>{
   const o=state.overrides[r.key],at=date(o?.date||r.date)?(o?.date||r.date):'',config=state.years[at.slice(0,4)]||{},advance=/^(Zal|KorZal)$/i.test(r.type),final=/^(Roz|KorRoz)$/i.test(r.type)&&!r.fullFinal;

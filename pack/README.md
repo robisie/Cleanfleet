@@ -73,7 +73,9 @@ of payment. Advance invoices are excluded by default. Bill final invoices use th
 full service value; external final invoices require review. Currency documents
 require a tax PLN value; the live mBank rate is never used for CIT. Users choose
 exempt VAT (gross costs) or active VAT (net costs), adjust dates and KUP shares,
-and resolve duplicate manual purchases and non-deductible expenses.
+and resolve non-deductible expenses. Legacy `cf_purchases` shopping-list entries
+without a source document are not loaded or included, even if old overrides exist.
+KSeF invoices, issued Bill documents and saved NIP receipts form the document ledger.
 
 The tax figure is an estimate of ordinary operating CIT for a calendar year,
 not an advance return. It requires confirmed regime/rate/VAT, all documents

@@ -30,6 +30,10 @@ function cfEarningWorkerBreakdown(rows,unpaidOnly=false){
   return [...grouped.values()].sort((a,b)=>b.cents-a.cents||a.name.localeCompare(b.name,'pl'));
 }
 
+function cfEarningSelectedRows(rows,selected){
+  return rows.filter(row=>selected.has(String(row.id))&&!row.employee_paid&&Number(row.employee_amount)>0);
+}
+
 function cfEarningsMoney(v){
   return new Intl.NumberFormat('pl-PL',{style:'currency',currency:'PLN'}).format(Number(v)||0);
 }
@@ -92,6 +96,15 @@ async function cfShowEarnings(host=null,allowed=()=>cfIsAdmin()&&Boolean(window.
         <div class="cf-earning-worker-card"><details id="cfUnpaidBreakdown"><summary><span>Do wypłaty</span><strong id="cfEarningUnpaid">0,00 zł</strong><small>Kliknij — podział na osoby</small></summary><div class="cf-earning-worker-popover" id="cfUnpaidBreakdownBody"></div></details></div>
       </div>
 
+      <div id="cfEarningSelection" class="cf-earning-selection" hidden aria-live="polite">
+        <div class="cf-earning-selection-head"><strong id="cfEarningSelectedCount"></strong><strong id="cfEarningSelectedTotal"></strong></div>
+        <div id="cfEarningSelectedWorkers" class="cf-earning-selection-workers"></div>
+        <div class="cf-earning-selection-actions">
+          <button class="btn btn-outline" type="button" id="cfEarningSelectAll">Zaznacz wszystkie</button>
+          <button class="btn btn-outline" type="button" id="cfEarningClearSelection">Odznacz</button>
+          <button class="btn btn-solid" type="button" id="cfEarningMarkPaid">Oznacz jako wypłacone</button>
+        </div>
+      </div>
       <div id="cfEarningsList" class="cf-earnings-list"></div>
     </div>
   </div>`;
@@ -101,7 +114,7 @@ async function cfShowEarnings(host=null,allowed=()=>cfIsAdmin()&&Boolean(window.
   overlay.querySelector('[data-close]')?.addEventListener('click',close);
   overlay.addEventListener('click',e=>{if(!host&&e.target===overlay) close();});
 
-  const state={rows:[],rules:[],contractors:[],presetRows:[]};
+  const state={rows:[],rules:[],contractors:[],presetRows:[],selected:new Set()};
   const workerBubbles=[document.getElementById('cfEmployeeBreakdown'),document.getElementById('cfUnpaidBreakdown')];
   workerBubbles.forEach(bubble=>{bubble.addEventListener('toggle',()=>{if(bubble.open)workerBubbles.filter(other=>other!==bubble).forEach(other=>other.open=false);});bubble.addEventListener('keydown',event=>{if(event.key==='Escape'){bubble.open=false;bubble.querySelector('summary').focus();}});});
   overlay.addEventListener('click',event=>workerBubbles.forEach(bubble=>{if(!bubble.contains(event.target))bubble.open=false;}));
@@ -180,6 +193,45 @@ async function cfShowEarnings(host=null,allowed=()=>cfIsAdmin()&&Boolean(window.
     return rows;
   }
 
+  function updateSelection(rows=filtered()){
+    const eligible=rows.filter(row=>!row.employee_paid&&Number(row.employee_amount)>0);
+    const visibleIds=new Set(eligible.map(row=>String(row.id)));
+    for(const id of state.selected)if(!visibleIds.has(id))state.selected.delete(id);
+    const selected=cfEarningSelectedRows(eligible,state.selected);
+    const menu=document.getElementById('cfEarningSelection');
+    menu.hidden=!selected.length;
+    if(!selected.length)return;
+    const workers=cfEarningWorkerBreakdown(selected);
+    document.getElementById('cfEarningSelectedCount').textContent=`Zaznaczono: ${selected.length}`;
+    document.getElementById('cfEarningSelectedTotal').textContent=`Razem: ${cfEarningsMoney(workers.reduce((sum,worker)=>sum+worker.cents,0)/100)}`;
+    document.getElementById('cfEarningSelectedWorkers').innerHTML=workers.map(worker=>`<div><span>${escapeHtml(worker.name)} (${worker.count})</span><strong>${cfEarningsMoney(worker.cents/100)}</strong></div>`).join('');
+    document.getElementById('cfEarningSelectAll').disabled=selected.length===eligible.length;
+  }
+
+  document.getElementById('cfEarningSelectAll').addEventListener('click',()=>{
+    filtered().forEach(row=>{if(!row.employee_paid&&Number(row.employee_amount)>0)state.selected.add(String(row.id));});
+    document.querySelectorAll('#cfEarningsList [data-select-payout]').forEach(input=>{input.checked=state.selected.has(input.dataset.selectPayout);});
+    updateSelection();
+  });
+  document.getElementById('cfEarningClearSelection').addEventListener('click',()=>{
+    state.selected.clear();
+    document.querySelectorAll('#cfEarningsList [data-select-payout]').forEach(input=>{input.checked=false;});
+    updateSelection();
+  });
+  document.getElementById('cfEarningMarkPaid').addEventListener('click',async()=>{
+    if(!allowed())return;
+    const rows=cfEarningSelectedRows(filtered(),state.selected);
+    if(!rows.length)return;
+    const button=document.getElementById('cfEarningMarkPaid');button.disabled=true;
+    try{
+      const {error}=await cfSupabase.from('cf_earnings').update({employee_paid:true}).in('id',rows.map(row=>row.id));
+      if(error)throw error;
+      state.selected.clear();
+      await loadRows();
+    }catch(error){showToast(error.message||'Nie udało się oznaczyć wypłaty.');}
+    finally{button.disabled=false;}
+  });
+
   function render(){
     if(!allowed()||!document.getElementById('cfEarningPeriod'))return;
     const custom=document.getElementById('cfEarningPeriod').value==='custom';
@@ -203,6 +255,7 @@ async function cfShowEarnings(host=null,allowed=()=>cfIsAdmin()&&Boolean(window.
     const list=document.getElementById('cfEarningsList');
     if(!rows.length){
       list.innerHTML='<div class="empty-state">Brak wpisów dla wybranych filtrów.</div>';
+      updateSelection(rows);
       return;
     }
 
@@ -214,16 +267,22 @@ async function cfShowEarnings(host=null,allowed=()=>cfIsAdmin()&&Boolean(window.
         ${r.note?`<small>${escapeHtml(r.note)}</small>`:''}
       </div>
       <div class="cf-earning-actions">
-        ${Number(r.employee_amount||0)>0?`<label class="cf-earning-paid-check"><input type="checkbox" data-paid="${r.id}" ${r.employee_paid?'checked':''}><span>${r.employee_paid?'Wypłacone':'Do wypłaty'}</span></label>`:''}
+        ${Number(r.employee_amount||0)>0?(r.employee_paid?`<button class="btn btn-outline" type="button" data-unpay="${r.id}" title="Przywróć do wypłaty">Wypłacone</button>`:`<label class="cf-earning-paid-check"><input type="checkbox" data-select-payout="${r.id}" ${state.selected.has(String(r.id))?'checked':''}><span>Do wypłaty</span></label>`):''}
         <button class="btn btn-outline" type="button" data-edit="${r.id}">Edytuj</button>
         <button class="btn btn-danger" type="button" data-delete="${r.id}">Usuń</button>
       </div>
     </div>`).join('');
 
-    list.querySelectorAll('[data-paid]').forEach(cb=>cb.addEventListener('change',async()=>{
+    updateSelection(rows);
+    list.querySelectorAll('[data-select-payout]').forEach(cb=>cb.addEventListener('change',()=>{
+      if(cb.checked)state.selected.add(cb.dataset.selectPayout);else state.selected.delete(cb.dataset.selectPayout);
+      updateSelection(rows);
+    }));
+    list.querySelectorAll('[data-unpay]').forEach(cb=>cb.addEventListener('click',async()=>{
       if(!allowed())return;
-      const {error}=await cfSupabase.from('cf_earnings').update({employee_paid:cb.checked}).eq('id',cb.dataset.paid);
-      if(error){showToast(error.message);cb.checked=!cb.checked;return;}
+      cb.disabled=true;
+      const {error}=await cfSupabase.from('cf_earnings').update({employee_paid:false}).eq('id',cb.dataset.unpay);
+      if(error){showToast(error.message);cb.disabled=false;return;}
       await loadRows();
     }));
     list.querySelectorAll('[data-edit]').forEach(btn=>btn.addEventListener('click',()=>{

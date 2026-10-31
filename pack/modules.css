@@ -3906,6 +3906,13 @@ body.cf-boot-lock{overflow:hidden !important;touch-action:none;}
 .cf-earning-actions{display:flex;align-items:center;gap:6px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end;}
 .cf-earning-paid-check{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;}
 .cf-earning-paid-check input{width:18px;height:18px;accent-color:var(--green-ink);}
+.cf-earning-selection{position:sticky;top:0;z-index:30;margin:0 0 12px;padding:12px 14px;border:1px solid #b7c87d;border-radius:12px;background:#f2f7e8;box-shadow:0 7px 20px #1831291c;}
+.cf-earning-selection[hidden]{display:none;}
+.cf-earning-selection-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:15px;}
+.cf-earning-selection-workers{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:6px 18px;margin:10px 0;}
+.cf-earning-selection-workers>div{display:flex;justify-content:space-between;gap:8px;border-top:1px solid #cbd9bd;padding-top:6px;font-size:13px;}
+.cf-earning-selection-workers strong{white-space:nowrap;}
+.cf-earning-selection-actions{display:flex;gap:8px;flex-wrap:wrap;}
 .cf-earning-form-sheet{max-width:720px;}
 .cf-earning-presets{margin:14px 0 18px;}
 .cf-earning-presets-title{font-size:13px;font-weight:700;margin-bottom:8px;}

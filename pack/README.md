@@ -70,16 +70,20 @@ the tax estimate until dated or explicitly excluded.
 
 The document result includes sales and purchases once by KSeF identity, regardless
 of payment. Advance invoices are excluded by default. Bill final invoices use the
-full service value; external final invoices require review. Currency documents
-require a tax PLN value; the live mBank rate is never used for CIT. Users choose
+full service value; external final invoices require review. Nonzero currency documents
+require a tax PLN value or conversion rate; zero-value corrections need no FX. The live mBank rate is never used for CIT. Users choose
 exempt VAT (gross costs) or active VAT (net costs), adjust dates and KUP shares,
 and resolve non-deductible expenses. Legacy `cf_purchases` shopping-list entries
 without a source document are not loaded or included, even if old overrides exist.
 KSeF invoices, issued Bill documents and saved NIP receipts form the document ledger.
 
 The tax figure is an estimate of ordinary operating CIT for a calendar year,
-not an advance return. It requires confirmed regime/rate/VAT, all documents
-reviewed and completeness confirmed for the selected period. A ledger signature
+not an advance return. It requires confirmed regime/rate/VAT, resolved data gaps and completeness
+confirmed for the selected period. Complete documents are included automatically;
+ordinary costs default to a clearly disclosed 100% share for the estimate. Users
+can change the share, exclude documents or explicitly defer review. Legacy blank
+pending flags from the former mandatory review flow no longer block complete
+documents. The table shows the specific reason for each actual data gap. A ledger signature
 invalidates completeness after source amounts or documents change. CIT payments
 carry a tax year separately from the payment date. Estonian CIT and capital gains
 are not estimated. A failed, truncated or cancelled KSeF sync keeps the last archive.

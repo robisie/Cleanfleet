@@ -34,6 +34,13 @@ test('established dates, completed work and approval proposals do not age; first
  assert.equal(ctx.scheduleUndatedExpiryAt(rescheduled),now);
  assert.equal(ctx.scheduleMatchesMainFilter(rescheduled,'todo'),true);
 });
+test('main unpaid filter includes only completed entries without payment confirmation',()=>{
+ const pending={zlecone:true,created_at:now,schedule_status:'',zaplacone:false,zatwierdzone:false};
+ assert.equal(ctx.scheduleMatchesMainFilter(pending,'unpaid'),false);
+ assert.equal(ctx.scheduleMatchesMainFilter({...pending,data_prania:'2026-10-08'},'unpaid'),false);
+ assert.equal(ctx.scheduleMatchesMainFilter({...pending,zatwierdzone:true},'unpaid'),true);
+ assert.equal(ctx.scheduleMatchesMainFilter({...pending,zatwierdzone:true,data_prania:'2026-10-08',zaplacone:true},'unpaid'),false);
+});
 test('all classic inline JavaScript parses',()=>{
  let n=0;for(const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){
   if(/\bsrc=|type=["']module|application\/(?:json|ld\+json)/i.test(m[1])||!m[2].trim())continue;

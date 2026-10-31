@@ -9467,7 +9467,7 @@ function uid(){
         case 'expired': return scheduleIsExpired(r);
         case 'done': return !!r.data_prania;
         case 'unapproved': return !!r.data_prania && !r.zatwierdzone;
-        case 'unpaid': return !r.zaplacone;
+        case 'unpaid': return !!r.zatwierdzone && !r.zaplacone;
         case 'approved_paid': return !!r.zatwierdzone && !!r.zaplacone;
         case 'old': {
           const days = daysSinceLastWashForRecord(r);

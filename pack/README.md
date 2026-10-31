@@ -54,3 +54,33 @@ Pack no longer destroys frames on pagehide. BFCache return retains the actual DO
 
 ### v1.2.3 — AppPACK logo
 Use the supplied orange AppPACK logo in the header and login screen. Favicons, Apple touch and installation icons use its orange R symbol on white. New asset filenames and manifest/style versions refresh cached branding without changing application logos or workspace behavior.
+
+
+## Księgowy
+
+The eighth finance tab follows Aga. `accountant.js` owns its mount, revision-checked
+settings writes and cleanup; `accountant-core.js` calculates amounts in cents;
+`accountant-data.js` pages cached purchases and reads sales through the authorized
+Bill edge API (Bill tables intentionally have no client SELECT policy).
+Settings, per-document reviews, manual entries, CIT payments and compact yearly
+KSeF metadata are stored under `rs_settings.payload.accountant` for the owner.
+No finance state is stored in browser localStorage.
+
+The document result includes sales and purchases once by KSeF identity, regardless
+of payment. Advance invoices are excluded by default. Bill final invoices use the
+full service value; external final invoices require review. Currency documents
+require a tax PLN value; the live mBank rate is never used for CIT. Users choose
+exempt VAT (gross costs) or active VAT (net costs), adjust dates and KUP shares,
+and resolve duplicate manual purchases and non-deductible expenses.
+
+The tax figure is an estimate of ordinary operating CIT for a calendar year,
+not an advance return. It requires confirmed regime/rate/VAT, all documents
+reviewed and completeness confirmed for the selected period. A ledger signature
+invalidates completeness after source amounts or documents change. CIT payments
+carry a tax year separately from the payment date. Estonian CIT and capital gains
+are not estimated. A failed, truncated or cancelled KSeF sync keeps the last archive.
+Bill history reaching the API's 1000-row cap raises an error instead of silently
+reporting an incomplete total. Full KSeF synchronization is an explicit action.
+
+Validation: `node --test tests/accountant.test.mjs` and
+`node tests/accountant.browser.cjs` (Playwright; optional `CF_CHROMIUM_EXECUTABLE`).

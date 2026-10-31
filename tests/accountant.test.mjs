@@ -24,8 +24,8 @@ test('CIT uses year-to-date income, exact cents, rounding and payments assigned 
  data.bills.push(bill('new',10));sum=C.summary(C.documents(data,s),s,period);assert.equal(sum.tax,null,'new documents invalidate completeness');
  s.years['2026'].regime='estonian';confirm(data,s);assert.equal(C.summary(C.documents(data,s),s,period).tax,null);
 });
-test('unknown rate, unreviewed costs and partial coverage prevent tax; no tax on loss',()=>{
- const s=configured(),data={bills:[bill('A',100)],purchases:[purchase('P',200)]};confirm(data,s);assert.equal(C.summary(C.documents(data,s),s,period).tax,null);s.overrides['purchases:P']={status:'include',percent:100,pln:20000,date:'2026-10-10'};confirm(data,s);assert.equal(C.summary(C.documents(data,s),s,period).tax,0);s.years['2026'].rate=null;assert.equal(C.summary(C.documents(data,s),s,period).tax,null);
+test('unknown rate and explicitly deferred costs prevent tax; no tax on loss',()=>{
+ const s=configured(),data={bills:[bill('A',100)],purchases:[purchase('P',200)]};s.overrides['purchases:P']={status:'pending',manualReview:true,percent:100,pln:20000,date:'2026-10-10'};confirm(data,s);assert.equal(C.summary(C.documents(data,s),s,period).tax,null);s.overrides['purchases:P']={status:'include',percent:100,pln:20000,date:'2026-10-10'};confirm(data,s);assert.equal(C.summary(C.documents(data,s),s,period).tax,0);s.years['2026'].rate=null;assert.equal(C.summary(C.documents(data,s),s,period).tax,null);
  assert.equal(C.range('2024','month',2).to,'2024-02-29');assert.equal(C.range('2026','quarter',4).to,'2026-12-31');assert.throws(()=>C.range('2026','month',13));assert.throws(()=>C.amount('abc'));assert.equal(C.amount('-10,55'),-1055);
 });
 test('synchronization reads paginated quarters; partial response or cancel cannot publish partial archive',async()=>{
@@ -47,3 +47,13 @@ test('null, absent and invalid source dates stay unassigned and block tax until 
 });
 
 test('undocumented legacy purchases never affect result or tax, including old inclusion overrides',()=>{const s=configured(),data={bills:[bill('A',1000)],unlinked:[{id:'old',purchase_date:null,amount:500},{id:'dated',purchase_date:'2026-10-01',amount:300}]};s.overrides['purchases:cf:old']={status:'include',percent:100,pln:50000,date:'2026-10-01'};confirm(data,s);const rows=C.documents(data,s),sum=C.summary(rows,s,period);assert.equal(rows.length,1);assert.equal(sum.costs,0);assert.equal(sum.unplaced.length,0);assert.equal(sum.tax,9000);});
+
+test('zero-value EUR corrections need no exchange rate and complete ordinary costs are automatic',()=>{
+ const s=configured(),original=bill('original',225,{currency:'EUR'}).payload,data={bills:[bill('KA7',225,{currency:'EUR',correction:{before:original,mode:'tax'}})],purchases:[purchase('P',123,100)]};
+ s.archives['2026']={sales:[{ksefNumber:'K-KA7',invoiceNumber:'KA7',currency:'EUR',issueDate:'2026-10-31',grossAmount:0,netAmount:0,invoiceType:'Kor'},{ksefNumber:'K-KA8',invoiceNumber:'KA8',currency:'EUR',issueDate:'2026-10-31',grossAmount:0,netAmount:0,invoiceType:'Kor'}]};
+ s.overrides['purchases:P']={status:'pending',percent:100,pln:12300,date:'2026-10-10',reason:''};
+ const rows=C.documents(data,s);for(const r of rows){assert.equal(r.status,'include');assert.equal(r.issues.length,0);}for(const r of rows.filter(r=>r.kind==='sales')){assert.equal(r.base,0);assert.equal(r.neutralCorrection,true);assert.equal(r.missing,false);}assert.equal(C.summary(rows,s,period).pending.length,0);
+});
+test('nonzero foreign amounts require conversion, not re-entry of the source amount',()=>{
+ const s=configured(),row=C.documents({bills:[bill('EUR',225,{currency:'EUR'})]},s)[0];assert.equal(row.status,'pending');assert.equal(row.native,22500);assert.match(row.issues[0],/Brakuje jej przeliczenia/);assert.equal(C.convert(row.native,'4,3210'),97223);assert.equal(C.convert(-100,'4.325'),-433);assert.throws(()=>C.convert(100,'0'));assert.throws(()=>C.convert(100,'abc'));
+});

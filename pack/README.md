@@ -64,7 +64,9 @@ settings writes and cleanup; `accountant-core.js` calculates amounts in cents;
 Bill edge API (Bill tables intentionally have no client SELECT policy).
 Settings, per-document reviews, manual entries, CIT payments and compact yearly
 KSeF metadata are stored under `rs_settings.payload.accountant` for the owner.
-No finance state is stored in browser localStorage.
+No finance state is stored in browser localStorage. Source documents with missing
+or invalid dates stay in a separate review list, outside period totals; they block
+the tax estimate until dated or explicitly excluded.
 
 The document result includes sales and purchases once by KSeF identity, regardless
 of payment. Advance invoices are excluded by default. Bill final invoices use the

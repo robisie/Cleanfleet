@@ -37,3 +37,11 @@ test('synchronization reads paginated quarters; partial response or cancel canno
 test('reader uses authorized Bill endpoint and pages cost tables beyond 500 rows',async()=>{
  const db={functions:{invoke:async()=>({data:[bill('A',100)]})},from(name){let from=0,to=499;const q={select:()=>q,eq:()=>q,is:()=>q,order:()=>q,range:(a,b)=>{from=a;to=b;return q;},maybeSingle:async()=>({data:{revision:1,payload:{}}}),then(resolve){const source=name==='rs_ksef_documents'?Array.from({length:501},(_,i)=>({ksef_number:'P'+i})):[];return Promise.resolve({data:source.slice(from,to+1)}).then(resolve);}};return q;}};const data=await readData(db,'owner');assert.equal(data.bills.length,1);assert.equal(data.purchases.length,501);
 });
+test('null, absent and invalid source dates stay unassigned and block tax until reviewed',()=>{
+ const s=configured(),data={bills:[bill('dated',100),bill('undated',20,{saleDate:null,issueDate:null})],unlinked:[{id:'null',name:'Stary zakup',purchase_date:null,amount:25},{id:'missing',name:'Brak daty',amount:30},{id:'bad',name:'Niepoprawna data',purchase_date:'2026-02-31',amount:40}]};
+ let rows=C.documents(data,s),sum=C.summary(rows,s,period);assert.equal(sum.unplaced.length,4);assert.equal(sum.revenue,10000);assert.equal(sum.costs,0);assert.equal(sum.incomplete,true);assert(rows.filter(r=>r.key!=='sales:K-DATED').every(r=>r.date===''));
+ confirm(data,s);assert.equal(C.summary(C.documents(data,s),s,period).tax,null);
+ s.overrides['purchases:cf:null']={status:'include',percent:100,pln:2500,date:'2026-10-01'};
+ for(const key of ['sales:K-UNDATED','purchases:cf:missing','purchases:cf:bad'])s.overrides[key]={status:'exclude',percent:100,pln:null,date:''};
+ confirm(data,s);rows=C.documents(data,s);sum=C.summary(rows,s,period);assert.equal(sum.unplaced.length,0);assert.equal(sum.costs,2500);assert.equal(sum.tax,700);assert.equal(rows.find(r=>r.key==='purchases:cf:null').date,'2026-10-01');
+});

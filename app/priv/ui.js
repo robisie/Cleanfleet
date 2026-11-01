@@ -1,4 +1,4 @@
-import {matchReceiptEvidence} from '/pack/accountant-currency.js?v=1';
+import {matchReceiptEvidence} from '/pack/accountant-currency.js?v=2';
 import {validateWallet} from './wallet-core.js?v=10';
 import {cashAmount,cashBalance,validateCash} from './cash.js?v=112';
 import {keyFor,newSalt,seal,open,checkEnvelope,newAccountKey,openAccount} from './vault.js?v=110';

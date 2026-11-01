@@ -8,7 +8,7 @@ const period={year:'2026',mode:'month',part:10};
 test('Bill and KSeF sale duplicates and cost allocations are counted once; corrections keep their sign',()=>{
  const s=configured(),before=bill('A',1000).payload,correction=bill('KA',800,{correction:{before}}),data={bills:[bill('A',1000),correction],purchases:[purchase('P',246,200)],unlinked:[{id:'copy',source_ksef_number:'P',amount:246}],costs:[{ksef_number:'P',preview:{gross:246}}]};
  s.archives['2026']={sales:[{ksefNumber:'K-A',invoiceNumber:'A',issueDate:'2026-10-31',currency:'PLN',grossAmount:1000,netAmount:1000}],purchases:[purchase('P',246,200).metadata]};
- const rows=C.documents(data,s),sum=C.summary(rows,s,period);assert.equal(rows.length,3);assert.equal(sum.revenue,80000);assert.equal(sum.costs,24600);assert.equal(sum.profit,55400);assert.equal(sum.tax,null);
+ const rows=C.documents(data,s),sum=C.summary(rows,s,period);assert.equal(rows.length,3);assert.equal(sum.revenue,80000);assert.equal(sum.costs,24600);assert.equal(sum.profit,55400);assert.equal(sum.tax,5000);assert.equal(sum.taxProvisional,true);
  s.overrides['purchases:P']={status:'include',percent:75,pln:24600,date:'2026-10-10'};confirm(data,s);const tax=C.summary(C.documents(data,s),s,period);assert.equal(tax.taxCosts,18450);assert.equal(tax.tax,5500);assert.equal(tax.base,61600);
 });
 test('VAT treatment uses gross for exemption and net for active VAT; missing FX never becomes zero',()=>{
@@ -21,11 +21,11 @@ test('advance is excluded; final Bill includes full service value, not outstandi
 });
 test('CIT uses year-to-date income, exact cents, rounding and payments assigned to correct tax year',()=>{
  const s=configured(),data={bills:[bill('A',1000,{saleDate:'2026-01-01'}),bill('B',1000)]};s.payments=[{id:'paid',date:'2026-09-20',name:'CIT',amount:9000,taxYear:'2026'},{id:'old',date:'2026-01-20',name:'Poprzedni rok',amount:5000,taxYear:'2025'}];confirm(data,s);let sum=C.summary(C.documents(data,s),s,period);assert.equal(sum.revenue,100000);assert.equal(sum.taxRevenue,200000);assert.equal(sum.tax,18000);assert.equal(sum.balance,9000);
- data.bills.push(bill('new',10));sum=C.summary(C.documents(data,s),s,period);assert.equal(sum.tax,null,'new documents invalidate completeness');
+ data.bills.push(bill('new',10));sum=C.summary(C.documents(data,s),s,period);assert.equal(sum.tax,18100);assert.equal(sum.reviewed,false,'new documents invalidate review, not the live estimate');assert.equal(sum.taxProvisional,true);
  s.years['2026'].regime='estonian';confirm(data,s);assert.equal(C.summary(C.documents(data,s),s,period).tax,null);
 });
-test('unknown rate and explicitly deferred costs prevent tax; no tax on loss',()=>{
- const s=configured(),data={bills:[bill('A',100)],purchases:[purchase('P',200)]};s.overrides['purchases:P']={status:'pending',manualReview:true,percent:100,pln:20000,date:'2026-10-10'};confirm(data,s);assert.equal(C.summary(C.documents(data,s),s,period).tax,null);s.overrides['purchases:P']={status:'include',percent:100,pln:20000,date:'2026-10-10'};confirm(data,s);assert.equal(C.summary(C.documents(data,s),s,period).tax,0);s.years['2026'].rate=null;assert.equal(C.summary(C.documents(data,s),s,period).tax,null);
+test('missing settings prevent tax, unresolved documents yield a clearly incomplete estimate; no tax on loss',()=>{
+ const s=configured(),data={bills:[bill('A',100)],purchases:[purchase('P',200)]};s.overrides['purchases:P']={status:'pending',manualReview:true,percent:100,pln:20000,date:'2026-10-10'};confirm(data,s);assert.equal(C.summary(C.documents(data,s),s,period).tax,900);assert.equal(C.summary(C.documents(data,s),s,period).taxProvisional,true);s.overrides['purchases:P']={status:'include',percent:100,pln:20000,date:'2026-10-10'};confirm(data,s);assert.equal(C.summary(C.documents(data,s),s,period).tax,0);s.years['2026'].rate=null;assert.equal(C.summary(C.documents(data,s),s,period).tax,null);
  assert.equal(C.range('2024','month',2).to,'2024-02-29');assert.equal(C.range('2026','quarter',4).to,'2026-12-31');assert.throws(()=>C.range('2026','month',13));assert.throws(()=>C.amount('abc'));assert.equal(C.amount('-10,55'),-1055);
 });
 test('synchronization reads paginated quarters; partial response or cancel cannot publish partial archive',async()=>{
@@ -37,10 +37,10 @@ test('synchronization reads paginated quarters; partial response or cancel canno
 test('reader uses authorized Bill endpoint and pages cost tables beyond 500 rows',async()=>{
  const db={functions:{invoke:async()=>({data:[bill('A',100)]})},from(name){let from=0,to=499;const q={select:()=>q,eq:()=>q,is:()=>q,order:()=>q,range:(a,b)=>{from=a;to=b;return q;},maybeSingle:async()=>({data:{revision:1,payload:{}}}),then(resolve){const source=name==='rs_ksef_documents'?Array.from({length:501},(_,i)=>({ksef_number:'P'+i})):[];return Promise.resolve({data:source.slice(from,to+1)}).then(resolve);}};return q;}};const data=await readData(db,'owner');assert.equal(data.bills.length,1);assert.equal(data.purchases.length,501);
 });
-test('null, absent and invalid source dates stay unassigned and block tax until reviewed',()=>{
+test('undated documents stay unassigned with a provisional estimate from known documents',()=>{
  const s=configured(),data={bills:[bill('dated',100),bill('undated',20,{saleDate:null,issueDate:null})],purchases:[{metadata:{...purchase('KNULL',25).metadata,issueDate:null}},{metadata:{...purchase('KMISSING',30).metadata,issueDate:undefined}},{metadata:{...purchase('KBAD',40).metadata,issueDate:'2026-02-31'}}]};
  let rows=C.documents(data,s),sum=C.summary(rows,s,period);assert.equal(sum.unplaced.length,4);assert.equal(sum.revenue,10000);assert.equal(sum.costs,0);assert.equal(sum.incomplete,true);assert(rows.filter(r=>r.key!=='sales:K-DATED').every(r=>r.date===''));
- confirm(data,s);assert.equal(C.summary(C.documents(data,s),s,period).tax,null);
+ confirm(data,s);assert.equal(C.summary(C.documents(data,s),s,period).tax,900);assert.equal(C.summary(C.documents(data,s),s,period).taxProvisional,true);
  s.overrides['purchases:KNULL']={status:'include',percent:100,pln:2500,date:'2026-10-01'};
  for(const key of ['sales:K-UNDATED','purchases:KMISSING','purchases:KBAD'])s.overrides[key]={status:'exclude',percent:100,pln:null,date:''};
  confirm(data,s);rows=C.documents(data,s);sum=C.summary(rows,s,period);assert.equal(sum.unplaced.length,0);assert.equal(sum.costs,2500);assert.equal(sum.tax,700);assert.equal(rows.find(r=>r.key==='purchases:KNULL').date,'2026-10-01');
@@ -56,4 +56,14 @@ test('zero-value EUR corrections need no exchange rate and complete ordinary cos
 });
 test('nonzero foreign amounts require conversion, not re-entry of the source amount',()=>{
  const s=configured(),row=C.documents({bills:[bill('EUR',225,{currency:'EUR'})]},s)[0];assert.equal(row.status,'pending');assert.equal(row.native,22500);assert.match(row.issues[0],/Brakuje jej przeliczenia/);assert.equal(C.convert(row.native,'4,3210'),97223);assert.equal(C.convert(-100,'4.325'),-433);assert.throws(()=>C.convert(100,'0'));assert.throws(()=>C.convert(100,'abc'));
+});
+
+test('documented final purchase uses full item values and does not count its advance twice',()=>{
+ const s=configured(),advance={...purchase('ADVANCE',656.07,533.39).metadata,invoiceType:'Zal',issueDate:'2026-07-30'},final={...purchase('FINAL',0.02,0.02).metadata,invoiceType:'Roz',issueDate:'2026-08-05'},preview={currency:'PLN',gross:0.02,items:[{gross:580.58,net:null,vat:'23',before:false},{gross:75.51,net:null,vat:'23',before:false}]};
+ const data={bills:[bill('SALE',1000)],purchases:[{metadata:advance},{metadata:final,preview}]};s.archives['2026']={sales:[],purchases:[advance,final]};const rows=C.documents(data,s),r=rows.find(r=>r.ksef==='FINAL');assert.equal(r.gross,65609);assert.equal(r.net,53341);assert.equal(r.settlementGross,2);assert.equal(r.fullFinal,true);assert.equal(r.status,'include');assert.equal(rows.find(r=>r.ksef==='ADVANCE').status,'exclude');
+ const sum=C.summary(rows,s,{year:'2026',mode:'year'});assert.equal(sum.costs,65609);assert.equal(sum.taxCosts,65609);assert.equal(sum.pending.length,0);assert.equal(sum.tax,3100);assert.equal(sum.taxProvisional,true);
+ s.years['2026'].vat='active';assert.equal(C.documents(data,s).find(r=>r.ksef==='FINAL').base,53341);
+});
+test('a final invoice without full details remains identified but does not hide the available tax estimate',()=>{
+ const s=configured(),data={bills:[bill('SALE',1000)],purchases:[{metadata:{...purchase('FINAL-NO-ITEMS',0.02).metadata,invoiceType:'Roz'}}]};const sum=C.summary(C.documents(data,s),s,period);assert.equal(sum.tax,9000);assert.equal(sum.taxProvisional,true);assert.equal(sum.pending[0].number,'FINAL-NO-ITEMS');assert.equal(sum.pending[0].base,null);assert.equal(sum.incomplete,true);assert.equal(C.finalPreview({currency:'PLN',items:[{gross:null,vat:'23'}]},'PLN'),null);
 });

@@ -12,6 +12,10 @@ const {chromium}=require('playwright'),fs=require('node:fs'),assert=require('nod
  assert.equal(await page.locator('.cf-date-clear .cf-glass-icon').count(),0);
  const iconSize=await page.locator('#test-date + .cf-date-clear').evaluate(button=>{const icon=button.querySelector('svg').getBoundingClientRect(),box=button.getBoundingClientRect(),css=getComputedStyle(button);return {width:icon.width/(box.width-parseFloat(css.borderLeftWidth)-parseFloat(css.borderRightWidth)),height:icon.height/(box.height-parseFloat(css.borderTopWidth)-parseFloat(css.borderBottomWidth))};});
  assert(Math.abs(iconSize.width-.9)<.01&&Math.abs(iconSize.height-.9)<.01,JSON.stringify(iconSize));
+ // Include the stroke and round caps: the glyph itself must have an inset
+ // inside its SVG, rather than running all the way into the rounded corners.
+ const ink=await page.locator('#test-date + .cf-date-clear path').evaluate(path=>{const b=path.getBBox(),stroke=Number(path.getAttribute('stroke-width'));return {left:b.x-stroke/2,top:b.y-stroke/2,width:b.width+stroke,height:b.height+stroke};});
+ assert(ink.left>=5&&ink.top>=5&&ink.width<=90&&ink.height<=90,JSON.stringify(ink));
  await page.locator('#test-date + .cf-date-clear').tap();assert.equal(await page.inputValue('#test-date'),'');assert.equal(await page.locator('#test-date').evaluate(el=>el.defaultValue),'');assert.deepEqual(await page.evaluate(()=>events),[{type:'input',value:''},{type:'change',value:''}]);
  assert(await page.locator('#locked + .cf-date-clear').isDisabled());await page.evaluate(()=>document.querySelector('#locked').disabled=false);await page.locator('#locked + .cf-date-clear').tap();assert.equal(await page.inputValue('#locked'),'');
  await page.evaluate(()=>{const input=document.createElement('input');input.type='date';input.id='later';input.value='2026-11-01';document.body.append(input);});await page.locator('#later + .cf-date-clear').tap();assert.equal(await page.inputValue('#later'),'');

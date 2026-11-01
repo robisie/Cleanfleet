@@ -17,7 +17,7 @@
   function enhance(input){
     if(controls.has(input))return;
     const wrapper=document.createElement('span');wrapper.className='cf-date-control';
-    const button=document.createElement('button');button.type='button';button.className='cf-date-clear';button.innerHTML='<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><path d="M4 4L96 96M96 4L4 96" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>';
+    const button=document.createElement('button');button.type='button';button.className='cf-date-clear';button.innerHTML='<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><path d="M9 9L91 91M91 9L9 91" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>';
     const label='Wyczyść: '+labelFor(input);button.setAttribute('aria-label',label);button.title=label;
     input.before(wrapper);wrapper.append(input,button);controls.set(input,button);
     const sync=()=>{button.disabled=input.disabled||input.readOnly;wrapper.hidden=input.hidden||input.style.display==='none';};sync();

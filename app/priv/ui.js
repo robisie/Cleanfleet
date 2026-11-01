@@ -1,3 +1,4 @@
+import {matchReceiptEvidence} from '/pack/accountant-currency.js?v=1';
 import {validateWallet} from './wallet-core.js?v=10';
 import {cashAmount,cashBalance,validateCash} from './cash.js?v=112';
 import {keyFor,newSalt,seal,open,checkEnvelope,newAccountKey,openAccount} from './vault.js?v=110';
@@ -223,6 +224,7 @@ async function accountUnlock(){
 async function init(){try{if(!window.supabase)throw Error('Nie udało się załadować logowania. Odśwież stronę.');db=window.supabase.createClient('https://nxmrobbhfqijmbjjzbof.supabase.co','sb_publishable_9lz7NUv2-MloX7MEcH2-vQ_AZS8IIHz');const {data,error}=await db.auth.getUser();if(error||!data?.user)throw Error('Zaloguj się w Robisię Pack jako administrator i otwórz moduł ponownie.');user=data.user;const role=await db.rpc('cf_is_admin');if(role.error||role.data!==true)throw Error('To narzędzie jest dostępne tylko dla administratora.');await loadEnvelope();if(!envelope||envelope.accountKey){await accountUnlock();}else{$('gateInfo').textContent=envelope?'Jednorazowo wpisz stare hasło, aby przełączyć istniejącą historię na dostęp przez konto administratora.':'Przygotowuję finanse.';$('repeatLabel').hidden=!!envelope;$('repeatPin').required=!envelope;$('unlock').textContent=envelope?'Przełącz na dostęp konta':'Otwórz finanse';$('unlockForm').hidden=false;}db.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT'||session&&session.user.id!==user.id){lock();$('unlockForm').hidden=true;$('gateError').textContent='Sesja administratora została zakończona.';}});}catch(e){$('gateInfo').textContent=e.message;$('unlockForm').hidden=true;}}
 document.addEventListener('keydown',event=>{if(financeEmbedded&&event.key==='Escape'&&!$('modal').open){event.preventDefault();financeNotify('cf-finances-close');}});
 window.CFPrivateFinance={
+ invoiceReceipts(rows){if(!key||!state||!user||!Array.isArray(rows))return [];return matchReceiptEvidence(rows,P.businessIncomeState(state).incomes,today());},
  cashBalance(){if(!key||!state||!user)return null;activity();return cashBalance(state.cash||[]);},
  canSwitch:()=>Boolean(key&&state&&!busy&&!importInFlight&&!$('modal').open&&walletController?.canSwitch?.()!==false),
  activity,lock,

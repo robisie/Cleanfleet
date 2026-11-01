@@ -92,3 +92,23 @@ reporting an incomplete total. Full KSeF synchronization is an explicit action.
 
 Validation: `node --test tests/accountant.test.mjs` and
 `node tests/accountant.browser.cjs` (Playwright; optional `CF_CHROMIUM_EXECUTABLE`).
+
+
+Foreign amounts are converted automatically by `accountant-currency.js` using
+public historical NBP rates. The user-selected estimate method uses receipt dates,
+or the invoice issue date when no dated receipt exists; for a day without a rate,
+the last publication on or before that day is used. This is labelled as the
+selected estimate convention, not a complete statutory CIT/FX settlement.
+The unlocked private finance frame supplies only minimal receipt facts matched
+to exactly one full invoice number in company-account income. It returns no
+account numbers, counterparties, titles or vault state. Manual paid flags and
+record update timestamps do not establish a receipt date. Explicit invoice
+upfront payments are a fallback; bank and invoice evidence are not added twice.
+Partial receipts in the invoice currency are weighted separately, with the unpaid
+remainder using the issue date. A matched receipt in another currency supplies
+its date (latest date for multiple receipts), not a fictitious EUR amount.
+Each converted row and CSV shows its rate, publication date and date basis.
+Manual PLN overrides are preserved. Rate failures leave an explicit gap instead
+of treating a missing conversion as zero. No credentials or invoice identifiers
+are sent to NBP; only currency and historical dates. Quotes are cached in memory
+and cleared on disposal.

@@ -9,11 +9,11 @@ function harness({enumerate,save,focus=['continuous','single-shot'],rejectFocus=
  const video=nodes.get('.cf-cam-video');Object.assign(video,{videoWidth:4096,videoHeight:3072,readyState:2,play:async()=>{}});
  const zooms=['0.5','1','2'].map(k=>({...node(),dataset:{camZoom:k}}));nodes.get('.cf-cam-zoom').querySelectorAll=()=>zooms;
  let opened=false;const overlay={style:{},querySelector:s=>nodes.get(s),querySelectorAll:()=>zooms,classList:{contains:()=>opened,add:()=>opened=true,remove:()=>opened=false}};
- const context={console,File,Blob,setTimeout,clearTimeout,setInterval:fn=>{intervals.set(++nextTimer,fn);return nextTimer;},clearInterval:id=>intervals.delete(id),showToast:m=>messages.push(m),ImageCapture:class{async getPhotoCapabilities(){return {imageWidth:{max:6000},imageHeight:{max:4000}};}async takePhoto(){nativeShots++;if(nativeError)throw Error('still unsupported');return new Blob(['native'],{type:'image/jpeg'});}},navigator:{mediaDevices:{enumerateDevices:enumerate||(async()=>[{kind:'videoinput',deviceId:'main',label:'Back Camera'},{kind:'videoinput',deviceId:'ultra',label:'Back Ultra Wide'}]),getUserMedia:async constraints=>{
+ const context={console,File,Blob,CustomEvent,setTimeout,clearTimeout,setInterval:fn=>{intervals.set(++nextTimer,fn);return nextTimer;},clearInterval:id=>intervals.delete(id),showToast:m=>messages.push(m),ImageCapture:class{async getPhotoCapabilities(){return {imageWidth:{max:6000},imageHeight:{max:4000}};}async takePhoto(){nativeShots++;if(nativeError)throw Error('still unsupported');return new Blob(['native'],{type:'image/jpeg'});}},navigator:{mediaDevices:{enumerateDevices:enumerate||(async()=>[{kind:'videoinput',deviceId:'main',label:'Back Camera'},{kind:'videoinput',deviceId:'ultra',label:'Back Ultra Wide'}]),getUserMedia:async constraints=>{
   const settings={deviceId:constraints.video.deviceId?.exact||'main',torch:false,zoom:1};
   const t={readyState:'live',getCapabilities:()=>({torch,focusMode:focus,zoom:{min:1,max:3}}),getSettings:()=>({...settings}),applyConstraints:async({advanced:[options]})=>{calls.push({...options});if(rejectFocus&&options.focusMode)throw Error('focus rejected');settings.torch=options.torch??false;settings.focusMode=options.focusMode??'manual';if(options.zoom!==undefined)settings.zoom=options.zoom;},stop(){this.readyState='ended';settings.torch=false;},dropTorch(){settings.torch=false;}};
   const s={getVideoTracks:()=>[t],getTracks:()=>[t]};streams.push(s);return s;
- }}},document:{visibilityState:'visible',documentElement:{style:{}},addEventListener:(name,fn)=>events[name]=fn,createElement:name=>name==='canvas'?{getContext:()=>({drawImage:()=>frames++,translate(){},scale(){}}),toBlob:cb=>cb(new Blob(['frame'],{type:'image/jpeg'}))}:node()},window:{visualViewport:{width:390,height:844,addEventListener(){},removeEventListener(){}},addEventListener(){},removeEventListener(){},cfPhotoSession:{get:()=>({record:{id:'wash1'},kind:'przed'}),addFiles:files=>saved.push(...files)},cfPhotoLocalStoreShot:async(record,kind,file)=>{if(save)await save(record,kind,file);saved.push(file);}}};
+ }}},document:{visibilityState:'visible',documentElement:{style:{}},dispatchEvent(){},addEventListener:(name,fn)=>events[name]=fn,createElement:name=>name==='canvas'?{getContext:()=>({drawImage:()=>frames++,translate(){},scale(){}}),toBlob:cb=>cb(new Blob(['frame'],{type:'image/jpeg'}))}:node()},window:{visualViewport:{width:390,height:844,addEventListener(){},removeEventListener(){}},addEventListener(){},removeEventListener(){},cfPhotoSession:{get:()=>({record:{id:'wash1'},kind:'przed'}),addFiles:files=>saved.push(...files)},cfPhotoLocalStoreShot:async(record,kind,file)=>{if(save)await save(record,kind,file);saved.push(file);}}};
  let source=fs.readFileSync('app/photo-camera-v1213.js','utf8').replace("  document.addEventListener('click'", "  window.h={init:o=>overlay=o,openCamera,toggleTorch,requestCapture,setLens,closeCamera,get:()=>({busy,pendingCaptures,torchOn,torchWanted,captureCount,shots})};\n  document.addEventListener('click'");
  vm.runInNewContext(source,context);const h=context.window.h;h.init(overlay);
  return {context,h,nodes,streams,saved,messages,calls,events,video,intervals,get nativeShots(){return nativeShots;},get frames(){return frames;}};
@@ -34,7 +34,9 @@ test('startup finishes lens selection before enabling lamp; a shutter tap during
 test('torch survives zoom, autofocus and repeated photos; external torch reset is repaired and reflected in icon',async()=>{
  const x=harness();await x.h.openCamera();await x.h.toggleTorch();await x.h.setLens('2');
  assert.equal(x.h.get().torchOn,true);assert.equal(x.calls.at(-1).zoom,2);assert.equal(x.calls.at(-1).torch,true);assert.equal(x.calls.at(-1).focusMode,'continuous');
+ const controlsBefore=x.calls.length;
  x.h.requestCapture();await until(()=>x.saved.length===1&&!x.h.get().busy);
+ assert.equal(x.calls.length,controlsBefore,'a ready continuously focused camera must not be reconfigured on every shot');
  assert.equal(x.nativeShots,0);assert.equal(x.frames,1);assert.equal(x.h.get().torchOn,true);
  assert.ok(x.calls.some(c=>c.torch===true&&c.focusMode==='continuous'));
  x.streams.at(-1).getVideoTracks()[0].dropTorch();[...x.intervals.values()][0]();
@@ -46,7 +48,7 @@ test('three shutter taps during a slow local save produce three separately saved
  let release;const x=harness({save:()=>new Promise(resolve=>release=resolve)});await x.h.openCamera();
  x.h.requestCapture();await until(()=>release);const first=release;
  x.h.requestCapture();x.h.requestCapture();assert.equal(x.h.get().pendingCaptures,2);
- assert.match(x.nodes.get('.cf-cam-status').textContent,/Zapisywanie.*W kolejce: 2/);
+ assert.match(x.nodes.get('.cf-cam-status').textContent,/Zapisywanie[\s\S]*w kolejce: 2/);
  first();await until(()=>x.saved.length===1&&release!==first);const second=release;
  second();await until(()=>x.saved.length===2&&release!==second);release();
  await until(()=>!x.h.get().busy);assert.equal(x.saved.length,3);assert.equal(new Set(x.saved.map(f=>f.name)).size,3);
@@ -64,7 +66,7 @@ test('an early shutter tap waits for a real frame and failed auto-save keeps the
  const x=harness({save:async()=>{throw Error('storage full');}});x.video.readyState=0;x.video.videoWidth=0;
  const opening=x.h.openCamera();await until(()=>x.streams.length===2);x.h.requestCapture();assert.equal(x.saved.length,0);
  x.video.readyState=2;x.video.videoWidth=4096;await opening;await until(()=>!x.h.get().busy);
- assert.equal(x.h.get().shots.length,1);assert.match(x.messages[0],/Nie zapisano ujęcia automatycznie/);x.h.closeCamera();assert.equal(x.saved.length,1);
+ assert.equal(x.h.get().shots.length,1);assert.match(x.messages[0],/zapis na urządzeniu nie powiódł się: storage full/);x.h.closeCamera();assert.equal(x.saved.length,1);
 });
 test('returning from background restarts the camera with autofocus and active light restored',async()=>{
  const x=harness();await x.h.openCamera();await x.h.toggleTorch();
@@ -72,4 +74,11 @@ test('returning from background restarts the camera with autofocus and active li
  x.context.document.visibilityState='hidden';x.events.visibilitychange();assert.equal(x.h.get().torchOn,false);assert.equal(x.intervals.size,0);
  x.context.document.visibilityState='visible';x.events.visibilitychange();await until(()=>!x.h.get().busy);
  assert.equal(x.h.get().torchOn,true);assert.equal(x.calls.at(-1).focusMode,'continuous');x.h.closeCamera();
+});
+
+test('full queue reports why another tap is rejected inside the camera',async()=>{
+ let release,first=true;const x=harness({save:()=>first?(first=false,new Promise(resolve=>release=resolve)):Promise.resolve()});await x.h.openCamera();
+ x.h.requestCapture();await until(()=>release);for(let i=0;i<6;i++)x.h.requestCapture();
+ assert.equal(x.h.get().pendingCaptures,5);assert.match(x.nodes.get('.cf-cam-status').textContent,/Nie przyjęto kolejnego zdjęcia.*5 ujęć/);
+ release();await until(()=>x.saved.length===6&&!x.h.get().busy);x.h.closeCamera();
 });

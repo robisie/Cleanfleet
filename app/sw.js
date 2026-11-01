@@ -189,9 +189,9 @@ self.addEventListener('fetch', event => {
       '<script src="/app/weather-refresh-v12311.js?v=20260923-13068"></script>\n' +
       '<script src="/app/layout-v11913.js?v=20261010-15517"></script>\n' +
       '<script src="/app/operations-v1200.js?v=20261010-15517"></script>\n' +
-      '<script src="/app/photo-local-v1240.js?v=20261021-selection1"></script>\n' +
+      '<script src="/app/photo-local-v1240.js?v=20261101-preview1"></script>\n' +
       '<script src="/app/photo-local-ui-v1232.js?v=20260919-13032"></script>\n' +
-      '<script src="/app/photo-camera-v1213.js?v=20261101-camera1"></script>\n' +
+      '<script src="/app/photo-camera-v1213.js?v=20261101-camera2"></script>\n' +
       '<script src="/app/ui-v1209.js?v=20260915-3"></script>\n' +
       '<script src="/app/reminder-form-v1251.js?v=20261004-15415"></script>\n' +
       '<script src="/app/admin-dashboard-v1270.js?v=20260928-130133"></script>';

@@ -1,4 +1,4 @@
-import {compactMetadata,today} from './accountant-core.js?v=5';
+import {compactMetadata,today} from './accountant-core.js?v=6';
 async function pages(db,table,select,order,filter=q=>q){const all=[];for(let offset=0;;offset+=500){const result=await filter(db.from(table).select(select).order(order).range(offset,offset+499));if(result.error)throw result.error;all.push(...(result.data||[]));if((result.data||[]).length<500)return all;}}
 async function readBills(db){const r=await db.functions.invoke('cleanfleet-bill',{body:{action:'search',q:''}});if(r.error||r.data?.error)throw Error(r.data?.error||r.error?.message||'Nie można odczytać faktur Bill.');if(!Array.isArray(r.data)||r.data.length>=1000)throw Error('Historia Bill osiągnęła limit odczytu. Zestawienie wymaga rozszerzenia stronicowania, aby nie pominąć faktur.');return r.data;}
 export async function readData(db,owner){const [settings,bills,purchases,costs]=await Promise.all([

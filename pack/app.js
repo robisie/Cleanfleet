@@ -54,7 +54,7 @@ function ensureTab(kind,name){
  if(!tabs.has(key)){
   const target=document.createElement('iframe'),title=kind==='application'?applications[name].name:modules[name];
   target.id='pack-frame-'+key.replace(':','-');target.title=title;target.setAttribute('role','tabpanel');target.hidden=true;
-  target.src=kind==='application'?applications[name].url:name==='calendar'?'/pack/calendar.html?v=123':'/pack/module.html?module='+name+'&v=151';
+  target.src=kind==='application'?applications[name].url:name==='calendar'?'/pack/calendar.html?v=123':'/pack/module.html?module='+name+'&v=152';
   target.setAttribute('allow',kind==='application'?'camera; microphone; geolocation; clipboard-write; web-share':'clipboard-write; web-share');target.onload=()=>fitFrame(target);
   tabs.set(key,{kind,name,title,frame:target});$('frameHost').append(target);
  }

@@ -1,4 +1,4 @@
-import {date,today,cents,convert,documents} from './accountant-core.js?v=5';
+import {date,today,cents,convert,documents} from './accountant-core.js?v=6';
 const escaped=s=>String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 // Inputs are already restricted to company-account income by the private finance frame.
 // Return payment facts only; titles, bank accounts and vault contents stay in that frame.
@@ -57,7 +57,7 @@ export function createQuoteReader({fetchImpl=globalThis.fetch,asOf=today,now=Dat
  return {read,clear:()=>cache.clear()};
 }
 export async function hydrateCurrencies(data,state,{quote,getReceiptEvidence=()=>[],signal,asOf=today(),progress=()=>{}}){
- const rows=documents({...data,fx:{}},state).filter(r=>r.currency&&r.currency!=='PLN'&&r.native!==null&&r.native!==0&&r.status!=='exclude'&&state.overrides[r.key]?.pln==null);
+ const rows=documents({...data,fx:{}},state).filter(r=>r.currency&&r.currency!=='PLN'&&r.native!==null&&r.native!==0&&!r.final&&r.status!=='exclude'&&state.overrides[r.key]?.pln==null);
  const evidence=await getReceiptEvidence(rows.filter(r=>r.kind==='sales')),plans=new Map(rows.map(r=>[r.key,conversionPlan(r,evidence,asOf)])),requests=new Map();
  for(const row of rows)for(const leg of plans.get(row.key))requests.set(row.currency+':'+leg.date,{currency:row.currency,date:leg.date});
  const quotes=new Map(),jobs=[...requests.entries()];let cursor=0,finished=0;

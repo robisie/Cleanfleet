@@ -65,12 +65,13 @@ Bill edge API (Bill tables intentionally have no client SELECT policy).
 Settings, per-document reviews, manual entries, CIT payments and compact yearly
 KSeF metadata are stored under `rs_settings.payload.accountant` for the owner.
 No finance state is stored in browser localStorage. Source documents with missing
-or invalid dates stay in a separate review list, outside period totals; they block
-the tax estimate until dated or explicitly excluded.
+or invalid dates stay in a separate review list, outside period totals; the
+available tax estimate is labelled incomplete until those items are resolved.
 
 The document result includes sales and purchases once by KSeF identity, regardless
 of payment. Advance invoices are excluded by default. Bill final invoices use the
-full service value; external final invoices require review. Nonzero currency documents
+full service value; external final invoices use complete saved item previews
+when available, otherwise the unresolved full value is identified by document. Nonzero currency documents
 require a tax PLN value or conversion rate; zero-value corrections need no FX. The live mBank rate is never used for CIT. Users choose
 exempt VAT (gross costs) or active VAT (net costs), adjust dates and KUP shares,
 and resolve non-deductible expenses. Legacy `cf_purchases` shopping-list entries
@@ -78,8 +79,9 @@ without a source document are not loaded or included, even if old overrides exis
 KSeF invoices, issued Bill documents and saved NIP receipts form the document ledger.
 
 The tax figure is an estimate of ordinary operating CIT for a calendar year,
-not an advance return. It requires confirmed regime/rate/VAT, resolved data gaps and completeness
-confirmed for the selected period. Complete documents are included automatically;
+not an advance return. It requires configured regime/rate/VAT. Optional review
+and unresolved documents do not hide the available estimate; unresolved items
+are named individually and an incomplete figure is explicitly labelled. Complete documents are included automatically;
 ordinary costs default to a clearly disclosed 100% share for the estimate. Users
 can change the share, exclude documents or explicitly defer review. Legacy blank
 pending flags from the former mandatory review flow no longer block complete
@@ -112,3 +114,9 @@ Manual PLN overrides are preserved. Rate failures leave an explicit gap instead
 of treating a missing conversion as zero. No credentials or invoice identifiers
 are sent to NBP; only currency and historical dates. Quotes are cached in memory
 and cleared on disposal.
+
+Final KSeF invoices can have a tiny or zero remaining balance despite a larger
+full purchase value. Complete saved item previews reconstruct that full value
+(gross and, where possible, net), retained when KSeF metadata is merged. The
+advance stays excluded, so the purchase is counted once on the final invoice.
+An incomplete preview stays unresolved rather than using a guessed full amount.

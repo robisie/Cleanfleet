@@ -6,6 +6,12 @@ const {chromium}=require('playwright'),fs=require('node:fs'),assert=require('nod
  await page.setContent('<meta name="viewport" content="width=device-width,initial-scale=1"><style>'+styles+'</style><div id="modalRoot"></div><label>Test daty<input id="test-date" type="date" value="2026-10-31"></label><input type="date" id="locked" value="2026-10-31" disabled><textarea style="font-size:12px"></textarea>');
  await page.addScriptTag({content:fs.readFileSync('app/form-controls.js','utf8')});
  await page.evaluate(()=>{window.events=[];for(const name of ['input','change'])document.querySelector('#test-date').addEventListener(name,e=>events.push({type:e.type,value:e.target.value}));});
+ await page.addStyleTag({content:fs.readFileSync('app/glass-icons.css','utf8')});
+ await page.addScriptTag({content:fs.readFileSync('app/glass-icons.js','utf8')});
+ await page.evaluate(()=>CFGlassIcons.scan(document));
+ assert.equal(await page.locator('.cf-date-clear .cf-glass-icon').count(),0);
+ const iconSize=await page.locator('#test-date + .cf-date-clear').evaluate(button=>{const icon=button.querySelector('svg').getBoundingClientRect(),box=button.getBoundingClientRect(),css=getComputedStyle(button);return {width:icon.width/(box.width-parseFloat(css.borderLeftWidth)-parseFloat(css.borderRightWidth)),height:icon.height/(box.height-parseFloat(css.borderTopWidth)-parseFloat(css.borderBottomWidth))};});
+ assert(Math.abs(iconSize.width-.9)<.01&&Math.abs(iconSize.height-.9)<.01,JSON.stringify(iconSize));
  await page.locator('#test-date + .cf-date-clear').tap();assert.equal(await page.inputValue('#test-date'),'');assert.equal(await page.locator('#test-date').evaluate(el=>el.defaultValue),'');assert.deepEqual(await page.evaluate(()=>events),[{type:'input',value:''},{type:'change',value:''}]);
  assert(await page.locator('#locked + .cf-date-clear').isDisabled());await page.evaluate(()=>document.querySelector('#locked').disabled=false);await page.locator('#locked + .cf-date-clear').tap();assert.equal(await page.inputValue('#locked'),'');
  await page.evaluate(()=>{const input=document.createElement('input');input.type='date';input.id='later';input.value='2026-11-01';document.body.append(input);});await page.locator('#later + .cf-date-clear').tap();assert.equal(await page.inputValue('#later'),'');
@@ -22,6 +28,7 @@ const {chromium}=require('playwright'),fs=require('node:fs'),assert=require('nod
  const dbStart=html.indexOf('  function cfRecordToDb('),dbEnd=html.indexOf('\n',dbStart);
  await page.addScriptTag({content:html.slice(dbStart,dbEnd)+'\n'+html.slice(formStart,formEnd)+'\n'+html.slice(submitStart,submitEnd)});
  await page.evaluate(()=>{window.saveRecords=async id=>{window.persisted=cfRecordToDb(records.find(r=>r.id===id));};openForm('test');});
+ await page.evaluate(()=>CFGlassIcons.scan(document));assert.equal(await page.locator('#f_data_zlecenia_do + .cf-date-clear .cf-glass-icon').count(),0);
  await page.locator('#f_data_zlecenia_do + .cf-date-clear').tap();assert.equal(await page.inputValue('#f_data_zlecenia_do'),'');
  await page.evaluate(()=>submitForm());const persisted=await page.evaluate(()=>window.persisted);assert.equal(persisted.order_due_date,null);assert.equal(persisted.schedule_proposed_date,null);assert.equal(persisted.schedule_status,null);assert.equal(persisted.order_date,'2026-10-01');
  await page.evaluate(()=>openForm('test'));assert.equal(await page.inputValue('#f_data_zlecenia_do'),'');

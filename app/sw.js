@@ -75,7 +75,7 @@ self.addEventListener('fetch', event => {
       html = html.replace('</head>', '<link rel="stylesheet" href="/app/glass-icons.css?v=13068">\n</head>');
     }
     if (!html.includes('/app/glass-icons.js')) {
-      html = html.replace('</body>', '<script src="/app/glass-icons.js?v=20261010-15517"><\/script>\n</body>');
+      html = html.replace('</body>', '<script src="/app/glass-icons.js?v=20261101-date-clear"><\/script>\n</body>');
     }
 
     const originalBucket = `function cfReminderBucket(r, now=new Date()){

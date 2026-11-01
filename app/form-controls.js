@@ -8,6 +8,8 @@
     .cf-date-control[hidden]{display:none!important}
     .cf-date-control>input{width:100%!important;max-width:100%!important;min-width:0!important;box-sizing:border-box!important}
     .cf-date-control>.cf-date-clear{position:static!important;display:flex!important;align-items:center;justify-content:center;width:44px!important;min-width:44px!important;height:44px!important;min-height:44px!important;max-height:none!important;margin:0!important;padding:0!important;border:1px solid #b8c4bd!important;border-radius:8px!important;background:#fff!important;color:#253b30!important;font:24px/1 system-ui!important;cursor:pointer;touch-action:manipulation}
+    .cf-date-control>.cf-date-clear>svg{display:block!important;width:90%!important;height:90%!important;max-width:none!important;max-height:none!important;flex:0 0 90%!important;pointer-events:none}
+    .cf-date-control>.cf-date-clear>.cf-glass-icon{display:none!important}
     .cf-date-control>.cf-date-clear:disabled{opacity:.35;cursor:default}
     @media(any-pointer:coarse){input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=file]):not([type=range]),select,textarea{font-size:16px!important}}
   `;document.head.appendChild(style);
@@ -15,7 +17,7 @@
   function enhance(input){
     if(controls.has(input))return;
     const wrapper=document.createElement('span');wrapper.className='cf-date-control';
-    const button=document.createElement('button');button.type='button';button.className='cf-date-clear';button.textContent='×';
+    const button=document.createElement('button');button.type='button';button.className='cf-date-clear';button.innerHTML='<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><path d="M4 4L96 96M96 4L4 96" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>';
     const label='Wyczyść: '+labelFor(input);button.setAttribute('aria-label',label);button.title=label;
     input.before(wrapper);wrapper.append(input,button);controls.set(input,button);
     const sync=()=>{button.disabled=input.disabled||input.readOnly;wrapper.hidden=input.hidden||input.style.display==='none';};sync();

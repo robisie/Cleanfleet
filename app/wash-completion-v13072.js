@@ -179,7 +179,7 @@
     overlay.style.zIndex='26000';
     overlay.innerHTML=`<div class="sheet cf-service-catalog-sheet">
       <button class="close" data-close type="button">&times;</button>
-      <h2>Cennik usług</h2>
+      <h2>Cennik usług</h2><section><h3>Roczna korekta GUS</h3><div data-cf-inflation></div></section>
       <div class="confirm-text">Stawki używane są do automatycznego wyliczania kwoty przy zakończeniu prania. Zmiana ceny nie zmienia historycznych wykonań.</div>
       <div class="cf-service-catalog-list" id="cfServiceCatalogList"></div>
       <button class="btn btn-outline cf-service-catalog-add" id="cfServiceCatalogAdd" type="button">+ Dodaj usługę</button>
@@ -189,6 +189,8 @@
       </div>
     </div>`;
     document.body.appendChild(overlay);
+    window.CFInflation?.mount(overlay.querySelector('[data-cf-inflation]'));
+    overlay.addEventListener('input',()=>{overlay.dataset.gusDirty='true';});
     const close=()=>overlay.remove();
     overlay.querySelectorAll('[data-close]').forEach(x=>x.addEventListener('click',close));
     overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
@@ -203,6 +205,7 @@
         ${r.is_default?'<div class="cf-service-default-note">Domyślna przy zakończeniu prania · wyklucza pozostałe pozycje</div>':''}
       </div>`).join('');
       list.querySelectorAll('[data-service-delete]').forEach(btn=>btn.addEventListener('click',()=>{
+        overlay.dataset.gusDirty='true';
         const idx=Number(btn.dataset.serviceDelete);
         const row=rows[idx];
         if(!row)return;
@@ -214,6 +217,7 @@
     render();
 
     overlay.querySelector('#cfServiceCatalogAdd')?.addEventListener('click',()=>{
+      overlay.dataset.gusDirty='true';
       rows.push({id:null,name:'',price:0,active:true,sort_order:(rows.length+1)*10,is_default:false,exclusive:false});
       render();
       list.lastElementChild?.querySelector('[data-service-name]')?.focus();

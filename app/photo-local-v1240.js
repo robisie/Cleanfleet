@@ -24,6 +24,8 @@
     if(dbPromise)return dbPromise;
     dbPromise=new Promise((resolve,reject)=>{
       const req=indexedDB.open(DB_NAME,DB_VERSION);
+      let expired=false;
+      const timer=setTimeout(()=>{expired=true;dbPromise=null;reject(new Error('Pamięć zdjęć nie odpowiedziała przez 15 sekund. Zamknij inne karty CleanFleet i spróbuj ponownie.'));},15000);
       req.onupgradeneeded=()=>{
         const db=req.result;
         if(!db.objectStoreNames.contains(STORE)){
@@ -33,8 +35,8 @@
           s.createIndex('createdAt','createdAt',{unique:false});
         }
       };
-      req.onsuccess=()=>resolve(req.result);
-      req.onerror=()=>reject(req.error||new Error('Błąd lokalnej bazy zdjęć'));
+      req.onsuccess=()=>{clearTimeout(timer);if(expired){req.result.close();return;}resolve(req.result)};
+      req.onerror=()=>{clearTimeout(timer);dbPromise=null;reject(req.error||new Error('Błąd lokalnej bazy zdjęć'))};
     });
     return dbPromise;
   }
@@ -42,10 +44,11 @@
     const db=await openDb();
     return new Promise((resolve,reject)=>{
       const t=db.transaction(STORE,mode),s=t.objectStore(STORE);
-      try{fn(s,t)}catch(e){t.abort();reject(e);return}
-      t.oncomplete=()=>resolve();
-      t.onerror=()=>reject(t.error||new Error('Błąd lokalnej bazy'));
-      t.onabort=()=>reject(t.error||new Error('Przerwano zapis lokalny'));
+      const timer=setTimeout(()=>{try{t.abort()}catch(_){}reject(new Error('Zapis w pamięci urządzenia trwał ponad 15 sekund'));},15000);
+      try{fn(s,t)}catch(e){clearTimeout(timer);t.abort();reject(e);return}
+      t.oncomplete=()=>{clearTimeout(timer);resolve()};
+      t.onerror=()=>{clearTimeout(timer);reject(t.error||new Error('Błąd lokalnej bazy'))};
+      t.onabort=()=>{clearTimeout(timer);reject(t.error||new Error('Przerwano zapis lokalny'))};
     });
   }
   async function put(x){await tx('readwrite',s=>s.put(x));return x}
@@ -86,7 +89,7 @@
       name:file.name||`zdjecie-${Date.now()}.jpg`,mime:file.type||'image/jpeg',
       blob:file,thumbnail:null,createdAt:Date.now()});
     document.dispatchEvent(new CustomEvent('cf:photos-saved',{detail:{recordId}}));
-    renderLocal().catch(error=>console.warn('CleanFleet photo preview',error));
+    if(!document.querySelector('.cf-cam-overlay.open'))renderLocal().catch(error=>console.warn('CleanFleet photo preview',error));
   };
 
   async function metadata(recordId,record=null){
@@ -434,9 +437,51 @@
     catch(e){if(!closed){console.error(e);status.textContent='Nie udało się odczytać zdjęć lokalnych.';}}
   }
 
+  let photoViewer=null;
+  function closePhotoPreview(){photoViewer?.close();}
+  async function showPhotoPreview(loadOriginal,label='Zdjęcie'){
+    closePhotoPreview();
+    const previous=document.activeElement,root=document.createElement('div');
+    root.className='cf-photo-viewer';root.setAttribute('role','dialog');root.setAttribute('aria-modal','true');root.setAttribute('aria-label','Podgląd zdjęcia');
+    root.innerHTML='<div class="cf-photo-viewer-head"><strong></strong><button type="button" data-preview-close aria-label="Zamknij podgląd">× Zamknij</button></div><div class="cf-photo-viewer-stage"><div role="status" data-preview-status>Wczytywanie oryginału…</div><img alt="Podgląd oryginalnego zdjęcia" hidden></div>';
+    root.querySelector('strong').textContent=label;
+    let url=null,closed=false;
+    const image=root.querySelector('img'),status=root.querySelector('[data-preview-status]'),button=root.querySelector('[data-preview-close]');
+    const handle={close(){
+      if(closed)return;closed=true;image.removeAttribute('src');root.remove();if(url)URL.revokeObjectURL(url);
+      document.removeEventListener('keydown',keys,true);if(photoViewer===handle)photoViewer=null;
+      if(previous?.isConnected)previous.focus?.({preventScroll:true});
+    }};
+    function keys(event){
+      if(event.key==='Escape'){event.preventDefault();event.stopPropagation();handle.close();}
+      if(event.key==='Tab'){event.preventDefault();button.focus();}
+    }
+    photoViewer=handle;button.onclick=()=>handle.close();document.addEventListener('keydown',keys,true);
+    document.body.appendChild(root);button.focus({preventScroll:true});
+    image.onload=()=>{status.hidden=true;image.hidden=false;};
+    image.onerror=()=>{image.hidden=true;status.hidden=false;status.textContent='Nie można wyświetlić tego formatu zdjęcia w tej przeglądarce.';};
+    try{
+      const original=await loadOriginal();if(closed)return;
+      if(!original)throw new Error('Nie znaleziono oryginału zdjęcia na tym urządzeniu.');
+      if(typeof original==='string')image.src=original;
+      else{url=URL.createObjectURL(original);image.src=url;}
+    }catch(error){if(!closed)status.textContent=error?.message||'Nie udało się otworzyć zdjęcia.';}
+  }
+  function markPendingPreviews(){
+    document.querySelectorAll('#cfPhotoOverlay [data-photo-pending] .cf-photo-thumb img').forEach(img=>{
+      img.tabIndex=0;img.setAttribute('role','button');img.setAttribute('aria-label','Otwórz zdjęcie');img.style.cursor='zoom-in';
+    });
+  }
+  function openPendingPreview(image){
+    const cell=image.closest('.cf-photo-thumb'),index=Number(cell?.querySelector('[data-photo-remove]')?.dataset.photoRemove);
+    const session=window.cfPhotoSession?.get(),item=session?.pending?.[session.kind]?.[index];
+    if(item)showPhotoPreview(async()=>item.file,`Nowe zdjęcie · ${session.kind.toUpperCase()}`);
+  }
+
   function ensureStyles(){
     if(document.getElementById('cfPhotoLocal1240Style'))return;
     const s=document.createElement('style');s.id='cfPhotoLocal1240Style';s.textContent=`
+      .cf-photo-viewer{box-sizing:border-box;position:fixed;inset:0;z-index:400500;display:flex;flex-direction:column;background:#080808;color:#fff;padding:max(64px,calc(env(safe-area-inset-top) + 12px)) max(10px,env(safe-area-inset-right)) max(18px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}.cf-photo-viewer-head{display:flex;flex:none;align-items:center;justify-content:space-between;gap:12px;padding-bottom:12px;font:700 14px system-ui}.cf-photo-viewer-head button{flex:none;min-height:44px;border:1px solid #777;border-radius:10px;padding:10px 14px;background:#292929;color:#fff;font:700 15px system-ui;touch-action:manipulation}.cf-photo-viewer-stage{position:relative;min-height:0;flex:1;display:flex;align-items:center;justify-content:center;overflow:auto}.cf-photo-viewer-stage img{display:block;width:100%;height:100%;object-fit:contain}.cf-photo-viewer [hidden]{display:none!important}.cf-photo-viewer [data-preview-status]{text-align:center;padding:15px;font:14px system-ui}.cf-photo-local-thumb .cf-photo-local-open{position:static;display:block;width:100%;height:100%;border-radius:0;background:transparent;line-height:normal;cursor:zoom-in}.cf-photo-local-thumb .cf-photo-local-remove{width:28px;height:28px;line-height:28px}
       .cf-photo-local{margin:8px 0 12px;padding:10px;border:1px solid #dfe5da;border-radius:12px;background:#fbfcf8}.cf-photo-local-head{display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:900}.cf-photo-local-meta{font-size:9px;color:#626a63;margin-top:5px}.cf-photo-local-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px}.cf-photo-local-thumb{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:#ecefea}.cf-photo-local-thumb img{width:100%;height:100%;object-fit:cover}.cf-photo-local-thumb button{position:absolute;right:3px;top:3px;width:20px;height:20px;border:0;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:13px;line-height:20px;padding:0}.cf-photo-local-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.cf-photo-local-actions button{border:1px solid #ccd1c7;background:#fff;border-radius:9px;padding:8px 10px;font-size:10px;font-weight:900}.cf-photo-local-actions .primary{background:#9fbd17;border-color:#9fbd17;color:#111}.cf-local-zip-ready{box-sizing:border-box;position:fixed;inset:0;z-index:300500;background:rgba(15,18,16,.48);display:flex;align-items:center;justify-content:center;padding:max(18px,env(safe-area-inset-top)) 18px max(18px,env(safe-area-inset-bottom))}.cf-local-zip-card{width:min(390px,100%);max-height:calc(100dvh - 48px);overflow:auto;box-sizing:border-box;background:#fff;border-radius:20px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.3);color:#171a18}.cf-local-zip-card h3{margin:0 0 8px;font-size:20px}.cf-local-zip-card button{width:100%;border:0;border-radius:12px;padding:13px;font-weight:900;font-size:14px;margin-top:8px}.cf-local-zip-card [data-local-download]{display:block;text-align:center;text-decoration:none;border-radius:12px;padding:13px;font-weight:900;font-size:14px;margin-top:8px;background:#9fbd17;color:#111}.cf-local-zip-card [hidden]{display:none!important}.cf-local-zip-card [data-local-share]{background:#9fbd17;color:#111}.cf-local-zip-card [data-local-close]{background:#f0f2ef;color:#333}`;document.head.appendChild(s)
   }
 
@@ -453,7 +498,7 @@
   function clearPreviews(){previewUrls.forEach(u=>URL.revokeObjectURL(u));previewUrls=[];document.querySelector('#cfPhotoOverlay [data-local-grid]')?.replaceChildren()}
   async function renderLocal(){
     renderVersion++;
-    if(window.cfPhotoSession?.get()?.busy)return;
+    if(window.cfPhotoSession?.get()?.busy||document.querySelector('.cf-cam-overlay.open'))return;
     if(renderRunning){renderAgain=true;return;}
     renderRunning=true;
     try{do{renderAgain=false;await renderLocalOnce(renderVersion)}while(renderAgain)}finally{renderRunning=false}
@@ -463,7 +508,7 @@
     const box=ensureLocalBox();if(!box)return;
     const recordId=currentRecordId,kind=activeKind();
     const allPhotos=await byRecord(recordId);
-    if(version!==renderVersion||recordId!==currentRecordId||kind!==activeKind()||!m.classList.contains('open'))return;
+    if(version!==renderVersion||recordId!==currentRecordId||kind!==activeKind()||!m.classList.contains('open')||document.querySelector('.cf-cam-overlay.open'))return;
     const before=allPhotos.filter(x=>x.kind==='przed'),after=allPhotos.filter(x=>x.kind==='po'),visible=kind==='po'?after:before;
     box.querySelector('[data-local-counts]').textContent=`PRZED ${before.length} · PO ${after.length}`;
     box.querySelector('[data-local-meta]').textContent=before.length&&after.length?'Komplet gotowy do jednego ZIP-a.':before.length?'Zdjęcia PRZED zapisane lokalnie. Po praniu dodaj zdjęcia PO.':'Możesz pobrać ZIP w każdej chwili. Brakujące zdjęcia oznaczają pusty folder PRZED lub PO.';
@@ -472,11 +517,12 @@
     for(const p of visible){
       const row=await getPhoto(p.id);if(!row)continue;
       const blob=row.thumbnail||await window.cfPhotoThumbnail(row.blob||new Blob([row.bytes],{type:row.mime}));
-      if(version!==renderVersion||recordId!==currentRecordId||kind!==activeKind()||!m.classList.contains('open'))return;
+      if(version!==renderVersion||recordId!==currentRecordId||kind!==activeKind()||!m.classList.contains('open')||document.querySelector('.cf-cam-overlay.open'))return;
       const url=blob?URL.createObjectURL(blob):null;if(url)previewUrls.push(url);
-      const cell=document.createElement('div');cell.className='cf-photo-local-thumb';cell.innerHTML='<img alt="Zdjęcie"><button type="button" aria-label="Usuń">×</button>';
+      const cell=document.createElement('div');cell.className='cf-photo-local-thumb';cell.innerHTML='<button type="button" class="cf-photo-local-open" data-local-view aria-label="Otwórz zdjęcie"><img alt="Zdjęcie"></button><button type="button" class="cf-photo-local-remove" data-local-remove aria-label="Usuń">×</button>';
       if(url)cell.querySelector('img').src=url;
-      cell.querySelector('button').onclick=async()=>{if(busy||window.cfPhotoSession?.get()?.busy)return;await del(p.id);document.dispatchEvent(new CustomEvent('cf:photos-saved'));await renderLocal()};grid.appendChild(cell);
+      cell.querySelector('[data-local-view]').onclick=()=>showPhotoPreview(async()=>{const original=await getPhoto(p.id);return original&&(original.blob||new Blob([original.bytes],{type:original.mime}));},`Zdjęcie · ${kind.toUpperCase()}`);
+      cell.querySelector('[data-local-remove]').onclick=async event=>{event.stopPropagation();if(busy||window.cfPhotoSession?.get()?.busy)return;await del(p.id);document.dispatchEvent(new CustomEvent('cf:photos-saved'));await renderLocal()};grid.appendChild(cell);
     }
   }
 
@@ -496,15 +542,21 @@
   }
 
   function events(){
-    document.addEventListener('cf:photos-close',()=>{renderVersion++;clearPreviews()});
+    document.addEventListener('cf:photos-close',()=>{closePhotoPreview();renderVersion++;clearPreviews()});
     document.addEventListener('cf:photos-open',e=>{
       currentRecordId=e.detail.recordId;
       renderLocal().catch(e=>toast(e?.message||'Nie udało się odczytać zdjęć lokalnych.'));
     });
     document.addEventListener('cf:photos-render',()=>{
+      markPendingPreviews();
       renderLocal().catch(e=>toast(e?.message||'Nie udało się odczytać zdjęć lokalnych.'));
     });
+    document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches?.('#cfPhotoOverlay [data-photo-pending] .cf-photo-thumb img')){e.preventDefault();openPendingPreview(e.target);}});
     document.addEventListener('click',e=>{
+      const pending=e.target.closest?.('#cfPhotoOverlay [data-photo-pending] .cf-photo-thumb img');
+      if(pending){e.preventDefault();e.stopPropagation();openPendingPreview(pending);return;}
+      const saved=e.target.closest?.('#cfPhotoOverlay [data-photo-saved] a');
+      if(saved){e.preventDefault();e.stopPropagation();showPhotoPreview(async()=>saved.href,'Zapisane zdjęcie');return;}
       const save=e.target.closest?.('[data-photo-save]');
       if(save){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();saveCurrent();}
     },true);

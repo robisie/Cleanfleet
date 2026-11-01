@@ -24,12 +24,22 @@ const {chromium}=require('playwright'),fs=require('node:fs'),assert=require('nod
  await page.locator('.cf-cam-shutter').evaluate(el=>{el.click();el.click();el.click();});
  await page.waitForFunction(()=>window.saved.length===4);await page.waitForFunction(()=>!document.querySelector('.cf-cam-torch').disabled);
  assert.equal(await page.locator('.cf-cam-torch').getAttribute('aria-pressed'),'true');assert.equal(await page.locator('.cf-cam-count').textContent(),'4 zdjęć');
+ // A moved/cancelled touch can have no synthesized click; it still registers once.
+ await page.dispatchEvent('.cf-cam-shutter','pointerdown',{button:0,isPrimary:true,pointerType:'touch'});
+ await page.dispatchEvent('.cf-cam-shutter','pointercancel',{pointerType:'touch'});
+ await page.dispatchEvent('.cf-cam-shutter','click',{detail:1});
+ await page.waitForFunction(()=>window.saved.length===5);await page.waitForFunction(()=>!document.querySelector('.cf-cam-torch').disabled);
+ assert.equal(await page.evaluate(()=>saved.length),5);
+ await page.locator('.cf-cam-shutter').focus();await page.keyboard.press('Enter');await page.waitForFunction(()=>window.saved.length===6);await page.waitForFunction(()=>!document.querySelector('.cf-cam-torch').disabled);
+ await page.evaluate(()=>{window.originalToBlob=HTMLCanvasElement.prototype.toBlob;HTMLCanvasElement.prototype.toBlob=function(callback){callback(null);};});
+ await page.click('.cf-cam-shutter');await page.waitForFunction(()=>document.querySelector('.cf-cam-status').textContent.includes('Nie zrobiono zdjęcia: Przeglądarka nie utworzyła pliku'));
+ assert.equal(await page.evaluate(()=>saved.length),6);await page.evaluate(()=>HTMLCanvasElement.prototype.toBlob=originalToBlob);
  await page.click('[data-cam-zoom="2"]');await page.waitForFunction(()=>!document.querySelector('.cf-cam-torch').disabled);
  const last=await page.evaluate(()=>window.constraints.at(-1));assert.equal(last.torch,true);assert.equal(last.focusMode,'continuous');assert.equal(last.zoom,2);
  for(const viewport of [{width:390,height:844},{width:844,height:390}]){
   await page.setViewportSize(viewport);await page.waitForTimeout(300);
   for(const selector of ['.cf-cam-shutter','.cf-cam-cancel','.cf-cam-torch']){const b=await page.locator(selector).boundingBox();assert(b.x>=-1&&b.y>=-1&&b.x+b.width<=viewport.width+1&&b.y+b.height<=viewport.height+1,selector+' outside viewport');}
  }
- await page.click('.cf-cam-done');assert.equal(await page.locator('.cf-cam-overlay').isVisible(),false);assert.deepEqual(errors,[]);assert.equal(await page.evaluate(()=>new Set(saved.map(f=>f.name)).size),4);
+ await page.click('.cf-cam-done');assert.equal(await page.locator('.cf-cam-overlay').isVisible(),false);assert.deepEqual(errors,[]);assert.equal(await page.evaluate(()=>new Set(saved.map(f=>f.name)).size),6);
  await browser.close();console.log('PASS camera DOM: startup shutter, light, rapid taps and saves, autofocus+zoom, portrait/landscape controls, close. Mock camera hardware.');
 })().catch(error=>{console.error(error);process.exit(1)});

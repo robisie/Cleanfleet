@@ -2991,7 +2991,7 @@ body.cf-boot-lock{overflow:hidden !important;touch-action:none;}
 }
 </style>
 
-</head>
+<script defer src="/app/form-controls.js?v=20261101-1"></script></head>
 <body>
 
 <div id="cfBootLoader" role="status" aria-live="polite" aria-label="Uruchamianie CleanFleet">
@@ -9689,7 +9689,7 @@ function uid(){
               <!-- Wiersz 6: termin wykonania -->
               <div class="field grid-c1 cf-schedule-date-field iphone-due-date-row">
                 <label>Termin wykonania</label>
-                <input type="date" id="f_data_zlecenia_do" value="${rec ? (rec.schedule_proposed_date || rec.data_zlecenia_do || '') : ''}" ${rec && ((rec.schedule_status === 'pending_admin' && cfIsAdmin()) || (rec.schedule_status === 'pending_employee' && !cfIsAdmin()) || rec.schedule_status === 'rejected') ? 'disabled' : ''}>
+                <input type="date" id="f_data_zlecenia_do" value="${rec ? ((['pending_admin','pending_employee'].includes(rec.schedule_status) ? rec.schedule_proposed_date : rec.data_zlecenia_do) || '') : ''}" ${rec && ((rec.schedule_status === 'pending_admin' && cfIsAdmin()) || (rec.schedule_status === 'pending_employee' && !cfIsAdmin()) || rec.schedule_status === 'rejected') ? 'disabled' : ''}>
               </div>
               <div class="grid-c2 cf-schedule-action-cell iphone-schedule-actions-row">
                 ${rec && rec.schedule_status === 'pending_admin' && cfIsAdmin() ? `
@@ -10138,6 +10138,9 @@ function uid(){
     if(editingId){
       const rec = records.find(x => x.id === editingId);
       Object.assign(rec, { tablica: plate, typ, marka, billing_category, billing_company_id, currency, zlecone, kto_zlecil, data_zlecenia, data_zlecenia_do, priority, uwagi, opis_wykonania, data_prania, wash_start_time, wash_end_time, kto_wykonal, koszt });
+      if(!data_zlecenia_do && cfIsAdmin()){
+        Object.assign(rec,{schedule_status:'',schedule_proposed_date:'',schedule_proposed_by:null,schedule_proposed_at:null,schedule_confirmed_by:null,schedule_confirmed_at:null,schedule_note:''});
+      }
     } else {
       records.push({
         id: uid(),

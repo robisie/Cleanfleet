@@ -1,0 +1,31 @@
+const {chromium}=require('playwright'),fs=require('node:fs'),assert=require('node:assert/strict');
+(async()=>{
+ const browser=await chromium.launch({headless:true,args:['--no-sandbox'],...(process.env.CF_CHROMIUM_EXECUTABLE?{executablePath:process.env.CF_CHROMIUM_EXECUTABLE}:{})});
+ const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const html=fs.readFileSync('app/index.html','utf8'),styles=[...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map(m=>m[1]).join('\n');
+ await page.setContent('<meta name="viewport" content="width=device-width,initial-scale=1"><style>'+styles+'</style><div id="modalRoot"></div><label>Test daty<input id="test-date" type="date" value="2026-10-31"></label><input type="date" id="locked" value="2026-10-31" disabled><textarea style="font-size:12px"></textarea>');
+ await page.addScriptTag({content:fs.readFileSync('app/form-controls.js','utf8')});
+ await page.evaluate(()=>{window.events=[];for(const name of ['input','change'])document.querySelector('#test-date').addEventListener(name,e=>events.push({type:e.type,value:e.target.value}));});
+ await page.locator('#test-date + .cf-date-clear').tap();assert.equal(await page.inputValue('#test-date'),'');assert.equal(await page.locator('#test-date').evaluate(el=>el.defaultValue),'');assert.deepEqual(await page.evaluate(()=>events),[{type:'input',value:''},{type:'change',value:''}]);
+ assert(await page.locator('#locked + .cf-date-clear').isDisabled());await page.evaluate(()=>document.querySelector('#locked').disabled=false);await page.locator('#locked + .cf-date-clear').tap();assert.equal(await page.inputValue('#locked'),'');
+ await page.evaluate(()=>{const input=document.createElement('input');input.type='date';input.id='later';input.value='2026-11-01';document.body.append(input);});await page.locator('#later + .cf-date-clear').tap();assert.equal(await page.inputValue('#later'),'');
+ await page.evaluate(()=>{const i=document.createElement('input');i.type='date';i.id='conditional';i.style.display='none';i.value='2026-10-31';document.body.append(i);});assert.equal(await page.locator('#conditional + .cf-date-clear').isVisible(),false);
+ await page.evaluate(()=>document.querySelector('#conditional').style.display='');await page.locator('#conditional + .cf-date-clear').tap();assert.equal(await page.inputValue('#conditional'),'');
+ await page.evaluate(()=>document.querySelector('#conditional').hidden=true);await page.waitForFunction(()=>document.querySelector('#conditional').parentElement.hidden);assert.equal(await page.locator('#conditional + .cf-date-clear').isVisible(),false);
+ assert.equal(await page.locator('textarea').evaluate(el=>getComputedStyle(el).fontSize),'16px');
+ await page.evaluate(()=>{
+  window.records=[{id:'test',tablica:'ST6427U',typ:'BUS',marka:'Test',zlecone:true,data_zlecenia:'2026-10-01',data_zlecenia_do:'2026-10-31',schedule_proposed_date:'2026-10-31',schedule_status:'accepted',data_prania:'',kto_wykonal:'',kto_zlecil:'',koszt:100,uwagi:'',opis_wykonania:'',zatwierdzone:false,zaplacone:false,created_at:Date.now()}];
+  Object.assign(window,{registry:{ST6427U:{}},options:{typ:[],marka:[],kto_zlecil:[],kto_wykonal:[]},CF_WASH_TYPE_OPTIONS:['BUS'],cfCanonicalWashType:v=>v,cfBillingCompanyCurrency:()=> 'PLN',cfRecordCurrency:()=> 'PLN',cfIsAdmin:()=>true,cfIsFleetEmployee:()=>false,cfIsCleanFleetEmployee:()=>false,cfCurrentUserId:'owner',cfActiveCompanyId:'company',editingId:null,cfScheduleCounterMode:false,escapeHtml:v=>String(v||'').replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;'),normalizePlate:v=>v,cfResizeEntryOpis(){},renderPlateList(){},renderAttentionPanel(){},renderRecords(){},addOptionIfNew(){},saveRegistry:async()=>{},closeModal(){},showToast(){}});
+ });
+ const formStart=html.indexOf('  function openForm(id){'),formEnd=html.indexOf('  // Udostępnij formularz edycji',formStart);
+ const submitStart=html.indexOf('  async function submitForm(){'),submitEnd=html.indexOf('  function cfFindNativeBackAction',submitStart);
+ const dbStart=html.indexOf('  function cfRecordToDb('),dbEnd=html.indexOf('\n',dbStart);
+ await page.addScriptTag({content:html.slice(dbStart,dbEnd)+'\n'+html.slice(formStart,formEnd)+'\n'+html.slice(submitStart,submitEnd)});
+ await page.evaluate(()=>{window.saveRecords=async id=>{window.persisted=cfRecordToDb(records.find(r=>r.id===id));};openForm('test');});
+ await page.locator('#f_data_zlecenia_do + .cf-date-clear').tap();assert.equal(await page.inputValue('#f_data_zlecenia_do'),'');
+ await page.evaluate(()=>submitForm());const persisted=await page.evaluate(()=>window.persisted);assert.equal(persisted.order_due_date,null);assert.equal(persisted.schedule_proposed_date,null);assert.equal(persisted.schedule_status,null);assert.equal(persisted.order_date,'2026-10-01');
+ await page.evaluate(()=>openForm('test'));assert.equal(await page.inputValue('#f_data_zlecenia_do'),'');
+ const fonts=await page.locator('#formOverlay input:not([type=checkbox]),#formOverlay textarea,#formOverlay select').evaluateAll(els=>els.filter(el=>getComputedStyle(el).display!=='none').map(el=>({id:el.id,size:parseFloat(getComputedStyle(el).fontSize)})));assert(fonts.every(f=>f.size>=16),JSON.stringify(fonts));
+ await page.locator('#f_data_zlecenia + .cf-date-clear').tap();await page.evaluate(()=>submitForm());assert.equal(await page.evaluate(()=>persisted.order_date),null);
+ assert.deepEqual(errors,[]);await browser.close();console.log('PASS date controls: touch clear, empty default, events, dynamic fields, disabled state, mobile fonts; actual CleanFleet form save/reopen clears ST6427U-like accepted due date and stale proposal without changing other dates. Mock persistence.');
+})().catch(e=>{console.error(e);process.exit(1)});

@@ -1,3 +1,4 @@
+import * as ReceiptImport from '../bill/receipt-import.js';
 import * as PDF from '../app/robisie/pdf.js';
 // Run with SHOPPING_DOM_MODULE pointing to an installed happy-dom module (20.8.4).
 // Uses a synthetic API and DOM, never connects to a production account.
@@ -11,7 +12,7 @@ async function setup(){
  const api={restoreSession:()=>null,getSession:()=>({user:{id:'owner'}}),project:async()=>structuredClone(db),saveProject:async(row,payload)=>{if(failing)throw Error('Offline test');assert.equal(row.id,db.id);assert.equal(row.revision,db.revision);writes.push(structuredClone(payload));db.payload=structuredClone(payload);db.revision++;return structuredClone(db);}};
  const timers=new Set(),context=vm.createContext({console,crypto,structuredClone,URL,window,document:window.document,location:window.location,FormData:window.FormData,confirm:()=>true,localStorage:window.localStorage,setTimeout:(fn,ms)=>{const id=setTimeout(fn,ms);timers.add(id);return id},clearTimeout,fetch:async()=>({ok:true,json:async()=>[]})});
  const source=await readFile(new URL('../app/robisie/app.js',import.meta.url),'utf8'),module=new vm.SourceTextModule(source+`\nexport function configure(row){selected=structuredClone(row);all=[structuredClone(row)];config={payload:{catalog:[],company:{},shops:[]},revision:1};configBaseline=structuredClone(config);view='shopping';projectDirty=settingsDirty=dirty=false;render();}export {pdfDialog,shoppingDialog,shoppingMatchDialog,flushChanges,undoChanges,refreshLinkedInvestment};export const data=()=>selected;`,{context});
- await module.link(spec=>{const values=spec.includes('shopping.js')?Shopping:spec.includes('autosave')?Auto:spec.includes('core.js')?C:spec.includes('api.js')?api:spec.includes('pdf.js')?PDF:{};return new vm.SyntheticModule(Object.keys(values),function(){for(const [k,v]of Object.entries(values))this.setExport(k,v)},{context})});await module.evaluate();await new Promise(r=>setImmediate(r));module.namespace.configure(db);
+ await module.link(spec=>{const values=spec.includes('receipt-import')?ReceiptImport:spec.includes('shopping.js')?Shopping:spec.includes('autosave')?Auto:spec.includes('core.js')?C:spec.includes('api.js')?api:spec.includes('pdf.js')?PDF:{};return new vm.SyntheticModule(Object.keys(values),function(){for(const [k,v]of Object.entries(values))this.setExport(k,v)},{context})});await module.evaluate();await new Promise(r=>setImmediate(r));module.namespace.configure(db);
  const $=s=>window.document.querySelector(s),fill=(name,value)=>{$(`[name="${name}"]`).value=String(value)},submit=()=>$('#modal-form').onsubmit({preventDefault(){},target:$('#modal-form')});
  return {n:module.namespace,db,writes,previews,$,fill,submit,window,fail:()=>failing=true,close:async()=>{for(const id of timers)clearTimeout(id);await window.happyDOM.abort()}};
 }
@@ -57,5 +58,19 @@ test('To nie to dismisses the selected proposal, survives refresh and exposes mi
  t.n.shoppingMatchDialog('need',lines[0].key);await t.submit();t.$('#shopping-filter').value='all';t.$('#shopping-filter').dispatchEvent(new t.window.Event('change',{bubbles:true}));
  const unlink=t.$('.shopping-unlink-actions [data-action="shopping-unlink"]');assert(unlink);assert.equal(unlink.closest('details'),null);assert.equal(unlink.textContent,'Usuń powiązanie');unlink.click();
  for(let i=0;i<30&&t.db.payload.shoppingList[0].links.length;i++)await new Promise(r=>setImmediate(r));assert.equal(t.db.payload.shoppingList[0].links.length,0);assert.equal(Shopping.rows(t.db.payload)[0].name,'Płyta OSB');assert.deepEqual(C.totals(t.db.payload),before);assert.equal(t.db.payload.purchases.length,2);assert(!Shopping.suggestions(t.db.payload).some(m=>m.line.purchaseId==='one'));
+ }finally{await t.close()}
+});
+
+test('clicking the name, quantity and row space opens the same item editor and saves changes',async()=>{
+ const t=await setup();try{
+ t.n.shoppingDialog();t.fill('name','Panele winylowe');t.fill('quantity',8.91);t.fill('unit','m²');await t.submit();const id=t.db.payload.shoppingList[0].id;
+ for(const selector of ['.shopping-name strong','.shopping-quantity','.shopping-edit-target']){
+  t.$(selector).click();await new Promise(r=>setImmediate(r));
+  assert(t.$('#dialog').open);assert.equal(t.$('#f-name').value,'Panele winylowe');assert.equal(t.$('#f-quantity').value,'8.91');t.$('#dialog').close();
+ }
+ t.$('.shopping-quantity').click();await new Promise(r=>setImmediate(r));t.fill('name','Panele do salonu');t.fill('quantity',10);t.fill('shop','Leroy');await t.submit();
+ assert.equal(t.db.payload.shoppingList.length,1);assert.equal(t.db.payload.shoppingList[0].id,id);assert.equal(t.db.payload.shoppingList[0].name,'Panele do salonu');assert.equal(t.db.payload.shoppingList[0].quantity,10);assert.equal(t.db.payload.shoppingList[0].shop,'Leroy');
+ t.n.configure(t.db);assert.equal(t.$('.shopping-quantity').textContent,'10 m²');
+ t.$('[data-action="shopping-check"]').click();for(let i=0;i<20&&!t.db.payload.shoppingList[0].boughtQuantity;i++)await new Promise(r=>setImmediate(r));assert.equal(t.db.payload.shoppingList[0].boughtQuantity,10);assert(!t.$('#dialog').open);
  }finally{await t.close()}
 });

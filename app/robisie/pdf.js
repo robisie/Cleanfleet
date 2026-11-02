@@ -1,5 +1,5 @@
 import * as Shopping from './shopping.js?v=1.0.82';
-import * as C from './core.js?v=1.0.107';
+import * as C from './core.js?v=1.0.108';
 import {paginateContract} from './pdf-layout.js?v=1.0.68';
 
 export const MODULES=[

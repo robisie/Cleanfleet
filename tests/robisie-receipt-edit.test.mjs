@@ -25,7 +25,7 @@ async function open(db){
   db.payload=stored;db.revision++;return structuredClone(db);
  }};
  const context=vm.createContext({console,crypto,structuredClone,URL,FormData:class extends Map{constructor(fields){super(Object.entries(fields));}getAll(key){const value=this.get(key);return Array.isArray(value)?value:value?[value]:[];}},setTimeout(fn,ms){const timer=setTimeout(fn,ms);timers.push(timer);return timer;},clearTimeout,confirm:()=>accept,fetch:async()=>({ok:true,json:async()=>[]}),window:{location:{href:'https://test.local/app/robisie/'},scrollY:0,scrollTo(){},addEventListener(){}},document:{body:{style:{}},documentElement:{style:{}},querySelector:node,querySelectorAll:()=>[],addEventListener(type,fn){events.set(type,fn);}}});
- const mod=new vm.SourceTextModule(source+`\nexport {receiptDialog};export const data=()=>selected;export function setup(row){all=[structuredClone(row)];selected=structuredClone(row);config={revision:1,payload:{catalog:[],company:{}}};configBaseline=structuredClone(config);view='payments';projectDirty=settingsDirty=dirty=false;render();}`,{context});
+ const mod=new vm.SourceTextModule(source+`\nexport {receiptDialog,purchaseDialog};export const data=()=>selected;export function setup(row){all=[structuredClone(row)];selected=structuredClone(row);config={revision:1,payload:{catalog:[],company:{},shops:["Mój sklep — Mikołów"]}};configBaseline=structuredClone(config);view='payments';projectDirty=settingsDirty=dirty=false;render();}`,{context});
  await mod.link(spec=>{const values=spec.includes('receipt-import')?ReceiptImport:spec.includes('purchase-items')?PurchaseItems:spec.includes('purchase-payment-form')?PurchasePaymentForm:spec.includes('purchase-payments')?PurchasePayments:spec.includes('shopping.js')?Shopping:spec.includes('completion.js')?Completion:spec.includes('purchase-settlement-form')?PurchaseSettlementForm:spec.includes('purchase-settlement')?PurchaseSettlement:spec.includes('invoices')?BI:spec.includes('autosave')?Auto:spec.includes('core')?C:spec.includes('pdf')?PDF:api;return new vm.SyntheticModule(Object.keys(values),function(){for(const [key,value]of Object.entries(values))this.setExport(key,value);},{context});});
  await mod.evaluate();await new Promise(resolve=>setImmediate(resolve));mod.namespace.setup(db);
  return {app:mod.namespace,node,accept(value){accept=value;},async click(action,id,extra={}){await events.get('click')({target:{closest:()=>({dataset:{action,id,...extra},isConnected:true})}});},async submit(fields){await node('#modal-form').onsubmit({preventDefault(){},target:fields});},close(){timers.forEach(clearTimeout);}};
@@ -78,4 +78,15 @@ test('invoice list paid button opens a short dialog, saves once and retains the 
   await ui.click('invoice-paid','fv');assert.equal(db.revision,2);assert.equal(db.payload.receipts.length,1);
  }finally{ui.close();}
  const reopened=await open(db);try{await reopened.click('invoices-refresh');assert.match(reopened.node('#app').innerHTML,/Zapłacona ✓/);assert.equal(C.purchaseTotals(reopened.app.data().payload).advances,1900);}finally{reopened.close();}
+});
+
+test('an assigned receipt exposes an editable shop and retains its name after saving and reopening',async()=>{
+ const db=fixture();db.payload.receipts=[];db.payload.purchases=[{id:'receipt-purchase',date:'2026-10-27',shop:'Nazwa ze skanu',invoice:'PAR/1',description:'Towar',amount:20,charge:20,paid:false,paidAmount:0,sourceReceiptId:'RECEIPT:test',documentType:'nip-receipt',supplierNip:'5260250995'}];
+ const ui=await open(db);try{
+  await ui.app.purchaseDialog('receipt-purchase');
+  const shop=ui.node('#dialog').innerHTML.match(/<input[^>]*name="shop"[^>]*>/)[0];assert.doesNotMatch(shop,/readonly|disabled/);assert.match(shop,/shop-suggestions/);
+  await ui.submit({date:'2026-10-27',shop:'Mój sklep — Mikołów',invoice:'PAR/1',description:'Towar',amount:'20',charge:'20'});
+  assert.equal(db.payload.purchases[0].shop,'Mój sklep — Mikołów');assert.equal(db.payload.purchases[0].sourceReceiptId,'RECEIPT:test');assert.equal(db.payload.purchases[0].amount,20);
+ }finally{ui.close();}
+ const reopened=await open(db);try{await reopened.app.purchaseDialog('receipt-purchase');assert.match(reopened.node('#dialog').innerHTML,/value="Mój sklep — Mikołów"/);}finally{reopened.close();}
 });

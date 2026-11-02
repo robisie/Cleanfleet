@@ -1,0 +1,31 @@
+begin;
+select set_config('request.jwt.claim.sub',(select user_id::text from public.user_roles where role='admin' limit 1),true);
+set local role authenticated;
+do $$
+declare n text;p public.rs_projects;l jsonb;item jsonb;data jsonb;saved jsonb;bad boolean;
+begin
+ p:=public.rs_create_project('{"name":"Receipt shop edit test","purchases":[],"receipts":[],"invoiceSettlements":[]}'::jsonb,current_date);
+ n:=public.rs_receipt_save(encode(sha256(convert_to(gen_random_uuid()::text,'UTF8')),'hex'),jsonb_build_object('buyerNip','6351861297','sellerNip','5260250995','seller','Nazwa ze skanu','number','SHOP-TEST-'||gen_random_uuid()::text,'date',current_date,'total',50,'items',jsonb_build_array(jsonb_build_object('name','Towar A','unit','szt.','quantity',2,'gross',40),jsonb_build_object('name','Towar B','unit','szt.','quantity',1,'gross',10))));
+ perform public.rs_receipt_assign_project(n,p.id,'[{"index":1,"quantity":1}]',p.revision);
+ select * into p from public.rs_projects where id=p.id;
+ select document into l from public.rs_ksef_links where project_id=p.id and ksef_number=n;
+ item:=p.payload->'purchases'->0;
+ data:=jsonb_set(p.payload,'{purchases,0,shop}','"Mój sklep — Mikołów"');
+ saved:=public.rs_receipt_update_allocation(p.id,n,'[{"index":1,"quantity":1}]',p.revision,l,data);
+ assert saved#>>'{payload,purchases,0,shop}'='Mój sklep — Mikołów','Edited shop must persist';
+ assert ((saved#>'{payload,purchases,0}')-'shop')=(item-'shop'),'Name-only edit must preserve purchase data';
+ select * into p from public.rs_projects where id=p.id;
+ select document into l from public.rs_ksef_links where project_id=p.id and ksef_number=n;
+ saved:=public.rs_receipt_update_allocation(p.id,n,'[{"index":1,"quantity":2}]',p.revision,l,jsonb_set(p.payload,'{purchases,0,charge}','40'));
+ assert saved#>>'{payload,purchases,0,shop}'='Mój sklep — Mikołów','Quantity edit must not restore the OCR shop';
+ assert (saved#>>'{payload,purchases,0,amount}')::numeric=40;
+ assert (select metadata#>>'{seller,name}'='Nazwa ze skanu' from public.rs_ksef_documents where ksef_number=n),'Source document identity stays intact';
+ select * into p from public.rs_projects where id=p.id;
+ select document into l from public.rs_ksef_links where project_id=p.id and ksef_number=n;
+ bad:=false;
+ begin perform public.rs_receipt_update_allocation(p.id,n,'[{"index":1,"quantity":2}]',p.revision,l,jsonb_set(p.payload,'{purchases,0,shop}','"   "'));exception when raise_exception then bad:=true;end;
+ assert bad,'Blank shop must fail';
+ assert not has_function_privilege('anon','public.rs_receipt_update_allocation(uuid,text,jsonb,bigint,jsonb,jsonb)','execute');
+end;$$;
+rollback;
+select 'Receipt shop rename, reopen, subsequent allocation, source preservation and blank-name rejection passed; all fixtures rolled back.' as result;

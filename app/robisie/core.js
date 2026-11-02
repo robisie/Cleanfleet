@@ -1,4 +1,4 @@
-export const VERSION='1.0.103';
+export const VERSION='1.0.104';
 export const MODULES=[['overview','Panel inwestycji'],['ledger','Wspólne rozliczenie'],['data','Dane inwestycji'],['contract','Umowa'],['rooms','Pomieszczenia'],['offer','Oferta wstępna'],['works','Kalkulacja końcowa'],['payments','Etapy i płatności'],['journal','Dziennik prac'],['handover','Odbiór inwestycji'],['summary','Zestawienie prac'],['shopping','Do kupienia'],['purchases','Zakupy i materiały']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -49,6 +49,10 @@ export function purchasePayment(item){
  const actual=basePaid+invoicePurchasePaid(item)+receiptPurchasePaid(item),paid=corrected?actual:Math.min(limit,actual);
  const ratio=limit?paid/limit:(corrected||item.paid&&!explicit?1:0);
  return {paid,charged:explicit?charge:charge*Math.min(1,ratio),remaining:round(Math.max(0,(corrected?charge:limit)-paid)),state:ratio>=1?'full':paid>0?'partial':'unpaid',...(corrected?{overpaid:round(Math.max(0,paid-charge))}:{})};
+}
+// Display order only: settlement group, purchase date descending, newest addition for ties.
+export function orderPurchases(items){
+ return items.map((item,index)=>({item,index})).sort((a,b)=>Number(purchasePayment(a.item).state==='full')-Number(purchasePayment(b.item).state==='full')||String(b.item.date||'').localeCompare(String(a.item.date||''))||b.index-a.index).map(({item})=>item);
 }
 export function purchasePaymentLabel(item){
  const payment=purchasePayment(item);

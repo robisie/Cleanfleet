@@ -78,3 +78,14 @@ test('powierzchnie łączą dwie ściany z sufitem i podłogą bez podwójnego l
  p.works[1].done=true;t=C.totals(p);assert.equal(t.workRemaining,105);assert.equal(t.remaining,125);
  p.works.forEach(l=>l.done=false);t=C.totals(p);assert.equal(t.works.done,0);assert.equal(t.workRemaining,-210);
  });
+
+test('identical services with different catalog IDs are combined across the investment',()=>{
+ const lines=[{serviceId:'manual-vinyl-a',roomId:'room-a',name:'Panele Winylowe na podkładzie',category:'PODŁOGI',unit:'m²',qty:3.36,price:40.5},{serviceId:'imported-vinyl-b',roomId:'room-b',name:'Panele Winylowe na podkładzie',category:'PODŁOGI',unit:'m²',qty:5.55,price:40.5}];
+ const original=structuredClone(lines),result=C.aggregate(lines);
+ assert.equal(result.length,1);assert.equal(result[0].qty,8.91);assert.equal(result[0].value,360.86);assert.deepEqual(lines,original);
+});
+test('summary ignores case and redundant spaces but keeps different units and categories separate',()=>{
+ const base={name:'Listwy przypodłogowe',category:'PODŁOGI',unit:'mb',qty:2,price:10};
+ const result=C.aggregate([{...base,serviceId:'a'},{...base,serviceId:'b',name:'  listwy   przypodłogowe ',category:' podłogi ',unit:' MB ',qty:3,price:20},{...base,serviceId:'a',unit:'szt.',qty:4},{...base,serviceId:'a',category:'INNE',qty:5},{...base,included:false,qty:100}]);
+ assert.equal(result.length,3);const combined=result.find(row=>row.unit==='mb'&&row.category==='PODŁOGI');assert.equal(combined.qty,5);assert.equal(combined.value,80);
+});

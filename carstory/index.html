@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CarStory</title>
+<link rel="stylesheet" href="./style.css">
+<script src="/app/vendor/supabase-2.57.4.min.js"></script>
+<script type="module" src="./app.js?v=2"></script>
+</head>
+<body>
+<main>
+  <header><p class="eyebrow">Robisię Pack</p><h1>CarStory</h1><p>Tankowania, spalanie i wydatki na paliwo</p></header>
+  <p id="status" role="status">Sprawdzam dostęp…</p>
+  <button type="button" id="retry" class="secondary" hidden>Odśwież dane</button>
+  <div id="dashboard" hidden>
+    <section class="toolbar" aria-label="Samochody">
+      <label>Samochód <select id="vehicle"></select></label>
+      <form id="vehicleForm">
+        <label>Nazwa auta <input name="name" required maxlength="80" placeholder="np. Renault Trafic"></label>
+        <button>Dodaj samochód</button>
+      </form>
+    </section>
+    <section id="summary" aria-label="Podsumowanie">
+      <div class="stats">
+        <div><span>Średnie spalanie auta</span><strong id="consumption">—</strong><small id="measurement"></small></div>
+        <div><span>Dzisiaj</span><strong id="day"></strong></div>
+        <div><span>Ten tydzień</span><strong id="week"></strong></div>
+        <div><span>Ten miesiąc</span><strong id="month"></strong></div>
+      </div>
+      <p id="scope" class="note"></p>
+    </section>
+    <section id="entry" hidden>
+      <h2 id="entryTitle">Dodaj tankowanie</h2>
+      <form id="fuelForm">
+        <div class="fields">
+          <label>Data <input type="date" name="date" required></label>
+          <label>Stan licznika (km) <input type="number" name="odometer" min="0" max="99999999" step="1" required inputmode="numeric"></label>
+          <label>Zatankowane litry <input type="text" name="liters" required inputmode="decimal" placeholder="np. 42,50"></label>
+          <label>Zapłacona kwota (zł) <input type="text" name="amount" required inputmode="decimal" placeholder="np. 260,00"></label>
+        </div>
+        <label class="check"><input type="checkbox" name="full"> Tankowanie do pełna</label>
+        <div class="actions"><button>Zapisz tankowanie</button><button type="button" id="cancel" class="secondary" hidden>Anuluj edycję</button></div>
+      </form>
+    </section>
+    <section>
+      <h2>Historia tankowań</h2>
+      <p id="empty">Brak zapisanych tankowań.</p>
+      <div id="history"></div>
+    </section>
+    <p class="note">Historia jest zapisywana na serwerze i dostępna na urządzeniach zalogowanych na to samo konto.</p>
+  </div>
+</main>
+</body>
+</html>

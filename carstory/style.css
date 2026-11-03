@@ -33,7 +33,7 @@ dialog .fields{grid-template-columns:repeat(2,minmax(0,1fr))}
 #vehicleFuelForm{flex-basis:100%}
 .record>div:first-child{flex:1 1 24rem;min-width:0}
 .record-fields{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
-.record-fields>div{background:#eef6f1;border:1px solid #dce6e0;border-radius:8px;padding:5px 9px}
+.record-fields>div{background:var(--record-bg,#eef6f1);border:1px solid var(--record-border,#dce6e0);border-radius:8px;padding:5px 9px}
 .record-fields dt{color:#496458;font-size:.75rem}
 .record-fields dd{margin:0;font-size:.9rem;font-weight:700}
 .garage{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));gap:10px}
@@ -50,3 +50,6 @@ dialog [role=status]:empty{display:none}
 .garage-vehicle-image{width:min(100%,120px);height:54px;object-fit:contain;object-position:center bottom}
 #openReport{margin-top:12px}
 #reportRange,#reportForm .actions{width:100%}
+.record-fields[data-tone=green]{--record-bg:#e8f4e9;--record-border:#c6dfcc}
+.record-fields[data-tone=gray]{--record-bg:#f1f2f4;--record-border:#d7dade}
+.record-fields[data-tone=blue]{--record-bg:#eaf3fd;--record-border:#ccdef2}

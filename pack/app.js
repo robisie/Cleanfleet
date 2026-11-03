@@ -1,5 +1,5 @@
 import {mountTodayBadges} from './today-badges.js?v=2';
-import {client,administrator,modules,applications} from './auth.js?v=126';
+import {client,administrator,modules,applications} from './auth.js?v=127';
 import {mountTiles} from './tiles.js?v=113';
 const $=id=>document.getElementById(id),db=client(),tabs=new Map();
 let user=null,epoch=0,current='',frame=null,disposeTiles=null,leaving=false,tileBadges=null;

@@ -8,7 +8,7 @@ import * as PurchasePaymentForm from './purchase-payment-form.js?v=1.0.80';
 import * as PurchaseItems from './purchase-items.js?v=1.0.90';
 import * as BI from './invoices.js?v=1.0.80';
 import * as Auto from './autosave.js?v=1.0.80';
-import * as C from './core.js?v=1.0.108';
+import * as C from './core.js?v=1.0.109';
 import * as API from './api.js?v=1.0.98';
 import * as PDF from './pdf.js?v=1.0.108';
 const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -196,10 +196,44 @@ function ledgerDialog(kind,id){
  },id?()=>{if(kind==='receipts'){const next=changeReceipt(id,null);if(!next)throw Error('Nie można usunąć powiązanej wpłaty.');selected.payload=next;}else{if(old.sourceKsefNumber||old.sourceReceiptId||old.ksefCorrections?.length||C.invoicePurchasePaid(old)||C.receiptPurchasePaid(old))throw Error('Powiązaną pozycję usuń w module źródłowym.');p()[kind]=p()[kind].filter(x=>x.id!==id);}markDirty();}:null);
 }
 
+function workDaysSection(editable=false){
+ const days=C.workDays(p().workDays),last=p().status==='zakonczona'?'Zakończenie prac':'Ostatni dzień prac';
+ return card(`<section aria-label="Dni pracy"><div class="panel-section-heading"><h2>Dni pracy</h2>${editable?btn('work-days','Zaznacz dni'):''}</div><div class="metrics">${metric('Rozpoczęcie prac',date(days[0]))}${metric(last,date(days.at(-1)))}${metric('Faktyczne dni pracy',days.length)}</div></section>`);
+}
+function workDaysDialog(){
+ const projectId=selected.id, days=new Set(C.workDays(p().workDays)),today=C.today();
+ const month=new Date((days.size?[...days].at(-1):today).slice(0,7)+'-01T00:00:00Z');
+ const monthName=new Intl.DateTimeFormat('pl-PL',{month:'long',year:'numeric',timeZone:'UTC'});
+ const fullDate=new Intl.DateTimeFormat('pl-PL',{dateStyle:'full',timeZone:'UTC'});
+ modal('Zaznacz dni pracy',`<p class="muted">Kliknij dni, w których pracowałeś. Możesz zaznaczać daty w różnych miesiącach.</p><div id="rs-work-calendar"></div>`,()=>{
+  if(selected?.id!==projectId)throw Error('Inwestycja została zmieniona.');
+  const next=C.workDays([...days]);
+  if(JSON.stringify(next)!==JSON.stringify(C.workDays(p().workDays))){p().workDays=next;markDirty();}
+ });
+ const root=$('#rs-work-calendar');
+ function paint(focusKey){
+  const year=month.getUTCFullYear(),index=month.getUTCMonth();
+  const offset=(month.getUTCDay()+6)%7,count=new Date(Date.UTC(year,index+1,0)).getUTCDate();
+  const prefix=month.toISOString().slice(0,7);
+  const dates=Array.from({length:count},(_,i)=>{
+   const value=prefix+'-'+String(i+1).padStart(2,'0');
+   return `<button type="button" data-day="${value}" aria-label="${esc(fullDate.format(new Date(value+'T00:00:00Z')))}" aria-pressed="${days.has(value)}"${value===today?' aria-current="date"':''}>${i+1}</button>`;
+  }).join('');
+  root.innerHTML=`<div class="rs-work-calendar-nav"><button type="button" data-month="-1" aria-label="Poprzedni miesiąc">‹</button><strong aria-live="polite">${esc(monthName.format(month))}</strong><button type="button" data-month="1" aria-label="Następny miesiąc">›</button></div><div class="rs-work-calendar-grid">${['Pn','Wt','Śr','Cz','Pt','So','Nd'].map(day=>`<span class="muted">${day}</span>`).join('')}${'<span aria-hidden="true"></span>'.repeat(offset)}${dates}</div><p class="muted" aria-live="polite">Zaznaczone dni: ${days.size}</p>`;
+  if(focusKey)root.querySelector(focusKey)?.focus({preventScroll:true});
+ }
+ root.onclick=event=>{
+  const button=event.target.closest('button');
+  if(!button)return;
+  if(button.dataset.month){month.setUTCMonth(month.getUTCMonth()+Number(button.dataset.month));paint(`[data-month="${button.dataset.month}"]`);}
+  if(button.dataset.day){const day=button.dataset.day;if(days.has(day))days.delete(day);else days.add(day);paint(`[data-day="${day}"]`);}
+ };
+ paint();
+}
 function overview(){
  const data=p(),t=C.totals(data),closed=data.status==='zakonczona',invoices=stageInvoiceCache.get(selected.id)||[],tasks=overviewTasks(data,t),events=overviewEvents(data,invoices),received=C.round(t.paid+t.materials.advances);
  const tile=(label,value,detail,tone='')=>`<article class="panel-metric ${tone}"><span>${label}</span><strong>${money(value)}</strong><small>${detail}</small></article>`;
- return `<div class="investment-panel">${shoppingNotice()}
+ return `<div class="investment-panel">${workDaysSection(true)}${shoppingNotice()}
   <section class="card panel-actions" aria-label="Szybkie działania"><div class="panel-section-heading"><h2>Szybkie działania</h2><span class="tag ${esc(data.status)}">${esc(statuses[data.status]||data.status)}</span></div><div class="panel-action-buttons">
    <a class="button primary" data-action="stage-invoice" href="/bill/?new=1&amp;brand=robisie&amp;source=${encodeURIComponent(selected.id)}" target="_blank" rel="noopener">Wystaw fakturę</a>
    ${btn('nav','Do kupienia','','data-view="shopping"')}${btn('purchase-add','Dodaj koszt / zakup')}${btn('receipt-add','Dodaj wpłatę')}${btn('purchases-settle','Rozlicz zakupy')}${btn('print','Generuj PDF')}${btn(closed?'completion-review':'finish',closed?'Rozliczenie końcowe':'Zakończ inwestycję','panel-finish')}
@@ -324,7 +358,7 @@ function shoppingMatchDialog(id,sourceKey){
 function purchasesView(){const t=C.purchaseTotals(p()),filters=purchaseShopFilters(),items=C.orderPurchases(p().purchases.filter(x=>shopFilter===null||shopKey(x.shop)===shopFilter));return `${shoppingNotice()}<div class="metrics">${metric('Otrzymane zaliczki',money(t.advances))}${metric('Faktyczne wydatki',money(t.spent))}${metric('Koszt dla inwestora',money(t.charged))}${metric(t.balance>=0?'Do zwrotu inwestorowi':'Dopłata inwestora',money(Math.abs(t.balance)),'gold')}${metric('Różnica rozliczenia',money(t.difference))}</div>${card(`<div class="toolbar"><h2>Zakupy materiałów</h2><div class="actions">${btn('purchases-settle','Rozlicz zakupy','primary')}${btn('purchase-add','Dodaj zakup')}${btn('purchase-receipt-scan','Dodaj paragon z NIP-em')}</div></div>${filters}<p class="muted purchase-filter-info" aria-live="polite">Pokazano ${items.length} z ${p().purchases.length} zakupów. Najpierw nieuregulowane i częściowo rozliczone, potem uregulowane — w każdej grupie od najnowszej daty. Podsumowanie finansowe obejmuje całą inwestycję.</p>${table(['Data','Sklep','Zakup / dokument','Kwota zakupu','Koszt inwestora','Rozliczono z inwestorem',''],items.map(x=>`<tr class="${C.purchaseNeedsInvoice(x)?'purchase-needs-invoice':''}"><td>${date(x.date)}</td><td>${esc(x.shop)}</td><td>${C.purchaseNeedsInvoice(x)?'<span class="invoice-required">wymaga faktury</span><br>':''}${esc(x.description)}<br><span class="muted">${esc(x.invoice)}${x.sourceKsefNumber?'<br>KSeF: '+esc(x.sourceKsefNumber):''}${x.ksefCorrections?.map(c=>'<br>Korekta '+esc(c.number)+': '+money(c.amount)).join('')||''}</span></td><td class="num">${money(x.amount)}</td><td class="num">${money(x.charge)}</td><td class="purchase-status ${C.purchasePayment(x).state}">${esc(C.purchasePaymentLabel(x))}</td><td>${btn('purchase-edit','Edytuj','',`data-id="${x.id}"`)}</td></tr>`).join(''))}<p class="muted" style="margin-top:16px">Tutaj zapisujesz koszty materiałów, także z faktur zakupowych KSeF. Wpłaty inwestora i faktury sprzedażowe rozliczasz w „Etapach i płatnościach”. Ręcznie odnotowana przy zakupie wpłata inwestora zwiększa otrzymane zaliczki — nie dodawaj jej ponownie. Koszt inwestora można ustalić niezależnie od kwoty zakupu.</p>`)} `;}
 function journalView(){return card(`<div class="toolbar"><h2>Wpisy dziennika</h2>${btn('journal-add','Dodaj wpis','primary')}</div>${p().journal.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(x=>`<div class="history"><div class="toolbar"><strong>${date(x.date)} · ${esc(x.roomId?roomName(x.roomId):'Cała inwestycja')}</strong>${btn('journal-edit','Edytuj','',`data-id="${x.id}"`)}</div><p style="white-space:pre-wrap">${esc(x.description)}</p><p class="muted">Potwierdzenie inwestora: ${x.investorConfirmed?'tak':'brak'} · wykonawcy: ${x.contractorConfirmed?'tak':'brak'}</p></div>`).join('')||'<div class="empty">Brak wpisów w dzienniku.</div>'}`);}
 function contractView(){const d=p();return card(`<div class="grid">${field('contractDate','Data umowy',d.contractDate,'date')}${field('contractPlace','Miejsce zawarcia umowy',d.contractPlace)}${field('paymentDays','Termin zapłaty faktury (dni)',d.paymentDays,'number','min="0"')}${field('materialAdvance','Uzgodniona zaliczka na materiały (zł)',d.materialAdvance,'number','min="0" step="0.01"')}${field('terminationPercent','Uzgodniona kara za rozwiązanie (%)',d.terminationPercent,'number','min="0" max="100"')}</div><div class="actions" style="margin-bottom:20px">${btn('contract-edit','Edytuj pełną treść umowy')}${btn('contract-generate','Wstaw treść z aktualnych danych')}</div><div class="contract-preview"><pre class="document">${esc(PDF.contractParts(d.contractText||C.contractTemplate(selected,config.payload)).text)}</pre><div class="contract-preview-signatures"><span>${esc(PDF.contractParts(d.contractText||C.contractTemplate(selected,config.payload)).contractor)}<br>Data i podpis Wykonawcy</span><span>${esc(PDF.contractParts(d.contractText||C.contractTemplate(selected,config.payload)).investor)}<br>Data i podpis Inwestora</span></div></div><p class="muted">Po edycji pełnej treści zmiany danych nie nadpisują jej automatycznie. „Wstaw treść z aktualnych danych” przygotowuje nowy tekst.</p>`);}
-function handoverView(){const d=p(),h=d.handover,closed=d.status==='zakonczona',entry=projectEarningsCache.get(selected.id);return card(`<div class="grid">${input('handover.date','Data odbioru',h.date,'date','data-handover="date"')}${input('handover.receiver','Odbiorca (jeśli inny niż inwestor)',h.receiver,'text','data-handover="receiver"')}</div><label class="inline-check"><input type="checkbox" data-handover="accepted" ${h.accepted?'checked':''}> Prace zaakceptowane przez inwestora</label><div style="margin-top:16px">${text('handover.notes','Uwagi do wykonanych prac',h.notes,'data-handover="notes"')}</div><p class="muted">Dokument ${esc(C.attachment(selected,'PZO'))} zawiera dane inwestycji, zakres wykonanych prac i miejsce na podpisy.</p>${closed?`<p><span class="tag zakonczona">Zakończona</span> <span class="tag ${Completion.summary(d).open?'odbior':'prace'}">${Completion.status(d)}</span></p><p class="muted">${entry?'Wpis w Moich zarobkach: '+money(entry.my_amount)+'.':'Inwestycja nie została jeszcze dodana do Moich zarobków.'}</p><div class="actions">${btn('completion-review','Zobacz rozliczenie')}${btn('reopen','Cofnij zakończenie inwestycji')}${entry?'<a class="button primary" href="/pack/?module=finances" target="_top">Zobacz w moich zarobkach</a>':btn('earnings-add','Dodaj do moich zarobków','primary')}</div>`:`<p class="muted">Przed zakończeniem sprawdzisz rozliczenie materiałów i robocizny. Dodanie do zarobków jest osobnym krokiem.</p>${btn('finish','Zakończ','primary')}`}`);}
+function handoverView(){const d=p(),h=d.handover,closed=d.status==='zakonczona',entry=projectEarningsCache.get(selected.id);return workDaysSection()+card(`<div class="grid">${input('handover.date','Data odbioru',h.date,'date','data-handover="date"')}${input('handover.receiver','Odbiorca (jeśli inny niż inwestor)',h.receiver,'text','data-handover="receiver"')}</div><label class="inline-check"><input type="checkbox" data-handover="accepted" ${h.accepted?'checked':''}> Prace zaakceptowane przez inwestora</label><div style="margin-top:16px">${text('handover.notes','Uwagi do wykonanych prac',h.notes,'data-handover="notes"')}</div><p class="muted">Dokument ${esc(C.attachment(selected,'PZO'))} zawiera dane inwestycji, zakres wykonanych prac i miejsce na podpisy.</p>${closed?`<p><span class="tag zakonczona">Zakończona</span> <span class="tag ${Completion.summary(d).open?'odbior':'prace'}">${Completion.status(d)}</span></p><p class="muted">${entry?'Wpis w Moich zarobkach: '+money(entry.my_amount)+'.':'Inwestycja nie została jeszcze dodana do Moich zarobków.'}</p><div class="actions">${btn('completion-review','Zobacz rozliczenie')}${btn('reopen','Cofnij zakończenie inwestycji')}${entry?'<a class="button primary" href="/pack/?module=finances" target="_top">Zobacz w moich zarobkach</a>':btn('earnings-add','Dodaj do moich zarobków','primary')}</div>`:`<p class="muted">Przed zakończeniem sprawdzisz rozliczenie materiałów i robocizny. Dodanie do zarobków jest osobnym krokiem.</p>${btn('finish','Zakończ','primary')}`}`);}
 async function refreshCompletionData(){
  await flushChanges();const id=selected.id,revision=selected.revision;
  const [row,documents,earnings]=await Promise.all([API.project(id),API.stageInvoices(id),API.projectEarnings(id)]);
@@ -604,6 +638,7 @@ document.addEventListener('change',e=>{if(e.target.id==='summary-category'){summ
 // Keep a typed expression focused until the step click handles it; blur must not replace the button first.
 document.addEventListener('pointerdown',e=>{if(e.target.closest?.('[data-action="quantity-step"]'))e.preventDefault();});
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const a=b.dataset.action,id=b.dataset.id;try{
+ if(a==='work-days'){workDaysDialog();return;}
  if(a==='quantity-step'){stepQuantity(b);return;}
  if(a==='close'){if(modalSubmitting)return;closeModal();return;}if(a==='delete')return;
  if(a==='stage-invoice'){e.preventDefault();if(window.parent&&window.parent!==window){await flushChanges();window.parent.postMessage({type:'robisie-pack-open-url',url:b.href},window.location.origin);return;}const tab=window.open('about:blank','_blank');if(tab)tab.opener=null;try{await flushChanges();if(tab)tab.location.href=b.href;else window.location.href=b.href;}catch(error){tab?.close();throw error;}return;}

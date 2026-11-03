@@ -1,4 +1,5 @@
 import {administrator, client} from '../pack/auth.js?v=121';
+import {carStoryStorage} from './storage.mjs';
 import {chronological, consumption, decimal, localDate, periodTotals} from './model.mjs';
 
 const $ = id => document.getElementById(id);
@@ -8,7 +9,8 @@ const field = name => form.elements.namedItem(name);
 const money = new Intl.NumberFormat('pl-PL', {style: 'currency', currency: 'PLN'});
 const number = new Intl.NumberFormat('pl-PL', {maximumFractionDigits: 3});
 const averageNumber = new Intl.NumberFormat('pl-PL', {minimumFractionDigits: 1, maximumFractionDigits: 1});
-let storageKey, editing = null;
+let storage, editing, fuelDraftId, vehicleDraft;
+let loading, writing = false, loaded = false;
 let data = {vehicles: [], entries: []};
 
 function status(message = '') {
@@ -17,31 +19,61 @@ function status(message = '') {
 
 function resetForm() {
   editing = null;
+  fuelDraftId = null;
   form.reset();
   field('date').value = field('date').max = localDate();
   $('entryTitle').textContent = 'Dodaj tankowanie';
   $('cancel').hidden = true;
 }
 
-function load() {
-  return JSON.parse(localStorage.getItem(storageKey) || 'null') ?? {vehicles: [], entries: []};
+function refresh() {
+  if (!storage || writing) return;
+  if (loading) return loading;
+  const current = storage;
+  loading = current.load().then(next => {
+    if (storage !== current) return;
+    data = next;
+    field('date').max = localDate();
+    render(loaded ? vehicle.value : data.vehicles[0]?.id);
+    loaded = true;
+    $('dashboard').hidden = false;
+    $('retry').hidden = true;
+    status();
+  }).catch(() => {
+    if (storage !== current) return;
+    $('retry').hidden = false;
+    status('Nie udało się pobrać danych z serwera. Sprawdź połączenie i odśwież.');
+  }).finally(() => { loading = null; });
+  return loading;
 }
 
-function save(next) {
-  if (!storageKey) return false;
+async function write(operation) {
+  if (!storage || writing) return;
+  const current = storage;
+  const pendingRead = loading;
+  writing = true;
+  $('dashboard').inert = true;
+  status('Zapisuję na serwerze…');
   try {
-    localStorage.setItem(storageKey, JSON.stringify(next));
-  } catch {
-    status('Nie udało się zapisać danych. Sprawdź ustawienia i miejsce w przeglądarce.');
-    return false;
+    await pendingRead;
+    if (storage !== current) return;
+    const apply = await operation(current);
+    if (storage !== current) return;
+    apply();
+    status();
+  } catch (error) {
+    if (storage !== current) return;
+    $('retry').hidden = false;
+    status(error instanceof Error && !/^Failed to fetch|^Load failed|^NetworkError/.test(error.message)
+      ? error.message : 'Nie udało się potwierdzić zapisu. Sprawdź połączenie i odśwież dane lub spróbuj ponownie.');
+  } finally {
+    writing = false;
+    $('dashboard').inert = false;
   }
-  data = next;
-  status();
-  return true;
 }
 
 function edit(entry) {
-  editing = entry.id;
+  editing = entry;
   field('date').value = entry.date;
   field('odometer').value = entry.odometer;
   field('liters').value = String(entry.liters).replace('.', ',');
@@ -80,11 +112,14 @@ function historyRow(entry, showVehicle) {
   remove.textContent = 'Usuń';
   remove.onclick = () => {
     if (!window.confirm('Usunąć tankowanie z ' + date + '?')) return;
-    const latest = load();
-    if (save({...latest, entries: latest.entries.filter(item => item.id !== entry.id)})) {
-      if (editing === entry.id) resetForm();
-      render();
-    }
+    void write(async current => {
+      await current.removeFuel(entry);
+      return () => {
+        data.entries = data.entries.filter(item => item.id !== entry.id);
+        if (editing?.id === entry.id) resetForm();
+        render();
+      };
+    });
   };
   const actions = document.createElement('div');
   actions.className = 'actions';
@@ -117,15 +152,17 @@ $('vehicleForm').onsubmit = event => {
   event.preventDefault();
   const name = new FormData(event.target).get('name').trim();
   if (!name) return status('Wpisz nazwę samochodu.');
-  const latest = load();
-  if (latest.vehicles.some(car => car.name.toLocaleLowerCase('pl') === name.toLocaleLowerCase('pl'))) {
-    return status('Samochód o tej nazwie już istnieje.');
-  }
-  const car = {id: crypto.randomUUID(), name};
-  if (!save({...latest, vehicles: [...latest.vehicles, car]})) return;
-  event.target.reset();
-  resetForm();
-  render(car.id);
+  if (vehicleDraft?.name !== name) vehicleDraft = {id: crypto.randomUUID(), name};
+  void write(async current => {
+    const car = await current.addVehicle(vehicleDraft.id, name);
+    return () => {
+      if (!data.vehicles.some(item => item.id === car.id)) data.vehicles.push(car);
+      vehicleDraft = null;
+      event.target.reset();
+      resetForm();
+      render(car.id);
+    };
+  });
 };
 
 form.onsubmit = event => {
@@ -136,40 +173,43 @@ form.onsubmit = event => {
   const date = field('date').value;
   if (!(liters > 0) || !Number.isFinite(amount)) return status('Wpisz dodatnią liczbę litrów i poprawną kwotę.');
   if (!date || date > localDate()) return status('Wybierz datę tankowania do dzisiaj.');
-  const latest = load();
-  const previous = latest.entries.find(entry => entry.id === editing);
-  if (editing && !previous) return status('Ten wpis został usunięty w innej zakładce.');
   const entry = {
-    id: previous?.id ?? crypto.randomUUID(),
+    id: editing?.id ?? (fuelDraftId ??= crypto.randomUUID()),
+    revision: editing?.revision,
     vehicleId: vehicle.value,
     date,
     odometer: field('odometer').valueAsNumber,
     liters,
     cents: Math.round(amount * 100),
     full: field('full').checked,
-    order: previous?.order ?? Math.max(0, ...latest.entries.map(item => item.order)) + 1,
   };
-  const entries = latest.entries.filter(item => item.id !== editing);
-  const carEntries = entries.filter(item => item.vehicleId === entry.vehicleId);
-  if (carEntries.some(item => (item.date < date && item.odometer > entry.odometer) ||
-      (item.date > date && item.odometer < entry.odometer))) {
-    return status('Sprawdź przebieg. Musi być zgodny z wcześniejszymi i późniejszymi tankowaniami tego auta.');
-  }
-  if (save({...latest, entries: [...entries, entry]})) {
-    resetForm();
-    render();
-  }
+  void write(async current => {
+    const saved = await current.saveFuel(entry);
+    return () => {
+      data.entries = [...data.entries.filter(item => item.id !== saved.id), saved];
+      resetForm();
+      render();
+    };
+  });
 };
 
-window.addEventListener('storage', event => {
-  if (storageKey && event.key === storageKey) {
-    data = load();
-    render();
-  }
+$('retry').onclick = () => refresh();
+window.addEventListener('focus', refresh);
+window.addEventListener('online', refresh);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) refresh();
 });
+window.addEventListener('message', event => {
+  if (event.source === parent && event.origin === location.origin && event.data?.type === 'robisie-pack-activated') refresh();
+});
+window.setInterval(() => {
+  if (!document.hidden) refresh();
+}, 30000);
 
 function lock(message) {
-  storageKey = null;
+  storage = null;
+  vehicleDraft = null;
+  $('retry').hidden = true;
   data = {vehicles: [], entries: []};
   resetForm();
   render();
@@ -179,21 +219,19 @@ function lock(message) {
 
 async function start() {
   const db = client();
-  let signedOut = false;
-  db.auth.onAuthStateChange(event => {
-    if (event === 'SIGNED_OUT') {
-      signedOut = true;
+  let sessionChanged = false, ownerId;
+  db.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT' || (ownerId && session?.user?.id !== ownerId)) {
+      sessionChanged = true;
       lock('Zaloguj się w Robisię Pack.');
     }
   });
   const user = await administrator(db);
-  if (signedOut || !user) return lock('Zaloguj się w Robisię Pack.');
-  storageKey = 'carstory-v1:' + user.id;
-  data = load();
+  if (sessionChanged || !user) return lock('Zaloguj się w Robisię Pack.');
+  ownerId = user.id;
+  storage = carStoryStorage(db);
   resetForm();
-  render(data.vehicles[0]?.id);
-  status();
-  $('dashboard').hidden = false;
+  await refresh();
 }
 
 start().catch(error => lock(error.message));

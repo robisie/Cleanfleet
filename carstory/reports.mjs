@@ -1,4 +1,4 @@
-import {chronological, consumption} from './model.mjs';
+import {chronological, consumption} from './model.mjs?v=8';
 
 export function reportRange(period, anchor, end) {
   const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(value) &&
@@ -33,14 +33,15 @@ export function buildReport(vehicles, entries, {from, to}, vehicleId) {
         inRange.push(entry);
         cents += entry.cents;
         liters += entry.liters;
-        history.push({...entry, car: car.name, previousDate: previous?.date,
-          distance: previous ? entry.odometer - previous.odometer : null});
+        history.push({...entry, car: car.name, previousDate: previous?.odometer != null ? previous.date : null,
+          distance: previous?.odometer != null && entry.odometer != null ? entry.odometer - previous.odometer : null});
       }
       previous = entry;
     }
-    const first = inRange[0], last = inRange.at(-1);
+    const readings = inRange.filter(entry => entry.odometer != null);
+    const first = readings[0], last = readings.at(-1);
     summaries.push({name: car.name, count: inRange.length, cents, liters,
-      distance: inRange.length > 1 ? last.odometer - first.odometer : null,
+      distance: readings.length > 1 ? last.odometer - first.odometer : null,
       firstDate: first?.date, lastDate: last?.date, ...consumption(inRange)});
   }
   const totals = summaries.reduce((total, car) => ({
@@ -55,7 +56,7 @@ const average = new Intl.NumberFormat('pl-PL', {minimumFractionDigits: 1, maximu
 const dateLabel = value => value ? value.split('-').reverse().join('.') : '—';
 const km = value => value == null ? '—' : number.format(value) + ' km';
 const amount = cents => money.format(cents / 100);
-const fuel = {diesel: 'Diesel', '95': 'Benzyna 95', '98': 'Benzyna 98'};
+const fuel = {diesel: 'Diesel', diesel_premium: 'Diesel Premium', '95': 'Benzyna 95', '98': 'Benzyna 98'};
 
 export function reportPdf(report, jsPDF, font) {
   const doc = new jsPDF({orientation: 'landscape', unit: 'mm', format: 'a4'});
@@ -81,7 +82,7 @@ export function reportPdf(report, jsPDF, font) {
   table(['Auto', 'Tankowania', 'Litry', 'Koszt', 'Dystans', 'Daty odczytów', 'Średnie spalanie'],
     report.summaries.map(car => [
       car.name, car.count, number.format(car.liters), amount(car.cents), km(car.distance),
-      car.firstDate ? dateLabel(car.firstDate) + (car.count > 1 ? ' – ' + dateLabel(car.lastDate) : '') : '—',
+      car.firstDate ? dateLabel(car.firstDate) + (car.distance != null ? ' – ' + dateLabel(car.lastDate) : '') : '—',
       car.average == null ? 'Brak pełnego cyklu' : average.format(car.average) + ' l/100 km',
     ]), y + 13);
   let historyY = doc.lastAutoTable.finalY + 9;
@@ -97,7 +98,7 @@ export function reportPdf(report, jsPDF, font) {
     table(['Data', 'Auto', 'Stan licznika', 'Dystans', 'Poprzedni odczyt', 'Paliwo', 'Litry', 'Koszt', 'Do pełna'],
       report.history.map(entry => [
         dateLabel(entry.date), entry.car, km(entry.odometer), km(entry.distance), dateLabel(entry.previousDate),
-        fuel[entry.fuel_type] ?? 'Brak danych', number.format(entry.liters), amount(entry.cents), entry.full ? 'Tak' : 'Nie',
+        fuel[entry.fuel_type] ?? 'Brak danych', number.format(entry.liters), amount(entry.cents), entry.full == null ? '—' : entry.full ? 'Tak' : 'Nie',
       ]), historyY + 8);
   } else {
     doc.text('Brak tankowań w wybranym okresie.', 12, historyY + 11);

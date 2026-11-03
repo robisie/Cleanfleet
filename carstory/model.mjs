@@ -19,14 +19,14 @@ export function periodTotals(entries, today = localDate()) {
 
 export function chronological(entries) {
   return [...entries].sort((a, b) => a.date.localeCompare(b.date) ||
-    a.odometer - b.odometer || a.order - b.order);
+    (a.odometer ?? -1) - (b.odometer ?? -1) || a.order - b.order);
 }
 
 export function consumption(entries) {
   let start = null, pending = 0, liters = 0, km = 0, intervals = 0;
   for (const entry of chronological(entries)) {
     if (start !== null) pending += entry.liters;
-    if (!entry.full) continue;
+    if (!entry.full || entry.odometer == null) continue;
     if (start !== null && entry.odometer === start) continue;
     if (start !== null && entry.odometer > start) {
       km += entry.odometer - start;

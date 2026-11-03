@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CarStory</title>
-<link rel="stylesheet" href="./style.css">
+<link rel="stylesheet" href="./style.css?v=3">
 <script src="/app/vendor/supabase-2.57.4.min.js"></script>
-<script type="module" src="./app.js?v=2"></script>
+<script type="module" src="./app.js?v=3"></script>
 </head>
 <body>
 <main>
@@ -31,7 +31,7 @@
       <p id="scope" class="note"></p>
     </section>
     <section id="entry" hidden>
-      <h2 id="entryTitle">Dodaj tankowanie</h2>
+      <h2>Dodaj tankowanie</h2>
       <form id="fuelForm">
         <div class="fields">
           <label>Data <input type="date" name="date" required></label>
@@ -40,7 +40,7 @@
           <label>Zapłacona kwota (zł) <input type="text" name="amount" required inputmode="decimal" placeholder="np. 260,00"></label>
         </div>
         <label class="check"><input type="checkbox" name="full"> Tankowanie do pełna</label>
-        <div class="actions"><button>Zapisz tankowanie</button><button type="button" id="cancel" class="secondary" hidden>Anuluj edycję</button></div>
+        <div class="actions"><button>Zapisz tankowanie</button></div>
       </form>
     </section>
     <section>
@@ -50,6 +50,11 @@
     </section>
     <p class="note">Historia jest zapisywana na serwerze i dostępna na urządzeniach zalogowanych na to samo konto.</p>
   </div>
+  <dialog id="editDialog" aria-labelledby="editTitle">
+    <h2 id="editTitle">Edytuj tankowanie</h2>
+    <p id="editVehicle" class="note"></p>
+    <p id="editStatus" role="status"></p>
+  </dialog>
 </main>
 </body>
 </html>

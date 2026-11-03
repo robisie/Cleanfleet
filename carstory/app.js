@@ -5,7 +5,17 @@ import {chronological, consumption, decimal, localDate, periodTotals} from './mo
 const $ = id => document.getElementById(id);
 const vehicle = $('vehicle');
 const form = $('fuelForm');
-const field = name => form.elements.namedItem(name);
+const dialog = $('editDialog');
+const editForm = form.cloneNode(true);
+editForm.id = 'editForm';
+const cancel = document.createElement('button');
+cancel.type = 'button';
+cancel.className = 'secondary';
+cancel.textContent = 'Anuluj';
+cancel.onclick = () => { if (!writing) dialog.close(); };
+editForm.querySelector('.actions').append(cancel);
+dialog.append(editForm);
+const field = (name, target = form) => target.elements.namedItem(name);
 const money = new Intl.NumberFormat('pl-PL', {style: 'currency', currency: 'PLN'});
 const number = new Intl.NumberFormat('pl-PL', {maximumFractionDigits: 3});
 const averageNumber = new Intl.NumberFormat('pl-PL', {minimumFractionDigits: 1, maximumFractionDigits: 1});
@@ -14,16 +24,13 @@ let loading, writing = false, loaded = false;
 let data = {vehicles: [], entries: []};
 
 function status(message = '') {
-  $('status').textContent = message;
+  $(dialog.open ? 'editStatus' : 'status').textContent = message;
 }
 
 function resetForm() {
-  editing = null;
   fuelDraftId = null;
   form.reset();
   field('date').value = field('date').max = localDate();
-  $('entryTitle').textContent = 'Dodaj tankowanie';
-  $('cancel').hidden = true;
 }
 
 function refresh() {
@@ -38,7 +45,7 @@ function refresh() {
     loaded = true;
     $('dashboard').hidden = false;
     $('retry').hidden = true;
-    status();
+    if (!dialog.open) status();
   }).catch(() => {
     if (storage !== current) return;
     $('retry').hidden = false;
@@ -53,6 +60,7 @@ async function write(operation) {
   const pendingRead = loading;
   writing = true;
   $('dashboard').inert = true;
+  editForm.inert = true;
   status('Zapisuję na serwerze…');
   try {
     await pendingRead;
@@ -69,22 +77,26 @@ async function write(operation) {
   } finally {
     writing = false;
     $('dashboard').inert = false;
+    editForm.inert = false;
   }
 }
 
-function edit(entry) {
+function edit(entry, name) {
   editing = entry;
-  field('date').value = entry.date;
-  field('odometer').value = entry.odometer;
-  field('liters').value = String(entry.liters).replace('.', ',');
-  field('amount').value = (entry.cents / 100).toFixed(2).replace('.', ',');
-  field('full').checked = entry.full;
-  $('entryTitle').textContent = 'Edytuj tankowanie';
-  $('cancel').hidden = false;
-  field('date').focus();
+  $('editVehicle').textContent = name;
+  $('editStatus').textContent = '';
+  field('date', editForm).max = localDate();
+  field('date', editForm).value = entry.date;
+  field('odometer', editForm).value = entry.odometer;
+  field('liters', editForm).value = String(entry.liters).replace('.', ',');
+  field('amount', editForm).value = (entry.cents / 100).toFixed(2).replace('.', ',');
+  field('full', editForm).checked = entry.full;
+  dialog.showModal();
 }
 
-function historyRow(entry, showVehicle) {
+dialog.addEventListener('cancel', event => { if (writing) event.preventDefault(); });
+
+function historyRow(entry, showVehicle, distance) {
   const row = document.createElement('article');
   row.className = 'record';
   const description = document.createElement('div');
@@ -95,18 +107,18 @@ function historyRow(entry, showVehicle) {
   title.textContent = showVehicle ? date + ' · ' + name : date;
   details.className = 'details';
   details.textContent = [
-    number.format(entry.odometer) + ' km', number.format(entry.liters) + ' l',
+    number.format(entry.odometer) + ' km na liczniku', number.format(entry.liters) + ' l',
     money.format(entry.cents / 100), entry.full ? 'Do pełna' : 'Częściowe',
   ].join(' · ');
-  description.append(title, details);
+  const traveled = document.createElement('div');
+  traveled.className = 'details';
+  traveled.textContent = distance == null ? 'Dystans od poprzedniego tankowania: —'
+    : 'Dystans od poprzedniego tankowania: ' + number.format(distance) + ' km';
+  description.append(title, details, traveled);
   const change = document.createElement('button');
   change.className = 'secondary';
   change.textContent = 'Edytuj';
-  change.onclick = () => {
-    vehicle.value = entry.vehicleId;
-    render();
-    edit(entry);
-  };
+  change.onclick = () => edit(entry, name);
   const remove = document.createElement('button');
   remove.className = 'secondary';
   remove.textContent = 'Usuń';
@@ -116,7 +128,6 @@ function historyRow(entry, showVehicle) {
       await current.removeFuel(entry);
       return () => {
         data.entries = data.entries.filter(item => item.id !== entry.id);
-        if (editing?.id === entry.id) resetForm();
         render();
       };
     });
@@ -142,11 +153,16 @@ function render(selected = vehicle.value) {
   $('scope').textContent = 'Wydatki według dat tankowania · ' + (vehicle.value ? 'wybrane auto' : 'wszystkie auta');
   $('entry').hidden = !vehicle.value;
   $('empty').hidden = !!entries.length;
-  $('history').replaceChildren(...chronological(entries).reverse().map(entry => historyRow(entry, !vehicle.value)));
+  const previous = new Map();
+  const rows = chronological(entries).map(entry => {
+    const odometer = previous.get(entry.vehicleId);
+    previous.set(entry.vehicleId, entry.odometer);
+    return historyRow(entry, !vehicle.value, odometer === undefined ? null : entry.odometer - odometer);
+  });
+  $('history').replaceChildren(...rows.reverse());
 }
 
 vehicle.onchange = () => { resetForm(); status(); render(); };
-$('cancel').onclick = resetForm;
 
 $('vehicleForm').onsubmit = event => {
   event.preventDefault();
@@ -165,29 +181,35 @@ $('vehicleForm').onsubmit = event => {
   });
 };
 
-form.onsubmit = event => {
+form.onsubmit = editForm.onsubmit = event => {
   event.preventDefault();
-  if (!vehicle.value) return;
-  const liters = decimal(field('liters').value, 3);
-  const amount = decimal(field('amount').value, 2);
-  const date = field('date').value;
+  const target = event.currentTarget;
+  const original = target === editForm ? editing : null;
+  const vehicleId = original?.vehicleId ?? vehicle.value;
+  if (!vehicleId) return;
+  const liters = decimal(field('liters', target).value, 3);
+  const amount = decimal(field('amount', target).value, 2);
+  const date = field('date', target).value;
   if (!(liters > 0) || !Number.isFinite(amount)) return status('Wpisz dodatnią liczbę litrów i poprawną kwotę.');
   if (!date || date > localDate()) return status('Wybierz datę tankowania do dzisiaj.');
   const entry = {
-    id: editing?.id ?? (fuelDraftId ??= crypto.randomUUID()),
-    revision: editing?.revision,
-    vehicleId: vehicle.value,
+    id: original?.id ?? (fuelDraftId ??= crypto.randomUUID()),
+    revision: original?.revision,
+    vehicleId,
     date,
-    odometer: field('odometer').valueAsNumber,
+    odometer: field('odometer', target).valueAsNumber,
     liters,
     cents: Math.round(amount * 100),
-    full: field('full').checked,
+    full: field('full', target).checked,
   };
   void write(async current => {
     const saved = await current.saveFuel(entry);
     return () => {
       data.entries = [...data.entries.filter(item => item.id !== saved.id), saved];
-      resetForm();
+      if (original) {
+        dialog.close();
+        editing = null;
+      } else resetForm();
       render();
     };
   });
@@ -208,6 +230,8 @@ window.setInterval(() => {
 
 function lock(message) {
   storage = null;
+  if (dialog.open) dialog.close();
+  editing = null;
   vehicleDraft = null;
   $('retry').hidden = true;
   data = {vehicles: [], entries: []};

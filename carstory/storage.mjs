@@ -1,4 +1,4 @@
-const fuelColumns = 'id,vehicle_id,date,odometer,liters,cents,full_tank,entry_order,revision';
+const fuelColumns = 'id,vehicle_id,date,odometer,liters,cents,full_tank,entry_order,revision,fuel_type';
 
 function unwrap({data, error}) {
   if (error) {
@@ -41,7 +41,7 @@ export function carStoryStorage(db) {
   return {
     async load() {
       const [cars, entries] = await Promise.all([
-        readAll(() => vehicles().select('id,name'), 'id'),
+        readAll(() => vehicles().select('id,name,fuel_type'), 'id'),
         readAll(() => fuel().select(fuelColumns), 'entry_order'),
       ]);
       return {
@@ -50,14 +50,18 @@ export function carStoryStorage(db) {
       };
     },
 
-    async addVehicle(id, name) {
-      unwrap(await vehicles().upsert({id, name}, {onConflict: 'id', ignoreDuplicates: true}));
-      return unwrap(await vehicles().select('id,name').eq('id', id).single());
+    async addVehicle(id, name, fuel_type) {
+      unwrap(await vehicles().upsert({id, name, fuel_type}, {onConflict: 'id', ignoreDuplicates: true}));
+      return unwrap(await vehicles().select('id,name,fuel_type').eq('id', id).single());
+    },
+
+    async updateVehicleFuel(id, fuel_type) {
+      return unwrap(await vehicles().update({fuel_type}).eq('id', id).select('id,name,fuel_type').single());
     },
 
     async saveFuel(entry) {
-      const {id, revision, vehicleId, date, odometer, liters, cents, full} = entry;
-      const values = {date, odometer, liters, cents, full_tank: full};
+      const {id, revision, vehicleId, date, odometer, liters, cents, full, fuel_type} = entry;
+      const values = {date, odometer, liters, cents, full_tank: full, fuel_type};
       if (revision) {
         const row = unwrap(await fuel().update(values).eq('id', id).eq('revision', revision)
           .select(fuelColumns).maybeSingle());
@@ -65,7 +69,7 @@ export function carStoryStorage(db) {
       }
       unwrap(await fuel().upsert({id, vehicle_id: vehicleId, ...values}, {onConflict: 'id', ignoreDuplicates: true}));
       const saved = fuelEntry(unwrap(await fuel().select(fuelColumns).eq('id', id).single()));
-      if (Object.entries({date, odometer, liters, cents, full}).some(([key, value]) => saved[key] !== value)) {
+      if (Object.entries({date, odometer, liters, cents, full, fuel_type}).some(([key, value]) => saved[key] !== value)) {
         throw Error('Poprzedni zapis tego tankowania dotarł już na serwer. Odśwież historię i edytuj zapisany wpis.');
       }
       return saved;

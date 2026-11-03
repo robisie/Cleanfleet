@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CarStory</title>
-<link rel="stylesheet" href="./style.css?v=3">
+<link rel="stylesheet" href="./style.css?v=4">
 <script src="/app/vendor/supabase-2.57.4.min.js"></script>
-<script type="module" src="./app.js?v=3"></script>
+<script type="module" src="./app.js?v=4"></script>
 </head>
 <body>
 <main>
@@ -18,7 +18,12 @@
       <label>Samochód <select id="vehicle"></select></label>
       <form id="vehicleForm">
         <label>Nazwa auta <input name="name" required maxlength="80" placeholder="np. Renault Trafic"></label>
+        <label>Paliwo <select name="fuel_type" required></select></label>
         <button>Dodaj samochód</button>
+      </form>
+      <form id="vehicleFuelForm" hidden>
+        <label>Domyślne paliwo wybranego auta <select name="fuel_type" required></select></label>
+        <button class="secondary">Zapisz paliwo auta</button>
       </form>
     </section>
     <section id="summary" aria-label="Podsumowanie">
@@ -39,6 +44,7 @@
           <label>Zatankowane litry <input type="text" name="liters" required inputmode="decimal" placeholder="np. 42,50"></label>
           <label>Zapłacona kwota (zł) <input type="text" name="amount" required inputmode="decimal" placeholder="np. 260,00"></label>
         </div>
+        <label>Zatankowane paliwo <select name="fuel_type"></select></label>
         <label class="check"><input type="checkbox" name="full"> Tankowanie do pełna</label>
         <div class="actions"><button>Zapisz tankowanie</button></div>
       </form>

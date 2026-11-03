@@ -30,3 +30,9 @@ dialog{width:min(100% - 24px,560px);max-height:calc(100% - 24px);overflow:auto;p
 dialog::backdrop{background:#18312980}
 dialog .fields{grid-template-columns:repeat(2,minmax(0,1fr))}
 #editStatus:empty{display:none}
+#vehicleFuelForm{flex-basis:100%}
+.record>div:first-child{flex:1 1 24rem;min-width:0}
+.record-fields{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
+.record-fields>div{background:#eef6f1;border:1px solid #dce6e0;border-radius:8px;padding:5px 9px}
+.record-fields dt{color:#496458;font-size:.75rem}
+.record-fields dd{margin:0;font-size:.9rem;font-weight:700}

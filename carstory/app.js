@@ -1,5 +1,5 @@
 import {administrator, client} from '../pack/auth.js?v=121';
-import {carStoryStorage} from './storage.mjs';
+import {carStoryStorage} from './storage.mjs?v=4';
 import {chronological, consumption, decimal, localDate, periodTotals} from './model.mjs';
 
 const $ = id => document.getElementById(id);
@@ -16,6 +16,16 @@ cancel.onclick = () => { if (!writing) dialog.close(); };
 editForm.querySelector('.actions').append(cancel);
 dialog.append(editForm);
 const field = (name, target = form) => target.elements.namedItem(name);
+const fuelTypes = {diesel: 'Diesel', '95': 'Benzyna 95', '98': 'Benzyna 98'};
+const fuelOptions = ['diesel', '95', '98'];
+const vehicleFuelForm = $('vehicleFuelForm');
+function setFuelOptions(select, placeholder) {
+  select.replaceChildren(new Option(placeholder, ''), ...fuelOptions.map(type => new Option(fuelTypes[type], type)));
+}
+setFuelOptions(field('fuel_type', $('vehicleForm')), 'Wybierz paliwo');
+setFuelOptions(field('fuel_type', vehicleFuelForm), 'Wybierz paliwo');
+setFuelOptions(field('fuel_type', editForm), 'Brak danych');
+
 const money = new Intl.NumberFormat('pl-PL', {style: 'currency', currency: 'PLN'});
 const number = new Intl.NumberFormat('pl-PL', {maximumFractionDigits: 3});
 const averageNumber = new Intl.NumberFormat('pl-PL', {minimumFractionDigits: 1, maximumFractionDigits: 1});
@@ -91,6 +101,7 @@ function edit(entry, name) {
   field('liters', editForm).value = String(entry.liters).replace('.', ',');
   field('amount', editForm).value = (entry.cents / 100).toFixed(2).replace('.', ',');
   field('full', editForm).checked = entry.full;
+  field('fuel_type', editForm).value = entry.fuel_type ?? '';
   dialog.showModal();
 }
 
@@ -101,20 +112,28 @@ function historyRow(entry, showVehicle, distance) {
   row.className = 'record';
   const description = document.createElement('div');
   const title = document.createElement('strong');
-  const details = document.createElement('div');
   const name = data.vehicles.find(car => car.id === entry.vehicleId)?.name;
   const date = entry.date.split('-').reverse().join('.');
   title.textContent = showVehicle ? date + ' · ' + name : date;
-  details.className = 'details';
-  details.textContent = [
-    number.format(entry.odometer) + ' km na liczniku', number.format(entry.liters) + ' l',
-    money.format(entry.cents / 100), entry.full ? 'Do pełna' : 'Częściowe',
-  ].join(' · ');
-  const traveled = document.createElement('div');
-  traveled.className = 'details';
-  traveled.textContent = distance == null ? 'Dystans od poprzedniego tankowania: —'
-    : 'Dystans od poprzedniego tankowania: ' + number.format(distance) + ' km';
-  description.append(title, details, traveled);
+  const details = document.createElement('dl');
+  details.className = 'record-fields';
+  for (const [label, value] of [
+    ['Stan licznika', number.format(entry.odometer) + ' km'],
+    ['Dystans od tankowania', distance == null ? '—' : number.format(distance) + ' km'],
+    ['Zatankowano', number.format(entry.liters) + ' l'],
+    ['Koszt', money.format(entry.cents / 100)],
+    ['Tankowanie', entry.full ? 'Do pełna' : 'Częściowe'],
+    ['Paliwo', fuelTypes[entry.fuel_type] ?? 'Brak danych'],
+  ]) {
+    const box = document.createElement('div');
+    const term = document.createElement('dt');
+    const definition = document.createElement('dd');
+    term.textContent = label;
+    definition.textContent = value;
+    box.append(term, definition);
+    details.append(box);
+  }
+  description.append(title, details);
   const change = document.createElement('button');
   change.className = 'secondary';
   change.textContent = 'Edytuj';
@@ -141,7 +160,19 @@ function historyRow(entry, showVehicle, distance) {
 
 function render(selected = vehicle.value) {
   vehicle.replaceChildren(new Option('Wszystkie auta', ''), ...data.vehicles.map(car => new Option(car.name, car.id)));
-  vehicle.value = data.vehicles.some(car => car.id === selected) ? selected : '';
+  const car = data.vehicles.find(item => item.id === selected);
+  vehicle.value = car?.id ?? '';
+  vehicleFuelForm.hidden = !car;
+  const settings = field('fuel_type', vehicleFuelForm);
+  if (vehicleFuelForm.dataset.vehicleId !== vehicle.value || settings.value === vehicleFuelForm.dataset.savedFuel) {
+    settings.value = car?.fuel_type ?? '';
+  }
+  vehicleFuelForm.dataset.vehicleId = vehicle.value;
+  vehicleFuelForm.dataset.savedFuel = car?.fuel_type ?? '';
+  const selection = field('fuel_type').value;
+  setFuelOptions(field('fuel_type'), car?.fuel_type ? 'Domyślne · ' + fuelTypes[car.fuel_type] : 'Wybierz paliwo');
+  field('fuel_type').value = selection;
+  field('fuel_type').required = !car?.fuel_type;
   const entries = data.entries.filter(entry => !vehicle.value || entry.vehicleId === vehicle.value);
   const totals = periodTotals(entries);
   for (const [period, cents] of Object.entries(totals)) $(period).textContent = money.format(cents / 100);
@@ -168,15 +199,31 @@ $('vehicleForm').onsubmit = event => {
   event.preventDefault();
   const name = new FormData(event.target).get('name').trim();
   if (!name) return status('Wpisz nazwę samochodu.');
+  const fuel = field('fuel_type', event.target).value;
+  if (!fuelOptions.includes(fuel)) return status('Wybierz paliwo samochodu.');
   if (vehicleDraft?.name !== name) vehicleDraft = {id: crypto.randomUUID(), name};
   void write(async current => {
-    const car = await current.addVehicle(vehicleDraft.id, name);
+    const car = await current.addVehicle(vehicleDraft.id, name, fuel);
     return () => {
       if (!data.vehicles.some(item => item.id === car.id)) data.vehicles.push(car);
       vehicleDraft = null;
       event.target.reset();
       resetForm();
       render(car.id);
+    };
+  });
+};
+
+vehicleFuelForm.onsubmit = event => {
+  event.preventDefault();
+  const carId = vehicle.value;
+  const fuel = field('fuel_type', vehicleFuelForm).value;
+  if (!carId || !fuelOptions.includes(fuel)) return;
+  void write(async current => {
+    const saved = await current.updateVehicleFuel(carId, fuel);
+    return () => {
+      data.vehicles = data.vehicles.map(car => car.id === carId ? saved : car);
+      render();
     };
   });
 };
@@ -192,7 +239,11 @@ form.onsubmit = editForm.onsubmit = event => {
   const date = field('date', target).value;
   if (!(liters > 0) || !Number.isFinite(amount)) return status('Wpisz dodatnią liczbę litrów i poprawną kwotę.');
   if (!date || date > localDate()) return status('Wybierz datę tankowania do dzisiaj.');
+  const selection = field('fuel_type', target).value;
+  const fuel = selection || (original ? null : data.vehicles.find(car => car.id === vehicleId)?.fuel_type);
+  if (!original && !fuel) return status('Wybierz zatankowane paliwo.');
   const entry = {
+    fuel_type: fuel,
     id: original?.id ?? (fuelDraftId ??= crypto.randomUUID()),
     revision: original?.revision,
     vehicleId,

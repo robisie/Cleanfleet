@@ -25,3 +25,8 @@ section .note{margin:10px 0 0}
 #status:not(:empty){padding:10px 12px;background:#fff;border-radius:8px}
 [hidden],#status:empty{display:none!important}
 @media(max-width:650px){.fields,.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.toolbar>label,.toolbar form{width:100%}}
+input[type=date]{width:calc(100% - 32px);appearance:none;-webkit-appearance:none}
+dialog{width:min(100% - 24px,560px);max-height:calc(100% - 24px);overflow:auto;padding:20px;border:1px solid #dce6e0;border-radius:16px;color:inherit;background:#fff}
+dialog::backdrop{background:#18312980}
+dialog .fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+#editStatus:empty{display:none}

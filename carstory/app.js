@@ -124,6 +124,8 @@ function historyRow(entry, showVehicle, distance) {
   title.textContent = showVehicle ? date + ' · ' + name : date;
   const details = document.createElement('dl');
   details.className = 'record-fields';
+  const appearance = vehicleAppearance(name);
+  if (appearance) details.dataset.tone = appearance.tone;
   for (const [label, value] of [
     ['Stan licznika', entry.odometer == null ? 'Brak danych' : number.format(entry.odometer) + ' km'],
     ['Dystans od tankowania', distance == null ? '—' : number.format(distance) + ' km'],
@@ -165,10 +167,17 @@ function historyRow(entry, showVehicle, distance) {
   return row;
 }
 
-const vehicleImages = new Map([
-  ['kia sportage 2023', './assets/kia-sportage-2023.webp'],
-  ['renault trafic 2009', './assets/renault-trafic-2009.webp'],
+const niroAppearance = {icon: 'kia-niro-2022', tone: 'blue'};
+const vehicleAppearances = new Map([
+  ['kia sportage 2023', {icon: 'kia-sportage-2023', tone: 'gray'}],
+  ['renault trafic 2009', {icon: 'renault-trafic-2009', tone: 'green'}],
+  ['kia niro', niroAppearance],
+  ['kia niro 2022', niroAppearance],
 ]);
+
+function vehicleAppearance(name) {
+  return vehicleAppearances.get(name?.trim().toLowerCase().replace(/\s+/g, ' '));
+}
 
 function garageIcon(name) {
   const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -178,13 +187,13 @@ function garageIcon(name) {
   path.setAttribute('d', 'm8 17 5-10h22l5 10M8 17h32l4 4v8h-6v-4H10v4H4v-8z M10 21h5m18 0h5');
   icon.append(path);
 
-  const source = vehicleImages.get(name.trim().toLowerCase().replace(/\s+/g, ' '));
+  const source = vehicleAppearance(name)?.icon;
   if (!source) return icon;
   const image = document.createElement('img');
   image.className = 'garage-vehicle-image';
   image.alt = '';
   image.addEventListener('error', () => image.replaceWith(icon), {once: true});
-  image.src = source;
+  image.src = './assets/' + source + '.webp';
   return image;
 }
 

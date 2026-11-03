@@ -1,7 +1,12 @@
-export const VERSION='1.0.108';
+export const VERSION='1.0.109';
 export const MODULES=[['overview','Panel inwestycji'],['ledger','Wspólne rozliczenie'],['data','Dane inwestycji'],['contract','Umowa'],['rooms','Pomieszczenia'],['offer','Oferta wstępna'],['works','Kalkulacja końcowa'],['payments','Etapy i płatności'],['journal','Dziennik prac'],['handover','Odbiór inwestycji'],['summary','Zestawienie prac'],['shopping','Do kupienia'],['purchases','Zakupy i materiały']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
+export function workDays(values){
+ if(!Array.isArray(values))return [];
+ return [...new Set(values.filter(value=>typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&
+  Number.isFinite(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value))].sort();
+}
 export function number(v){const n=Number(String(v??'').replace(',','.'));return Number.isFinite(n)?n:0;}
 export const money=v=>new Intl.NumberFormat('pl-PL',{style:'currency',currency:'PLN'}).format(number(v));
 export const quantity=v=>new Intl.NumberFormat('pl-PL',{maximumFractionDigits:3}).format(number(v));

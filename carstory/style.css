@@ -48,3 +48,5 @@ dialog .fields{grid-template-columns:repeat(2,minmax(0,1fr))}
 dialog [role=status]:empty{display:none}
 @media(max-width:650px){.garage{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .garage-vehicle-image{width:min(100%,120px);height:54px;object-fit:contain;object-position:center bottom}
+#openReport{margin-top:12px}
+#reportRange,#reportForm .actions{width:100%}

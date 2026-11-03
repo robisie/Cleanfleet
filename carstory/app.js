@@ -227,7 +227,36 @@ function updateFuelOptions() {
   field('fuel_type').required = !car?.fuel_type;
 }
 
-function render(selected = selectedVehicle) {
+const historyCar = $('historyCar');
+const historyFuel = $('historyFuel');
+const historyFill = $('historyFill');
+historyFuel.append(...['diesel', 'diesel_premium', '95', '98'].map(type => new Option(fuelTypes[type], type)),
+  new Option('Brak danych', 'unknown'));
+for (const filter of [historyCar, historyFuel, historyFill]) filter.addEventListener('change', renderHistory);
+
+function renderHistory() {
+  const car = historyCar.value;
+  const fuel = historyFuel.value;
+  const fill = historyFill.value;
+  const previous = new Map();
+  const rows = [];
+  for (const entry of chronological(data.entries)) {
+    const odometer = previous.get(entry.vehicleId);
+    previous.set(entry.vehicleId, entry.odometer);
+    const fillType = entry.full == null ? 'unknown' : entry.full ? 'full' : 'partial';
+    if ((car && entry.vehicleId !== car) || (fuel && (entry.fuel_type ?? 'unknown') !== fuel) ||
+        (fill && fillType !== fill)) continue;
+    const distance = odometer == null || entry.odometer == null ? null : entry.odometer - odometer;
+    rows.push(historyRow(entry, !car, distance));
+  }
+  $('empty').hidden = rows.length > 0;
+  $('empty').textContent = data.entries.length ? 'Brak tankowań pasujących do filtrów.' : 'Brak zapisanych tankowań.';
+  $('history').replaceChildren(...rows.reverse());
+}
+
+function render(selected) {
+  const historySelection = selected ?? historyCar.value;
+  selected ??= selectedVehicle;
   const car = data.vehicles.find(item => item.id === selected);
   selectedVehicle = car?.id ?? '';
   renderGarage();
@@ -251,14 +280,9 @@ function render(selected = selectedVehicle) {
     ? number.format(result.km) + ' km w zamkniętych pomiarach'
     : 'Potrzebne dwa tankowania do pełna i dodatni dystans.';
   $('scope').textContent = 'Wydatki według dat tankowania · ' + (selectedVehicle ? 'wybrane auto' : 'wszystkie auta');
-  $('empty').hidden = !!entries.length;
-  const previous = new Map();
-  const rows = chronological(entries).map(entry => {
-    const odometer = previous.get(entry.vehicleId);
-    previous.set(entry.vehicleId, entry.odometer);
-    return historyRow(entry, !selectedVehicle, odometer == null || entry.odometer == null ? null : entry.odometer - odometer);
-  });
-  $('history').replaceChildren(...rows.reverse());
+  historyCar.replaceChildren(new Option('Wszystkie auta', ''), ...data.vehicles.map(item => new Option(item.name, item.id)));
+  historyCar.value = data.vehicles.some(item => item.id === historySelection) ? historySelection : '';
+  renderHistory();
 }
 
 const reportForm = $('reportForm');
@@ -436,6 +460,7 @@ window.setInterval(() => {
 }, 30000);
 
 function lock(message) {
+  historyCar.value = historyFuel.value = historyFill.value = '';
   clearReportPreview();
   storage = null;
   for (const popup of dialogs) if (popup.open) popup.close();

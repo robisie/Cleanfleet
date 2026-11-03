@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CarStory</title>
-<link rel="stylesheet" href="./style.css?v=10">
+<link rel="stylesheet" href="./style.css?v=11">
 <script src="/app/vendor/supabase-2.57.4.min.js"></script>
 <script defer src="/app/vendor/jspdf-2.5.1.umd.min.js"></script>
 <script defer src="/app/vendor/jspdf-autotable-3.8.2.min.js"></script>
 <script defer src="/app/reports-font.js"></script>
-<script type="module" src="./app.js?v=10"></script>
+<script type="module" src="./app.js?v=11"></script>
 </head>
 <body>
 <main>
@@ -42,6 +42,16 @@
     </section>
     <section>
       <h2>Historia tankowań</h2>
+      <div class="history-filters" role="group" aria-label="Filtry historii tankowań">
+        <label>Auto <select id="historyCar"><option value="">Wszystkie auta</option></select></label>
+        <label>Paliwo <select id="historyFuel"><option value="">Wszystkie paliwa</option></select></label>
+        <label>Rodzaj tankowania <select id="historyFill">
+          <option value="">Wszystkie rodzaje</option>
+          <option value="full">Do pełna</option>
+          <option value="partial">Częściowe</option>
+          <option value="unknown">Brak danych</option>
+        </select></label>
+      </div>
       <p id="empty">Brak zapisanych tankowań.</p>
       <div id="history"></div>
     </section>

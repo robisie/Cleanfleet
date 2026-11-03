@@ -1,7 +1,7 @@
-import {buildReport, reportRange, reportPdf} from './reports.mjs';
+import {buildReport, reportRange, reportPdf} from './reports.mjs?v=8';
 import {administrator, client} from '../pack/auth.js?v=121';
 import {carStoryStorage} from './storage.mjs?v=4';
-import {chronological, consumption, decimal, localDate, periodTotals} from './model.mjs';
+import {chronological, consumption, decimal, localDate, periodTotals} from './model.mjs?v=8';
 
 const $ = id => document.getElementById(id);
 const vehicle = $('vehicle');
@@ -24,11 +24,11 @@ for (const popup of dialogs) {
   popup.addEventListener('cancel', event => { if (writing) event.preventDefault(); });
 }
 const field = (name, target = form) => target.elements.namedItem(name);
-const fuelTypes = {diesel: 'Diesel', '95': 'Benzyna 95', '98': 'Benzyna 98'};
+const fuelTypes = {diesel: 'Diesel', diesel_premium: 'Diesel Premium', '95': 'Benzyna 95', '98': 'Benzyna 98'};
 const fuelOptions = ['diesel', '95', '98'];
 const vehicleFuelForm = $('vehicleFuelForm');
 function setFuelOptions(select, placeholder) {
-  select.replaceChildren(new Option(placeholder, ''), ...fuelOptions.map(type => new Option(fuelTypes[type], type)));
+  select.replaceChildren(new Option(placeholder, ''), ...(select.form === form || select.form === editForm ? [...fuelOptions, 'diesel_premium'] : fuelOptions).map(type => new Option(fuelTypes[type], type)));
 }
 setFuelOptions(field('fuel_type', $('vehicleForm')), 'Wybierz paliwo');
 setFuelOptions(field('fuel_type', vehicleFuelForm), 'Wybierz paliwo');
@@ -105,7 +105,8 @@ function edit(entry, name) {
   $('editStatus').textContent = '';
   field('date', editForm).max = localDate();
   field('date', editForm).value = entry.date;
-  field('odometer', editForm).value = entry.odometer;
+  field('odometer', editForm).value = entry.odometer ?? '';
+  field('odometer', editForm).required = entry.odometer != null;
   field('liters', editForm).value = String(entry.liters).replace('.', ',');
   field('amount', editForm).value = (entry.cents / 100).toFixed(2).replace('.', ',');
   field('full', editForm).checked = entry.full;
@@ -124,11 +125,11 @@ function historyRow(entry, showVehicle, distance) {
   const details = document.createElement('dl');
   details.className = 'record-fields';
   for (const [label, value] of [
-    ['Stan licznika', number.format(entry.odometer) + ' km'],
+    ['Stan licznika', entry.odometer == null ? 'Brak danych' : number.format(entry.odometer) + ' km'],
     ['Dystans od tankowania', distance == null ? '—' : number.format(distance) + ' km'],
     ['Zatankowano', number.format(entry.liters) + ' l'],
     ['Koszt', money.format(entry.cents / 100)],
-    ['Tankowanie', entry.full ? 'Do pełna' : 'Częściowe'],
+    ['Tankowanie', entry.full == null ? 'Brak danych' : entry.full ? 'Do pełna' : 'Częściowe'],
     ['Paliwo', fuelTypes[entry.fuel_type] ?? 'Brak danych'],
   ]) {
     const box = document.createElement('div');
@@ -246,7 +247,7 @@ function render(selected = selectedVehicle) {
   const rows = chronological(entries).map(entry => {
     const odometer = previous.get(entry.vehicleId);
     previous.set(entry.vehicleId, entry.odometer);
-    return historyRow(entry, !selectedVehicle, odometer === undefined ? null : entry.odometer - odometer);
+    return historyRow(entry, !selectedVehicle, odometer == null || entry.odometer == null ? null : entry.odometer - odometer);
   });
   $('history').replaceChildren(...rows.reverse());
 }
@@ -368,10 +369,10 @@ form.onsubmit = editForm.onsubmit = event => {
     revision: original?.revision,
     vehicleId,
     date,
-    odometer: field('odometer', target).valueAsNumber,
+    odometer: field('odometer', target).value === '' ? null : field('odometer', target).valueAsNumber,
     liters,
     cents: Math.round(amount * 100),
-    full: field('full', target).checked,
+    full: field('full', target).checked ? true : original?.full === null ? null : false,
   };
   void write(async current => {
     const saved = await current.saveFuel(entry);

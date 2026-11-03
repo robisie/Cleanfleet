@@ -55,3 +55,5 @@ dialog [role=status]:empty{display:none}
 .record-fields[data-tone=blue]{--record-bg:#eaf3fd;--record-border:#ccdef2}
 .history-filters{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 12px}
 .history-filters label{display:grid;flex:1 1 140px;gap:4px;font-size:.85rem;font-weight:650}
+
+.carstory-wordmark{display:block;width:min(100%,270px);height:auto}

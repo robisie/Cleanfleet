@@ -1,5 +1,5 @@
 import {mountTodayBadges} from './today-badges.js?v=2';
-import {client,administrator,modules,applications} from './auth.js?v=120';
+import {client,administrator,modules,applications} from './auth.js?v=121';
 import {mountTiles} from './tiles.js?v=113';
 const $=id=>document.getElementById(id),db=client(),tabs=new Map();
 let user=null,epoch=0,current='',frame=null,disposeTiles=null,leaving=false,tileBadges=null;
@@ -9,7 +9,7 @@ function saveWorkspace(){if(!user)return;try{sessionStorage.setItem(workspaceKey
 function forgetWorkspace(){try{sessionStorage.removeItem(workspaceKey);}catch(_){}}
 function restoreWorkspace(){
  try{const raw=sessionStorage.getItem(workspaceKey);if(!raw||raw.length>10000)return null;const saved=JSON.parse(raw);if(saved.version!==1||saved.userId!==user?.id||!Array.isArray(saved.tabs)){forgetWorkspace();return null;}
-  for(const t of saved.tabs.slice(0,9)){if(!t||!['application','module'].includes(t.kind))continue;const registry=t.kind==='application'?applications:modules;if(Object.hasOwn(registry,t.name))ensureTab(t.kind,t.name);}
+  for(const t of saved.tabs.slice(0,Object.keys(applications).length+Object.keys(modules).length)){if(!t||!['application','module'].includes(t.kind))continue;const registry=t.kind==='application'?applications:modules;if(Object.hasOwn(registry,t.name))ensureTab(t.kind,t.name);}
   return typeof saved.active==='string'&&tabs.has(saved.active)?saved.active:'';
  }catch(_){forgetWorkspace();return null;}
 }

@@ -4,9 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CarStory</title>
-<link rel="stylesheet" href="./style.css?v=6">
+<link rel="stylesheet" href="./style.css?v=7">
 <script src="/app/vendor/supabase-2.57.4.min.js"></script>
-<script type="module" src="./app.js?v=6"></script>
+<script defer src="/app/vendor/jspdf-2.5.1.umd.min.js"></script>
+<script defer src="/app/vendor/jspdf-autotable-3.8.2.min.js"></script>
+<script defer src="/app/reports-font.js"></script>
+<script type="module" src="./app.js?v=7"></script>
 </head>
 <body>
 <main>
@@ -34,6 +37,7 @@
         <div><span>Ten tydzień</span><strong id="week"></strong></div>
         <div><span>Ten miesiąc</span><strong id="month"></strong></div>
       </div>
+      <button type="button" id="openReport" class="secondary">Raporty PDF</button>
       <p id="scope" class="note"></p>
     </section>
     <section>
@@ -43,6 +47,21 @@
     </section>
     <p class="note">Historia jest zapisywana na serwerze i dostępna na urządzeniach zalogowanych na to samo konto.</p>
   </div>
+  <dialog id="reportDialog" aria-labelledby="reportTitle">
+    <h2 id="reportTitle">Raport PDF</h2>
+    <p role="status"></p>
+    <form id="reportForm">
+      <label>Samochód <select name="car"></select></label>
+      <label>Okres <select name="period">
+        <option value="year">Rok</option><option value="month" selected>Miesiąc</option>
+        <option value="week">Tydzień</option><option value="custom">Własny zakres</option>
+      </select></label>
+      <label><span id="reportDateLabel">Dzień w wybranym miesiącu</span><input type="date" name="anchor" required></label>
+      <label id="reportEnd" hidden>Do <input type="date" name="end"></label>
+      <p class="note" id="reportRange"></p>
+      <div class="actions"><button>Pobierz PDF</button></div>
+    </form>
+  </dialog>
   <dialog id="vehicleDialog" aria-labelledby="vehicleTitle">
     <h2 id="vehicleTitle">Dodaj pojazd</h2>
     <p role="status"></p>

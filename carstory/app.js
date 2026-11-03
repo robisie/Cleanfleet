@@ -1,3 +1,4 @@
+import {buildReport, reportRange, reportPdf} from './reports.mjs';
 import {administrator, client} from '../pack/auth.js?v=121';
 import {carStoryStorage} from './storage.mjs?v=4';
 import {chronological, consumption, decimal, localDate, periodTotals} from './model.mjs';
@@ -11,7 +12,8 @@ editForm.id = 'editForm';
 dialog.append(editForm);
 const vehicleDialog = $('vehicleDialog');
 const fuelDialog = $('fuelDialog');
-const dialogs = [dialog, vehicleDialog, fuelDialog];
+const reportDialog = $('reportDialog');
+const dialogs = [dialog, vehicleDialog, fuelDialog, reportDialog];
 for (const popup of dialogs) {
   const cancel = document.createElement('button');
   cancel.type = 'button';
@@ -248,6 +250,47 @@ function render(selected = selectedVehicle) {
   });
   $('history').replaceChildren(...rows.reverse());
 }
+
+const reportForm = $('reportForm');
+const reportField = name => field(name, reportForm);
+function reportDates() {
+  return reportRange(reportField('period').value, reportField('anchor').value, reportField('end').value);
+}
+function updateReportDates() {
+  const period = reportField('period').value;
+  $('reportEnd').hidden = period !== 'custom';
+  reportField('end').required = period === 'custom';
+  $('reportDateLabel').textContent = {
+    year: 'Dzień w wybranym roku', month: 'Dzień w wybranym miesiącu',
+    week: 'Dzień w wybranym tygodniu', custom: 'Od',
+  }[period];
+  try {
+    const {from, to} = reportDates();
+    $('reportRange').textContent = [from, to].map(value => value.split('-').reverse().join('.')).join(' – ');
+  } catch {
+    $('reportRange').textContent = '';
+  }
+}
+$('openReport').onclick = () => {
+  reportField('car').replaceChildren(new Option('Wszystkie auta', ''), ...data.vehicles.map(car => new Option(car.name, car.id)));
+  reportField('car').value = selectedVehicle;
+  reportField('anchor').value = reportField('end').value = localDate();
+  updateReportDates();
+  reportDialog.showModal();
+  status();
+};
+reportForm.addEventListener('input', updateReportDates);
+reportForm.onsubmit = event => {
+  event.preventDefault();
+  try {
+    const report = buildReport(data.vehicles, data.entries, reportDates(), reportField('car').value);
+    const doc = reportPdf(report, window.jspdf.jsPDF, window.CFReportFont);
+    doc.save('CarStory-' + report.from + '-' + report.to + '.pdf');
+    status('Raport PDF gotowy.');
+  } catch (error) {
+    status(error.message || 'Nie udało się utworzyć PDF.');
+  }
+};
 
 $('allVehicles').onclick = () => render('');
 $('addVehicle').onclick = () => {

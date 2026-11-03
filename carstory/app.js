@@ -162,6 +162,29 @@ function historyRow(entry, showVehicle, distance) {
   return row;
 }
 
+const vehicleImages = new Map([
+  ['kia sportage 2023', './assets/kia-sportage-2023.webp'],
+  ['renault trafic 2009', './assets/renault-trafic-2009.webp'],
+]);
+
+function garageIcon(name) {
+  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  icon.setAttribute('viewBox', '0 0 48 32');
+  icon.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(icon.namespaceURI, 'path');
+  path.setAttribute('d', 'm8 17 5-10h22l5 10M8 17h32l4 4v8h-6v-4H10v4H4v-8z M10 21h5m18 0h5');
+  icon.append(path);
+
+  const source = vehicleImages.get(name.trim().toLowerCase().replace(/\s+/g, ' '));
+  if (!source) return icon;
+  const image = document.createElement('img');
+  image.className = 'garage-vehicle-image';
+  image.alt = '';
+  image.addEventListener('error', () => image.replaceWith(icon), {once: true});
+  image.src = source;
+  return image;
+}
+
 function renderGarage() {
   const tiles = $('vehicleTiles');
   const focused = document.activeElement?.dataset.carId;
@@ -171,17 +194,11 @@ function renderGarage() {
     button.className = 'garage-tile';
     button.dataset.carId = car.id;
     button.setAttribute('aria-pressed', String(car.id === selectedVehicle));
-    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    icon.setAttribute('viewBox', '0 0 48 32');
-    icon.setAttribute('aria-hidden', 'true');
-    const path = document.createElementNS(icon.namespaceURI, 'path');
-    path.setAttribute('d', 'm8 17 5-10h22l5 10M8 17h32l4 4v8h-6v-4H10v4H4v-8z M10 21h5m18 0h5');
-    icon.append(path);
     const name = document.createElement('strong');
     name.textContent = car.name;
     const fuel = document.createElement('small');
     fuel.textContent = fuelTypes[car.fuel_type] ?? 'Ustaw paliwo';
-    button.append(icon, name, fuel);
+    button.append(garageIcon(car.name), name, fuel);
     button.onclick = () => render(car.id);
     return button;
   });

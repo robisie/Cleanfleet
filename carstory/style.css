@@ -47,3 +47,4 @@ dialog .fields{grid-template-columns:repeat(2,minmax(0,1fr))}
 .fuel-vehicle{display:grid;gap:4px;margin-bottom:12px;font-weight:650}
 dialog [role=status]:empty{display:none}
 @media(max-width:650px){.garage{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.garage-vehicle-image{width:min(100%,120px);height:54px;object-fit:contain;object-position:center bottom}

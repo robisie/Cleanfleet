@@ -36,3 +36,14 @@ dialog .fields{grid-template-columns:repeat(2,minmax(0,1fr))}
 .record-fields>div{background:#eef6f1;border:1px solid #dce6e0;border-radius:8px;padding:5px 9px}
 .record-fields dt{color:#496458;font-size:.75rem}
 .record-fields dd{margin:0;font-size:.9rem;font-weight:700}
+.garage{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));gap:10px}
+.vehicle-tiles{display:contents}
+.garage-tile{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;min-height:110px;background:#eef6f1;color:#183129;border:1px solid #cbded2;text-align:center;overflow-wrap:anywhere}
+.garage-tile[aria-pressed=true],.all-vehicles[aria-pressed=true]{border-color:#176849;background:#d8eee1}
+.garage-tile svg{width:42px;height:32px;fill:none;stroke:currentColor;stroke-width:3;stroke-linejoin:round}
+.garage-action{border-style:dashed;font-weight:700}
+.garage-action span{font-size:1.5rem}
+.all-vehicles,#vehicleFuelForm{margin-top:12px}
+.fuel-vehicle{display:grid;gap:4px;margin-bottom:12px;font-weight:650}
+dialog [role=status]:empty{display:none}
+@media(max-width:650px){.garage{grid-template-columns:repeat(2,minmax(0,1fr))}}

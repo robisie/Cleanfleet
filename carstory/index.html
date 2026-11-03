@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CarStory</title>
-<link rel="stylesheet" href="./style.css?v=4">
+<link rel="stylesheet" href="./style.css?v=5">
 <script src="/app/vendor/supabase-2.57.4.min.js"></script>
-<script type="module" src="./app.js?v=4"></script>
+<script type="module" src="./app.js?v=5"></script>
 </head>
 <body>
 <main>
@@ -14,13 +14,14 @@
   <p id="status" role="status">Sprawdzam dostęp…</p>
   <button type="button" id="retry" class="secondary" hidden>Odśwież dane</button>
   <div id="dashboard" hidden>
-    <section class="toolbar" aria-label="Samochody">
-      <label>Samochód <select id="vehicle"></select></label>
-      <form id="vehicleForm">
-        <label>Nazwa auta <input name="name" required maxlength="80" placeholder="np. Renault Trafic"></label>
-        <label>Paliwo <select name="fuel_type" required></select></label>
-        <button>Dodaj samochód</button>
-      </form>
+    <section aria-label="Pojazdy">
+      <h2>Pojazdy</h2>
+      <div class="garage">
+        <div id="vehicleTiles" class="vehicle-tiles"></div>
+        <button type="button" class="garage-tile garage-action" id="addVehicle"><span aria-hidden="true">＋</span>Dodaj pojazd</button>
+        <button type="button" class="garage-tile garage-action" id="addFuel"><span aria-hidden="true">⛽</span>Dodaj tankowanie</button>
+      </div>
+      <button type="button" class="secondary all-vehicles" id="allVehicles">Wszystkie auta</button>
       <form id="vehicleFuelForm" hidden>
         <label>Domyślne paliwo wybranego auta <select name="fuel_type" required></select></label>
         <button class="secondary">Zapisz paliwo auta</button>
@@ -35,9 +36,27 @@
       </div>
       <p id="scope" class="note"></p>
     </section>
-    <section id="entry" hidden>
-      <h2>Dodaj tankowanie</h2>
-      <form id="fuelForm">
+    <section>
+      <h2>Historia tankowań</h2>
+      <p id="empty">Brak zapisanych tankowań.</p>
+      <div id="history"></div>
+    </section>
+    <p class="note">Historia jest zapisywana na serwerze i dostępna na urządzeniach zalogowanych na to samo konto.</p>
+  </div>
+  <dialog id="vehicleDialog" aria-labelledby="vehicleTitle">
+    <h2 id="vehicleTitle">Dodaj pojazd</h2>
+    <p role="status"></p>
+    <form id="vehicleForm">
+        <label>Nazwa auta <input name="name" required maxlength="80" placeholder="np. Renault Trafic"></label>
+        <label>Paliwo <select name="fuel_type" required></select></label>
+        <button>Dodaj samochód</button>
+      </form>
+  </dialog>
+  <dialog id="fuelDialog" aria-labelledby="fuelTitle">
+    <h2 id="fuelTitle">Dodaj tankowanie</h2>
+    <p role="status"></p>
+    <label class="fuel-vehicle">Samochód <select id="vehicle"></select></label>
+    <form id="fuelForm">
         <div class="fields">
           <label>Data <input type="date" name="date" required></label>
           <label>Stan licznika (km) <input type="number" name="odometer" min="0" max="99999999" step="1" required inputmode="numeric"></label>
@@ -48,14 +67,7 @@
         <label class="check"><input type="checkbox" name="full"> Tankowanie do pełna</label>
         <div class="actions"><button>Zapisz tankowanie</button></div>
       </form>
-    </section>
-    <section>
-      <h2>Historia tankowań</h2>
-      <p id="empty">Brak zapisanych tankowań.</p>
-      <div id="history"></div>
-    </section>
-    <p class="note">Historia jest zapisywana na serwerze i dostępna na urządzeniach zalogowanych na to samo konto.</p>
-  </div>
+  </dialog>
   <dialog id="editDialog" aria-labelledby="editTitle">
     <h2 id="editTitle">Edytuj tankowanie</h2>
     <p id="editVehicle" class="note"></p>

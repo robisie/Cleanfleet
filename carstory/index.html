@@ -9,7 +9,7 @@
 <script defer src="/app/vendor/jspdf-2.5.1.umd.min.js"></script>
 <script defer src="/app/vendor/jspdf-autotable-3.8.2.min.js"></script>
 <script defer src="/app/reports-font.js"></script>
-<script type="module" src="./app.js?v=8"></script>
+<script type="module" src="./app.js?v=9"></script>
 </head>
 <body>
 <main>
@@ -59,7 +59,11 @@
       <label><span id="reportDateLabel">Dzień w wybranym miesiącu</span><input type="date" name="anchor" required></label>
       <label id="reportEnd" hidden>Do <input type="date" name="end"></label>
       <p class="note" id="reportRange"></p>
-      <div class="actions"><button>Pobierz PDF</button></div>
+      <div class="actions">
+        <button>Generuj podgląd</button>
+        <a id="reportPreview" target="_blank" rel="noopener" hidden>Otwórz podgląd PDF</a>
+        <a id="reportDownload" hidden>Pobierz PDF</a>
+      </div>
     </form>
   </dialog>
   <dialog id="vehicleDialog" aria-labelledby="vehicleTitle">

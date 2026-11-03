@@ -254,6 +254,19 @@ function render(selected = selectedVehicle) {
 
 const reportForm = $('reportForm');
 const reportField = name => field(name, reportForm);
+const previewLink = $('reportPreview');
+const downloadLink = $('reportDownload');
+let reportUrl;
+
+function clearReportPreview() {
+  if (reportUrl) URL.revokeObjectURL(reportUrl);
+  reportUrl = null;
+  for (const link of [previewLink, downloadLink]) {
+    link.hidden = true;
+    link.removeAttribute('href');
+  }
+}
+reportDialog.addEventListener('close', clearReportPreview);
 function reportDates() {
   return reportRange(reportField('period').value, reportField('anchor').value, reportField('end').value);
 }
@@ -273,6 +286,7 @@ function updateReportDates() {
   }
 }
 $('openReport').onclick = () => {
+  clearReportPreview();
   reportField('car').replaceChildren(new Option('Wszystkie auta', ''), ...data.vehicles.map(car => new Option(car.name, car.id)));
   reportField('car').value = selectedVehicle;
   reportField('anchor').value = reportField('end').value = localDate();
@@ -280,14 +294,23 @@ $('openReport').onclick = () => {
   reportDialog.showModal();
   status();
 };
-reportForm.addEventListener('input', updateReportDates);
+reportForm.addEventListener('input', () => {
+  clearReportPreview();
+  updateReportDates();
+  status();
+});
 reportForm.onsubmit = event => {
   event.preventDefault();
   try {
     const report = buildReport(data.vehicles, data.entries, reportDates(), reportField('car').value);
     const doc = reportPdf(report, window.jspdf.jsPDF, window.CFReportFont);
-    doc.save('CarStory-' + report.from + '-' + report.to + '.pdf');
-    status('Raport PDF gotowy.');
+    clearReportPreview();
+    reportUrl = URL.createObjectURL(doc.output('blob'));
+    previewLink.href = downloadLink.href = reportUrl;
+    downloadLink.download = 'CarStory-' + report.from + '-' + report.to + '.pdf';
+    previewLink.hidden = downloadLink.hidden = false;
+    status('Podgląd PDF otwiera się w nowej karcie. Po sprawdzeniu wróć tutaj, aby pobrać plik.');
+    previewLink.click();
   } catch (error) {
     status(error.message || 'Nie udało się utworzyć PDF.');
   }
@@ -404,6 +427,7 @@ window.setInterval(() => {
 }, 30000);
 
 function lock(message) {
+  clearReportPreview();
   storage = null;
   for (const popup of dialogs) if (popup.open) popup.close();
   $('vehicleForm').reset();

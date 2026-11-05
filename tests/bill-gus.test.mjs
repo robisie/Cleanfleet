@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import * as B from '../bill/core.js';
-const xml=createRequire(import.meta.url)(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES+'/xml-js');
+const xml=createRequire(import.meta.url)(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES?process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES+'/xml-js':'xml-js');
 const context=vm.createContext({console,fetch,AbortSignal,TextDecoder,Uint8Array,Map,Error,Date,setTimeout});
 const module=new vm.SourceTextModule(await readFile(new URL('../supabase/functions/cleanfleet-bill/gus.js',import.meta.url),'utf8'),{context});
 await module.link(spec=>{const values=spec.startsWith('npm:')?{default:xml}:B;return new vm.SyntheticModule(Object.keys(values),function(){for(const[k,v]of Object.entries(values))this.setExport(k,v);},{context});});await module.evaluate();

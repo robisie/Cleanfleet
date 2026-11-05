@@ -67,7 +67,22 @@ export function stockIntegration(rows,onChange=()=>{}){return {
  assign:async({project:projectId,number,xml,entries,previous,replacement,projectRevision})=>{const result=await stockRpc('rs_allocate_ksef_purchase',{p_project:projectId,p_number:number,p_xml:xml,p_entries:entries,p_revision:projectRevision,p_expected_document:previous?.document??null,p_replace_purchase:replacement||null});await onChange(result.project);return result.link;},
  unassign:async({project:projectId,number,revision})=>{const result=await stockRpc('rs_unassign_ksef_purchase',{p_project:projectId,p_number:number,p_revision:revision});await onChange(result);return result;}
 };}
-export const projects=()=>request('/rest/v1/rs_projects?select=*&order=created_at.desc');
+export async function projects(){
+ const owner=session?.user?.id;if(!owner)throw Error('Zaloguj się ponownie.');
+ const rows=[];let cursor='';
+ for(;;){
+  if(session?.user?.id!==owner)throw Error('Sesja zmieniła się.');
+  const page=await request('/rest/v1/rs_projects?select=*&owner_id=eq.'+encodeURIComponent(owner)+'&order=created_at.desc,id.desc&limit=500'+(cursor?'&or='+encodeURIComponent(cursor):''));
+  if(session?.user?.id!==owner)throw Error('Sesja zmieniła się.');
+  if(!Array.isArray(page))throw Error('Nieprawidłowa lista inwestycji.');
+  rows.push(...page);if(page.length<500)return rows;
+  const last=page.at(-1);
+  if(!/^[0-9a-f-]{36}$/i.test(last.id||'')||!Number.isFinite(Date.parse(last.created_at)))throw Error('Nie można pobrać dalszej części listy inwestycji.');
+  const next=`(created_at.lt.${last.created_at},and(created_at.eq.${last.created_at},id.lt.${last.id}))`;
+  if(next===cursor)throw Error('Serwer nie zwrócił dalszej części listy inwestycji.');
+  cursor=next;
+ }
+}
 export const settings=()=>request('/rest/v1/rs_settings?select=*');
 export const createProject=(payload,date)=>rpc('rs_create_project',{p_payload:payload,p_date:date});
 function clean(value){const {_undo,...data}=value||{};return data;}

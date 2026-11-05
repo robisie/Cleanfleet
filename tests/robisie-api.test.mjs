@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import vm from 'node:vm';
 const source=await fs.readFile(new URL('../app/robisie/api.js',import.meta.url),'utf8');
-async function api(fetch,session={access_token:'test',expires_at:9999999999},timeout=false){const storage=new Map([['robisie-auth-session-v1',JSON.stringify(session)]]);const context=vm.createContext({fetch,AbortController,structuredClone,clearTimeout,setTimeout:timeout?(fn)=>setTimeout(fn,20):setTimeout,localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}});const mod=new vm.SourceTextModule(source,{context});await mod.link(()=>{});await mod.evaluate();mod.namespace.restoreSession();return mod.namespace;}
+async function api(fetch,session={access_token:'test',expires_at:9999999999,user:{id:'owner'}},timeout=false){const storage=new Map([['robisie-auth-session-v1',JSON.stringify(session)]]);const context=vm.createContext({fetch,AbortController,structuredClone,clearTimeout,setTimeout:timeout?(fn)=>setTimeout(fn,20):setTimeout,localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}});const mod=new vm.SourceTextModule(source,{context});await mod.link(()=>{});await mod.evaluate();mod.namespace.restoreSession();return mod.namespace;}
 const response=value=>({ok:true,text:async()=>JSON.stringify(value)});
 test('Towar uses Robisię session for inventory reads, returns and project allocation',async()=>{
  const calls=[],changed=[],savedProject={id:'p',revision:2,payload:{name:'Remont',purchases:[]}};
@@ -61,7 +61,7 @@ test('timeout frees the request; unmatched server state is never accepted as sav
  const a=await api(async(u,o)=>o.method==='POST'?new Promise(()=>{}):response([{id:'p',revision:2,payload:{name:'OTHER'}}]),undefined,true);await assert.rejects(a.saveProject({id:'p',revision:1,payload:{name:'A'}},{name:'B'}));
 });
 test('concurrent requests share one token refresh',async()=>{
- let refresh=0;const a=await api(async(u)=>{if(u.includes('/auth/')){refresh++;await new Promise(resolve=>setTimeout(resolve,10));return response({access_token:'new',expires_in:3600});}return response([]);},{access_token:'old',refresh_token:'refresh',expires_at:1});await Promise.all([a.projects(),a.settings()]);assert.equal(refresh,1);
+ let refresh=0;const a=await api(async(u)=>{if(u.includes('/auth/')){refresh++;await new Promise(resolve=>setTimeout(resolve,10));return response({access_token:'new',expires_in:3600,user:{id:'owner'}});}return response([]);},{access_token:'old',refresh_token:'refresh',expires_at:1,user:{id:'owner'}});await Promise.all([a.projects(),a.settings()]);assert.equal(refresh,1);
 });
 test('investment invoice list merges external KSeF documents without duplicating Bill invoices',async()=>{
  const existing={id:'bill',ksef_number:'K1'},external={id:'external',ksef_number:'K2',originKind:'sales'},purchase={id:'purchase',ksef_number:'K3',originKind:'purchases'};
@@ -102,4 +102,23 @@ test('receipt import and later row changes use receipt RPCs without requesting K
  const entries=[{index:2,quantity:1}];await a.importProjectReceipt({hash:'hash',data:{items:[]},entries,project:'p',revision:1});
  const result=await a.savePurchaseAllocation({id:'p',revision:2},row.payload,{ksef_number:'PARAGON-1',document:{sourceReceipt:true}},entries,null);
  assert.equal(result.revision,3);assert.match(calls[0].url,/rs_receipt_import_selected$/);assert.equal(calls[0].args.p_entries[0].index,2);assert.match(calls[1].url,/rs_receipt_update_allocation$/);assert.equal(calls.length,2);assert.equal(calls[1].args.p_number,'PARAGON-1');
+});
+
+test('project list traverses pages by creation date and ID without silently truncating older investments',async()=>{
+ const calls=[],stamp='2026-11-05T12:00:00+00:00';
+ const row=n=>({id:'00000000-0000-4000-8000-'+String(n).padStart(12,'0'),created_at:stamp,payload:{name:'Project '+n}});
+ const first=Array.from({length:500},(_,i)=>row(1001-i)),second=Array.from({length:500},(_,i)=>row(501-i)),last=[row(1)];
+ const a=await api(async url=>{calls.push(new URL(url));return response(calls.length===1?first:calls.length===2?second:last);});
+ const rows=await a.projects();assert.equal(rows.length,1001);assert.equal(new Set(rows.map(r=>r.id)).size,1001);
+ assert.equal(calls[0].searchParams.get('order'),'created_at.desc,id.desc');assert.equal(calls[0].searchParams.get('owner_id'),'eq.owner');
+ assert.equal(calls[0].searchParams.get('limit'),'500');assert.equal(calls[0].searchParams.has('or'),false);
+ assert.equal(calls[1].searchParams.get('or'),`(created_at.lt.${stamp},and(created_at.eq.${stamp},id.lt.${first.at(-1).id}))`);
+ assert.equal(calls[2].searchParams.get('or'),`(created_at.lt.${stamp},and(created_at.eq.${stamp},id.lt.${second.at(-1).id}))`);
+});
+test('project list never presents a partial result as complete after a failed later page',async()=>{
+ let calls=0;const a=await api(async()=>{if(calls++)throw new TypeError('Offline');return response(Array.from({length:500},()=>({id:'00000000-0000-4000-8000-000000000001',created_at:'2026-11-05T12:00:00Z'})));});
+ await assert.rejects(a.projects(),/Offline/);
+});
+test('project list discards a pending response after logout',async()=>{
+ let release;const a=await api(async()=>{await new Promise(r=>release=r);return response([]);});const pending=a.projects();a.logout();release();await assert.rejects(pending,/Sesja zmieniła/);
 });

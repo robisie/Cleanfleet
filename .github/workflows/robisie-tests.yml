@@ -1,0 +1,33 @@
+name: Robisie and billing regression tests
+on:
+  pull_request:
+    paths:
+      - 'app/robisie/**'
+      - 'bill/**'
+      - 'pack/**'
+      - 'supabase/functions/**'
+      - 'scripts/edge-source.mjs'
+      - 'tests/**'
+      - '.github/workflows/robisie-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'app/robisie/**'
+      - 'bill/**'
+      - 'pack/**'
+      - 'supabase/functions/**'
+      - 'scripts/edge-source.mjs'
+      - 'tests/**'
+      - '.github/workflows/robisie-tests.yml'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --no-save --package-lock=false --ignore-scripts xml-js@1.6.11
+      - run: node --experimental-vm-modules --test tests/robisie-*.test.mjs tests/edge-source.test.mjs tests/bill-*.test.mjs tests/pack*.test.mjs

@@ -19,8 +19,13 @@ async function open(db){
  const api={finishProject:async row=>{assert.equal(row.revision,db.revision);db.finishCalls=(db.finishCalls||0)+1;db.payload.status='zakonczona';db.revision++;return structuredClone(db);},addProjectEarnings:async(row,amount)=>{assert.equal(row.revision,db.revision);db.earningsCalls=(db.earningsCalls||0)+1;db.earnings||={id:'earning',my_amount:amount,work_date:db.payload.handover.date};return structuredClone(db.earnings);},projectEarnings:async()=>structuredClone(db.earnings||null),stageInvoices:async()=>structuredClone(db.documents||[]),project:async()=>structuredClone(db),restoreSession:()=>null,getSession:()=>({user:{id:'test'}}),saveProject:async(row,payload)=>{
   assert.equal(row.revision,db.revision);const patch=changedFields(row.payload,payload),stored=structuredClone(db.payload);
   for(const key of patch.p_remove_keys)delete stored[key];Object.assign(stored,structuredClone(patch.p_fields));stored._undo=structuredClone(payload._undo);assert.deepEqual(stored,payload);
+  if(db.payload.status==='zakonczona'&&stored.status!=='zakonczona'&&db.earnings){
+   (db.earningsHistory??=[]).push({...db.earnings,reopened_at:'2026-11-05T23:00:00Z'});
+   db.earnings=null;
+  }
   db.payload=stored;db.revision++;return structuredClone(db);
  }};
+ api.projectEarningsHistory=async()=>structuredClone(db.earningsHistory||[]);
  const context=vm.createContext({console,crypto,structuredClone,URL,FormData:class extends Map{constructor(fields){super(Object.entries(fields));}getAll(key){const value=this.get(key);return Array.isArray(value)?value:value?[value]:[];}},setTimeout(fn,ms){const timer=setTimeout(fn,ms);timers.push(timer);return timer;},clearTimeout,confirm:()=>accept,fetch:async()=>({ok:true,json:async()=>[]}),window:{location:{href:'https://test.local/app/robisie/'},scrollY:0,scrollTo(){},addEventListener(){}},document:{body:{style:{}},documentElement:{style:{}},querySelector:node,querySelectorAll:()=>[],addEventListener(type,fn){events.set(type,fn);}}});
  const mod=new vm.SourceTextModule(source+`\nexport {receiptDialog};export const data=()=>selected;export function setup(row){all=[structuredClone(row)];selected=structuredClone(row);config={revision:1,payload:{catalog:[],company:{}}};configBaseline=structuredClone(config);view='payments';projectDirty=settingsDirty=dirty=false;render();}`,{context});
  await mod.link(spec=>{const values=spec.includes('receipt-import.js')?ReceiptImport:spec.includes('shopping.js')?Shopping:spec.includes('completion.js')?Completion:spec.includes('purchase-settlement-form')?PurchaseSettlementForm:spec.includes('purchase-settlement')?PurchaseSettlement:spec.includes('invoices')?BI:spec.includes('autosave')?Auto:spec.includes('core')?C:spec.includes('pdf')?PDF:api;return new vm.SyntheticModule(Object.keys(values),function(){for(const [key,value]of Object.entries(values))this.setExport(key,value);},{context});});
@@ -28,6 +33,22 @@ async function open(db){
  return {app:mod.namespace,node,accept(value){accept=value;},async click(action,id,extra={}){await events.get('click')({preventDefault(){},target:{closest:()=>({dataset:{action,id,...extra},isConnected:true})}});},async submit(fields){await node('#modal-form').onsubmit({preventDefault(){},target:fields});},close(){timers.forEach(clearTimeout);}};
 }
 const fixture=()=>{const payload=C.newProject('Test','Test');payload.receipts=[{id:'a',kind:'materials',date:'2026-10-12',amount:1000,note:'Zaliczka'}];payload.purchases=[{id:'p',amount:4725.65,charge:4725.65,paid:false,paidAmount:0}];return {id:'p',contract_number:'UUR',revision:1,payload};};
+
+test('handover shows the previous earning after reopening the investment',async()=>{
+ const row=fixture();row.payload.status='zakonczona';row.earnings={id:'earning',my_amount:5000,work_date:'2026-11-01'};
+ const ui=await open(row);
+ try{
+  await ui.click('nav',null,{view:'handover'});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.match(ui.node('#app').innerHTML,/Wpis w Moich zarobkach/);
+  await ui.click('reopen');
+  const html=ui.node('#app').innerHTML;
+  assert.match(html,/Historia zarobku/);
+  assert.match(html,/2026-11-01/);
+  assert.ok(html.includes(C.money(5000)));
+  assert.equal(row.earnings,null);
+ }finally{ui.close();}
+});
 
 test('completion shows separate balances and counts invoice-linked receipts only once',()=>{
  const p=C.newProject('A','B');p.works=[{id:'w',qty:1,price:1000,done:true},{id:'u',qty:1,price:600,done:false}];p.workDiscount=10;p.workCredit=50;

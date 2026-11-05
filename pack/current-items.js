@@ -6,6 +6,9 @@ export function currentItems(reminders, washes, projects, companies = [], now = 
  const limit = new Date(today + 'T12:00:00Z');
  limit.setUTCDate(limit.getUTCDate() + 6);
  const lastDay = limit.toISOString().slice(0,10);
+ const reminderLimit = new Date(today + 'T12:00:00Z');
+ reminderLimit.setUTCDate(reminderLimit.getUTCDate() + 2);
+ const lastReminderDay = reminderLimit.toISOString().slice(0,10);
  const names = new Map(companies.map(company => [company.id, company.short_name || company.name]));
  const items = [];
  for (const wash of washes) {
@@ -19,6 +22,7 @@ export function currentItems(reminders, washes, projects, companies = [], now = 
   if (!['active','snoozed'].includes(reminder.status)) continue;
   const at = reminder.status === 'snoozed' && reminder.snoozed_until ? reminder.snoozed_until : reminder.remind_at;
   const day = warsawDay(at || reminder.due_at || 'invalid');
+  if (!day || day < today || day > lastReminderDay) continue;
   items.push({kind:'Przypomnienie', title:reminder.title || 'Przypomnienie', date:day,
    detail: reminder.notes || '', module:'reminders', reminderId:reminder.id,
    priority:reminder.priority === 'high' ? 0 : 1});
@@ -69,6 +73,7 @@ export function mountCurrentItems(db, owner, document, {openModule, openApplicat
  const host=document.getElementById('currentItems');
  const message=document.getElementById('currentStatus');
  const count=document.getElementById('currentCount');
+ const expanded = new Set();
  let disposed=false, generation=0, pending=null, paused=false, again=false;
  function clear() {host.replaceChildren();count.textContent='';}
  async function refresh() {
@@ -89,9 +94,20 @@ export function mountCurrentItems(db, owner, document, {openModule, openApplicat
    clear();
    count.textContent=String(rows.length);
    message.textContent=failed.length?'Nie udało się pobrać '+failed.join(', ')+'. Spróbuj odświeżyć.':
-    rows.length?'Prania na najbliższe 7 dni, przypomnienia i sprawy inwestycji.':'Brak bieżących spraw.';
+    rows.length?'Przypomnienia: 3 dni · Prania: 7 dni · Inwestycje: bieżące sprawy':'Brak bieżących spraw.';
    const today=warsawDay();
-   for(const item of rows) {
+   for(const [kind,label] of [['Przypomnienie','Przypomnienia'],['Pranie','Prania'],['Inwestycja','Inwestycje']]) {
+    const items=rows.filter(item=>item.kind===kind);
+    const section=document.createElement('details');section.className='current-group';section.dataset.kind=kind;section.open=expanded.has(kind);
+    const summary=document.createElement('summary');
+    const labelNode=document.createElement('span');labelNode.textContent=label;
+    const total=document.createElement('span');total.className='current-group-count';total.textContent=String(items.length);
+    summary.append(labelNode,total);section.append(summary);
+    const list=document.createElement('div');list.className='current-group-list';section.append(list);
+    if(!items.length){const empty=document.createElement('p');empty.className='current-group-empty';empty.textContent='Brak spraw w tym zakresie.';list.append(empty);}
+    section.addEventListener('toggle',()=>{if(!section.isConnected)return;if(section.open)expanded.add(kind);else expanded.delete(kind);});
+    host.append(section);
+    for(const item of items) {
     const button=document.createElement('button');
     button.type='button';button.className='current-item';
     button.dataset.kind=item.kind;
@@ -108,7 +124,8 @@ export function mountCurrentItems(db, owner, document, {openModule, openApplicat
      const task=item.module ? openModule(item.module) : openApplicationLink(new URL(item.url,location.origin));
      Promise.resolve(task).catch(()=>{message.textContent='Nie udało się otworzyć wpisu. Spróbuj ponownie.';});
     };
-    host.append(button);
+    list.append(button);
+    }
    }
   })().catch(()=>{if(!disposed && run===generation){clear();message.textContent='Nie udało się pobrać bieżących spraw.';}})
    .finally(()=>{pending=null;if(again&&!disposed&&!paused){again=false;void refresh();}});

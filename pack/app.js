@@ -1,4 +1,4 @@
-import {mountCurrentItems} from './current-items.js?v=1';
+import {mountCurrentItems} from './current-items.js?v=2';
 import {mountTodayBadges} from './today-badges.js?v=2';
 import {client,administrator,modules,applications} from './auth.js?v=130';
 import {mountTiles} from './tiles.js?v=114';

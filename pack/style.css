@@ -59,3 +59,14 @@ body:has(#login:not([hidden])) .login-card{flex:none;width:100%;margin:auto}
 /* Today's counts stay clear of the drag handle and do not intercept taps. */
 .tile-date-counts{position:absolute;top:13px;right:48px;display:flex;gap:5px;pointer-events:none}.tile-today-count{display:inline-flex;align-items:center;justify-content:center;min-width:25px;height:25px;padding:0 6px;border-radius:999px;background:#c82636;color:#fff;font:750 13px/1 system-ui,sans-serif;box-shadow:0 2px 5px #65121a25;pointer-events:none;font-variant-numeric:tabular-nums}.tile-today-count[hidden]{display:none}.tile-count-tomorrow{background:#b95b00}.tile-count-upcoming{background:#667078}
 @media(max-width:599px){.tile-date-counts{top:12px;right:43px;gap:4px}.tile-today-count{min-width:23px;height:23px;font-size:12px}}
+
+/* A two-column feed grows in whole dashboard rows. */
+.current-tile{align-self:stretch;overflow:hidden;background:linear-gradient(140deg,#f7faf7,#fff)}
+.current-content{padding:18px 16px 16px;min-width:0;height:auto}
+.current-heading{padding-right:30px}.current-heading h3{margin:0;font-size:18px;color:#254f3d}
+#currentCount{display:inline-flex;min-width:24px;justify-content:center;border-radius:20px;background:#dcebe2;font-size:12px;padding:3px 6px;vertical-align:middle}
+#currentCount:empty{display:none}#currentStatus{font-size:12px;color:#64736a;line-height:1.45;margin:8px 0 12px}
+#currentItems{display:grid;gap:8px}.current-item{display:flex;flex-direction:column;align-items:stretch;gap:4px;min-width:0;width:100%;text-align:left;border:1px solid #dde6e0;border-left:3px solid #609b79;border-radius:10px;background:#fff;padding:10px 12px;color:#263e30;cursor:pointer;font:inherit}
+.current-item:hover{background:#f3f8f4}.current-item:focus-visible{outline:2px solid #275c48;outline-offset:2px}.current-item[data-kind="Przypomnienie"]{border-left-color:#c99342}.current-item[data-kind="Inwestycja"]{border-left-color:#758db9}
+.current-item-top{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 12px;color:#67766d}.current-item-top small{font-size:11px}.current-item strong{font-size:14px;overflow-wrap:anywhere}.current-detail{font-size:12px;line-height:1.4;color:#637169;overflow-wrap:anywhere;white-space:pre-line}.current-overdue{color:#bb3041!important;font-weight:700}.current-refresh{margin-top:12px;padding:5px 10px;border:1px solid #cedbd2;border-radius:7px;background:white;color:#335c44;font:inherit;font-size:12px;cursor:pointer}
+@media(max-width:599px){.current-content{padding:16px 12px 12px}.current-heading h3{font-size:17px}}

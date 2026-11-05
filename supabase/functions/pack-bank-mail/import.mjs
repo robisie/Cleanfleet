@@ -16,6 +16,6 @@ export function mergeStatement(state,batch,P){
 }
 export function bankPeriod(day){
   const [year,month,date]=day.split('-').map(Number);
-  if(date<7)return null;
+  if(date<5)return null;
   return {month:day.slice(0,7),period:new Date(Date.UTC(year,month-2,1)).toISOString().slice(0,7),from:day.slice(0,7)+'-01',to:day};
 }

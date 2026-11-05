@@ -32,6 +32,7 @@ test('overpayments, partials, wrong currency and excluded credits are handled co
 test('statement reconciliation replaces bank evidence while keeping the manual flag',async()=>{
  const invoiceRow={...invoice('a','A1/10/2026'),creator_id:'owner'},records=new Map([['a',{invoice_id:'a',manual_paid:true,bank_cents:null,bank_payments:[]}]]);
  const db={from:table=>{
+  if(table==='bill_bank_payment_links')return {select(){return this},eq:async()=>({data:[]})};
   if(table==='bill_invoices')return {select(){return this;},eq(){return this;},neq(){return this;},limit:async()=>({data:[invoiceRow]})};
   return {select(){return this;},in:async()=>({data:[...records.values()]}),update(value){this.value=value;return this;},eq:async function(_,id){records.set(id,{...records.get(id),...this.value});return {error:null};}};
  }};

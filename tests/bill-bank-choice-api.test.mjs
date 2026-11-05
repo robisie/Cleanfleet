@@ -1,0 +1,24 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {stripTypeScriptTypes} from 'node:module';
+import {readFile} from 'node:fs/promises';
+test('bank choices require authenticated admin and invoice ownership, use fresh evidence and trust no client owner',async()=>{
+ let handler,role='admin',owner='owner',vault=true,fail=false;const calls=[];
+ const row={id:'10000000-0000-4000-8000-000000000001',creator_id:owner,number:'A1/10/2026',status:'issued',payload:{}};
+ const db={auth:{getUser:async()=>({data:{user:{id:'owner'}}})},from:table=>({select(){return this},eq(){return this},single:async()=>({data:table==='user_roles'?{role}:{...row,creator_id:owner}}),maybeSingle:async()=>({data:vault?{envelope:{accountKey:'test-fixture'}}:null})}),rpc:async(name,args)=>{calls.push({name,args});return fail?{error:Error('Propozycja jest nieaktualna')}:{data:null}}};
+ const source=stripTypeScriptTypes(await readFile(new URL('../supabase/functions/cleanfleet-bill/index.ts',import.meta.url),'utf8'));
+ const imports=new Map([...source.matchAll(/import\s*\{([^}]+)\}\s*from\s*['"]([^'"]+)['"]/g)].map(m=>[m[2],m[1].split(',').map(s=>s.trim())]));
+ const implementations={createClient:()=>db,createArchiveService:()=>async()=>{},ksefApi:()=>async()=>{},createStateCodec:()=>({}),openAccount:async()=>({state:{}}),reconcileBillPayments:async()=>calls.push({name:'reconcile'})};
+ const context=vm.createContext({console,Request,Response,JSON,crypto,Deno:{env:{get:()=>''},serve:fn=>handler=fn}});
+ const module=new vm.SourceTextModule(source,{context});await module.link(spec=>new vm.SyntheticModule(imports.get(spec)||[],function(){for(const name of imports.get(spec)||[])this.setExport(name,implementations[name]||(()=>{}))},{context}));await module.evaluate();
+ const request=(body,auth=true)=>handler(new Request('https://example.test',{method:'POST',headers:auth?{Authorization:'Bearer test'}:{},body:JSON.stringify(body)}));
+ const body={action:'bank-link',id:row.id,incomeId:'transfer',ownerId:'forged',amount:1};
+ assert.equal((await request(body,false)).status,401);role='employee';assert.equal((await request(body)).status,403);assert.equal(calls.length,0);
+ role='admin';owner='other';assert.notEqual((await request(body)).status,200);assert.equal(calls.length,0);
+ owner='owner';vault=false;assert.notEqual((await request(body)).status,200);assert.equal(calls.length,0);
+ vault=true;assert.equal((await request(body)).status,200);assert.deepEqual(calls.map(c=>c.name),['reconcile','bill_bank_payment_choice','reconcile']);
+ assert.equal(calls[1].args.p_owner,'owner');assert.equal(calls[1].args.p_income,'transfer');assert.equal(calls[1].args.p_remove,false);assert.equal(calls[1].args.amount,undefined);
+ calls.length=0;fail=true;assert.notEqual((await request(body)).status,200);assert.deepEqual(calls.map(c=>c.name),['reconcile','bill_bank_payment_choice']);
+ calls.length=0;fail=false;assert.equal((await request({...body,action:'bank-unlink'})).status,200);assert.equal(calls[1].args.p_remove,true);
+});

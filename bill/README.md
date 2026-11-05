@@ -1,4 +1,4 @@
-# Bill 1.0.57
+# Bill 1.0.58
 
 Admin-only invoicing at `/bill/`. Uses the existing CleanFleet Supabase login, with a separate browser session key. No signup and no direct browser access to billing tables. The server checks the current user and administrator role for every operation.
 
@@ -148,3 +148,5 @@ Brak zmian oznacza brak drugiego przeliczenia całego magazynu. Niepełna histor
 Filtr „Oddano” obejmuje także całkowicie zwrócone pozycje z dostępnością zero, zarówno z faktur, jak i paragonów. Ręczny zwrot można cofnąć przyciskiem „Przywróć do magazynu”; ilość potwierdzona korektą KSeF nadal wynika z dokumentu. Widok zwrotów nie oferuje zbiorowego przypisania całego dokumentu.
 
 „Przypisz cały paragon” wybiera dostępne ilości, z pominięciem w pełni zwróconych, wykorzystanych, ukrytych i konfliktowych wierszy. Dialog wyjaśnia zakres. Dla inwestycji używa istniejącego wyboru ilości. Dla Auto, Kosztów firmowych i CleanFleet nowy RPC `rs_receipt_assign_remaining` porównuje listę i ilości pod blokadą dokumentu, a następnie zapisuje całość w jednej transakcji. Ponowne przypisanie przywróconej ilości dodaje ją do istniejącej ilości danej kategorii. Wdrożyć migrację przed klientami.
+
+Propozycje powiązania wpływów: identyczna kwota i waluta oraz wspólne dane płatnika; wymagają zatwierdzenia w Bill. Jeden przelew może potwierdzać jedną fakturę. Powiązanie można cofnąć. Dopasowania z numerem faktury pozostają automatyczne.

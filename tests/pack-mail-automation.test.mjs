@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {bankPeriod,mergeStatement} from '../supabase/functions/pack-bank-mail/import.mjs';
 const P=createRequire(import.meta.url)('../app/priv/engine.js');
-test('bank dates start on seventh and target previous month, including January',()=>{
- assert.equal(bankPeriod('2026-11-06'),null);
- assert.equal(bankPeriod('2026-11-07').period,'2026-10');
- assert.equal(bankPeriod('2027-01-07').period,'2026-12');
+test('bank dates start on fifth and target previous month, including January',()=>{
+ assert.equal(bankPeriod('2026-11-04'),null);
+ assert.equal(bankPeriod('2026-11-05').period,'2026-10');
+ assert.equal(bankPeriod('2027-01-05').period,'2026-12');
+ assert.equal(bankPeriod('2026-11-06').period,'2026-10');
+ assert.equal(bankPeriod('2026-11-30').period,'2026-10');
 });
 test('automatic imports retain real repeated payments and user overrides without duplicate reimports',()=>{
  const t={date:'2026-10-02',recipient:'ZUS',title:'Składka',account:'',amount:10000,currency:'PLN'};

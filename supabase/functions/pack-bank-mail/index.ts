@@ -87,6 +87,9 @@ async function run(settings:any,dry=false){
         check(await db.from('pack_bank_mail_files').update({status:'imported',last_error:null,imported_at:new Date().toISOString()}).eq('id',file.id));stats.imported++;
       }catch(e){stats.errors++;if(file)check(await db.from('pack_bank_mail_files').update({status:'needs_attention',last_error:String((e as any).message||'Błąd importu').slice(0,500)}).eq('id',file.id));else throw e;}
     }
+    // Recompute evidence and suggestions even when every attachment is already imported.
+    const currentVault=check(await db.from('cf_payment_vaults').select('envelope').eq('user_id',uid).maybeSingle());
+    if(currentVault?.envelope?.accountKey){const {state}=await openAccount(currentVault.envelope);await reconcileBillPayments(db,uid,state,P,invoiceAmount);}
     check(await db.from('pack_bank_mail_settings').update({last_checked_at:new Date().toISOString(),last_error:stats.errors?'Część wyciągów wymaga sprawdzenia.':stats.found?null:'Nie znaleziono wyciągów. Ponowne sprawdzenie jutro.'}).eq('user_id',uid));
     return {ok:stats.errors===0,...stats};
   }finally{try{client?.close();}catch{}if(!dry)check(await db.from('pack_bank_mail_settings').update({locked_until:null}).eq('user_id',uid));}

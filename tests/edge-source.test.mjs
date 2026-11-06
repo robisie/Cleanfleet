@@ -14,6 +14,18 @@ test('Bill deployment includes the current Robisie calculations and all cross-fu
  }
  assert.equal(files.get('supabase/functions/cleanfleet-bill/invoice.js'),await readFile(path.join(root,'bill/core.js'),'utf8'));
 });
+test('bank importer bundles the same invoice calculator as BILL',async()=>{
+ const path='supabase/functions/cleanfleet-bill/invoice.js';
+ const bundles=await Promise.all(['cleanfleet-bill','pack-bank-mail'].map(name=>edgeSource(root,name)));
+ const [bill,bank]=bundles.map(bundle=>bundle.files.find(file=>file.name===path)?.content);
+ assert.ok(bank);
+ assert.equal(bank,bill);
+ const {invoiceAmount}=await import('data:text/javascript;base64,'+Buffer.from(bank).toString('base64'));
+ const invoice={lines:[{qty:'1',price:'1000.00'}]};
+ assert.equal(invoiceAmount({...invoice,globalDiscount:'10'}),90000);
+ assert.equal(invoiceAmount({...invoice,documentType:'advance',advanceAmount:'250'}),25000);
+ assert.equal(invoiceAmount({...invoice,documentType:'final',advances:[{amount:'250'}]}),75000);
+});
 test('dependency collection follows side effects, re-exports, dynamic imports and cycles, ignoring remote packages',async()=>{
  const root=await mkdtemp(path.join(tmpdir(),'edge-source-'));
  try{

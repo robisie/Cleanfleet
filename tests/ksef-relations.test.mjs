@@ -43,7 +43,7 @@ test('stock sorts newest invoices, groups their items and combines shop and stat
  const item=(metadata,index,available,returned)=>({metadata,item:{index,name:'Towar '+index,unit:'szt.',gross:100},capacity:1,assigned:0,returned,available});
  const old={...a,invoiceNumber:'Starsza',issueDate:'2026-01-10',seller:{nip:'111',name:'A sklep'}},newer={...a,ksefNumber:'new',invoiceNumber:'Nowsza',issueDate:'2026-10-20',seller:{nip:'222',name:'B sklep'}};
  const rows=[item(old,1,1,0),item(newer,1,1,1),item(newer,2,0,1)];
- const html=stockMarkup(rows);assert.ok(html.indexOf('Nowsza')<html.indexOf('Starsza'));assert.equal((html.match(/class="kf-stock-invoice"/g)||[]).length,2);assert.equal((html.match(/Faktura PDF/g)||[]).length,2);
+ const html=stockMarkup(rows);assert.ok(html.indexOf('Nowsza')<html.indexOf('Starsza'));assert.equal((html.match(/class="kf-stock-invoice(?: [^"]*)?"/g)||[]).length,2);assert.equal((html.match(/Faktura PDF/g)||[]).length,2);
  assert.deepEqual(stockStores(rows),[['111','A sklep'],['222','B sklep']]);
  const filtered=stockMarkup(rows,'',{store:'222',status:'returned'});assert.match(filtered,/Towar 1/);assert.match(filtered,/Towar 2/);assert.doesNotMatch(filtered,/Starsza/);
  const available=stockMarkup(rows,'',{store:'222',status:'available'});assert.match(available,/Towar 1/);assert.doesNotMatch(available,/Towar 2/);

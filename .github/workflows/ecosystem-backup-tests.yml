@@ -1,0 +1,21 @@
+name: Ecosystem backup restore test
+on:
+  pull_request:
+    paths:
+      - 'scripts/ecosystem-backup.py'
+      - 'scripts/backup-requirements.txt'
+      - 'tests/ecosystem-backup-restore.py'
+      - 'supabase/migrations/*_ecosystem_backup_jobs.sql'
+      - '.github/workflows/ecosystem-backup-tests.yml'
+permissions:
+  contents: read
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r scripts/backup-requirements.txt pgserver==0.1.4
+      - run: python tests/ecosystem-backup-restore.py

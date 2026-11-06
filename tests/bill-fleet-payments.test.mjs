@@ -42,17 +42,36 @@ test('BILL fetches matching KSeF sales links and loads the linked investment',as
  const link={ksef_number:ksef,project_id:cfId,document:{id:'imported-sales-id'}};
  const context=vm.createContext({AbortController,Date,JSON,Map,Set,Promise,setTimeout,clearTimeout,fetch:async(url)=>{
   const path=new URL(url);calls.push(path);
-  const result=path.pathname.endsWith('/rs_ksef_links')?[link]:[{id:cfId,payload:{invoiceSettlements:[]}}];
+  const result=path.pathname.endsWith('/rs_ksef_links')?[link]:path.pathname.endsWith('/rs_projects')?[{id:cfId,payload:{invoiceSettlements:[]}}]:[];
   return {ok:true,text:async()=>JSON.stringify(result)};
  }});
  const source=await readFile(new URL('../bill/api.js',import.meta.url),'utf8');
  const module=new vm.SourceTextModule(source,{context});await module.link(()=>{});await module.evaluate();
  const row={id:billId,status:'accepted',ksef_number:ksef,payload:{currency:'PLN',source:{app:'external'}}};
  const result=await module.namespace.paymentEvidence([row,{...row,ksef_number:'invalid'}, {...row,status:'draft'}]);
- assert.equal(calls.length,2);
- assert.equal(calls[0].searchParams.get('kind'),'eq.sales');
- assert.equal(calls[0].searchParams.get('ksef_number'),'in.('+ksef+')');
- assert.equal(calls[1].searchParams.get('id'),'in.('+cfId+')');
+ assert.equal(calls.length,3);
+ const salesRequest=calls.find(path=>path.pathname.endsWith('/rs_ksef_links'));
+ assert.equal(salesRequest.searchParams.get('kind'),'eq.sales');
+ assert.equal(salesRequest.searchParams.get('ksef_number'),'in.('+ksef+')');
+ assert.equal(calls.find(path=>path.pathname.endsWith('/rs_projects')).searchParams.get('id'),'in.('+cfId+')');
  assert.equal(result.salesLinks.get(ksef).document.id,'imported-sales-id');
  assert.ok(result.projects.has(cfId));
+});
+
+test('legacy CleanFleet payments require an owned verified link and matching current amounts',async()=>{
+ const owner='owner',filters=[];
+ const cf={id:cfId,status:'paid',invoice_number:'QA/01/2026',invoice_date:'2026-01-12',amount:123.45,currency:'EUR'};
+ const db={from(table){return {select(){return this;},eq(column,value){filters.push([column,value]);return this;},async in(){
+  return {data:table==='invoices'?[cf]:[{invoice_id:billId,cf_invoice_id:cfId,bill_invoices:{
+   number:'QA/01/2026',payload:{issueDate:'2026-01-12',currency:'EUR',lines:[{price:'123.45',qty:'1'}]}
+  }}]};
+ }}}};
+ const options={legacy:true,userId:owner};
+ assert.deepEqual(await fleetPaymentEvidence(db,[billId],options),[{invoice_id:billId,paid:true}]);
+ assert.deepEqual(filters,[['bill_invoices.creator_id',owner]]);
+ cf.status='pending';
+ assert.deepEqual(await fleetPaymentEvidence(db,[billId],options),[{invoice_id:billId,paid:false}]);
+ cf.amount=124.45;
+ assert.deepEqual(await fleetPaymentEvidence(db,[billId],options),[]);
+ await assert.rejects(fleetPaymentEvidence(db,[billId],{legacy:true}),/właściciela/);
 });

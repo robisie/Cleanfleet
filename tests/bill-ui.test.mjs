@@ -38,6 +38,9 @@ test('billing gates access, escapes contractor text, and shares monthly numberin
  m.namespace.testView('invoices',row,[paymentMark],sources);
  assert.doesNotMatch(node('#app').innerHTML,/Wpłata w ROBISIĘ/);
  assert.match(node('#app').innerHTML,/Wpłata: Zapłacona ręcznie/);
+ m.namespace.testView('invoices',row,[paymentMark],{...sources,legacyFleet:new Map([[row.id,true]])});
+ assert.match(node('#app').innerHTML,/Potwierdzono w CleanFleet/);
+ assert.match(node('#app').innerHTML,/Pozostało 0,00/);
  row.payload.source=null;
  const proposal={incomeId:'income-1',amountCents:290000,date:'2026-10-19',sender:'Dawid <img src=x>',title:'Usługi remontowe',statement:'mBiznes.pdf',reason:'Zgodne dane płatnika',otherInvoices:1};
  m.namespace.testView('invoices',row,[{invoice_id:row.id,manual_paid:true,bank_candidates:[proposal]}]);

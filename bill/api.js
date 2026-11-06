@@ -58,12 +58,14 @@ export async function paymentEvidence(invoices){
  const numbers=[...new Set(issued.filter(r=>r.status==='accepted'&&r.payload?.currency==='PLN').map(r=>r.ksef_number)
   .filter(number=>typeof number==='string'&&/^\d{10}-\d{8}-[0-9a-f]{12}-[0-9a-f]{2}$/i.test(number)))];
  const fleetLookup=pages(fleet,ids=>call({action:'fleet-payments',ids}));
+ const legacyIds=[...new Set(issued.filter(r=>r.status==='accepted'&&r.payload?.source?.app==='external').map(r=>r.id).filter(validId))];
+ const legacyLookup=pages(legacyIds,ids=>call({action:'legacy-fleet-payments',ids}));
  const linksLookup=pages(numbers,ids=>request('/rest/v1/rs_ksef_links?select=ksef_number,project_id,document&kind=eq.sales&ksef_number=in.('+ids.join(',')+')'));
- const [links,fleetRows]=await Promise.all([linksLookup,fleetLookup]);
+ const [links,fleetRows,legacyRows]=await Promise.all([linksLookup,fleetLookup,legacyLookup]);
  const projectIds=[...new Set([...projects,...links.map(r=>r.project_id)].filter(validId))];
  const projectRows=await pages(projectIds,ids=>request('/rest/v1/rs_projects?select=id,payload&id=in.('+ids.join(',')+')'));
  return {projects:new Map(projectRows.map(r=>[r.id,r.payload])),fleet:new Map(fleetRows.map(r=>[r.invoice_id,r.paid===true])),
-  salesLinks:new Map(links.map(r=>[r.ksef_number,r]))};
+  salesLinks:new Map(links.map(r=>[r.ksef_number,r])),legacyFleet:new Map(legacyRows.map(r=>[r.invoice_id,r.paid===true]))};
 }
 
 export const correctCostContext=number=>stockRpc('rs_ksef_cost_correction_context',{p_number:number});

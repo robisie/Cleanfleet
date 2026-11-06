@@ -1,10 +1,10 @@
 import {invoiceGroups} from './invoice-groups.js?v=1.0.38';
 import * as KSEF from './ksef.js?v=1.0.57';
 import * as C from './core.js?v=1.0.57';
-import * as API from './api.js?v=1.0.60';
+import * as API from './api.js?v=1.0.61';
 import {preview,previewHtml} from './pdf.js?v=1.0.57';
 import * as Demand from './payment-demand.js?v=1.0.38';
-import {paymentStatus} from './payment-status.js?v=1.0.60';
+import {paymentStatus} from './payment-status.js?v=1.0.61';
 async function fleetPreview(row){const a=await API.call({action:'fleet-attachment',id:row.id});const {previewFleet}=await import('./fleet-pdf.js?v=1.0.57');await previewFleet(a);}
 const isFleetLines=r=>isFleet(r)&&r.payload.source.fleetLayout==='vehicle-lines';
 const isFleet=r=>r?.payload?.source?.fleetId===r?.id&&!r?.payload?.correction;
@@ -23,7 +23,7 @@ async function refresh(){data=await API.call({action:'bootstrap'});if(API.invoic
 function login(error=''){$('#app').innerHTML=`<div class="login"><div class="brand">Bill<span>.</span></div><p class="muted">Faktury · Robisię-Fer</p><div class="card"><h1>Zaloguj się</h1><p class="muted">Użyj konta administratora CleanFleet.</p><form id="login">${field('email','E-mail','','email','required autocomplete="username"')}${field('password','Hasło','','password','required autocomplete="current-password"')}<p class="error" role="alert">${e(error)}</p><button class="primary" type="submit">Otwórz faktury</button></form></div></div>`;}
 function render(){
  const title=view==='edit'?(editor?.payload?.correction?'Nowa korekta':'Nowa faktura'):view==='detail'?(selected.number||'Szkic faktury'):view==='parties'?'Kontrahenci':view==='ksef'?'KSeF':view==='settings'?'Ustawienia':'Faktury';
- $('#app').innerHTML=`<header class="topbar"><div><div class="brand">Bill<span>.</span></div><small>Robisię-Fer · CleanFleet & Robisię</small></div><div class="row"><span class="muted small">1.0.60</span>${button('logout','Wyloguj')}</div></header><div class="shell"><nav>${[['invoices','Faktury'],['parties','Kontrahenci'],['ksef','KSeF'],['settings','Ustawienia']].map(([v,l])=>button('nav',l,view===v?'active':'',`data-view="${v}"`)).join('')}<div class="links"><a href="/app/">CleanFleet ↗</a><a href="/app/robisie/">Robisię ↗</a></div></nav><main><div class="toolbar"><div><h1>${e(title)}</h1><p class="muted">${view==='edit'?'Wspólne dane i numeracja. Logo wybierasz osobno.':view==='invoices'?'Sprzedaż obu marek w jednym miejscu.':view==='detail'?e(brandName(selected.payload.brand)):''}</p></div><div class="actions">${view==='invoices'?button('new','+ Wystaw fakturę','primary'):view==='parties'?button('new-party','+ Dodaj kontrahenta','primary'):['edit','detail'].includes(view)?button('back','← Wróć do faktur'):''}</div></div><p id="page-error" class="error" role="alert"></p>${view==='invoices'?list():view==='parties'?parties():view==='ksef'?KSEF.view():view==='settings'?settings():view==='edit'?edit():detail()}</main></div>`;
+ $('#app').innerHTML=`<header class="topbar"><div><div class="brand">Bill<span>.</span></div><small>Robisię-Fer · CleanFleet & Robisię</small></div><div class="row"><span class="muted small">1.0.61</span>${button('logout','Wyloguj')}</div></header><div class="shell"><nav>${[['invoices','Faktury'],['parties','Kontrahenci'],['ksef','KSeF'],['settings','Ustawienia']].map(([v,l])=>button('nav',l,view===v?'active':'',`data-view="${v}"`)).join('')}<div class="links"><a href="/app/">CleanFleet ↗</a><a href="/app/robisie/">Robisię ↗</a></div></nav><main><div class="toolbar"><div><h1>${e(title)}</h1><p class="muted">${view==='edit'?'Wspólne dane i numeracja. Logo wybierasz osobno.':view==='invoices'?'Sprzedaż obu marek w jednym miejscu.':view==='detail'?e(brandName(selected.payload.brand)):''}</p></div><div class="actions">${view==='invoices'?button('new','+ Wystaw fakturę','primary'):view==='parties'?button('new-party','+ Dodaj kontrahenta','primary'):['edit','detail'].includes(view)?button('back','← Wróć do faktur'):''}</div></div><p id="page-error" class="error" role="alert"></p>${view==='invoices'?list():view==='parties'?parties():view==='ksef'?KSEF.view():view==='settings'?settings():view==='edit'?edit():detail()}</main></div>`;
  if(view==='edit'){syncCorrectionControls();if(editor.payload.source?.invoiceMode==='detailed'){const cur=document.querySelector('[name=currency]');if(cur)cur.disabled=true;}if(isFleet(editor)){for(const node of document.querySelectorAll('[name=currency],#source-select'))node.disabled=true;}}
  if(view==='ksef')KSEF.mount($('#ksef-panel'),API.call,{projects:data.sources?.projects||[],assign:API.assignKsef,preview:API.previewKsefPurchase,loadLinks:API.ksefAssignments,findPurchases:API.investmentPurchases,allocationContext:API.ksefAllocationContext,unassign:API.unassignKsef,historyState:API.ksefHistoryState,markHistory:API.markKsefHistory,index:API.ksefDocumentIndex,storeMetadata:API.storeKsefMetadata,storeXml:API.storeKsefXml,stock:API.ksefStock,correctCostContext:API.correctCostContext,applyCostCorrection:API.applyCostCorrection,setReturn:API.setKsefReturn,cfContext:API.cleanfleetCostContext,cfCompanies:API.cleanfleetCompanies,cfLinks:API.cleanfleetCostLinks,cfSave:API.saveCleanfleetCosts,bank:data.settings.bank||'',userId:API.getSession()?.user?.id});
 }
@@ -49,6 +49,9 @@ function paymentFor(row){
   const current=paymentStatus(row,linkedSource,recorded.state==='paid'?{...mark,manual_paid:false}:mark);
   return recorded.received>0?{...current,robisieReceived:recorded.received}:current;
  }
+ if(paymentEvidence.legacyFleet?.get(row.id)===true){
+  return {...paymentStatus(row,{kind:'cleanfleet',total,paid:true},mark),legacyFleetPaid:true};
+ }
  return paymentStatus(row,project?{kind:'robisie',total,project}:null,mark);
 }
 function paymentMarkup(row){
@@ -58,13 +61,14 @@ function paymentMarkup(row){
  const amount=['unknown','manual_paid'].includes(status.state)?'':` · Otrzymano ${C.money(Math.round(status.received*100),row.payload.currency)} · Pozostało ${C.money(Math.round(status.remaining*100),row.payload.currency)}`;
  const evidence=status.evidence==='bank'?` · Potwierdzono wyciągiem${status.payments?.length?' · '+e(status.payments.at(-1).date):''}`:status.evidence==='manual'?' · bez daty i kwoty wpłaty':'';
  const robisie=status.robisieReceived==null?'':` · Wpłata w ROBISIĘ: ${C.money(Math.round(status.robisieReceived*100),row.payload.currency)}`;
+ const cleanfleet=status.legacyFleetPaid?' · Potwierdzono w CleanFleet':'';
  const bank=status.evidence==='bank'&&status.payments?.length?`<details class="bill-bank-payments"><summary>Wpłaty z wyciągu (${status.payments.length})</summary>${status.payments.map(p=>`<div>${e(p.date)} · ${e(C.money(p.amountCents,row.payload.currency))} · ${e(p.statement)}</div>`).join('')}</details>`:'';
  const source=row.payload?.source;
  const action=source?.app==='robisie'&&source.id&&!['paid'].includes(status.state)&&row.payload.currency==='PLN'?`<button type="button" data-action="record-payment" data-id="${e(row.id)}">Zapisz wpływ</button>`:'';
  const mark=(data.payments||[]).find(p=>p.invoice_id===row.id);
  const manual=status.evidence==='bank'?'':mark?.manual_paid?button('payment-mark','Cofnij oznaczenie','',`data-id="${e(row.id)}" data-paid="false"`):button('payment-mark','Zapłacona','',`data-id="${e(row.id)}" data-paid="true"`);
  const proposals=bankProposalMarkup(row,mark);
- return `<div class="bill-payment-state ${status.state}"><span><strong>Wpłata: ${labels[status.state]}</strong>${e(amount)}${e(evidence)}${e(robisie)}${bank}</span>${action}${manual}</div>${proposals}`;
+ return `<div class="bill-payment-state ${status.state}"><span><strong>Wpłata: ${labels[status.state]}</strong>${e(amount)}${e(evidence)}${e(robisie)}${e(cleanfleet)}${bank}</span>${action}${manual}</div>${proposals}`;
 }
 function bankProposalMarkup(row,mark){
  const confirmed=(mark?.bank_payments||[]).filter(p=>p.confirmed&&p.incomeId);

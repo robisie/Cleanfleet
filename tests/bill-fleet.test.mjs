@@ -14,6 +14,24 @@ test('fleet amount cannot diverge from frozen vehicles; source survives normaliz
  for(const changed of [{...p,currency:'PLN'},{...p,lines:[{...p.lines[0],price:'200.31'}]},{...p,lines:[{...p.lines[0],qty:'2'}]},{...p,lines:[...p.lines,...p.lines]}])assert.throws(()=>F.guardFleetPayload(changed,a),/Kwota/);
  assert.equal(F.fleetOptions({columns:['tablica']}).includeUnassigned,false);assert.equal(F.fleetOptions({columns:['tablica'],includeUnassigned:true}).includeUnassigned,true);assert.equal(F.guardFleetPayload(p,null),p);assert.equal(F.fleetOptions({}).layout,'vehicle-lines');
 });
+test('fleet rejects document types and discounts that could change the gross amount',()=>{
+ for(const a of [attachment(),{...attachment(),options:{layout:'vehicle-lines'}}]){
+  const standard=payload();
+  if(a.options.layout==='vehicle-lines'){
+   standard.lines=a.snapshot.map(row=>({name:'Pranie — '+row.plate,unit:'szt.',qty:'1',price:row.cost.toFixed(2)}));
+  }
+  for(const globalDiscount of ['10','0,01','100']){
+   assert.throws(()=>F.guardFleetPayload({...standard,globalDiscount},a),/rabatów/);
+  }
+  for(const documentType of ['advance','final']){
+   assert.throws(()=>F.guardFleetPayload({...standard,documentType},a),/zwykłą fakturą/);
+  }
+  const permitted=F.guardFleetPayload({...standard,globalDiscount:'0,00'},a);
+  assert.equal(C.invoiceAmount(C.normalize(permitted)),20030);
+ }
+ const discounted={...payload(),globalDiscount:'10'};
+ assert.equal(C.invoiceAmount(C.normalize(F.guardFleetPayload(discounted,null))),18027);
+});
 test('attachment view exposes only PDF fields and multipage PDF retains Polish glyphs, totals and rows',async()=>{
  const a=attachment(),view=F.fleetView(a,{id,number:'A9/10/2026',status:'issued',payload:payload()});assert.equal(view.rows[0].cost,150.1);assert.equal(view.rows[0].paid,false);assert.equal(view.rows[0].performed_by,undefined);
  const context=vm.createContext({window:{}});vm.runInContext(await readFile(new URL('../app/reports-font.js',import.meta.url),'utf8'),context);

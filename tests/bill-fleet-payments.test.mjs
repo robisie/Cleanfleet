@@ -36,3 +36,23 @@ test('Bill client refresh observes CleanFleet paid status through authorized end
  assert.equal(paymentStatus(row,{kind:'cleanfleet',total:300,paid:evidence.fleet.get(billId)},{bank_cents:10000}).state,'paid');
  assert.equal(calls.length,2);
 });
+
+test('BILL fetches matching KSeF sales links and loads the linked investment',async()=>{
+ const ksef='6351861297-20261016-123456789ABC-AB',calls=[];
+ const link={ksef_number:ksef,project_id:cfId,document:{id:'imported-sales-id'}};
+ const context=vm.createContext({AbortController,Date,JSON,Map,Set,Promise,setTimeout,clearTimeout,fetch:async(url)=>{
+  const path=new URL(url);calls.push(path);
+  const result=path.pathname.endsWith('/rs_ksef_links')?[link]:[{id:cfId,payload:{invoiceSettlements:[]}}];
+  return {ok:true,text:async()=>JSON.stringify(result)};
+ }});
+ const source=await readFile(new URL('../bill/api.js',import.meta.url),'utf8');
+ const module=new vm.SourceTextModule(source,{context});await module.link(()=>{});await module.evaluate();
+ const row={id:billId,status:'accepted',ksef_number:ksef,payload:{currency:'PLN',source:{app:'external'}}};
+ const result=await module.namespace.paymentEvidence([row,{...row,ksef_number:'invalid'}, {...row,status:'draft'}]);
+ assert.equal(calls.length,2);
+ assert.equal(calls[0].searchParams.get('kind'),'eq.sales');
+ assert.equal(calls[0].searchParams.get('ksef_number'),'in.('+ksef+')');
+ assert.equal(calls[1].searchParams.get('id'),'in.('+cfId+')');
+ assert.equal(result.salesLinks.get(ksef).document.id,'imported-sales-id');
+ assert.ok(result.projects.has(cfId));
+});

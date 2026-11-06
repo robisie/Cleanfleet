@@ -16,7 +16,7 @@ export function paymentStatus(invoice,source,mark=null){
  if(!source||!Number.isFinite(total))return {state:'unknown',received:0,remaining:0};
  let received=0;
  if(source.kind==='robisie'){
-  const record=(source.project?.invoiceSettlements||[]).find(r=>r.id===invoice.id);
+  const record=(source.project?.invoiceSettlements||[]).find(r=>r.id===(source.settlementId??invoice.id));
   received=(record?.allocations||[]).reduce((sum,item)=>sum+Math.round(Number(item.paid||0)*100),0)
    +(record?.existingReceipts||[]).reduce((sum,item)=>sum+Math.round(Number(item.amount||0)*100),0);
  }else if(source.kind==='cleanfleet')received=source.paid?total:0;

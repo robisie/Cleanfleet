@@ -50,11 +50,20 @@ export const saveCleanfleetCosts=({number,xml,entries,revision})=>request('/rest
 
 // Read-only, source-specific payment evidence. An invoice without a ledger stays unknown.
 export async function paymentEvidence(invoices){
- const projects=[...new Set(invoices.filter(r=>r?.status!=='draft'&&r.payload?.source?.app==='robisie').map(r=>r.payload.source.id).filter(x=>/^[0-9a-f-]{36}$/i.test(x)))];
- const fleet=[...new Set(invoices.filter(r=>r?.status!=='draft'&&r.payload?.source?.fleetId).map(r=>r.payload.source.fleetId).filter(x=>/^[0-9a-f-]{36}$/i.test(x)))];
- const pages=(ids,table,columns)=>Promise.all(Array.from({length:Math.ceil(ids.length/50)},(_,page)=>request('/rest/v1/'+table+'?select='+columns+'&id=in.('+ids.slice(page*50,page*50+50).join(',')+')'))).then(rows=>rows.flat());
- const [projectRows,fleetPages]=await Promise.all([pages(projects,'rs_projects','id,payload'),Promise.all(Array.from({length:Math.ceil(fleet.length/50)},(_,page)=>call({action:'fleet-payments',ids:fleet.slice(page*50,page*50+50)})))]);
- return {projects:new Map(projectRows.map(r=>[r.id,r.payload])),fleet:new Map(fleetPages.flat().map(r=>[r.invoice_id,r.paid===true]))};
+ const issued=invoices.filter(r=>r?.status!=='draft'&&!r.payload?.correction);
+ const validId=id=>typeof id==='string'&&/^[0-9a-f-]{36}$/i.test(id);
+ const pages=(ids,load)=>Promise.all(Array.from({length:Math.ceil(ids.length/50)},(_,page)=>load(ids.slice(page*50,page*50+50)))).then(rows=>rows.flat());
+ const projects=issued.filter(r=>r.payload?.source?.app==='robisie').map(r=>r.payload.source.id);
+ const fleet=[...new Set(issued.map(r=>r.payload?.source?.fleetId).filter(validId))];
+ const numbers=[...new Set(issued.filter(r=>r.status==='accepted'&&r.payload?.currency==='PLN').map(r=>r.ksef_number)
+  .filter(number=>typeof number==='string'&&/^\d{10}-\d{8}-[0-9a-f]{12}-[0-9a-f]{2}$/i.test(number)))];
+ const fleetLookup=pages(fleet,ids=>call({action:'fleet-payments',ids}));
+ const linksLookup=pages(numbers,ids=>request('/rest/v1/rs_ksef_links?select=ksef_number,project_id,document&kind=eq.sales&ksef_number=in.('+ids.join(',')+')'));
+ const [links,fleetRows]=await Promise.all([linksLookup,fleetLookup]);
+ const projectIds=[...new Set([...projects,...links.map(r=>r.project_id)].filter(validId))];
+ const projectRows=await pages(projectIds,ids=>request('/rest/v1/rs_projects?select=id,payload&id=in.('+ids.join(',')+')'));
+ return {projects:new Map(projectRows.map(r=>[r.id,r.payload])),fleet:new Map(fleetRows.map(r=>[r.invoice_id,r.paid===true])),
+  salesLinks:new Map(links.map(r=>[r.ksef_number,r]))};
 }
 
 export const correctCostContext=number=>stockRpc('rs_ksef_cost_correction_context',{p_number:number});

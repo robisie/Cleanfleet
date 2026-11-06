@@ -1,7 +1,7 @@
 begin;
 -- All synthetic rows and number allocation are rolled back, no KSeF request.
 do $$
-declare u uuid; c uuid:=gen_random_uuid(); w1 uuid:=gen_random_uuid();w2 uuid:=gen_random_uuid();d uuid:=gen_random_uuid();d2 uuid:=gen_random_uuid();r public.bill_invoices;linked uuid;before_count int; v_payload jsonb; caught boolean;
+declare u uuid; c uuid:=gen_random_uuid(); w1 uuid:=gen_random_uuid();w2 uuid:=gen_random_uuid();d uuid:=gen_random_uuid();d2 uuid:=gen_random_uuid();r public.bill_invoices;linked uuid;before_count int; v_payload jsonb; changed jsonb; invalid jsonb; caught boolean;
 begin
  select user_id into u from public.user_roles where role='admin' limit 1;
  insert into public.companies(id,name,active) values(c,'BILL QA - ROLLBACK',true);
@@ -19,7 +19,25 @@ begin
  if exists(select 1 from public.invoices where company_id=c) then raise exception 'failed issue left receivable';end if;
  if (select last_number from public.bill_counters where period=to_char(current_date,'YYYY-MM')) is distinct from before_count then raise exception 'failed issue consumed number';end if;
  update public.wash_records set cost=150.10 where id=w1;
- r:=public.bill_issue(d,1);
+ for changed in select value from jsonb_array_elements('[
+  {"globalDiscount":"10"}, {"globalDiscount":"0,01"}, {"globalDiscount":"100"},
+  {"documentType":"advance","advanceAmount":"50"},
+  {"documentType":"final","advances":[]}
+ ]'::jsonb) loop
+  invalid:=r.payload||changed;
+  caught:=false;
+  begin
+   perform public.bill_issue_prepared(d,1,invalid);
+  exception when raise_exception then
+   if sqlerrm not in ('Kwoty aut nie mogą mieć dodatkowych rabatów ani wyrównań.','Wybrane auta można rozliczyć tylko zwykłą fakturą.') then raise; end if;
+   caught:=true;
+  end;
+  if not caught then raise exception 'invalid fleet issue accepted: %',changed;end if;
+  if exists(select 1 from public.invoices where company_id=c) then raise exception 'invalid issue left receivable';end if;
+  if (select last_number from public.bill_counters where period=to_char(current_date,'YYYY-MM')) is distinct from before_count then raise exception 'invalid issue consumed number';end if;
+  if (select payload from public.bill_invoices where id=d) is distinct from r.payload then raise exception 'invalid issue changed the draft';end if;
+ end loop;
+ r:=public.bill_issue_prepared(d,1,r.payload||'{"globalDiscount":"0,00","documentType":"standard"}'::jsonb);
  select cf_invoice_id into linked from public.bill_fleet_attachments where invoice_id=d;
  if linked is null or (select amount from public.invoices where id=linked)<>200.30 or (select count(*) from public.invoice_items where invoice_id=linked)<>2 then raise exception 'issue not atomic';end if;
  if exists(select 1 from public.wash_records where id=any(array[w1,w2]) and paid) then raise exception 'marked paid';end if;

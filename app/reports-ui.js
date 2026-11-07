@@ -224,7 +224,7 @@ function setupPDF(orientation='landscape'){
  if(!root.jspdf?.jsPDF||!root.CFReportFont)throw Error('Biblioteka PDF jest niedostępna. Odśwież aplikację.');
  const doc=new root.jspdf.jsPDF({orientation,unit:'mm',format:'a4'});doc.addFileToVFS('CleanFleet.ttf',root.CFReportFont);doc.addFont('CleanFleet.ttf','CleanFleet','normal');doc.setFont('CleanFleet');return doc;
 }
-async function quickWashPDF(b,{from,to,companyId=null}){
+async function prepareQuickWashReport(b,{from,to,companyId=null}){
  if(!b.canReports?.()&&!b.isAdmin?.())throw Error('Brak uprawnień do raportów.');
  const isDate=value=>{
   if(!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
@@ -243,7 +243,7 @@ async function quickWashPDF(b,{from,to,companyId=null}){
   let expected=null;
   for(let offset=0;;offset+=pageSize){
    let query=b.db.from('wash_records')
-    .select('id,type,plate,wash_date,ordered_by,performed_by,notes,order_cost,order_currency,cost,currency,approved,paid',{count:'exact'})
+    .select('id,type,plate,wash_date,ordered_by,performed_by,completion_notes,order_cost,order_currency,cost,currency,approved,paid',{count:'exact'})
     .gte('wash_date',from).lte('wash_date',to)
     .order('wash_date').order('id');
    if(companyId)query=query.eq('company_id',companyId);
@@ -259,22 +259,44 @@ async function quickWashPDF(b,{from,to,companyId=null}){
    throw Error('Dane zmieniły się podczas pobierania. Wygeneruj raport ponownie.');
   }
  }
- const current=(await b.db.auth.getSession()).data.session;
- if(current?.user.id!==session.user.id||(!b.canReports?.()&&!b.isAdmin?.()))throw Error('Sesja zmieniła się. Wygeneruj raport ponownie.');
+ async function checkAccess(){
+  const current=(await b.db.auth.getSession()).data.session;
+  if(current?.user.id!==session.user.id||(!b.canReports?.()&&!b.isAdmin?.())){
+   throw Error('Sesja zmieniła się. Otwórz podgląd ponownie.');
+  }
+  const currentScope=b.allowedCompanyIds?.();
+  if(Array.isArray(currentScope)){
+   const retainedScope=companyId?currentScope.includes(companyId)
+    :Array.isArray(scope)&&scope.every(id=>currentScope.includes(id));
+   if(!retainedScope)throw Error('Dostęp do firm zmienił się. Otwórz podgląd ponownie.');
+  }
+ }
+ await checkAccess();
 
  const report=E.report({wash_records:rows},{
   source:'wash_records',title:'Szybki raport prań',dateField:'wash_date',from,to,
   filters:[],groups:[],metricIds:['completed'],chart:'none',
-  columns:['type','plate','wash_date','ordered_by','performed_by','notes','order_cost','final_cost']
+  columns:['type','plate','wash_date','ordered_by','performed_by','completion_notes','order_cost','final_cost']
  });
+ report.fields.completion_notes.label='Opis usługi';
  report.loadedAt=new Date().toISOString();
  report.pdfColumnStyles={
   type:{cellWidth:22},plate:{cellWidth:26},wash_date:{cellWidth:24},
-  ordered_by:{cellWidth:31},performed_by:{cellWidth:31},notes:{cellWidth:87},
+  ordered_by:{cellWidth:31},performed_by:{cellWidth:31},completion_notes:{cellWidth:87},
   order_cost:{cellWidth:28,halign:'right'},final_cost:{cellWidth:28,halign:'right'}
  };
- const filename='CleanFleet_prania_'+from+(from===to?'':'_'+to)+'.pdf';
- return exportPDFVectorFallback(report,{filename,compact:true});
+ const filenameBase='CleanFleet_prania_'+from+(from===to?'':'_'+to);
+ const columns=report.cfg.columns.map(key=>({
+  key,label:report.fields[key].label,value:row=>cell(row,key),
+  color:key==='final_cost'?row=>washPrice(row).color:undefined
+ }));
+ return {
+  rows:report.rows,columns,filenameBase,
+  async download(){
+   await checkAccess();
+   return exportPDFVectorFallback(report,{filename:filenameBase+'.pdf',compact:true});
+  }
+ };
 }
 function pdfCards(doc,cards,y,orientation='landscape'){
  const pw=doc.internal.pageSize.getWidth(),margin=10,gap=3,cols=orientation==='portrait'?2:Math.min(4,cards.length||1),cw=(pw-margin*2-gap*(cols-1))/cols,ch=21;cards.forEach((c,i)=>{const col=i%cols,row=Math.floor(i/cols),x=margin+col*(cw+gap),cy=y+row*(ch+gap);doc.setFillColor(244,247,237);doc.setDrawColor(222,231,211);doc.roundedRect(x,cy,cw,ch,2,2,'FD');doc.setTextColor(96,108,89);doc.setFontSize(7.3);doc.text(doc.splitTextToSize(c.label,cw-6).slice(0,2),x+3,cy+5);doc.setTextColor(48,64,13);doc.setFontSize(12);doc.text(E.text(c.value),x+3,cy+16);});doc.setTextColor(32,38,28);return y+Math.ceil(cards.length/cols)*(ch+gap);
@@ -719,5 +741,5 @@ async function open(b){bridge=b;if(!(b.canReports?.()===true||b.isAdmin?.()===tr
 async function loadVehicleModel(b,plate,companyId){bridge=b;await bridge.refreshExchangeRate?.(false);const id=await identity();const [vehicles,washes,companies]=await Promise.all([all('vehicles',{plate,company_id:companyId},false),all('wash_records',{plate,company_id:companyId},false),all('companies',{id:companyId},false)]);if(await identity()!==id)throw Error('Sesja zmieniła się. Spróbuj ponownie.');const vehicle=vehicles[0];if(!vehicle)throw Error('Brak dostępu do pojazdu.');return vehicleModel(vehicle,washes,companies[0]);}
 async function vehicleReportPreview(b,plate,companyId){const existing=document.getElementById('cfVehicleReportPreview');if(existing)existing.remove();const model=await loadVehicleModel(b,plate,companyId),logo=await lightLogoSrc(),preview=document.createElement('section');preview.id='cfVehicleReportPreview';preview.setAttribute('role','dialog');preview.setAttribute('aria-modal','true');preview.setAttribute('aria-label','Podgląd karty pojazdu');preview.innerHTML=vehiclePreviewHtml(model,logo);document.body.append(preview);preview.querySelector('[data-vrp=close]').onclick=()=>preview.remove();preview.querySelector('[data-vrp=download]').onclick=async e=>{const btn=e.currentTarget;btn.disabled=true;btn.textContent='Tworzę PDF…';try{await vehicleReportPDF(model);btn.textContent='Pobrano PDF';}catch(err){console.error('CleanFleet vehicle PDF:',err);btn.textContent='Nie udało się utworzyć PDF';}finally{setTimeout(()=>{if(btn.isConnected){btn.disabled=false;btn.textContent='Pobierz PDF';}},1500);}};return model;}
 async function vehiclePDF(b,plate,companyId){return vehicleReportPDF(await loadVehicleModel(b,plate,companyId));}
-root.CFReports={open,reset,vehicleReportPreview,vehiclePDF,vehicleModel,vehicleReportPDF,quickWashPDF,washPrice};
+root.CFReports={open,reset,vehicleReportPreview,vehiclePDF,vehicleModel,vehicleReportPDF,prepareQuickWashReport,washPrice};
 })(window);

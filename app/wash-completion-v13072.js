@@ -133,6 +133,8 @@
       .cf-completion-services-head strong{font-size:13px}
       .cf-completion-extra{display:flex;align-items:center;gap:9px;margin:0 0 10px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#f8f7f3;font-size:13px;font-weight:700;cursor:pointer}
       .cf-completion-extra input{width:19px;height:19px;margin:0;accent-color:var(--green-ink)}
+      .cf-completion-photo-choice{margin:14px 0 0}
+      .cf-completion-grid input:disabled{background:#f2f2ef;color:var(--ink);opacity:1}
       .cf-completion-services{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
       .cf-completion-service{display:flex;align-items:flex-start;gap:9px;padding:11px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer}
       .cf-completion-service:has(input:checked){border-color:var(--green-ink);background:var(--green-bg,#f3f6df)}
@@ -348,10 +350,11 @@
         <div class="cf-completion-grid">
           <label class="field"><span>Data prania</span><input id="cfCompleteDate" type="date" value="${esc(row.wash_date||localDate())}"></label>
           <label class="field"><span>Kto wykonał</span><input id="cfCompletePerformer" type="text" list="cfCompletePerformerList" value="${esc(row.performed_by||'')}" placeholder="Imię / osoba"><datalist id="cfCompletePerformerList">${performerValues.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></label>
+          ${bulk?'':`<label class="cf-completion-extra cf-completion-photo-choice cf-completion-span-2"><input id="cfCompleteUsePhotos" type="checkbox" checked><span>Pobierz godzinę ze zdjęć</span></label>`}
           <label class="field cf-completion-span-2"><span>${bulk?'Łączny czas wszystkich aut':'Czas prania'} (opcjonalnie)</span><select id="cfCompleteTimeMode"><option value="range">Godziny od–do</option><option value="duration" ${!bulk&&row.duration_hours!=null&&!(row.wash_start_time&&row.wash_end_time)?'selected':''}>Wpisz czas trwania</option><option value="none">Bez czasu</option></select></label>
           <label class="field" data-time-range><span>Godzina od</span><input id="cfCompleteStart" type="time" value="${esc(!bulk&&row.wash_start_time?String(row.wash_start_time).slice(0,5):'')}"></label>
           <label class="field" data-time-range><span>Godzina do</span><input id="cfCompleteEnd" type="time" value="${esc(!bulk&&row.wash_end_time?String(row.wash_end_time).slice(0,5):'')}"></label>
-          <small id="cfCompletePhotoHint" class="cf-completion-span-2" hidden>Godziny podpowiedziane na podstawie zdjęć. Możesz je zmienić.</small>
+          <small id="cfCompletePhotoHint" class="cf-completion-span-2" hidden></small>
           <label class="field cf-completion-span-2" data-time-duration hidden><span>Czas trwania w godzinach</span><input id="cfCompleteManualDuration" type="text" inputmode="decimal" placeholder="np. 1:30 lub 1,5" value="${!bulk&&row.duration_hours!=null?esc(row.duration_hours):''}"><small>Możesz wpisać 1:30 lub 1,5 — oba oznaczają 1 godz. 30 min.</small></label>
           <div class="cf-completion-duration cf-completion-span-2"><span>Czas prania</span><strong id="cfCompleteDuration">—</strong></div>
         </div>
@@ -433,6 +436,9 @@
       const startInput=overlay.querySelector('#cfCompleteStart');
       const endInput=overlay.querySelector('#cfCompleteEnd');
       const dateInput=overlay.querySelector('#cfCompleteDate');
+      const usePhotos=overlay.querySelector('#cfCompleteUsePhotos');
+      const photoHint=overlay.querySelector('#cfCompletePhotoHint');
+      let photoReady=false,photoRequest=0,dateEdited=false;
       const totalHours=()=>{
         if(timeMode.value==='none')return null;
         if(timeMode.value==='duration')return parseDuration(manualDuration.value);
@@ -474,25 +480,47 @@
       endInput.addEventListener('input',syncDuration);
       timeMode.addEventListener('change',()=>{syncDuration();clearFormError();});
       manualDuration.addEventListener('input',syncDuration);
-      if(!bulk&&String(row.type||'').trim().toUpperCase()!=='BUS'&&row.duration_hours==null&&
-          !row.wash_start_time&&!row.wash_end_time&&window.cfPhotoLocalCaptureTimes){
-        const photoHint=overlay.querySelector('#cfCompletePhotoHint');
-        let timeEdited=false,dateEdited=false;
-        for(const input of [startInput,endInput,timeMode]){
-          input.addEventListener('input',()=>{timeEdited=true;photoHint.hidden=true;});
-          input.addEventListener('change',()=>{timeEdited=true;photoHint.hidden=true;});
-        }
-        dateInput.addEventListener('input',()=>{dateEdited=true;});
-        window.cfPhotoLocalCaptureTimes(row.id).then(times=>{
-          if(!overlay.isConnected||saving||timeEdited)return;
-          const range=photoRange(times);
-          if(!range)return;
-          startInput.value=range.start;
-          endInput.value=range.end;
+      dateInput.addEventListener('input',()=>{dateEdited=true;});
+      const loadPhotoTime=async()=>{
+        const request=++photoRequest;
+        photoReady=false;
+        timeMode.value='range';
+        timeMode.disabled=true;
+        startInput.disabled=true;
+        endInput.disabled=true;
+        startInput.value='';endInput.value='';
+        photoHint.hidden=false;
+        photoHint.textContent='Odczytuję godziny ze zdjęć…';
+        syncDuration();
+        try{
+          const times=await window.cfPhotoLocalCaptureTimes?.(row.id);
+          if(request!==photoRequest||!usePhotos.checked||!overlay.isConnected||saving)return;
+          const range=photoRange(times||[]);
+          if(!range){photoHint.textContent='Brak dwóch zdjęć z różnymi godzinami. Odznacz opcję, aby wpisać godziny ręcznie.';return;}
+          startInput.value=range.start;endInput.value=range.end;
           if(!dateEdited&&!row.wash_date)dateInput.value=range.date;
-          photoHint.hidden=false;
+          photoReady=true;
+          photoHint.textContent='Godzina startu: pierwsze zdjęcie; godzina końca: ostatnie zdjęcie.';
           syncDuration();
-        }).catch(error=>console.warn('CleanFleet photo time suggestion:',error));
+        }catch(error){
+          console.warn('CleanFleet photo time:',error);
+          if(request===photoRequest&&usePhotos.checked&&overlay.isConnected)
+            photoHint.textContent='Nie udało się odczytać zdjęć. Odznacz opcję, aby wpisać godziny ręcznie.';
+        }
+      };
+      if(usePhotos){
+        usePhotos.addEventListener('change',()=>{
+          if(usePhotos.checked)loadPhotoTime();
+          else{
+            ++photoRequest;
+            photoReady=false;
+            timeMode.disabled=false;startInput.disabled=false;endInput.disabled=false;
+            photoHint.hidden=true;
+            syncDuration();
+          }
+          clearFormError();
+        });
+        loadPhotoTime();
       }
       costEl?.addEventListener('input',()=>{manualTouched=true;syncCostHint();});
       overlay.querySelector('#cfCompleteRecalc')?.addEventListener('click',()=>{
@@ -550,6 +578,7 @@
         const endEl=overlay.querySelector('#cfCompleteEnd');
         const performerEl=overlay.querySelector('#cfCompletePerformer');
         if(!washDate){showFormError('Podaj datę prania.',dateEl);return;}
+        if(usePhotos?.checked&&!photoReady){showFormError('Nie ma dwóch zdjęć z różnymi godzinami. Odznacz „Pobierz godzinę ze zdjęć”, aby wpisać czas ręcznie.',usePhotos);return;}
         if((start&&!end)||(!start&&end)){showFormError('Uzupełnij obie godziny albo pozostaw obie puste.',start?endEl:startEl);return;}
         if(hours!==null&&(!Number.isFinite(hours)||hours<=0||hours>168)){showFormError('Podaj czas większy od zera, maksymalnie 168 godz.',timeMode.value==='duration'?manualDuration:endEl);return;}
         if(!performer){showFormError('Podaj, kto wykonał pranie.',performerEl);return;}
@@ -636,28 +665,99 @@
     }
   }
 
-  async function quickCompleteBus(id){
-    const rec=(typeof records!=='undefined'&&Array.isArray(records))
-      ? records.find(r=>String(r?.id||'')===String(id))
-      : null;
-
-    const {error}=await cfSupabase
-      .from('wash_records')
-      .update({approved:true})
-      .eq('id',id);
-
+  async function completeBus(id){
+    injectStyles();
+    const {data:row,error}=await cfSupabase.from('wash_records')
+      .select('id,plate,wash_date,wash_start_time,wash_end_time,approved,paid').eq('id',id).single();
     if(error)throw error;
-
-    if(rec) rec.zatwierdzone=true;
-
-    if(typeof loadAll==='function'){
-      await loadAll();
-    }else{
-      try{if(typeof renderAttentionPanel==='function')renderAttentionPanel();}catch(_){}
-      try{if(typeof renderRecords==='function')renderRecords();}catch(_){}
-    }
-
-    toast('Oznaczono jako wykonane');
+    if(!row||row.approved||row.paid){toast('Ten BUS jest już wykonany.');return;}
+    const root=document.getElementById('modalRoot')||document.body;
+    document.getElementById('cfWashCompletionOverlay')?.remove();
+    const overlay=document.createElement('div');
+    overlay.id='cfWashCompletionOverlay';overlay.className='overlay';
+    overlay.innerHTML=`<div class="sheet cf-completion-sheet">
+      <button class="close" data-close type="button">&times;</button>
+      <div class="cf-completion-head"><h2>Zakończ pranie BUS</h2><span class="cf-completion-plate">${esc(row.plate||'BUS')}</span></div>
+      <div class="cf-completion-grid">
+        <label class="cf-completion-extra cf-completion-photo-choice cf-completion-span-2"><input id="cfBusUsePhotos" type="checkbox" checked><span>Pobierz godzinę ze zdjęć</span></label>
+        <label class="field cf-completion-span-2"><span>Data prania</span><input id="cfBusDate" type="date" value="${esc(row.wash_date||localDate())}"></label>
+        <label class="field"><span>Godzina od</span><input id="cfBusStart" type="time"></label>
+        <label class="field"><span>Godzina do</span><input id="cfBusEnd" type="time"></label>
+        <small id="cfBusPhotoHint" class="cf-completion-span-2" aria-live="polite"></small>
+        <div class="cf-completion-duration cf-completion-span-2"><span>Czas prania</span><strong id="cfBusDuration">—</strong></div>
+      </div>
+      <div class="cf-completion-error" id="cfBusError" role="alert"></div>
+      <div class="sheet-actions"><button class="btn btn-outline" data-close type="button">Anuluj</button><button class="btn btn-solid" id="cfBusSave" type="button">Zapisz i oznacz jako wykonane</button></div>
+    </div>`;
+    root.appendChild(overlay);
+    const checkbox=overlay.querySelector('#cfBusUsePhotos'),start=overlay.querySelector('#cfBusStart');
+    const end=overlay.querySelector('#cfBusEnd'),date=overlay.querySelector('#cfBusDate');
+    const hint=overlay.querySelector('#cfBusPhotoHint'),save=overlay.querySelector('#cfBusSave');
+    const errorEl=overlay.querySelector('#cfBusError');
+    let saving=false,ready=false,request=0,dateEdited=false;
+    const close=()=>{if(!saving)overlay.remove();};
+    overlay.querySelectorAll('[data-close]').forEach(button=>button.addEventListener('click',close));
+    overlay.addEventListener('click',event=>{if(event.target===overlay)close();});
+    const sync=()=>{overlay.querySelector('#cfBusDuration').textContent=durationLabel(start.value,end.value);};
+    const showError=message=>{errorEl.textContent=message;errorEl.classList.add('show');};
+    for(const input of [start,end,date])input.addEventListener('input',()=>{errorEl.classList.remove('show');sync();});
+    date.addEventListener('input',()=>{dateEdited=true;});
+    const load=async()=>{
+      const current=++request;
+      ready=false;start.value='';end.value='';start.disabled=true;end.disabled=true;
+      hint.textContent='Odczytuję godziny ze zdjęć…';sync();
+      try{
+        const times=await window.cfPhotoLocalCaptureTimes?.(id);
+        if(current!==request||!checkbox.checked||!overlay.isConnected||saving)return;
+        const range=photoRange(times||[]);
+        if(!range){hint.textContent='Brak dwóch zdjęć z różnymi godzinami. Odznacz opcję, aby wpisać godziny ręcznie.';return;}
+        start.value=range.start;end.value=range.end;
+        if(!dateEdited&&!row.wash_date)date.value=range.date;
+        ready=true;hint.textContent='Godzina startu: pierwsze zdjęcie; godzina końca: ostatnie zdjęcie.';sync();
+      }catch(photoError){
+        console.warn('CleanFleet BUS photo time:',photoError);
+        if(current===request&&checkbox.checked&&overlay.isConnected)
+          hint.textContent='Nie udało się odczytać zdjęć. Odznacz opcję, aby wpisać godziny ręcznie.';
+      }
+    };
+    checkbox.addEventListener('change',()=>{
+      errorEl.classList.remove('show');
+      if(checkbox.checked)load();
+      else{++request;ready=false;start.disabled=false;end.disabled=false;hint.hidden=true;
+        start.value=row.wash_start_time?String(row.wash_start_time).slice(0,5):start.value;
+        end.value=row.wash_end_time?String(row.wash_end_time).slice(0,5):end.value;sync();}
+      if(checkbox.checked)hint.hidden=false;
+    });
+    load();
+    save.addEventListener('click',async()=>{
+      if(saving)return;
+      errorEl.classList.remove('show');
+      if(checkbox.checked&&!ready){showError('Brak dwóch zdjęć z różnymi godzinami. Odznacz opcję, aby wpisać czas ręcznie.');return;}
+      if(!date.value){showError('Podaj datę prania.');return;}
+      const minutes=durationMinutes(start.value,end.value);
+      if(!start.value||!end.value||minutes===null||minutes<=0){showError('Podaj poprawne godziny początku i końca prania.');return;}
+      saving=true;save.disabled=true;save.textContent='Zapisuję…';
+      try{
+        const {error:saveError}=await cfSupabase.from('wash_records').update({
+          approved:true,wash_date:date.value,wash_start_time:start.value,wash_end_time:end.value,
+          duration_hours:minutes/60
+        }).eq('id',id).eq('approved',false);
+        if(saveError)throw saveError;
+        saving=false;close();
+        const rec=(typeof records!=='undefined'&&Array.isArray(records))
+          ?records.find(item=>String(item?.id||'')===String(id)):null;
+        if(rec)rec.zatwierdzone=true;
+        if(typeof loadAll==='function')Promise.resolve(loadAll()).catch(err=>console.warn('CleanFleet BUS refresh:',err));
+        else{
+          try{if(typeof renderAttentionPanel==='function')renderAttentionPanel();}catch(_){}
+          try{if(typeof renderRecords==='function')renderRecords();}catch(_){}
+        }
+        toast('Oznaczono jako wykonane · '+durationLabel(start.value,end.value));
+      }catch(saveError){
+        saving=false;save.disabled=false;save.textContent='Zapisz i oznacz jako wykonane';
+        showError(saveError?.message||'Nie udało się zakończyć prania.');
+      }
+    });
   }
 
   document.addEventListener('click',async e=>{
@@ -685,7 +785,7 @@
 
     if(type==='BUS'){
       try{
-        await quickCompleteBus(id);
+        await completeBus(id);
       }catch(err){
         console.error('CleanFleet quick BUS completion:',err);
         toast(err?.message||'Nie udało się oznaczyć prania jako wykonanego.');

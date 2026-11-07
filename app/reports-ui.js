@@ -243,7 +243,7 @@ async function prepareQuickWashReport(b,{from,to,companyId=null}){
   let expected=null;
   for(let offset=0;;offset+=pageSize){
    let query=b.db.from('wash_records')
-    .select('id,type,plate,wash_date,ordered_by,performed_by,completion_notes,order_cost,order_currency,cost,currency,approved,paid',{count:'exact'})
+    .select('id,type,plate,wash_date,wash_start_time,wash_end_time,duration_hours,ordered_by,performed_by,completion_notes,order_cost,order_currency,cost,currency,approved,paid',{count:'exact'})
     .gte('wash_date',from).lte('wash_date',to)
     .order('wash_date').order('id');
    if(companyId)query=query.eq('company_id',companyId);
@@ -276,13 +276,17 @@ async function prepareQuickWashReport(b,{from,to,companyId=null}){
  const report=E.report({wash_records:rows},{
   source:'wash_records',title:'Szybki raport prań',dateField:'wash_date',from,to,
   filters:[],groups:[],metricIds:['completed'],chart:'none',
-  columns:['type','plate','wash_date','ordered_by','performed_by','completion_notes','order_cost','final_cost']
+  columns:['type','plate','wash_date','wash_duration','ordered_by','performed_by','completion_notes','order_cost','final_cost']
  });
+ report.fields.wash_duration={label:'Czas prania',type:'text'};
+ for(const row of report.rows){
+  row.wash_duration=b.formatWashDuration(row.wash_start_time,row.wash_end_time,row.duration_hours);
+ }
  report.fields.completion_notes.label='Opis usługi';
  report.loadedAt=new Date().toISOString();
  report.pdfColumnStyles={
-  type:{cellWidth:22},plate:{cellWidth:26},wash_date:{cellWidth:24},
-  ordered_by:{cellWidth:31},performed_by:{cellWidth:31},completion_notes:{cellWidth:87},
+  type:{cellWidth:19},plate:{cellWidth:24},wash_date:{cellWidth:22},wash_duration:{cellWidth:26},
+  ordered_by:{cellWidth:26},performed_by:{cellWidth:27},completion_notes:{cellWidth:77},
   order_cost:{cellWidth:28,halign:'right'},final_cost:{cellWidth:28,halign:'right'}
  };
  const filenameBase='CleanFleet_prania_'+from+(from===to?'':'_'+to);

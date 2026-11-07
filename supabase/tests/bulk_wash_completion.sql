@@ -35,8 +35,23 @@ begin
  result:=public.cf_complete_wash_records(ids[8:10],current_date,null,null,'Michał',null,array[service],null,1);
  if (select count(*) from public.wash_records where id=any(ids[8:10]) and cost=order_cost and order_cost between 108 and 110)<>3 then raise exception 'Bulk did not retain each order price'; end if;
  if (result->'cost_by_id'->>ids[8]::text)::numeric<>108 then raise exception 'Wrong returned batch amount'; end if;
- update public.wash_records set order_cost=999 where id=ids[1];
- if (select order_cost from public.wash_records where id=ids[1])<>101 then raise exception 'Original price overwritten'; end if;
+ update public.wash_records set order_cost=999 where id=ids[11];
+ if (select order_cost from public.wash_records where id=ids[11])<>111 then raise exception 'Open order price overwritten'; end if;
+ update public.wash_records set order_cost=93.25 where id=ids[1];
+ if not exists(select 1 from public.wash_records where id=ids[1] and order_cost=93.25 and order_currency=currency and cost=75) then
+  raise exception 'Administrator could not correct the completed order price independently';
+ end if;
+ if not exists(select 1 from public.cf_earnings where source_wash_record_id=ids[1] and total_amount=75) then
+  raise exception 'Order price correction changed earnings';
+ end if;
+ update public.wash_records set order_cost=null where id=ids[1];
+ if not exists(select 1 from public.wash_records where id=ids[1] and order_cost is null and order_currency is null and cost=75) then
+  raise exception 'Clearing the order price did not clear its currency';
+ end if;
+ update public.wash_records set order_cost=0 where id=ids[1];
+ if not exists(select 1 from public.wash_records where id=ids[1] and order_cost=0 and order_currency=currency and cost=75) then
+  raise exception 'Missing order price could not be set to zero';
+ end if;
  select sum(duration_hours) into total from public.wash_records where id=any(ids[8:10]);
  if abs(total-1)>0.000000001 then raise exception 'Fractional duration lost'; end if;
  -- Stale selection rejects the entire batch, without changing the pending row.
@@ -53,6 +68,8 @@ begin
  if not failed then raise exception 'Incomplete times accepted'; end if;
  -- No session cannot write.
  perform set_config('request.jwt.claim.sub','',true);
+ update public.wash_records set order_cost=999 where id=ids[1];
+ if (select order_cost from public.wash_records where id=ids[1])<>0 then raise exception 'Order price overwritten without admin identity'; end if;
  failed:=false;
  begin
   perform public.cf_complete_wash_records(ids[12:12],current_date,null,null,'Michał',100,array[service],null);
@@ -61,4 +78,4 @@ begin
  if has_function_privilege('anon','public.cf_complete_wash_records(uuid[],date,time,time,text,numeric,uuid[],text,numeric)','execute') then raise exception 'Anonymous execute granted'; end if;
 end;$$;
 rollback;
-select 'PASS: separate original and final prices, final-price earnings, per-order bulk amount, immutable quote, durations and authorization' as result;
+select 'PASS: separate order and final prices, admin order correction, final-price earnings, bulk amounts, durations and authorization' as result;

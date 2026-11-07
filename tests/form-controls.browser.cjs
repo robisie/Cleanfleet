@@ -28,7 +28,7 @@ const {chromium}=require('playwright'),fs=require('node:fs'),assert=require('nod
   Object.assign(window,{registry:{ST6427U:{}},options:{typ:[],marka:[],kto_zlecil:[],kto_wykonal:[]},CF_WASH_TYPE_OPTIONS:['BUS'],cfCanonicalWashType:v=>v,cfBillingCompanyCurrency:()=> 'PLN',cfRecordCurrency:()=> 'PLN',cfIsAdmin:()=>true,cfIsFleetEmployee:()=>false,cfIsCleanFleetEmployee:()=>false,cfCurrentUserId:'owner',cfActiveCompanyId:'company',editingId:null,cfScheduleCounterMode:false,escapeHtml:v=>String(v||'').replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;'),normalizePlate:v=>v,cfResizeEntryOpis(){},renderPlateList(){},renderAttentionPanel(){},renderRecords(){},addOptionIfNew(){},saveRegistry:async()=>{},closeModal(){},showToast(){}});
  });
  const formStart=html.indexOf('  function openForm(id){'),formEnd=html.indexOf('  // Udostępnij formularz edycji',formStart);
- const submitStart=html.indexOf('  async function submitForm(){'),submitEnd=html.indexOf('  function cfFindNativeBackAction',submitStart);
+ const submitStart=html.indexOf('  async function submitForm('),submitEnd=html.indexOf('  function cfFindNativeBackAction',submitStart);
  const dbStart=html.indexOf('  function cfRecordToDb('),dbEnd=html.indexOf('\n',dbStart);
  await page.addScriptTag({content:html.slice(dbStart,dbEnd)+'\n'+html.slice(formStart,formEnd)+'\n'+html.slice(submitStart,submitEnd)});
  await page.evaluate(()=>{window.saveRecords=async id=>{window.persisted=cfRecordToDb(records.find(r=>r.id===id));};openForm('test');});

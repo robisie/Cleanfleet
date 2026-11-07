@@ -250,8 +250,8 @@ async function quickWashPDF(b,{from,to,companyId=null}){
   let expected=null;
   for(let offset=0;;offset+=pageSize){
    let query=b.db.from('wash_records')
-    .select('id,type,plate,wash_date,ordered_by,performed_by,notes,order_cost,order_currency,cost,currency,approved',{count:'exact'})
-    .eq('approved',true).gte('wash_date',from).lte('wash_date',to)
+    .select('id,type,plate,wash_date,ordered_by,performed_by,notes,order_cost,order_currency,cost,currency,approved,paid',{count:'exact'})
+    .gte('wash_date',from).lte('wash_date',to)
     .order('wash_date').order('id');
    if(companyId)query=query.eq('company_id',companyId);
    else if(Array.isArray(scope))query=query.in('company_id',scope);

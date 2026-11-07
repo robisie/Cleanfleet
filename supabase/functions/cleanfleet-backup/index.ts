@@ -1,6 +1,7 @@
 // Read-only export of application data for administrators. Photos are temporary and excluded.
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 import pg from 'npm:pg@8.16.3';
+import { fullBackup } from './full-backup.ts';
 
 const TABLES = [
   'billing_companies','cf_client_errors','cf_earning_rules','cf_earnings',
@@ -32,14 +33,19 @@ async function authorize(req:Request){
 Deno.serve(async req=>{
   const origin=req.headers.get('origin')||'';
   if(req.method==='OPTIONS')return new Response(null,{status:204,headers:{
-    ...(ALLOWED_ORIGINS.has(origin)?{'access-control-allow-origin':origin,'access-control-allow-methods':'GET, OPTIONS','access-control-allow-headers':'authorization,apikey,content-type','vary':'Origin'}:{})}});
-  if(req.method!=='GET')return json({error:'Ta funkcja obsługuje tylko odczyt.'},405,origin);
+    ...(ALLOWED_ORIGINS.has(origin)?{'access-control-allow-origin':origin,'access-control-allow-methods':'GET, POST, OPTIONS','access-control-allow-headers':'authorization,apikey,content-type','vary':'Origin'}:{})}});
+  if(origin&&!ALLOWED_ORIGINS.has(origin))return json({error:'Niedozwolone źródło.'},403,origin);
+  if(req.method!=='GET'&&req.method!=='POST')return json({error:'Niedozwolona metoda.'},405,origin);
   try{
     const user=await authorize(req);
     const client=new pg.Client({connectionString:DB_URL});
     await client.connect();
     let payload;
     try{
+      if(req.method==='POST'){
+        const result=await fullBackup(req,user.id,client,admin);
+        return json(result.body,result.status,origin);
+      }
       await client.query('BEGIN');
       await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
       const tables:Record<string,unknown[]>={};
@@ -48,11 +54,16 @@ Deno.serve(async req=>{
       const users=(await client.query('SELECT id,email,phone,created_at,updated_at,raw_app_meta_data,raw_user_meta_data FROM auth.users')).rows;
       await client.query('COMMIT');
       payload={tables,users,objects:[]};
-    }catch(error){await client.query('ROLLBACK');throw error;}
+    }catch(error){if(req.method==='GET')await client.query('ROLLBACK');throw error;}
     finally{await client.end();}
     return json({format:'CleanFleet Unified Backup v2',createdAt:new Date().toISOString(),createdBy:user.id,
       project:new URL(PROJECT_URL).hostname.split('.')[0],...payload,
       limitations:['Hasła i aktywne sesje kont nie są zawarte w kopii.','Zdjęcia są pomijane.']},200,origin);
-  }catch(error){console.error('Backup export:',error);
+  }catch(error){
+    if(req.method==='POST'){
+      console.error('Ecosystem backup request failed');
+      return json({error:'Nie udało się obsłużyć kopii ekosystemu.'},500,origin);
+    }
+    console.error('Backup export:',error);
     return json({error:error instanceof Error?error.message:'Błąd eksportu.'},500,origin);}
 });

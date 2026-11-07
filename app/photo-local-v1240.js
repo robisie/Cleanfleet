@@ -8,6 +8,7 @@
   let currentRecordId=null;
   let dbPromise=null;
   let busy=false;
+  const nativeCaptureTimes=new WeakMap();
   const enc=new TextEncoder();
 
   const toast=m=>{try{typeof showToast==='function'?showToast(m):console.info(m)}catch(_){console.info(m)}};
@@ -64,6 +65,29 @@
   async function byRecord(recordId){return (await all()).filter(x=>String(x.recordId)===String(recordId)).sort((a,b)=>a.createdAt-b.createdAt)}
   async function byRecordKind(recordId,kind){return (await byRecord(recordId)).filter(x=>x.kind===kind)}
 
+  // Earlier CleanFleet camera files already contain their capture time in the name.
+  const cameraFileTime=name=>Number(/^CF-(\d{13})-\d+\./.exec(name||'')?.[1])||null;
+  window.cfPhotoLocalMarkCapture=(file,capturedAt)=>nativeCaptureTimes.set(file,capturedAt);
+  window.cfPhotoLocalCaptureTimes=async recordId=>{
+    const db=await openDb();
+    return new Promise((resolve,reject)=>{
+      const times=[];
+      const tx=db.transaction(STORE,'readonly');
+      const cursor=tx.objectStore(STORE).index('recordId').openCursor(String(recordId));
+      cursor.onsuccess=()=>{
+        const item=cursor.result;
+        if(!item)return;
+        const photo=item.value;
+        const capturedAt=photo.capturedAt??cameraFileTime(photo.name);
+        if(['przed','po'].includes(photo.kind)&&Number.isFinite(capturedAt))times.push(capturedAt);
+        item.continue();
+      };
+      tx.oncomplete=()=>resolve(times);
+      tx.onerror=()=>reject(tx.error);
+      tx.onabort=()=>reject(tx.error);
+    });
+  };
+
   async function persistStaged(recordId,kind){
     const session=window.cfPhotoSession?.get();
     if(!session||String(session.record.id)!==String(recordId))return 0;
@@ -72,7 +96,7 @@
     const ts=Date.now(),rows=[];
     for(let i=0;i<items.length;i++){
       const f=items[i].file;
-      rows.push({id:uid(),recordId,kind,recordKind:keyFor(recordId,kind),name:f.name||`zdjecie-${i+1}.jpg`,mime:f.type||'image/jpeg',blob:f,thumbnail:items[i].thumbnail,createdAt:ts+i});
+      rows.push({id:uid(),recordId,kind,recordKind:keyFor(recordId,kind),name:f.name||`zdjecie-${i+1}.jpg`,mime:f.type||'image/jpeg',blob:f,thumbnail:items[i].thumbnail,createdAt:ts+i,capturedAt:nativeCaptureTimes.get(f)??cameraFileTime(f.name)});
     }
     // Commit the entire batch, or leave every pending photo available for retry.
     await tx('readwrite',store=>rows.forEach(row=>store.put(row)));
@@ -87,7 +111,7 @@
       throw new Error('Nie wybrano wpisu do zapisu zdjęcia.');
     await put({id:uid(),recordId,kind,recordKind:keyFor(recordId,kind),
       name:file.name||`zdjecie-${Date.now()}.jpg`,mime:file.type||'image/jpeg',
-      blob:file,thumbnail:null,createdAt:Date.now()});
+      blob:file,thumbnail:null,createdAt:Date.now(),capturedAt:cameraFileTime(file.name)??file.lastModified});
     document.dispatchEvent(new CustomEvent('cf:photos-saved',{detail:{recordId}}));
     if(!document.querySelector('.cf-cam-overlay.open'))renderLocal().catch(error=>console.warn('CleanFleet photo preview',error));
   };

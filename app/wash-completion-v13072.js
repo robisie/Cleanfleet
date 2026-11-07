@@ -10,9 +10,24 @@
   function money(value){
     return (Number(value)||0).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2})+' zł';
   }
-  function todayLocal(){
-    const d=new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const twoDigits=value=>String(value).padStart(2,'0');
+  function localDate(d=new Date()){
+    return `${d.getFullYear()}-${twoDigits(d.getMonth()+1)}-${twoDigits(d.getDate())}`;
+  }
+  function photoRange(times){
+    let first=Infinity,last=-Infinity;
+    for(const time of times){
+      if(!Number.isFinite(time)||time<=0||time>8640000000000000)continue;
+      first=Math.min(first,time);
+      last=Math.max(last,time);
+    }
+    if(last<=first||last-first>=86400000)return null;
+    const startDate=new Date(first),endDate=new Date(last);
+    const clock=d=>`${twoDigits(d.getHours())}:${twoDigits(d.getMinutes())}`;
+    const date=localDate(startDate),start=clock(startDate),end=clock(endDate);
+    // The current start/end fields represent one interval of less than 24 hours.
+    if(localDate(endDate)===date?end<=start:end>=start)return null;
+    return {date,start,end};
   }
   function durationMinutes(start,end){
     if(!start||!end)return null;
@@ -331,11 +346,12 @@
           ${pending.length<rows.length?'<p>Wpisy już wykonane lub opłacone zostały pominięte.</p>':''}
         </div>
         <div class="cf-completion-grid">
-          <label class="field"><span>Data prania</span><input id="cfCompleteDate" type="date" value="${esc(row.wash_date||todayLocal())}"></label>
+          <label class="field"><span>Data prania</span><input id="cfCompleteDate" type="date" value="${esc(row.wash_date||localDate())}"></label>
           <label class="field"><span>Kto wykonał</span><input id="cfCompletePerformer" type="text" list="cfCompletePerformerList" value="${esc(row.performed_by||'')}" placeholder="Imię / osoba"><datalist id="cfCompletePerformerList">${performerValues.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></label>
           <label class="field cf-completion-span-2"><span>${bulk?'Łączny czas wszystkich aut':'Czas prania'} (opcjonalnie)</span><select id="cfCompleteTimeMode"><option value="range">Godziny od–do</option><option value="duration" ${!bulk&&row.duration_hours!=null&&!(row.wash_start_time&&row.wash_end_time)?'selected':''}>Wpisz czas trwania</option><option value="none">Bez czasu</option></select></label>
           <label class="field" data-time-range><span>Godzina od</span><input id="cfCompleteStart" type="time" value="${esc(!bulk&&row.wash_start_time?String(row.wash_start_time).slice(0,5):'')}"></label>
           <label class="field" data-time-range><span>Godzina do</span><input id="cfCompleteEnd" type="time" value="${esc(!bulk&&row.wash_end_time?String(row.wash_end_time).slice(0,5):'')}"></label>
+          <small id="cfCompletePhotoHint" class="cf-completion-span-2" hidden>Godziny podpowiedziane na podstawie zdjęć. Możesz je zmienić.</small>
           <label class="field cf-completion-span-2" data-time-duration hidden><span>Czas trwania w godzinach</span><input id="cfCompleteManualDuration" type="text" inputmode="decimal" placeholder="np. 1:30 lub 1,5" value="${!bulk&&row.duration_hours!=null?esc(row.duration_hours):''}"><small>Możesz wpisać 1:30 lub 1,5 — oba oznaczają 1 godz. 30 min.</small></label>
           <div class="cf-completion-duration cf-completion-span-2"><span>Czas prania</span><strong id="cfCompleteDuration">—</strong></div>
         </div>
@@ -414,6 +430,9 @@
 
       const timeMode=overlay.querySelector('#cfCompleteTimeMode');
       const manualDuration=overlay.querySelector('#cfCompleteManualDuration');
+      const startInput=overlay.querySelector('#cfCompleteStart');
+      const endInput=overlay.querySelector('#cfCompleteEnd');
+      const dateInput=overlay.querySelector('#cfCompleteDate');
       const totalHours=()=>{
         if(timeMode.value==='none')return null;
         if(timeMode.value==='duration')return parseDuration(manualDuration.value);
@@ -451,10 +470,30 @@
       }
       syncDuration();
       syncCostHint();
-      overlay.querySelector('#cfCompleteStart')?.addEventListener('input',syncDuration);
-      overlay.querySelector('#cfCompleteEnd')?.addEventListener('input',syncDuration);
+      startInput.addEventListener('input',syncDuration);
+      endInput.addEventListener('input',syncDuration);
       timeMode.addEventListener('change',()=>{syncDuration();clearFormError();});
       manualDuration.addEventListener('input',syncDuration);
+      if(!bulk&&String(row.type||'').trim().toUpperCase()!=='BUS'&&row.duration_hours==null&&
+          !row.wash_start_time&&!row.wash_end_time&&window.cfPhotoLocalCaptureTimes){
+        const photoHint=overlay.querySelector('#cfCompletePhotoHint');
+        let timeEdited=false,dateEdited=false;
+        for(const input of [startInput,endInput,timeMode]){
+          input.addEventListener('input',()=>{timeEdited=true;photoHint.hidden=true;});
+          input.addEventListener('change',()=>{timeEdited=true;photoHint.hidden=true;});
+        }
+        dateInput.addEventListener('input',()=>{dateEdited=true;});
+        window.cfPhotoLocalCaptureTimes(row.id).then(times=>{
+          if(!overlay.isConnected||saving||timeEdited)return;
+          const range=photoRange(times);
+          if(!range)return;
+          startInput.value=range.start;
+          endInput.value=range.end;
+          if(!dateEdited&&!row.wash_date)dateInput.value=range.date;
+          photoHint.hidden=false;
+          syncDuration();
+        }).catch(error=>console.warn('CleanFleet photo time suggestion:',error));
+      }
       costEl?.addEventListener('input',()=>{manualTouched=true;syncCostHint();});
       overlay.querySelector('#cfCompleteRecalc')?.addEventListener('click',()=>{
         manualTouched=false;

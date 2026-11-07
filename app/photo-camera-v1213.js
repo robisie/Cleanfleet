@@ -198,7 +198,18 @@
 
   function tempPicker({accept,multiple=true,capture=null}){
     const i=document.createElement('input');i.type='file';if(accept!==null)i.accept=accept;if(multiple)i.multiple=true;if(capture)i.setAttribute('capture',capture);i.style.position='fixed';i.style.left='-9999px';i.style.opacity='0';
-    i.addEventListener('change',()=>{deliverFiles(i.files);setTimeout(()=>i.remove(),0)},{once:true});document.body.appendChild(i);i.click();
+    const openedAt=Date.now();
+    i.addEventListener('change',()=>{
+      const files=[...(i.files||[])];
+      if(capture&&files[0]){
+        const file=files[0],now=Date.now();
+        const capturedAt=file.lastModified>=openedAt&&file.lastModified<=now?file.lastModified:now;
+        window.cfPhotoLocalMarkCapture?.(file,capturedAt);
+      }
+      deliverFiles(files);
+      setTimeout(()=>i.remove(),0);
+    },{once:true});
+    document.body.appendChild(i);i.click();
     setTimeout(()=>{if(document.body.contains(i))i.remove()},120000);
   }
   function openNativeCamera(){tempPicker({accept:'image/*',multiple:false,capture:'environment'});}

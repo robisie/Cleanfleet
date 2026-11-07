@@ -94,11 +94,5 @@
   .vrp-meta-line{font-size:12px}
 }
 
-.cf-quick-wash-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 8px 0 14px;
-}
-.cf-quick-wash-actions[hidden] { display: none; }
+
 .cf-wash-price-table { overflow-x: auto; }

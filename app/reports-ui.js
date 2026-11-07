@@ -224,13 +224,6 @@ function setupPDF(orientation='landscape'){
  if(!root.jspdf?.jsPDF||!root.CFReportFont)throw Error('Biblioteka PDF jest niedostępna. Odśwież aplikację.');
  const doc=new root.jspdf.jsPDF({orientation,unit:'mm',format:'a4'});doc.addFileToVFS('CleanFleet.ttf',root.CFReportFont);doc.addFont('CleanFleet.ttf','CleanFleet','normal');doc.setFont('CleanFleet');return doc;
 }
-function drawLogo(doc,x,y,w,h){const src=logoSrc();if(!src)return;try{const props=doc.getImageProperties(src),ratio=props.width/props.height;let rw=w,rh=w/ratio;if(rh>h){rh=h;rw=h*ratio;}doc.setFillColor(255,255,255);doc.roundedRect(x-2,y-2,rw+4,rh+4,2,2,'F');doc.addImage(src,'PNG',x,y,rw,rh,undefined,'FAST');}catch(_){} }
-function pdfHeader(doc,title,subtitle,orientation='landscape'){
- const pw=doc.internal.pageSize.getWidth();doc.setFillColor(22,27,20);doc.rect(0,0,pw,31,'F');doc.setFillColor(164,189,16);doc.rect(0,31,pw,3,'F');drawLogo(doc,10,5,54,20);doc.setTextColor(255,255,255);doc.setFontSize(16);doc.text(title,pw-10,13,{align:'right'});doc.setTextColor(190,199,183);doc.setFontSize(8.5);doc.text(subtitle,pw-10,21,{align:'right'});doc.setTextColor(32,38,28);return 42;
-}
-function addFooters(doc,label='CleanFleet'){
- const pages=doc.getNumberOfPages(),pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight();for(let n=1;n<=pages;n++){doc.setPage(n);doc.setDrawColor(222,228,216);doc.line(10,ph-11,pw-10,ph-11);doc.setTextColor(95,105,90);doc.setFontSize(7.5);doc.text(label,10,ph-6);doc.text(n+' / '+pages,pw-10,ph-6,{align:'right'});}doc.setTextColor(32,38,28);
-}
 async function quickWashPDF(b,{from,to,companyId=null}){
  if(!b.canReports?.()&&!b.isAdmin?.())throw Error('Brak uprawnień do raportów.');
  const isDate=value=>{
@@ -269,39 +262,19 @@ async function quickWashPDF(b,{from,to,companyId=null}){
  const current=(await b.db.auth.getSession()).data.session;
  if(current?.user.id!==session.user.id||(!b.canReports?.()&&!b.isAdmin?.()))throw Error('Sesja zmieniła się. Wygeneruj raport ponownie.');
 
- const doc=setupPDF();
- if(typeof doc.autoTable!=='function')throw Error('Biblioteka tabel PDF jest niedostępna. Odśwież aplikację.');
- const period=from===to?from:from+' – '+to;
- const title='Szybki raport prań';
- const header=()=>pdfHeader(doc,title,period+'   ·   Wykonane prania: '+rows.length);
- const y=header();
- doc.setFontSize(8);
- const legend=[['Niższa kwota',washPriceColors.lower],['Bez zmiany',washPriceColors.same],['Wyższa kwota',washPriceColors.higher]];
- legend.forEach(([label,color],index)=>{
-  doc.setTextColor(color);
-  doc.text(label,10+index*36,y);
+ const report=E.report({wash_records:rows},{
+  source:'wash_records',title:'Szybki raport prań',dateField:'wash_date',from,to,
+  filters:[],groups:[],metricIds:['completed'],chart:'none',
+  columns:['type','plate','wash_date','ordered_by','performed_by','notes','order_cost','final_cost']
  });
- if(rows.length){
-  const keys=['type','plate','wash_date','ordered_by','performed_by','notes','order_cost','final_cost'];
-  doc.autoTable({
-   head:[['Typ','Rejestracja','Data prania','Zlecił','Wykonał','Opis zlecenia','Kwota zlecenia','Kwota finalna']],
-   body:rows.map(row=>keys.map(key=>reportPdfCell(row,key))),
-   startY:y+5,margin:{top:41,bottom:16,left:10,right:10},
-   styles:{font:'CleanFleet',fontStyle:'normal',fontSize:8.3,cellPadding:2,overflow:'linebreak',valign:'top',textColor:[32,38,28]},
-   headStyles:{fillColor:[236,243,224],textColor:[32,38,28],fontStyle:'normal'},
-   alternateRowStyles:{fillColor:[249,250,247]},
-   columnStyles:{0:{cellWidth:22},1:{cellWidth:26},2:{cellWidth:24},3:{cellWidth:31},4:{cellWidth:31},5:{cellWidth:87},6:{cellWidth:28,halign:'right'},7:{cellWidth:28,halign:'right'}},
-   rowPageBreak:'avoid',showHead:'everyPage',
-   willDrawPage:({pageNumber})=>{if(pageNumber>1)header();}
-  });
- }else{
-  doc.setTextColor(32,38,28);
-  doc.setFontSize(10);
-  doc.text('Brak wykonanych prań w tym okresie.',10,y+10);
- }
- addFooters(doc,title);
- doc.save('CleanFleet_prania_'+from+(from===to?'':'_'+to)+'.pdf');
- return doc;
+ report.loadedAt=new Date().toISOString();
+ report.pdfColumnStyles={
+  type:{cellWidth:22},plate:{cellWidth:26},wash_date:{cellWidth:24},
+  ordered_by:{cellWidth:31},performed_by:{cellWidth:31},notes:{cellWidth:87},
+  order_cost:{cellWidth:28,halign:'right'},final_cost:{cellWidth:28,halign:'right'}
+ };
+ const filename='CleanFleet_prania_'+from+(from===to?'':'_'+to)+'.pdf';
+ return exportPDFVectorFallback(report,{filename,compact:true});
 }
 function pdfCards(doc,cards,y,orientation='landscape'){
  const pw=doc.internal.pageSize.getWidth(),margin=10,gap=3,cols=orientation==='portrait'?2:Math.min(4,cards.length||1),cw=(pw-margin*2-gap*(cols-1))/cols,ch=21;cards.forEach((c,i)=>{const col=i%cols,row=Math.floor(i/cols),x=margin+col*(cw+gap),cy=y+row*(ch+gap);doc.setFillColor(244,247,237);doc.setDrawColor(222,231,211);doc.roundedRect(x,cy,cw,ch,2,2,'FD');doc.setTextColor(96,108,89);doc.setFontSize(7.3);doc.text(doc.splitTextToSize(c.label,cw-6).slice(0,2),x+3,cy+5);doc.setTextColor(48,64,13);doc.setFontSize(12);doc.text(E.text(c.value),x+3,cy+16);});doc.setTextColor(32,38,28);return y+Math.ceil(cards.length/cols)*(ch+gap);
@@ -395,6 +368,7 @@ function adminPdfSourceTable(doc,r,y,logo){
      head:[[...chunk.map(k=>r.fields[k]?.label||k)]],
      body:r.rows.map(row=>chunk.map(k=>reportPdfCell(row,k))),
      startY:y,margin:{top:38,bottom:15,left:10,right:10},
+     columnStyles:Object.fromEntries(chunk.flatMap((key,index)=>r.pdfColumnStyles?.[key]?[[index,r.pdfColumnStyles[key]]]:[])),
      styles:{font:'CleanFleet',fontStyle:'normal',fontSize:6.4,cellPadding:2.1,overflow:'linebreak',valign:'top',textColor:[31,35,32],lineColor:[229,233,230],lineWidth:.12},
      headStyles:{fillColor:[241,246,235],textColor:[31,38,27],fontStyle:'normal'},
      alternateRowStyles:{fillColor:[252,252,251]},rowPageBreak:'avoid',showHead:'everyPage',
@@ -423,18 +397,20 @@ async function exportVehicleSummaryPDF(r){
  doc.save(safeName(r.cfg.title)+'.pdf');
  return doc;
 }
-async function exportPDFVectorFallback(r){
+async function exportPDFVectorFallback(r,{filename=safeName(r.cfg.title)+'.pdf',compact=false}={}){
  const doc=setupPDF('landscape'),logo=await lightLogoSrc();
  let y=adminPdfHeader(doc,r,logo);
  y=adminPdfFilterLine(doc,r,y);
  const ms=selectedMetrics(r);
  y=adminPdfKpis(doc,ms,y);
- y=adminPdfExplain(doc,y);
- y=adminPdfBarChart(doc,r,y);
- y=adminPdfGroupTable(doc,r,ms,y,logo);
+ if(!compact){
+  y=adminPdfExplain(doc,y);
+  y=adminPdfBarChart(doc,r,y);
+  y=adminPdfGroupTable(doc,r,ms,y,logo);
+ }
  y=adminPdfSourceTable(doc,r,y+2,logo);
  adminPdfFooter(doc,r);
- doc.save(safeName(r.cfg.title)+'.pdf');
+ doc.save(filename);
  return doc;
 }
 

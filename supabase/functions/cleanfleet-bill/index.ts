@@ -186,6 +186,26 @@ Deno.serve(async req=>{
    const created=await db.from('bill_invoices').insert({id:crypto.randomUUID(),creator_id:userId,payload}).select().single();
    if(created.error?.code==='23505'){const concurrent=checked(await find());if(concurrent)return json(concurrent);}return json(checked(created));
   }
+  if(body.action==='save-issued'){
+   const row=await invoice(body.id);
+   if(row.status!=='issued'||!row.number||row.ksef_number||row.ksef_session||row.ksef_reference||
+      (row.payload.source?.app==='external'&&!row.payload.correction)){
+    throw Error('Edycja jest dostępna dla faktur wystawionych w Bill przed wysłaniem do KSeF.');
+   }
+   if(row.revision!==body.revision)throw Error('Faktura zmieniła się na innym urządzeniu. Odśwież dane.');
+   if(!body.payload||typeof body.payload!=='object'||Array.isArray(body.payload))throw Error('Nieprawidłowe dane faktury.');
+   const input={...body.payload,source:row.payload.source,documentType:row.payload.documentType||'standard',
+    correction:row.payload.correction?{...row.payload.correction,mode:body.payload.correction?.mode,reason:body.payload.correction?.reason}:undefined};
+   const payload=normalize(await canonicalFinal(await canonicalFleet(row.id,await canonicalCorrection(input)),userId,row.id));
+   const [month,year]=row.number.split('/').slice(-2);
+   if(payload.issueDate.slice(0,7)!==year+'-'+month)throw Error('Data wystawienia musi pozostać w miesiącu nadanego numeru.');
+   const saved=checked(await db.from('bill_invoices')
+    .update({payload,revision:row.revision+1,xml:null,ksef_message:null,send_attempt:null,updated_at:new Date().toISOString()})
+    .eq('id',row.id).eq('status','issued').eq('revision',row.revision)
+    .is('ksef_number',null).is('ksef_session',null).is('ksef_reference',null).select().maybeSingle());
+   if(!saved)throw Error('Faktura została zmieniona lub rozpoczęto wysyłkę. Odśwież dane.');
+   return json(saved);
+  }
   if(body.action==='save-draft'){
    // Partial drafts are allowed. Full validation happens before any number is allocated.
    if(!body.payload||typeof body.payload!=='object'||Array.isArray(body.payload))throw Error('Nieprawidłowy szkic.');
@@ -204,14 +224,15 @@ Deno.serve(async req=>{
    let row=await invoice(body.id);
    if(row.status==='draft')throw Error('Najpierw wystaw fakturę i sprawdź PDF. Wysyłka do KSeF jest osobną operacją.');
    if(row.status!=='issued')return json(row);
+   if(body.revision!=null&&body.revision!==row.revision)throw Error('Faktura została zmieniona. Odśwież dane i sprawdź ją przed wysłaniem.');
    if(row.payload.source?.app==='external'&&!row.payload.correction)throw Error('Zaimportowana faktura zachowuje oryginał. Z tego miejsca można wysłać wyłącznie jej korektę.');
    const payload=normalize(await canonicalFinal(await canonicalFleet(row.id,await canonicalCorrection(storedPayload(row))),userId,row.id));
    if(payload.issueDate!==today())throw Error('Dla wysyłki online ustaw dzisiejszą datę wystawienia.');
    if(payload.correction){const parent=await invoice(payload.correction.originalId);if(parent.payload.source?.app==='external'&&!parent.payload.correction&&!parent.ksef_number&&parent.payload.source.externalKsefStatus!=='outside')throw Error('Uzupełnij status KSeF faktury źródłowej: wpisz jej numer KSeF albo potwierdź wystawienie poza KSeF w szczegółach oryginału.');}
    const auth=await authKsef(userId);
    const attempt=crypto.randomUUID();
-   const lock=checked(await db.from('bill_invoices').update({payload,status:'sending',send_attempt:attempt,ksef_session:null,ksef_reference:null,updated_at:new Date().toISOString()}).eq('id',row.id).eq('status','issued').select().maybeSingle());
-   if(!lock)return json(await invoice(row.id));
+   const lock=checked(await db.from('bill_invoices').update({payload,status:'sending',send_attempt:attempt,ksef_session:null,ksef_reference:null,updated_at:new Date().toISOString()}).eq('id',row.id).eq('status','issued').eq('revision',row.revision).select().maybeSingle());
+   if(!lock)throw Error('Faktura została zmieniona lub rozpoczęto wysyłkę. Odśwież dane.');
    row=lock;let postStarted=false,session:string|null=null;
    try{
     const xml=row.xml||invoiceXml(row,row.updated_at);

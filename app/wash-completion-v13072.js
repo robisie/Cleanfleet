@@ -10,6 +10,10 @@
   function money(value){
     return (Number(value)||0).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2})+' zł';
   }
+  function startingCost(row){
+    const value=row.order_currency===row.currency ? (row.order_cost??row.cost) : row.cost;
+    return Number(value??0).toFixed(2);
+  }
   const twoDigits=value=>String(value).padStart(2,'0');
   function localDate(d=new Date()){
     return `${d.getFullYear()}-${twoDigits(d.getMonth()+1)}-${twoDigits(d.getDate())}`;
@@ -147,7 +151,6 @@
       .cf-completion-total-row .field{margin:0}
       .cf-completion-total-row .btn{height:42px;white-space:nowrap}
       .cf-completion-total-hint{margin-top:5px;font-size:10px;color:var(--ink-soft)}
-      .cf-completion-total-hint.manual{color:#9c6400;font-weight:700}
       .cf-completion-existing-note{margin-top:14px;padding:10px 12px;border-left:3px solid var(--line-strong);background:#faf9f5;font-size:11px;color:var(--ink-soft);line-height:1.45}
       .cf-completion-error{display:none;margin-top:12px;padding:10px 12px;border:1px solid #c94b42;border-radius:8px;background:#fff4f2;color:#9c302b;font-size:12px;font-weight:700;line-height:1.35}
       .cf-completion-error.show{display:block}
@@ -306,7 +309,7 @@
       if(typeof cfSupabase==='undefined')throw new Error('Brak połączenia z bazą.');
       const [{data:rows,error:rowError},catalog]=await Promise.all([
         cfSupabase.from('wash_records')
-          .select('id,company_id,plate,type,brand,notes,wash_date,duration_hours,wash_start_time,wash_end_time,performed_by,cost,currency,approved,paid,work_items,completion_notes')
+          .select('id,company_id,plate,type,brand,notes,wash_date,duration_hours,wash_start_time,wash_end_time,performed_by,cost,currency,order_cost,order_currency,approved,paid,work_items,completion_notes')
           .in('id',ids),
         fetchCatalog(true)
       ]);
@@ -344,7 +347,7 @@
         <div class="cf-completion-head">
           <h2>${bulk?'Zakończ prania':'Zakończ pranie'}</h2>
           <span class="cf-completion-plate">${bulk?`Liczba aut: ${pending.length}`:esc(row.plate||'')}</span>
-          ${bulk?`<p>${pending.map(r=>esc(r.plate)).join(', ')}</p><p>Data, wykonawca, zakres prac i kwota dotyczą każdego auta. Łączny czas zostanie podzielony równo.</p>`:''}
+          ${bulk?`<p>${pending.map(r=>esc(r.plate)).join(', ')}</p><p>Data, wykonawca i zakres prac dotyczą każdego auta. Łączny czas zostanie podzielony równo.</p>`:''}
           ${pending.length<rows.length?'<p>Wpisy już wykonane lub opłacone zostały pominięte.</p>':''}
         </div>
         <div class="cf-completion-grid">
@@ -373,8 +376,10 @@
         <div class="cf-completion-grid">
           <label class="field cf-completion-span-2"><span>Opis wykonania</span><textarea id="cfCompleteNotes" rows="3" placeholder="Krótki opis wykonanej pracy">${esc(row.completion_notes||'')}</textarea></label>
           <div class="cf-completion-span-2 cf-completion-total-row">
-            <label class="field"><span>Kwota (zł)</span><input id="cfCompleteCost" type="number" min="0" step="0.01" inputmode="decimal" value="${Number(row.cost)||0}"><div class="cf-completion-total-hint" id="cfCompleteCostHint">Kwota wyliczana z zaznaczonych usług. Możesz ją zmienić ręcznie.</div></label>
-            <button class="btn btn-outline" id="cfCompleteRecalc" type="button">Przelicz z usług</button>
+            <label class="field"><span>Kwota finalna ${bulk?'za jedno auto ':''}(${esc(currency)})</span><input id="cfCompleteCost" type="number" min="0" step="0.01" inputmode="decimal" value="${bulk?'':esc(startingCost(row))}" aria-describedby="cfCompleteCostHint">
+              <div class="cf-completion-total-hint" id="cfCompleteCostHint"></div>
+            </label>
+            ${currency==='PLN'?'<button class="btn btn-outline" id="cfCompleteRecalc" type="button">Przelicz z usług</button>':''}
           </div>
         </div>
 
@@ -395,9 +400,7 @@
       const extraServiceEl=overlay.querySelector('#cfCompleteExtraService');
       const costEl=overlay.querySelector('#cfCompleteCost');
       const costHint=overlay.querySelector('#cfCompleteCostHint');
-      costEl.previousElementSibling.textContent=`Kwota ${bulk?'za jedno auto ':''}(${currency})`;
       let catalogRows=catalog;
-      let manualTouched=false;
 
       const selectedIds=()=>[...servicesEl.querySelectorAll('input[type="checkbox"]:checked')].map(x=>x.value);
       const selectedTotal=()=>[...servicesEl.querySelectorAll('input[type="checkbox"]:checked')].reduce((sum,cb)=>{
@@ -426,7 +429,6 @@
         }).join('');
         servicesEl.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.addEventListener('change',()=>{
           applyServiceSelection([...servicesEl.querySelectorAll('input[type="checkbox"]')],cb,extraServiceEl.checked);
-          if(!manualTouched)costEl.value=(Math.round(selectedTotal()*100)/100).toFixed(2);
           syncCostHint();
         }));
       };
@@ -453,11 +455,8 @@
           (bulk?`${hoursLabel(hours)} łącznie · ${hoursLabel(hours/pending.length)} / auto`:hoursLabel(hours));
       };
       const syncCostHint=()=>{
-        const total=selectedTotal();
-        costHint.textContent=manualTouched
-          ? `Kwota wpisana ręcznie. Suma z zaznaczonych usług: ${money(total)}.`
-          : `Suma z zaznaczonych usług: ${money(total)}. Pole kwoty możesz zmienić ręcznie.`;
-        costHint.classList.toggle('manual',manualTouched);
+        const tip=bulk?'Zostaw puste, aby zachować kwotę zlecenia każdego auta.':'Możesz zmienić kwotę przed zapisem.';
+        costHint.textContent=`${tip} Suma z cennika: ${money(selectedTotal())}.`;
       };
 
       renderServices(false);
@@ -467,13 +466,8 @@
           const exclusive=checked.find(cb=>cb.dataset.exclusive==='1');
           if(exclusive)checked.forEach(cb=>{if(cb!==exclusive)cb.checked=false;});
         }
-        if(!manualTouched)costEl.value=(Math.round(selectedTotal()*100)/100).toFixed(2);
         syncCostHint();
       });
-      {
-        const initialServicesTotal=Math.round(selectedTotal()*100)/100;
-        if(initialServicesTotal>0 || !(Number(row.cost)>0)) costEl.value=initialServicesTotal.toFixed(2);
-      }
       syncDuration();
       syncCostHint();
       startInput.addEventListener('input',syncDuration);
@@ -522,11 +516,9 @@
         });
         loadPhotoTime();
       }
-      costEl?.addEventListener('input',()=>{manualTouched=true;syncCostHint();});
       overlay.querySelector('#cfCompleteRecalc')?.addEventListener('click',()=>{
-        manualTouched=false;
-        costEl.value=(Math.round(selectedTotal()*100)/100).toFixed(2);
-        syncCostHint();
+        costEl.value=selectedTotal().toFixed(2);
+        clearFormError();
       });
 
       const errorEl=overlay.querySelector('#cfCompleteError');
@@ -556,7 +548,6 @@
         catalogRows=await fetchCatalog(true);
         renderServices(true);
         [...servicesEl.querySelectorAll('input[type="checkbox"]')].forEach(cb=>{if(keep.has(cb.value))cb.checked=true;});
-        if(!manualTouched)costEl.value=(Math.round(selectedTotal()*100)/100).toFixed(2);
         syncCostHint();
       }));
 
@@ -569,7 +560,7 @@
         const hours=totalHours();
         const performer=overlay.querySelector('#cfCompletePerformer').value.trim();
         const serviceIds=selectedIds();
-        const cost=Number(String(costEl.value||'').replace(',','.'));
+        const cost=costEl.value==='' ? null : Number(costEl.value);
         const notes=overlay.querySelector('#cfCompleteNotes').value.trim();
 
         clearFormError();
@@ -583,7 +574,10 @@
         if(hours!==null&&(!Number.isFinite(hours)||hours<=0||hours>168)){showFormError('Podaj czas większy od zera, maksymalnie 168 godz.',timeMode.value==='duration'?manualDuration:endEl);return;}
         if(!performer){showFormError('Podaj, kto wykonał pranie.',performerEl);return;}
         if(!serviceIds.length){showFormError('Zaznacz co najmniej jeden zakres wykonanych prac.',servicesEl);return;}
-        if(!Number.isFinite(cost)||cost<0){showFormError('Podaj poprawną kwotę.',costEl);return;}
+        if(costEl.validity.badInput || (cost===null ? !bulk : !Number.isFinite(cost)||cost<0)){
+          showFormError('Podaj poprawną kwotę finalną.',costEl);return;
+        }
+        const finalCost=cost===null?null:Math.round(cost*100)/100;
 
         saveBtn.disabled=true;
         saving=true;
@@ -596,7 +590,7 @@
             p_end_time:end||null,
             p_duration_hours:timeMode.value==='duration'?hours:null,
             p_performed_by:performer,
-            p_cost:Math.round(cost*100)/100,
+            p_cost:finalCost,
             p_service_ids:serviceIds,
             p_completion_notes:notes||null
           });
@@ -612,7 +606,7 @@
               end:bulk?'':end,
               durationHours:data?.duration_hours_per_vehicle??null,
               performer,
-              cost:Math.round(cost*100)/100,
+              cost:data?.cost_by_id?.[id]??finalCost,
               notes
             });
           }catch(localError){
@@ -648,7 +642,8 @@
             }
           }catch(_){}
 
-          toast(`${bulk?`Zakończono prania: ${pending.length}`:'Pranie zakończone'} · ${hours==null?'bez czasu':hoursLabel(hours)} · ${cost.toFixed(2)} ${currency}${bulk?' / auto':''}`);
+          const priceLabel=finalCost===null?'Kwoty zleceń':`${finalCost.toFixed(2)} ${currency}${bulk?' / auto':''}`;
+          toast(`${bulk?`Zakończono prania: ${pending.length}`:'Pranie zakończone'} · ${hours==null?'bez czasu':hoursLabel(hours)} · ${priceLabel}`);
         }catch(err){
           console.error('CleanFleet complete wash:',err);
           showFormError(err?.message||'Nie udało się zakończyć prania.');
@@ -668,7 +663,7 @@
   async function completeBus(id){
     injectStyles();
     const {data:row,error}=await cfSupabase.from('wash_records')
-      .select('id,plate,wash_date,wash_start_time,wash_end_time,approved,paid').eq('id',id).single();
+      .select('id,plate,wash_date,wash_start_time,wash_end_time,performed_by,completion_notes,cost,currency,order_cost,order_currency,approved,paid').eq('id',id).single();
     if(error)throw error;
     if(!row||row.approved||row.paid){toast('Ten BUS jest już wykonany.');return;}
     const root=document.getElementById('modalRoot')||document.body;
@@ -685,6 +680,7 @@
         <label class="field"><span>Godzina do</span><input id="cfBusEnd" type="time"></label>
         <small id="cfBusPhotoHint" class="cf-completion-span-2" aria-live="polite"></small>
         <div class="cf-completion-duration cf-completion-span-2"><span>Czas prania</span><strong id="cfBusDuration">—</strong></div>
+        <label class="field cf-completion-span-2"><span>Kwota finalna (${esc(row.currency||'PLN')})</span><input id="cfBusCost" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(startingCost(row))}"></label>
       </div>
       <div class="cf-completion-error" id="cfBusError" role="alert"></div>
       <div class="sheet-actions"><button class="btn btn-outline" data-close type="button">Anuluj</button><button class="btn btn-solid" id="cfBusSave" type="button">Zapisz i oznacz jako wykonane</button></div>
@@ -692,6 +688,7 @@
     root.appendChild(overlay);
     const checkbox=overlay.querySelector('#cfBusUsePhotos'),start=overlay.querySelector('#cfBusStart');
     const end=overlay.querySelector('#cfBusEnd'),date=overlay.querySelector('#cfBusDate');
+    const costInput=overlay.querySelector('#cfBusCost');
     const hint=overlay.querySelector('#cfBusPhotoHint'),save=overlay.querySelector('#cfBusSave');
     const errorEl=overlay.querySelector('#cfBusError');
     let saving=false,ready=false,request=0,dateEdited=false;
@@ -700,7 +697,7 @@
     overlay.addEventListener('click',event=>{if(event.target===overlay)close();});
     const sync=()=>{overlay.querySelector('#cfBusDuration').textContent=durationLabel(start.value,end.value);};
     const showError=message=>{errorEl.textContent=message;errorEl.classList.add('show');};
-    for(const input of [start,end,date])input.addEventListener('input',()=>{errorEl.classList.remove('show');sync();});
+    for(const input of [start,end,date,costInput])input.addEventListener('input',()=>{errorEl.classList.remove('show');sync();});
     date.addEventListener('input',()=>{dateEdited=true;});
     const load=async()=>{
       const current=++request;
@@ -736,17 +733,23 @@
       if(!date.value){showError('Podaj datę prania.');return;}
       const minutes=durationMinutes(start.value,end.value);
       if(!start.value||!end.value||minutes===null||minutes<=0){showError('Podaj poprawne godziny początku i końca prania.');return;}
+      const amount=Number(costInput.value);
+      if(!costInput.value || !Number.isFinite(amount) || amount<0){showError('Podaj poprawną kwotę finalną.');return;}
+      const cost=Math.round(amount*100)/100;
+      const washDate=date.value,durationHours=minutes/60;
       saving=true;save.disabled=true;save.textContent='Zapisuję…';
       try{
-        const {error:saveError}=await cfSupabase.from('wash_records').update({
-          approved:true,wash_date:date.value,wash_start_time:start.value,wash_end_time:end.value,
-          duration_hours:minutes/60
-        }).eq('id',id).eq('approved',false);
+        const {data:saved,error:saveError}=await cfSupabase.from('wash_records').update({
+          approved:true,wash_date:washDate,wash_start_time:start.value,wash_end_time:end.value,
+          duration_hours:durationHours,cost
+        }).eq('id',id).eq('approved',false).eq('paid',false).select('id').maybeSingle();
         if(saveError)throw saveError;
+        if(!saved)throw new Error('Nie udało się zapisać prania. Odśwież listę i spróbuj ponownie.');
         saving=false;close();
-        const rec=(typeof records!=='undefined'&&Array.isArray(records))
-          ?records.find(item=>String(item?.id||'')===String(id)):null;
-        if(rec)rec.zatwierdzone=true;
+        window.cfApplyCompletedWashLocal?.({
+          id,washDate,start:start.value,end:end.value,durationHours,cost,
+          performer:row.performed_by,notes:row.completion_notes
+        });
         if(typeof loadAll==='function')Promise.resolve(loadAll()).catch(err=>console.warn('CleanFleet BUS refresh:',err));
         else{
           try{if(typeof renderAttentionPanel==='function')renderAttentionPanel();}catch(_){}

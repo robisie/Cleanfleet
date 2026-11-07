@@ -12,13 +12,13 @@ begin
  perform set_config('request.jwt.claim.sub',admin_id::text,true);
  for n in 1..12 loop
   insert into public.wash_records(company_id,plate,type,brand,created_by,cost)
-  values(company,'CF-REGRESSION-'||n,'CIĄGNIK','TEST',admin_id,100) returning id into rid;
+  values(company,'CF-REGRESSION-'||n,'CIĄGNIK','TEST',admin_id,100+n) returning id into rid;
   ids:=array_append(ids,rid);
  end loop;
  -- No time is a completed wash and adds one earning for Michał.
- result:=public.cf_complete_wash_records(ids[1:1],current_date,null,null,'Michał',100,array[service],null);
- if not exists(select 1 from public.wash_records where id=ids[1] and approved and wash_date=current_date and duration_hours is null) then raise exception 'No-time completion failed'; end if;
- if (select count(*) from public.cf_earnings where source_wash_record_id=ids[1])<>1 then raise exception 'No-time earning missing'; end if;
+ result:=public.cf_complete_wash_records(ids[1:1],current_date,null,null,'Michał',75,array[service],null);
+ if not exists(select 1 from public.wash_records where id=ids[1] and approved and wash_date=current_date and duration_hours is null and order_cost=101 and cost=75 and order_currency=currency) then raise exception 'Final/order amount or no-time completion failed'; end if;
+ if (select count(*) from public.cf_earnings where source_wash_record_id=ids[1] and total_amount=75)<>1 then raise exception 'Final-price earning missing'; end if;
  -- Other performers do not add earnings; duration without fictitious clock times.
  result:=public.cf_complete_wash_records(ids[2:2],current_date,null,null,'AGA',100,array[service],null,1.5);
  if not exists(select 1 from public.wash_records where id=ids[2] and approved and duration_hours=1.5 and wash_start_time is null and wash_end_time is null) then raise exception 'Manual duration failed'; end if;
@@ -32,7 +32,11 @@ begin
  result:=public.cf_complete_wash_records(array[ids[7],ids[7]],current_date,'23:00','01:00','Michał',100,array[service],null);
  if not exists(select 1 from public.wash_records where id=ids[7] and duration_hours=2 and wash_start_time='23:00' and wash_end_time='01:00') then raise exception 'Midnight duration failed'; end if;
  -- Fractional minutes retained; sum stays one hour.
- result:=public.cf_complete_wash_records(ids[8:10],current_date,null,null,'Michał',100,array[service],null,1);
+ result:=public.cf_complete_wash_records(ids[8:10],current_date,null,null,'Michał',null,array[service],null,1);
+ if (select count(*) from public.wash_records where id=any(ids[8:10]) and cost=order_cost and order_cost between 108 and 110)<>3 then raise exception 'Bulk did not retain each order price'; end if;
+ if (result->'cost_by_id'->>ids[8]::text)::numeric<>108 then raise exception 'Wrong returned batch amount'; end if;
+ update public.wash_records set order_cost=999 where id=ids[1];
+ if (select order_cost from public.wash_records where id=ids[1])<>101 then raise exception 'Original price overwritten'; end if;
  select sum(duration_hours) into total from public.wash_records where id=any(ids[8:10]);
  if abs(total-1)>0.000000001 then raise exception 'Fractional duration lost'; end if;
  -- Stale selection rejects the entire batch, without changing the pending row.
@@ -57,4 +61,4 @@ begin
  if has_function_privilege('anon','public.cf_complete_wash_records(uuid[],date,time,time,text,numeric,uuid[],text,numeric)','execute') then raise exception 'Anonymous execute granted'; end if;
 end;$$;
 rollback;
-select 'PASS: optional time, manual duration, batch allocation, midnight, fractions, earnings, atomicity and authentication' as result;
+select 'PASS: separate original and final prices, final-price earnings, per-order bulk amount, immutable quote, durations and authorization' as result;

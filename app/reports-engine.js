@@ -13,6 +13,7 @@ function fields(source){const f=JSON.parse(JSON.stringify(catalog[source].fields
   for(const [k,v]of Object.entries(catalog.vehicles.fields))if(!['company_id','plate'].includes(k))f['vehicle_'+k]={...v,label:'Kartoteka: '+v.label};
   for(const k of ['invoice_number','invoice_date','status','paid_at'])f['invoice_'+k]={...catalog.invoices.fields[k],label:'Faktura: '+catalog.invoices.fields[k].label};
   f.has_invoice={label:'Przypisano fakturę',type:'boolean'};f.completed={label:'Pranie wykonane',type:'boolean'};
+  f.final_cost={label:'Kwota finalna',type:'number'};
  }
  if(['invoice_items','wash_change_requests','wash_record_photos'].includes(source))for(const k of ['company_id','plate','type','performed_by','wash_date'])f['wash_'+k]={...catalog.wash_records.fields[k],label:'Pranie: '+catalog.wash_records.fields[k].label};
  if(source==='invoice_items')f.invoice_number={label:'Numer faktury',type:'text'};
@@ -23,6 +24,7 @@ function fields(source){const f=JSON.parse(JSON.stringify(catalog[source].fields
 function enrich(source,data){const companies=new Map((data.companies||[]).map(c=>[c.id,c]));const vehicles=new Map((data.vehicles||[]).map(v=>[key(v),v]));const invoices=new Map((data.invoices||[]).map(i=>[i.id,i]));const items=new Map((data.invoice_items||[]).map(i=>[i.wash_record_id,i]));const washes=new Map((data.wash_records||[]).map(w=>[w.id,w]));
  return (data[source]||[]).map(raw=>{const r={...raw};if('company_id'in r){const c=companies.get(r.company_id);r.company_name=c?.short_name||c?.name||r.company_id||null;}
  if(source==='wash_records'){const v=vehicles.get(key(r));for(const k of Object.keys(catalog.vehicles.fields))if(!['company_id','plate'].includes(k))r['vehicle_'+k]=v?.[k]??null;const i=invoices.get(items.get(r.id)?.invoice_id);r.has_invoice=!!i;r.completed=!!r.wash_date;for(const k of ['invoice_number','invoice_date','status','paid_at'])r['invoice_'+k]=i?.[k]??null;}
+ if(source==='wash_records')r.final_cost=r.approved||r.paid?r.cost:null;
  if(['invoice_items','wash_change_requests','wash_record_photos'].includes(source)){const w=washes.get(r.wash_record_id);for(const k of ['company_id','plate','type','performed_by','wash_date'])r['wash_'+k]=w?.[k]??null;}
  if(source==='invoice_items')r.invoice_number=invoices.get(r.invoice_id)?.invoice_number??null;
  if(root.CFExchange){

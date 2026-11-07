@@ -3,7 +3,7 @@ const fx=require('../app/exchange-rate.js'),engine=require('../app/reports-engin
 function render(rows,exchange=fx){
  const pane={innerHTML:'',querySelectorAll:()=>[]};
  const root={CFReportEngine:engine,CFExchange:exchange};
- const source=fs.readFileSync(require.resolve('../app/reports-ui.js'),'utf8').replace('root.CFReports={open,reset,vehicleReportPreview,vehiclePDF,vehicleModel,vehicleReportPDF};','root.renderTest=(r,h)=>{result=r;host=h;renderRows();};');
+ const source=fs.readFileSync(require.resolve('../app/reports-ui.js'),'utf8').replace(/root\.CFReports=\{[^\n]+?\};/,'root.renderTest=(r,h)=>{result=r;host=h;renderRows();};');
  vm.runInNewContext(source,{window:root});
  root.renderTest({rows,cfg:{columns:['plate','cost']},fields:{plate:{label:'Rejestracja'},cost:{label:'Kwota usługi'}}},{querySelector:()=>pane});
  return pane.innerHTML.replace(/\s/g,' ');

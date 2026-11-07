@@ -2,7 +2,32 @@
 const E=root.CFReportEngine,C=E.catalog;
 const esc=v=>E.text(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const display=v=>v==null||v===''?'—':v===true?'Tak':v===false?'Nie':E.text(v);
+const washPriceColors={lower:'#606973',same:'#176337',higher:'#a32232'};
+const washMoney=(amount,currency)=>Number(amount).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(currency||'PLN');
+function washPrice(row){
+ const order=E.number(row.order_cost),final=(row.approved||row.paid)?E.number(row.cost):null;
+ const currency=row.currency||'PLN';
+ let color;
+ if(order!==null&&final!==null&&row.order_currency===currency){
+  const difference=Math.round(final*100)-Math.round(order*100);
+  color=washPriceColors[difference<0?'lower':difference>0?'higher':'same'];
+ }
+ return {
+  order:order===null?'Brak danych':washMoney(order,row.order_currency),
+  final:final===null?'—':washMoney(final,currency),
+  color
+ };
+}
+function reportCellHtml(row,key){
+ const color=key==='final_cost'?washPrice(row).color:null;
+ return color?'<strong style="color:'+color+'">'+esc(cell(row,key))+'</strong>':esc(cell(row,key));
+}
+function reportPdfCell(row,key){
+ const content=cell(row,key),color=key==='final_cost'?washPrice(row).color:null;
+ return color?{content,styles:{textColor:color}}:content;
+}
 const cell=(row,key)=>{
+ if(key==='order_cost'||key==='final_cost')return washPrice(row)[key==='order_cost'?'order':'final'];
  if(key==='cost'&&row.cost!=null){
   if(root.CFExchange)return root.CFExchange.format({...row,currency:row.currency||'PLN'}).replace('€','EUR').replace('zł','PLN');
   return Number(row.cost).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(row.currency||'PLN')+(row.currency==='EUR'?' / brak kursu PLN':'');
@@ -12,7 +37,7 @@ const cell=(row,key)=>{
 };
 const fmt=v=>v==null?'—':Number(v).toLocaleString('pl-PL',{maximumFractionDigits:2});
 let bridge,host,data={},result=null,owner=null,loading=false,serial=0,viewRows=null,page=0,sortField='',sortDir=1,detailStack=[];
-let cfg={source:'wash_records',title:'Raport CleanFleet',dateField:'wash_date',from:'',to:'',filters:[],groups:[],columns:['company_name','plate','type','wash_date','performed_by','cost','approved','paid','invoice_invoice_number'],metricIds:['count','completed','vehicles','sum','avg'],chart:'bar',chartMetric:'count',resultMode:'full'};
+let cfg={source:'wash_records',title:'Raport CleanFleet',dateField:'wash_date',from:'',to:'',filters:[],groups:[],columns:['company_name','plate','type','wash_date','performed_by','order_cost','final_cost','approved','paid','invoice_invoice_number'],metricIds:['count','completed','vehicles','sum','avg'],chart:'bar',chartMetric:'count',resultMode:'full'};
 const initialConfig=JSON.parse(JSON.stringify(cfg));
 const $=s=>host.querySelector(s),$$=s=>[...host.querySelectorAll(s)];
 const isLocked=s=>/^cf_earning/.test(s)&&!bridge.canEarnings();
@@ -70,8 +95,8 @@ function renderColumnPicker(fields){
 }
 function columnPreset(name,defs){
  const sets={
-  basic:['company_name','plate','type','wash_date','performed_by','cost','completion_notes'],
-  billing:['company_name','plate','type','wash_date','performed_by','cost','approved','paid','invoice_invoice_number','invoice_status'],
+  basic:['company_name','plate','type','wash_date','performed_by','order_cost','final_cost','completion_notes'],
+  billing:['company_name','plate','type','wash_date','performed_by','order_cost','final_cost','approved','paid','invoice_invoice_number','invoice_status'],
   invoice:['company_name','plate','wash_date','cost','invoice_invoice_number','invoice_invoice_date','invoice_status','invoice_paid_at'],
   vehicle:['company_name','plate','vehicle_type','vehicle_brand','vehicle_model','vehicle_production_year','vehicle_fleet_number','vehicle_driver_name']
  };
@@ -163,10 +188,10 @@ function renderResult(){if(!result)return;if((result.cfg.resultMode||'full')==='
  host.querySelectorAll('[data-metric]').forEach(b=>b.onclick=()=>drill(result.metrics.find(m=>m.id===b.dataset.metric),null));$$('[data-group]').forEach(b=>{const action=()=>{const g=result.groups[+b.dataset.group];const m=b.dataset.gmetric?g.metrics.find(x=>x.id===b.dataset.gmetric):{rows:g.rows,label:g.label};drill(m,g);};b.onclick=action;b.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();action();}};});renderRows();}
 function drill(m,g){guard();const title=(g?g.label+' · ':'')+m.label;viewRows={rows:m.rows,title,metric:m};page=0;sortField='';renderRows();$('#rRows').scrollIntoView({block:'start'});}
 function renderRows(){const pane=$('#rRows');if(!pane||!result)return;let rows=[...(viewRows?.rows||result.rows)],cols=result.cfg.columns,defs=result.fields;const m=viewRows?.metric;let kind='rows';if(m?.kind==='vehicles'){kind='vehicles';rows=E.distinctVehicles(rows);cols=['company_name','plate'];defs={company_name:{label:'Firma'},plate:{label:'Rejestracja'}};}else if(m?.kind==='distinct'){kind='distinct';const grouped=new Map();for(const r of rows){const k=E.text(r[m.field]);if(!grouped.has(k))grouped.set(k,{[m.field]:r[m.field],_count:0,rows:[]});grouped.get(k)._count++;grouped.get(k).rows.push(r);}rows=[...grouped.values()];cols=[m.field,'_count'];defs={...defs,_count:{label:'Liczba rekordów'}};}else if(m?.kind==='interval'){kind='pairs';rows=(m.pairs||[]).map(p=>({company_name:p.to.company_name,plate:p.to.plate,from_date:p.from.wash_date,to_date:p.to.wash_date,days:p.days,from_id:p.from.id,to_id:p.to.id}));cols=['company_name','plate','from_date','to_date','days','from_id','to_id'];defs=Object.fromEntries(['Firma','Rejestracja','Poprzednie pranie','Kolejne pranie','Odstęp (dni)','Poprzedni wpis','Kolejny wpis'].map((v,i)=>[cols[i],{label:v}]));}
- if(sortField)rows.sort((a,b)=>{const x=a[sortField],y=b[sortField];return sortDir*(typeof x==='number'&&typeof y==='number'?x-y:display(x).localeCompare(display(y),'pl',{numeric:true}));});const pages=Math.max(1,Math.ceil(rows.length/50));page=Math.min(page,pages-1);const shown=rows.slice(page*50,page*50+50);pane.innerHTML='<div class="r-barline"><h2>'+esc(viewRows?.title||'Dane źródłowe')+' <small>('+rows.length+')</small></h2>'+(viewRows?'<button data-action="back-report">← Wszystkie dane raportu</button>':'')+'</div>'+(m?.kind==='frequency'?'<p>'+m.rows.length+' wykonanych prań / '+E.distinctVehicles(m.rows).length+' pojazdów = '+fmt(m.value)+'</p>':'')+'<div class="r-scroll"><table><thead><tr><th>Szczegóły</th>'+cols.map(k=>'<th><button class="link" data-sort="'+esc(k)+'">'+esc(defs[k]?.label||k)+(sortField===k?(sortDir===1?' ↑':' ↓'):'')+'</button></th>').join('')+'</tr></thead><tbody>'+shown.map((r,i)=>'<tr><td><button class="link" data-row="'+i+'">Otwórz</button></td>'+cols.map(k=>'<td>'+esc(cell(r,k))+'</td>').join('')+'</tr>').join('')+'</tbody></table></div><div class="r-barline r-actions"><p class="r-muted">Strona '+(page+1)+' / '+pages+' · Eksport obejmuje wszystkie przefiltrowane rekordy raportu nadrzędnego.</p><div class="r-flex"><button data-action="prev" '+(page===0?'disabled':'')+'>←</button><button data-action="next" '+(page===pages-1?'disabled':'')+'>→</button></div></div>';
+ if(sortField)rows.sort((a,b)=>{const x=a[sortField],y=b[sortField];return sortDir*(typeof x==='number'&&typeof y==='number'?x-y:display(x).localeCompare(display(y),'pl',{numeric:true}));});const pages=Math.max(1,Math.ceil(rows.length/50));page=Math.min(page,pages-1);const shown=rows.slice(page*50,page*50+50);pane.innerHTML='<div class="r-barline"><h2>'+esc(viewRows?.title||'Dane źródłowe')+' <small>('+rows.length+')</small></h2>'+(viewRows?'<button data-action="back-report">← Wszystkie dane raportu</button>':'')+'</div>'+(m?.kind==='frequency'?'<p>'+m.rows.length+' wykonanych prań / '+E.distinctVehicles(m.rows).length+' pojazdów = '+fmt(m.value)+'</p>':'')+'<div class="r-scroll"><table><thead><tr><th>Szczegóły</th>'+cols.map(k=>'<th><button class="link" data-sort="'+esc(k)+'">'+esc(defs[k]?.label||k)+(sortField===k?(sortDir===1?' ↑':' ↓'):'')+'</button></th>').join('')+'</tr></thead><tbody>'+shown.map((r,i)=>'<tr><td><button class="link" data-row="'+i+'">Otwórz</button></td>'+cols.map(k=>'<td>'+reportCellHtml(r,k)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div><div class="r-barline r-actions"><p class="r-muted">Strona '+(page+1)+' / '+pages+' · Eksport obejmuje wszystkie przefiltrowane rekordy raportu nadrzędnego.</p><div class="r-flex"><button data-action="prev" '+(page===0?'disabled':'')+'>←</button><button data-action="next" '+(page===pages-1?'disabled':'')+'>→</button></div></div>';
  pane.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{sortDir=sortField===b.dataset.sort?-sortDir:1;sortField=b.dataset.sort;renderRows();});pane.querySelectorAll('[data-row]').forEach(b=>b.onclick=()=>{const r=shown[+b.dataset.row];if(kind==='distinct'){viewRows={rows:r.rows,title:display(r[m.field]),metric:{kind:'count'}};page=0;renderRows();}else if(kind==='vehicles')showEntity('vehicles',data.vehicles?.find(v=>v.plate===r.plate&&v.company_id===r.company_id)||r);else if(kind==='pairs')showEntity('wash_records',data.wash_records.find(w=>w.id===r.to_id));else showEntity(result.cfg.source,r);});}
 function showEntity(source,row){guard();if(!row)return;const detail={source,row};detailStack.push(detail);paintDetail(detail);}
-function paintDetail({source,row}){const el=$('#rDetails');$('#rConfig').hidden=true;$('#rResults').hidden=true;el.hidden=false;const defs=E.fields(source);let links=[];const washId=row.wash_record_id||row.source_wash_record_id;const wash=data.wash_records?.find(w=>w.id===washId);const companyId=row.company_id||row.wash_company_id||wash?.company_id;const plate=row.plate||row.vehicle_plate||row.wash_plate||wash?.plate;const vehicle=data.vehicles?.find(v=>v.plate===plate&&v.company_id===companyId);const company=data.companies?.find(c=>c.id===companyId);if(wash)links.push(['Wpis prania','wash_records',wash]);if(vehicle&&source!=='vehicles')links.push(['Karta pojazdu','vehicles',vehicle]);if(company&&source!=='companies')links.push(['Firma / klient','companies',company]);el.innerHTML='<section class="r-box r-detail"><button data-action="back-detail">← Powrót</button><h2>'+esc(source==='vehicles'?'Karta pojazdu · '+row.plate:C[source].label)+'</h2><dl>'+Object.entries(defs).filter(([k])=>row[k]!=null&&row[k]!=='').map(([k,d])=>'<div><dt>'+esc(d.label)+'</dt><dd>'+esc(cell(row,k))+'</dd></div>').join('')+'</dl><div class="r-flex">'+links.map(([l],i)=>'<button data-entity="'+i+'">'+l+'</button>').join('')+'</div></section>';el.querySelectorAll('[data-entity]').forEach(b=>b.onclick=()=>{const [,s,r]=links[+b.dataset.entity];showEntity(s,r);});if(source==='vehicles'&&data.wash_records){const washes=data.wash_records.filter(w=>w.plate===row.plate&&w.company_id===row.company_id).sort((a,b)=>String(b.wash_date||'').localeCompare(String(a.wash_date||'')));el.firstChild.insertAdjacentHTML('beforeend','<h3>Historia dostępna w pobranym zestawie ('+washes.length+')</h3>'+washes.map((w,i)=>'<p><button class="link" data-wash="'+i+'">'+esc(w.wash_date||'Oczekujące')+' · '+esc(w.performed_by||'—')+' · '+cell(w,'cost')+'</button></p>').join(''));el.querySelectorAll('[data-wash]').forEach(b=>b.onclick=()=>showEntity('wash_records',washes[+b.dataset.wash]));}el.scrollIntoView({block:'start'});}
+function paintDetail({source,row}){const el=$('#rDetails');$('#rConfig').hidden=true;$('#rResults').hidden=true;el.hidden=false;const defs=E.fields(source);let links=[];const washId=row.wash_record_id||row.source_wash_record_id;const wash=data.wash_records?.find(w=>w.id===washId);const companyId=row.company_id||row.wash_company_id||wash?.company_id;const plate=row.plate||row.vehicle_plate||row.wash_plate||wash?.plate;const vehicle=data.vehicles?.find(v=>v.plate===plate&&v.company_id===companyId);const company=data.companies?.find(c=>c.id===companyId);if(wash)links.push(['Wpis prania','wash_records',wash]);if(vehicle&&source!=='vehicles')links.push(['Karta pojazdu','vehicles',vehicle]);if(company&&source!=='companies')links.push(['Firma / klient','companies',company]);el.innerHTML='<section class="r-box r-detail"><button data-action="back-detail">← Powrót</button><h2>'+esc(source==='vehicles'?'Karta pojazdu · '+row.plate:C[source].label)+'</h2><dl>'+Object.entries(defs).filter(([k])=>row[k]!=null&&row[k]!=='').map(([k,d])=>'<div><dt>'+esc(d.label)+'</dt><dd>'+reportCellHtml(row,k)+'</dd></div>').join('')+'</dl><div class="r-flex">'+links.map(([l],i)=>'<button data-entity="'+i+'">'+l+'</button>').join('')+'</div></section>';el.querySelectorAll('[data-entity]').forEach(b=>b.onclick=()=>{const [,s,r]=links[+b.dataset.entity];showEntity(s,r);});if(source==='vehicles'&&data.wash_records){const washes=data.wash_records.filter(w=>w.plate===row.plate&&w.company_id===row.company_id).sort((a,b)=>String(b.wash_date||'').localeCompare(String(a.wash_date||'')));el.firstChild.insertAdjacentHTML('beforeend','<h3>Historia dostępna w pobranym zestawie ('+washes.length+')</h3>'+washes.map((w,i)=>'<p><button class="link" data-wash="'+i+'">'+esc(w.wash_date||'Oczekujące')+' · '+esc(w.performed_by||'—')+' · '+cell(w,'cost')+'</button></p>').join(''));el.querySelectorAll('[data-wash]').forEach(b=>b.onclick=()=>showEntity('wash_records',washes[+b.dataset.wash]));}el.scrollIntoView({block:'start'});}
 function backDetail(){detailStack.pop();if(detailStack.length)paintDetail(detailStack.at(-1));else{$('#rDetails').hidden=true;$('#rConfig').hidden=false;$('#rResults').hidden=false;$('#rRows').scrollIntoView({block:'start'});}}
 function describe(r){const c=r.cfg,f=r.fields;return ['Źródło: '+C[c.source].label,'Okres: '+(c.from||'bez początku')+' – '+(c.to||'bez końca')+(c.dateField?' ('+f[c.dateField].label+')':''),...(c.filters||[]).map(x=>(f[x.field]?.label||x.field)+': '+(x.op==='in'?(x.values||[]).map(display).join(' LUB ')||'nic nie wybrano':x.op==='range'?(x.min||'−∞')+' – '+(x.max||'+∞'):x.op==='empty'?'brak danych':x.op==='notempty'?'uzupełnione':x.value)), 'Grupowanie: '+(c.groups.map(g=>(f[g.field]?.label||g.field)+(['date','datetime'].includes(f[g.field]?.type)?' / '+({day:'dzień',week:'tydzień',month:'miesiąc',year:'rok'}[g.bucket]||'dzień'):'')).join(' → ')||'brak')];}
 const palette=['#819b0b','#226e85','#c38627','#7562a2','#b45168','#447b4c','#516781'];
@@ -205,6 +230,78 @@ function pdfHeader(doc,title,subtitle,orientation='landscape'){
 }
 function addFooters(doc,label='CleanFleet'){
  const pages=doc.getNumberOfPages(),pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight();for(let n=1;n<=pages;n++){doc.setPage(n);doc.setDrawColor(222,228,216);doc.line(10,ph-11,pw-10,ph-11);doc.setTextColor(95,105,90);doc.setFontSize(7.5);doc.text(label,10,ph-6);doc.text(n+' / '+pages,pw-10,ph-6,{align:'right'});}doc.setTextColor(32,38,28);
+}
+async function quickWashPDF(b,{from,to,companyId=null}){
+ if(!b.canReports?.()&&!b.isAdmin?.())throw Error('Brak uprawnień do raportów.');
+ const isDate=value=>{
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
+  const date=new Date(value+'T00:00:00Z');
+  return Number.isFinite(+date)&&date.toISOString().slice(0,10)===value;
+ };
+ if(!isDate(from)||!isDate(to)||from>to)throw Error('Wybierz poprawny zakres dat.');
+ const {data:{session}}=await b.db.auth.getSession();
+ if(!session)throw Error('Sesja wygasła. Zaloguj się ponownie.');
+
+ const scope=b.allowedCompanyIds?.();
+ if(Array.isArray(scope)&&companyId&&!scope.includes(companyId))throw Error('Brak dostępu do tej firmy.');
+ const rows=[];
+ if(!Array.isArray(scope)||scope.length){
+  const pageSize=500;
+  let expected=null;
+  for(let offset=0;;offset+=pageSize){
+   let query=b.db.from('wash_records')
+    .select('id,type,plate,wash_date,ordered_by,performed_by,notes,order_cost,order_currency,cost,currency,approved',{count:'exact'})
+    .eq('approved',true).gte('wash_date',from).lte('wash_date',to)
+    .order('wash_date').order('id');
+   if(companyId)query=query.eq('company_id',companyId);
+   else if(Array.isArray(scope))query=query.in('company_id',scope);
+   const {data,error,count}=await query.range(offset,offset+pageSize-1);
+   if(error)throw error;
+   if(expected===null)expected=count;
+   if(count!==expected)throw Error('Dane zmieniły się podczas pobierania. Wygeneruj raport ponownie.');
+   rows.push(...data);
+   if(data.length<pageSize)break;
+  }
+  if((expected!==null&&rows.length!==expected)||new Set(rows.map(row=>row.id)).size!==rows.length){
+   throw Error('Dane zmieniły się podczas pobierania. Wygeneruj raport ponownie.');
+  }
+ }
+ const current=(await b.db.auth.getSession()).data.session;
+ if(current?.user.id!==session.user.id||(!b.canReports?.()&&!b.isAdmin?.()))throw Error('Sesja zmieniła się. Wygeneruj raport ponownie.');
+
+ const doc=setupPDF();
+ if(typeof doc.autoTable!=='function')throw Error('Biblioteka tabel PDF jest niedostępna. Odśwież aplikację.');
+ const period=from===to?from:from+' – '+to;
+ const title='Szybki raport prań';
+ const header=()=>pdfHeader(doc,title,period+'   ·   Wykonane prania: '+rows.length);
+ const y=header();
+ doc.setFontSize(8);
+ const legend=[['Niższa kwota',washPriceColors.lower],['Bez zmiany',washPriceColors.same],['Wyższa kwota',washPriceColors.higher]];
+ legend.forEach(([label,color],index)=>{
+  doc.setTextColor(color);
+  doc.text(label,10+index*36,y);
+ });
+ if(rows.length){
+  const keys=['type','plate','wash_date','ordered_by','performed_by','notes','order_cost','final_cost'];
+  doc.autoTable({
+   head:[['Typ','Rejestracja','Data prania','Zlecił','Wykonał','Opis zlecenia','Kwota zlecenia','Kwota finalna']],
+   body:rows.map(row=>keys.map(key=>reportPdfCell(row,key))),
+   startY:y+5,margin:{top:41,bottom:16,left:10,right:10},
+   styles:{font:'CleanFleet',fontStyle:'normal',fontSize:8.3,cellPadding:2,overflow:'linebreak',valign:'top',textColor:[32,38,28]},
+   headStyles:{fillColor:[236,243,224],textColor:[32,38,28],fontStyle:'normal'},
+   alternateRowStyles:{fillColor:[249,250,247]},
+   columnStyles:{0:{cellWidth:22},1:{cellWidth:26},2:{cellWidth:24},3:{cellWidth:31},4:{cellWidth:31},5:{cellWidth:87},6:{cellWidth:28,halign:'right'},7:{cellWidth:28,halign:'right'}},
+   rowPageBreak:'avoid',showHead:'everyPage',
+   willDrawPage:({pageNumber})=>{if(pageNumber>1)header();}
+  });
+ }else{
+  doc.setTextColor(32,38,28);
+  doc.setFontSize(10);
+  doc.text('Brak wykonanych prań w tym okresie.',10,y+10);
+ }
+ addFooters(doc,title);
+ doc.save('CleanFleet_prania_'+from+(from===to?'':'_'+to)+'.pdf');
+ return doc;
 }
 function pdfCards(doc,cards,y,orientation='landscape'){
  const pw=doc.internal.pageSize.getWidth(),margin=10,gap=3,cols=orientation==='portrait'?2:Math.min(4,cards.length||1),cw=(pw-margin*2-gap*(cols-1))/cols,ch=21;cards.forEach((c,i)=>{const col=i%cols,row=Math.floor(i/cols),x=margin+col*(cw+gap),cy=y+row*(ch+gap);doc.setFillColor(244,247,237);doc.setDrawColor(222,231,211);doc.roundedRect(x,cy,cw,ch,2,2,'FD');doc.setTextColor(96,108,89);doc.setFontSize(7.3);doc.text(doc.splitTextToSize(c.label,cw-6).slice(0,2),x+3,cy+5);doc.setTextColor(48,64,13);doc.setFontSize(12);doc.text(E.text(c.value),x+3,cy+16);});doc.setTextColor(32,38,28);return y+Math.ceil(cards.length/cols)*(ch+gap);
@@ -296,7 +393,7 @@ function adminPdfSourceTable(doc,r,y,logo){
    if(cols.length>10){doc.setTextColor(96,103,98);doc.setFontSize(6.8);doc.text('Kolumny '+(i+1)+'–'+Math.min(i+10,cols.length)+' · numer wiersza łączy części tabeli',10,y);y+=4;}
    doc.autoTable({
      head:[[...chunk.map(k=>r.fields[k]?.label||k)]],
-     body:r.rows.map(row=>chunk.map(k=>cell(row,k))),
+     body:r.rows.map(row=>chunk.map(k=>reportPdfCell(row,k))),
      startY:y,margin:{top:38,bottom:15,left:10,right:10},
      styles:{font:'CleanFleet',fontStyle:'normal',fontSize:6.4,cellPadding:2.1,overflow:'linebreak',valign:'top',textColor:[31,35,32],lineColor:[229,233,230],lineWidth:.12},
      headStyles:{fillColor:[241,246,235],textColor:[31,38,27],fontStyle:'normal'},
@@ -357,7 +454,7 @@ function reportPdfAllRowsHtml(r){
    cols.map(k=>'<th>'+sortLabel(k)+'</th>').join('')+
    '</tr></thead><tbody>'+
    rows.map(row=>'<tr>'+
-     cols.map(k=>'<td>'+esc(cell(row,k))+'</td>').join('')+'</tr>').join('')+
+     cols.map(k=>'<td>'+reportCellHtml(row,k)+'</td>').join('')+'</tr>').join('')+
    '</tbody></table></div>';
 }
 
@@ -467,7 +564,7 @@ function vrpSummaryTable(title,items,money=false){
  return'<section class="vrp-report-block"><h3>'+esc(title)+'</h3><div class="vrp-table-wrap"><table class="vrp-report-table"><thead><tr><th>Grupa</th><th>'+(money?'Wartość':'Liczba')+'</th></tr></thead><tbody>'+items.map(x=>'<tr><td>'+esc(x.label)+'</td><td>'+esc(fmt(x.value)+(money?' zł':''))+'</td></tr>').join('')+'</tbody></table></div></section>';
 }
 function vrpHistoryTable(rows){
- return'<section class="vrp-report-block"><h3>HISTORIA PRAŃ</h3><div class="vrp-table-wrap"><table class="vrp-report-table vrp-history-table"><thead><tr><th>Data</th><th>Typ</th><th>Wykonał</th><th>Zlecił</th><th>Kwota</th><th>Termin</th><th>Kategoria</th><th>Status</th><th>Zatw.</th><th>Zapł.</th><th>Opis zlecenia</th><th>Opis wykonania</th></tr></thead><tbody>'+(rows.length?rows.map(r=>'<tr><td>'+esc(r.wash_date||r.order_date||String(r.created_at||'').slice(0,10)||'—')+'</td><td>'+esc(display(r.type))+'</td><td>'+esc(display(r.performed_by))+'</td><td>'+esc(display(r.ordered_by))+'</td><td>'+esc(root.CFExchange?root.CFExchange.format(r):(E.number(r.cost)==null?'—':fmt(r.cost)+' zł'))+'</td><td>'+esc(display(r.order_due_date))+'</td><td>'+esc(display(r.billing_category))+'</td><td>'+esc(vehicleStatus(r))+'</td><td>'+esc(display(r.approved))+'</td><td>'+esc(display(r.paid))+'</td><td>'+esc(display(r.notes))+'</td><td>'+esc(display(r.completion_notes))+'</td></tr>').join(''):'<tr><td colspan="12">Brak historii usług.</td></tr>')+'</tbody></table></div></section>';
+ return'<section class="vrp-report-block"><h3>HISTORIA PRAŃ</h3><div class="vrp-table-wrap"><table class="vrp-report-table vrp-history-table"><thead><tr><th>Data</th><th>Typ</th><th>Wykonał</th><th>Zlecił</th><th>Kwota zlecenia</th><th>Kwota finalna</th><th>Termin</th><th>Kategoria</th><th>Status</th><th>Zatw.</th><th>Zapł.</th><th>Opis zlecenia</th><th>Opis wykonania</th></tr></thead><tbody>'+(rows.length?rows.map(r=>'<tr><td>'+esc(r.wash_date||r.order_date||String(r.created_at||'').slice(0,10)||'—')+'</td><td>'+esc(display(r.type))+'</td><td>'+esc(display(r.performed_by))+'</td><td>'+esc(display(r.ordered_by))+'</td><td>'+esc(washPrice(r).order)+'</td><td>'+reportCellHtml(r,'final_cost')+'</td><td>'+esc(display(r.order_due_date))+'</td><td>'+esc(display(r.billing_category))+'</td><td>'+esc(vehicleStatus(r))+'</td><td>'+esc(display(r.approved))+'</td><td>'+esc(display(r.paid))+'</td><td>'+esc(display(r.notes))+'</td><td>'+esc(display(r.completion_notes))+'</td></tr>').join(''):'<tr><td colspan="13">Brak historii usług.</td></tr>')+'</tbody></table></div></section>';
 }
 function vehiclePreviewHtml(m,logo){
  const v=m.vehicle,c=m.company;
@@ -646,5 +743,5 @@ async function open(b){bridge=b;if(!(b.canReports?.()===true||b.isAdmin?.()===tr
 async function loadVehicleModel(b,plate,companyId){bridge=b;await bridge.refreshExchangeRate?.(false);const id=await identity();const [vehicles,washes,companies]=await Promise.all([all('vehicles',{plate,company_id:companyId},false),all('wash_records',{plate,company_id:companyId},false),all('companies',{id:companyId},false)]);if(await identity()!==id)throw Error('Sesja zmieniła się. Spróbuj ponownie.');const vehicle=vehicles[0];if(!vehicle)throw Error('Brak dostępu do pojazdu.');return vehicleModel(vehicle,washes,companies[0]);}
 async function vehicleReportPreview(b,plate,companyId){const existing=document.getElementById('cfVehicleReportPreview');if(existing)existing.remove();const model=await loadVehicleModel(b,plate,companyId),logo=await lightLogoSrc(),preview=document.createElement('section');preview.id='cfVehicleReportPreview';preview.setAttribute('role','dialog');preview.setAttribute('aria-modal','true');preview.setAttribute('aria-label','Podgląd karty pojazdu');preview.innerHTML=vehiclePreviewHtml(model,logo);document.body.append(preview);preview.querySelector('[data-vrp=close]').onclick=()=>preview.remove();preview.querySelector('[data-vrp=download]').onclick=async e=>{const btn=e.currentTarget;btn.disabled=true;btn.textContent='Tworzę PDF…';try{await vehicleReportPDF(model);btn.textContent='Pobrano PDF';}catch(err){console.error('CleanFleet vehicle PDF:',err);btn.textContent='Nie udało się utworzyć PDF';}finally{setTimeout(()=>{if(btn.isConnected){btn.disabled=false;btn.textContent='Pobierz PDF';}},1500);}};return model;}
 async function vehiclePDF(b,plate,companyId){return vehicleReportPDF(await loadVehicleModel(b,plate,companyId));}
-root.CFReports={open,reset,vehicleReportPreview,vehiclePDF,vehicleModel,vehicleReportPDF};
+root.CFReports={open,reset,vehicleReportPreview,vehiclePDF,vehicleModel,vehicleReportPDF,quickWashPDF,washPrice};
 })(window);

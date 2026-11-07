@@ -31,18 +31,56 @@ export async function documentHtml(row){
 }
 export async function preview(row){
  if(!row.payload.lines?.length)throw Error('Dodaj pozycję faktury.');
- return previewHtml(await documentHtml(row));
+ const label=row.payload.correction?'Korekta':'Faktura';
+ const name=String(row.number||'szkic').replace(/[^a-zA-Z0-9._-]+/g,'-');
+ return previewHtml(await documentHtml(row),{filename:label+'_'+name+'.pdf'});
 }
-export async function previewHtml(html){
+export async function previewHtml(html,{filename}={}){
  const blob=new Blob([html],{type:'text/html'}),url=URL.createObjectURL(blob);
+ const exportTask=new AbortController();
+ let pdfUrl;
  const overlay=document.createElement('div');overlay.style.cssText='position:fixed;inset:0;z-index:200;background:#edf0f2;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)';
  const bar=document.createElement('div');bar.style.cssText='padding:12px 16px;background:#fff;display:flex;gap:12px;justify-content:space-between;border-bottom:1px solid #ddd;flex:none;flex-wrap:wrap';
- const close=document.createElement('button');close.textContent='× Zamknij';close.setAttribute('aria-label','Zamknij podgląd faktury');const print=document.createElement('button');print.className='primary';print.textContent='Drukuj / zapisz PDF';print.disabled=true;
- const help=document.createElement('p');help.className='muted';help.textContent='W oknie drukowania wybierz zapis PDF. Na iPhonie możesz udostępnić podgląd wydruku.';help.style.cssText='width:100%;margin:0;font-size:12px';
- bar.append(close,print,help);const frame=document.createElement('iframe');frame.title='Podgląd faktury';frame.style.cssText='width:100%;flex:1;min-height:0;border:0;background:white';frame.src=url;
+ const close=document.createElement('button');close.textContent='× Zamknij';close.setAttribute('aria-label','Zamknij podgląd faktury');const print=document.createElement('button');print.className=filename?'':'primary';print.textContent=filename?'Drukuj':'Drukuj / zapisz PDF';print.disabled=true;
+ const help=document.createElement('p');help.className='muted';help.setAttribute('role','status');help.textContent=filename?'Pobierz gotowy plik PDF bez otwierania okna drukowania.':'W oknie drukowania wybierz zapis PDF. Na iPhonie możesz udostępnić podgląd wydruku.';help.style.cssText='width:100%;margin:0;font-size:12px';
+ const actions=document.createElement('div');
+ actions.style.cssText='display:flex;flex-wrap:wrap;gap:8px';
+ actions.append(print);
+ const download=document.createElement('button');
+ if(filename){
+  download.className='primary';
+  download.textContent='Pobierz PDF';
+  download.disabled=true;
+  actions.append(download);
+ }
+ bar.append(close,actions,help);const frame=document.createElement('iframe');frame.title='Podgląd faktury';frame.style.cssText='width:100%;flex:1;min-height:0;border:0;background:white';frame.src=url;
  overlay.append(bar,frame);document.body.append(overlay);const overflow=document.body.style.overflow;document.body.style.overflow='hidden';
- close.onclick=()=>{overlay.remove();document.body.style.overflow=overflow;URL.revokeObjectURL(url);};
- frame.onload=async()=>{try{await Promise.all([...frame.contentDocument.images].map(img=>img.decode()));await frame.contentDocument.fonts.ready;print.disabled=false;}catch{help.textContent='Nie udało się wczytać logo. Zamknij i otwórz podgląd ponownie.';}};
+ close.onclick=()=>{exportTask.abort();overlay.remove();document.body.style.overflow=overflow;URL.revokeObjectURL(url);if(pdfUrl)URL.revokeObjectURL(pdfUrl);};
+ frame.onload=async()=>{try{await Promise.all([...frame.contentDocument.images].map(img=>img.decode()));await frame.contentDocument.fonts.ready;print.disabled=false;download.disabled=false;}catch{help.textContent='Nie udało się wczytać logo. Zamknij i otwórz podgląd ponownie.';}};
  print.onclick=()=>{frame.contentWindow.focus();frame.contentWindow.print();};
+ download.onclick=async()=>{
+  download.disabled=true;
+  help.textContent='Przygotowuję plik PDF…';
+  try {
+   const {createInvoicePdf}=await import('./invoice-download.js?v=1.0.64');
+   const pdf=await createInvoicePdf(html,filename.slice(0,-4),exportTask.signal);
+   if(exportTask.signal.aborted)return;
+   pdfUrl=URL.createObjectURL(pdf);
+   const link=document.createElement('a');
+   link.href=pdfUrl;
+   link.download=filename;
+   link.textContent='Pobierz PDF';
+   link.className='primary';
+   link.style.cssText='display:inline-flex;align-items:center;padding:10px 14px;border-radius:10px;color:inherit;text-decoration:none';
+   download.replaceWith(link);
+   help.textContent='PDF gotowy. Kliknij „Pobierz PDF”, jeśli pobieranie nie rozpoczęło się automatycznie.';
+   link.focus();
+   link.click();
+  } catch(error) {
+   if(exportTask.signal.aborted)return;
+   download.disabled=false;
+   help.textContent=error.message||'Nie udało się przygotować PDF. Spróbuj ponownie.';
+  }
+ };
  close.focus();
 }

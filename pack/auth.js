@@ -10,4 +10,4 @@ export async function administrator(db){
 }
 export const modules=Object.freeze({finances:'Moje finanse',taxes:'ZUS i podatki',documents:'Dokumenty księgowe',website:'Statystyki WWW',reminders:'Przypomnienia',calendar:'Kalendarz'});
 
-export const applications=Object.freeze({cleanfleet:{name:'CleanFleet',url:'/app/'},robisie:{name:'Robisię',url:'/app/robisie/?v=110'},bill:{name:'Bill',url:'/bill/'},carstory:{name:'CarStory',url:'/carstory/?v=12'}});
+export const applications=Object.freeze({cleanfleet:{name:'CleanFleet',url:'/app/'},robisie:{name:'Robisię',url:'/app/robisie/?v=110'},bill:{name:'Bill',url:'/bill/'},carstory:{name:'CarStory',url:'/carstory/?v=13'}});

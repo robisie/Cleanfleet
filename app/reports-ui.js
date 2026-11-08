@@ -224,8 +224,12 @@ function setupPDF(orientation='landscape'){
  if(!root.jspdf?.jsPDF||!root.CFReportFont)throw Error('Biblioteka PDF jest niedostępna. Odśwież aplikację.');
  const doc=new root.jspdf.jsPDF({orientation,unit:'mm',format:'a4'});doc.addFileToVFS('CleanFleet.ttf',root.CFReportFont);doc.addFont('CleanFleet.ttf','CleanFleet','normal');doc.setFont('CleanFleet');return doc;
 }
-async function prepareQuickWashReport(b,{from,to,companyId=null}){
+const quickWashColumns=['type','plate','wash_date','wash_duration','ordered_by','performed_by','completion_notes','order_cost','final_cost'];
+async function prepareQuickWashReport(b,{from,to,companyId=null,columns:selectedColumns=quickWashColumns}){
  if(!b.canReports?.()&&!b.isAdmin?.())throw Error('Brak uprawnień do raportów.');
+ if(!Array.isArray(selectedColumns)||!selectedColumns.length||selectedColumns.some(key=>!quickWashColumns.includes(key))||new Set(selectedColumns).size!==selectedColumns.length){
+  throw Error('Wybierz przynajmniej jedną poprawną kolumnę raportu.');
+ }
  const isDate=value=>{
   if(!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
   const date=new Date(value+'T00:00:00Z');
@@ -276,7 +280,7 @@ async function prepareQuickWashReport(b,{from,to,companyId=null}){
  const report=E.report({wash_records:rows},{
   source:'wash_records',title:'Szybki raport prań',dateField:'wash_date',from,to,
   filters:[],groups:[],metricIds:['completed'],chart:'none',
-  columns:['type','plate','wash_date','wash_duration','ordered_by','performed_by','completion_notes','order_cost','final_cost']
+  columns:quickWashColumns.filter(key=>selectedColumns.includes(key))
  });
  report.fields.wash_duration={label:'Czas prania',type:'text'};
  for(const row of report.rows){

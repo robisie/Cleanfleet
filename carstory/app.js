@@ -131,6 +131,7 @@ function historyRow(entry, showVehicle, distance) {
     ['Dystans od tankowania', distance == null ? '—' : number.format(distance) + ' km'],
     ['Zatankowano', number.format(entry.liters) + ' l'],
     ['Koszt', money.format(entry.cents / 100)],
+    ['Cena za litr', money.format(entry.cents / 100 / entry.liters) + '/l'],
     ['Tankowanie', entry.full == null ? 'Brak danych' : entry.full ? 'Do pełna' : 'Częściowe'],
     ['Paliwo', fuelTypes[entry.fuel_type] ?? 'Brak danych'],
   ]) {

@@ -10,7 +10,7 @@ const isFleetLines=r=>isFleet(r)&&r.payload.source.fleetLayout==='vehicle-lines'
 const canEditIssued=r=>r?.status==='issued'&&!!r.number&&!r.ksef_number&&!r.ksef_session&&!r.ksef_reference&&(r.payload.source?.app!=='external'||!!r.payload.correction);
 const isFleet=r=>r?.payload?.source?.fleetId===r?.id&&!r?.payload?.correction;
 const $=s=>document.querySelector(s),e=C.esc;
-let searchTimer,searchGeneration=0,demandCompensation=null;
+let searchTimer,searchGeneration=0,demandCompensation=null,reminderDraft=null;
 let investmentAmounts={id:null,options:[],detailed:null};
 let data={invoices:[],payments:[],parties:[],settings:{},counters:[]},view='invoices',selected=null,editor=null,dirty=false,busy=false,filters={q:'',month:'',brand:'',status:''},paymentEvidence=null;
 const brandFromUrl=()=>new URLSearchParams(location.search).get('brand')==='robisie'?'robisie':'cleanfleet';
@@ -69,7 +69,7 @@ function paymentMarkup(row){
  const mark=(data.payments||[]).find(p=>p.invoice_id===row.id);
  const manual=status.evidence==='bank'?'':mark?.manual_paid?button('payment-mark','Cofnij oznaczenie','',`data-id="${e(row.id)}" data-paid="false"`):button('payment-mark','Zapłacona','',`data-id="${e(row.id)}" data-paid="true"`);
  const proposals=bankProposalMarkup(row,mark);
- return `<div class="bill-payment-state ${status.state}"><span><strong>Wpłata: ${labels[status.state]}</strong>${e(amount)}${e(evidence)}${e(robisie)}${e(cleanfleet)}${bank}</span>${action}${manual}</div>${proposals}`;
+ return `<div class="bill-payment-state ${status.state}"><span><strong>Wpłata: ${labels[status.state]}</strong>${e(amount)}${e(evidence)}${e(robisie)}${e(cleanfleet)}${bank}</span>${action}${isOverdue(row)?button('reminder-preview','Wyślij przypomnienie','',`data-id="${e(row.id)}"`):''}${manual}</div>${proposals}`;
 }
 function bankProposalMarkup(row,mark){
  const confirmed=(mark?.bank_payments||[]).filter(p=>p.confirmed&&p.incomeId);
@@ -126,6 +126,17 @@ document.addEventListener('click',event=>{const b=event.target.closest('[data-ac
  if(action==='back'){await backToInvoices();return;}
  if(action==='new'){if(!await abandon())return;await work(beginNew);return;}
  if(action==='open'){selected=data.invoices.find(r=>r.id===b.dataset.id);view='detail';render();return;}
+ if(action==='reminder-preview'){await work(async()=>{
+  const id=b.dataset.id||selected?.id;
+  reminderDraft={id,requestId:crypto.randomUUID(),...(await API.call({action:'reminder-preview',id}))};
+  const d=reminderDraft,history=d.history.length?`<details><summary>Historia przypomnień (${d.history.length})</summary>${d.history.map(h=>`<p>${e(h.created_at.slice(0,16).replace('T',' '))} · ${e(h.recipient)} · ${e({sent:'Wysłano',sending:'Wysyłanie',uncertain:'Sprawdź wynik',failed:'Nie wysłano'}[h.state]||h.state)}</p>`).join('')}</details>`:'';
+  modal('Przypomnienie o płatności',`<div class="modal-body"><p>Odbiorca: <strong>${e(d.recipient)}</strong></p><p>Kwota pozostała: <strong>${e(C.money(d.amount,d.currency))}</strong></p><p>Temat: <strong>${e(d.subject)}</strong></p><pre style="white-space:pre-wrap;font:inherit;overflow-wrap:anywhere">${e(d.text)}</pre>${history}${d.configured?'':'<p class="notice">Wysyłka czeka na konfigurację zweryfikowanego nadawcy.</p>'}${d.configured?'<label><input type="checkbox" id="reminder-confirm"> Potwierdzam, że wskazane saldo uwzględnia również wpłaty zapisane poza aplikacją.</label>':''}<footer>${button('close-modal','Zamknij')}${d.configured?button('reminder-send','Potwierdź i wyślij','primary'):''}</footer></div>`);
+ });return;}
+ if(action==='reminder-send'){if(!reminderDraft)throw Error('Otwórz podgląd przypomnienia.');if(!$('#reminder-confirm')?.checked)throw Error('Potwierdź saldo przed wysyłką.');await work(async()=>{
+  const d=reminderDraft,result=await API.call({action:'reminder-send',id:d.id,recipient:d.recipient,amount:d.amount,requestId:d.requestId,acknowledged:true});
+  if(result.state!=='sent')throw Error('Wysyłka jest już w toku lub wymaga sprawdzenia w historii.');
+  reminderDraft=null;closeModal();toast('Przypomnienie wysłane.');
+ });return;}
  if(action==='bank-link-review'){
   const row=data.invoices.find(r=>r.id===b.dataset.id),choice=(data.payments.find(p=>p.invoice_id===row?.id)?.bank_candidates||[]).find(p=>p.incomeId===b.dataset.income);
   if(!row||!choice)throw Error('Propozycja jest nieaktualna. Odśwież faktury.');

@@ -2,8 +2,6 @@
   'use strict';
 
   const STYLE_ID='cf-wash-completion-v13072-style';
-  const CONDITION_LEVELS={1:'Lekki',2:'Typowy',3:'Mocny',4:'Bardzo mocny'};
-  const CONDITION_FACTORS={mud:'Błoto',sand:'Piasek',stains:'Plamy',fur:'Sierść',trash:'Śmieci',odor:'Zapach'};
   let opening=false;
 
   function esc(value){
@@ -142,9 +140,6 @@
       .cf-completion-condition{margin-top:16px;padding:13px;border:1px solid var(--line-strong);border-radius:10px;background:#fafbf6}
       .cf-completion-condition strong,.cf-completion-condition small{display:block;margin-bottom:8px}
       .cf-completion-condition select{width:100%;min-height:42px;font-size:16px}
-      .cf-completion-factors[hidden]{display:none}.cf-completion-factors{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-      .cf-completion-factors label{display:inline-flex;align-items:center;gap:5px;padding:7px 9px;border:1px solid var(--line-strong);border-radius:8px;background:#fff;cursor:pointer}
-      .cf-completion-factors input{width:18px;height:18px;accent-color:var(--green-ink)}
       .cf-completion-photo-choice{margin:14px 0 0}
       .cf-completion-grid input:disabled{background:#f2f2ef;color:var(--ink);opacity:1}
       .cf-completion-services{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -381,7 +376,7 @@
 
         ${row.notes?`<div class="cf-completion-existing-note"><strong>Uwagi ze zlecenia:</strong><br>${esc(row.notes)}</div>`:''}
 
-        ${bulk?'':`<div class="cf-completion-condition"><strong>Stan auta przed praniem</strong><small>Opcjonalnie · oceń stopień zabrudzenia przy odbiorze auta.</small><select id="cfCompleteCondition" aria-label="Stan czystości przed praniem"><option value="">Nie oceniono</option>${Object.entries(CONDITION_LEVELS).map(([level,label])=>`<option value="${level}" ${Number(row.condition_level)===Number(level)?'selected':''}>${level}/4 · ${label}</option>`).join('')}</select><div class="cf-completion-factors" id="cfCompleteConditionFactors">${Object.entries(CONDITION_FACTORS).map(([key,label])=>`<label><input type="checkbox" value="${key}" ${row.condition_factors?.includes(key)?'checked':''}>${label}</label>`).join('')}</div></div>`}
+        ${bulk?'':`<div class="cf-completion-condition"><strong>Stan auta przed praniem</strong><small>Opcjonalnie · oceń stopień zabrudzenia przy odbiorze auta.</small><select id="cfCompleteCondition" aria-label="Stan czystości przed praniem">${window.CFWashCondition.options(row.condition_level)}</select><div class="cf-condition-factors" id="cfCompleteConditionFactors">${window.CFWashCondition.picker(row.condition_factors)}</div></div>`}
 
         <div class="cf-completion-grid">
           <label class="field cf-completion-span-2"><span>Opis wykonania</span><textarea id="cfCompleteNotes" rows="3" placeholder="Krótki opis wykonanej pracy">${esc(row.completion_notes||'')}</textarea></label>

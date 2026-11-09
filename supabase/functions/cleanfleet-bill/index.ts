@@ -34,8 +34,9 @@ async function savedSmtp(userId:string){
  return row?await smtpCodec.open(row.ciphertext,userId,'smtp-config'):null;
 }
 async function savedReminderTemplate(userId:string){
- const {DEFAULT_REMINDER_TEMPLATE}=await import('./reminder.js');
- return checked(await db.from('bill_reminder_templates').select('subject,body').eq('user_id',userId).maybeSingle())||DEFAULT_REMINDER_TEMPLATE;
+ const {upgradeReminderTemplate}=await import('./reminder.js');
+ const template=checked(await db.from('bill_reminder_templates').select('subject,body').eq('user_id',userId).maybeSingle());
+ return upgradeReminderTemplate(template);
 }
 async function reminderContext(id:string,userId:string){
  const {reminderAmount,reminderText}=await import('./reminder.js');

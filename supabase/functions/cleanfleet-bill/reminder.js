@@ -16,10 +16,27 @@ export function reminderAmount(row,{evidence,project,fleetPaid=false}={}){
  return remaining;
 }
 
+const previousDefaultBody=`Dzień dobry,
+
+przypominamy o płatności za fakturę {{numer}}, której termin upłynął {{termin}}. Według naszych danych do zapłaty pozostało {{kwota}}.
+
+Prosimy o przelew na rachunek {{rachunek}}, wpisując numer faktury w tytule płatności. Jeżeli płatność została już wykonana, prosimy o wiadomość zwrotną z potwierdzeniem.
+
+Z poważaniem,
+Robisię-Fer sp. z o.o.`;
+
 export const DEFAULT_REMINDER_TEMPLATE={
  subject:'Przypomnienie o płatności — faktura {{numer}}',
- body:'Dzień dobry,\n\nprzypominamy o płatności za fakturę {{numer}}, której termin upłynął {{termin}}. Według naszych danych do zapłaty pozostało {{kwota}}.\n\nProsimy o przelew na rachunek {{rachunek}}, wpisując numer faktury w tytule płatności. Jeżeli płatność została już wykonana, prosimy o wiadomość zwrotną z potwierdzeniem.\n\nZ poważaniem,\nRobisię-Fer sp. z o.o.'
+ body:`${previousDefaultBody}\n\nTa wiadomość została wysłana automatycznie z aplikacji cleanfleet.pl.`
 };
+
+export function upgradeReminderTemplate(template){
+ if(!template)return DEFAULT_REMINDER_TEMPLATE;
+ if(template.body.replaceAll('\r\n','\n')===previousDefaultBody){
+  return {...template,body:DEFAULT_REMINDER_TEMPLATE.body};
+ }
+ return template;
+}
 
 export function validReminderTemplate(input){
  const subject=String(input?.subject||'').trim(),body=String(input?.body||'').trim();

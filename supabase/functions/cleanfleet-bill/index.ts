@@ -33,6 +33,10 @@ async function savedSmtp(userId:string){
  const row=checked(await db.from('bill_smtp_credentials').select('ciphertext').eq('user_id',userId).maybeSingle());
  return row?await smtpCodec.open(row.ciphertext,userId,'smtp-config'):null;
 }
+async function savedReminderTemplate(userId:string){
+ const {DEFAULT_REMINDER_TEMPLATE}=await import('./reminder.js');
+ return checked(await db.from('bill_reminder_templates').select('subject,body').eq('user_id',userId).maybeSingle())||DEFAULT_REMINDER_TEMPLATE;
+}
 async function reminderContext(id:string,userId:string){
  const {reminderAmount,reminderText}=await import('./reminder.js');
  const row=await invoice(id);if(row.creator_id!==userId)throw Error('Nie znaleziono faktury.');
@@ -47,7 +51,8 @@ async function reminderContext(id:string,userId:string){
  const amount=reminderAmount(row,{evidence:checked(evidence),project:checked(project)?.payload,fleetPaid:fleet.some((x:any)=>x.paid)||legacy.some((x:any)=>x.paid)});
  const recipient=String(p.buyer?.email||'').trim().toLowerCase();
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)||recipient.length>254)throw Error('Uzupełnij poprawny e-mail nabywcy na fakturze.');
- return {row,amount,recipient,...reminderText(row,amount),configured:Boolean(await savedSmtp(userId))};
+ const [template,smtp]=await Promise.all([savedReminderTemplate(userId),savedSmtp(userId)]);
+ return {row,amount,recipient,...reminderText(row,amount,template),configured:Boolean(smtp)};
 }
 async function canonicalFleet(id:string,payload:any){return guardFleetPayload(payload,await fleetAttachment(id));}
 async function canonicalCorrection(payload:any){if(!payload?.correction)return payload;const parent=await invoice(payload.correction.originalId),seed=correctionSeed(parent);return {...payload,source:seed.source,correction:{...seed.correction,mode:payload.correction.mode,reason:payload.correction.reason}};}
@@ -103,6 +108,24 @@ Deno.serve(async req=>{
   if(body.action==='smtp-remove'){
    checked(await db.from('bill_smtp_credentials').delete().eq('user_id',userId));return json({configured:false});
   }
+  if(body.action==='smtp-test'){
+   const config=await savedSmtp(userId);if(!config)throw Error('Najpierw połącz pocztę w Ustawieniach Bill.');
+   const recipient=String(body.recipient||'').trim().toLowerCase();
+   if(recipient.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient))throw Error('Podaj poprawny adres testowy.');
+   const {smtpTransport}=await import('./smtp.js'),transport=await smtpTransport(config);
+   try{
+    const result=await transport.sendMail({from:'Robisię-Fer <kontakt@cleanfleet.pl>',to:recipient,subject:'Bill — test poczty',text:'To jest wiadomość testowa z aplikacji Bill. Połączenie skrzynki kontakt@cleanfleet.pl działa. Ta wiadomość nie dotyczy żadnej faktury.'});
+    if(!result.accepted?.some((address:string)=>address.toLowerCase()===recipient))throw Error('Serwer poczty nie potwierdził przyjęcia adresu.');
+    return json({ok:true,recipient});
+   }catch(_){throw Error('Nie udało się potwierdzić wysyłki testowej. Sprawdź folder Wysłane i odbiorczą skrzynkę przed ponowieniem.');}
+   finally{transport.close();}
+  }
+  if(body.action==='reminder-template')return json(await savedReminderTemplate(userId));
+  if(body.action==='reminder-template-save'){
+   const {validReminderTemplate}=await import('./reminder.js'),template=validReminderTemplate(body);
+   checked(await db.from('bill_reminder_templates').upsert({user_id:userId,...template,updated_at:new Date().toISOString()},{onConflict:'user_id'}));
+   return json(template);
+  }
   if(body.action==='reminder-preview'||body.action==='reminder-send'){
    const context=await reminderContext(String(body.id||''),userId);
    const history=checked(await db.from('bill_reminder_emails').select('id,recipient,amount_cents,currency,state,created_at,sent_at').eq('invoice_id',context.row.id).order('created_at',{ascending:false}).limit(10));
@@ -113,6 +136,7 @@ Deno.serve(async req=>{
    const existing=checked(await db.from('bill_reminder_emails').select('state').eq('id',body.requestId).maybeSingle());
    if(existing)return json({state:existing.state});
    if(body.recipient!==context.recipient||body.amount!==context.amount)throw Error('Adres lub saldo faktury zmieniły się. Otwórz podgląd ponownie.');
+   if(body.subject!==context.subject||body.text!==context.text)throw Error('Treść przypomnienia zmieniła się. Otwórz podgląd ponownie.');
    const record={id:body.requestId,invoice_id:context.row.id,actor_id:userId,recipient:context.recipient,subject:context.subject,body:context.text,amount_cents:context.amount,currency:context.row.payload.currency,state:'sending'};
    const inserted=await db.from('bill_reminder_emails').insert(record);
    if(inserted.error?.code==='23505')return json({state:'sending'});

@@ -8,7 +8,7 @@ import {openAccount} from '../pack-bank-mail/vault.js';
 import '../pack-bank-mail/engine.js';
 import {reconcileBillPayments} from '../_shared/bill-bank-match.js';
 import {createStateCodec,hash} from '../cleanfleet-ksef/core.js';
-import {normalize,newInvoice,party,invoiceXml,invoiceAmount,advanceAllocation,SELLER,today,validBank,correctionSeed,storedPayload,externalReference} from './invoice.js';
+import {normalize,newInvoice,party,partyCountry,invoiceXml,invoiceAmount,advanceAllocation,SELLER,today,validBank,correctionSeed,storedPayload,externalReference} from './invoice.js';
 import {ksefApi,authenticate,openSession,invoiceStatus,KsefError} from './ksef.js';
 const secret=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const db=createClient(Deno.env.get('SUPABASE_URL')!,secret,{auth:{persistSession:false,autoRefreshToken:false}});
@@ -38,6 +38,27 @@ async function savedReminderTemplate(userId:string){
  const template=checked(await db.from('bill_reminder_templates').select('subject,body').eq('user_id',userId).maybeSingle());
  return upgradeReminderTemplate(template);
 }
+async function reminderRecipient(buyer:any){
+ const country=partyCountry(buyer);
+ const nip=String(buyer.nip||'').replace(/[\s-]/g,'').toUpperCase();
+ const parties=db.from('bill_parties').select('payload');
+ let matches=[];
+ if(nip){
+  const identifiers=country==='PL'?[nip.replace(/^PL/,''),'PL'+nip.replace(/^PL/,'')]:[nip];
+  matches=checked(await parties.in('payload->>nip',identifiers));
+ }else if(buyer.name&&buyer.address&&buyer.city){
+  const rows=checked(await parties.eq('payload->>name',buyer.name).eq('payload->>address',buyer.address).eq('payload->>city',buyer.city));
+  matches=rows.filter((row:any)=>!row.payload.nip&&partyCountry(row.payload)===country);
+ }
+ if(matches.length>1)return {recipient:'',recipientSource:null,recipientIssue:'W kartotece jest kilka pasujących wpisów. Uporządkuj je w zakładce Kontrahenci.'};
+ const contact=matches[0]?.payload;
+ const recipient=String((contact||buyer).email||'').trim();
+ const validEmail=/^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i;
+ if(recipient.length>254||!validEmail.test(recipient)){
+  return {recipient:'',recipientSource:null,recipientIssue:'Uzupełnij adres e-mail nabywcy w zakładce Kontrahenci i otwórz podgląd ponownie.'};
+ }
+ return {recipient,recipientSource:contact?'party':'invoice',recipientIssue:''};
+}
 async function reminderContext(id:string,userId:string){
  const {reminderAmount,reminderText}=await import('./reminder.js');
  const row=await invoice(id);if(row.creator_id!==userId)throw Error('Nie znaleziono faktury.');
@@ -50,10 +71,8 @@ async function reminderContext(id:string,userId:string){
   fleetPaymentEvidence(db,[row.id],{legacy:true,userId})
  ]);
  const amount=reminderAmount(row,{evidence:checked(evidence),project:checked(project)?.payload,fleetPaid:fleet.some((x:any)=>x.paid)||legacy.some((x:any)=>x.paid)});
- const recipient=String(p.buyer?.email||'').trim().toLowerCase();
- if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)||recipient.length>254)throw Error('Uzupełnij poprawny e-mail nabywcy na fakturze.');
- const [template,smtp]=await Promise.all([savedReminderTemplate(userId),savedSmtp(userId)]);
- return {row,amount,recipient,...reminderText(row,amount,template),configured:Boolean(smtp)};
+ const [template,smtp,recipient]=await Promise.all([savedReminderTemplate(userId),savedSmtp(userId),reminderRecipient(p.buyer||{})]);
+ return {row,amount,...recipient,...reminderText(row,amount,template),configured:Boolean(smtp)};
 }
 async function canonicalFleet(id:string,payload:any){return guardFleetPayload(payload,await fleetAttachment(id));}
 async function canonicalCorrection(payload:any){if(!payload?.correction)return payload;const parent=await invoice(payload.correction.originalId),seed=correctionSeed(parent);return {...payload,source:seed.source,correction:{...seed.correction,mode:payload.correction.mode,reason:payload.correction.reason}};}
@@ -130,12 +149,13 @@ Deno.serve(async req=>{
   if(body.action==='reminder-preview'||body.action==='reminder-send'){
    const context=await reminderContext(String(body.id||''),userId);
    const history=checked(await db.from('bill_reminder_emails').select('id,recipient,amount_cents,currency,state,created_at,sent_at').eq('invoice_id',context.row.id).order('created_at',{ascending:false}).limit(10));
-   if(body.action==='reminder-preview')return json({recipient:context.recipient,subject:context.subject,text:context.text,amount:context.amount,currency:context.row.payload.currency,configured:context.configured,history});
+   if(body.action==='reminder-preview')return json({recipient:context.recipient,recipientSource:context.recipientSource,recipientIssue:context.recipientIssue,subject:context.subject,text:context.text,amount:context.amount,currency:context.row.payload.currency,configured:context.configured,history});
    if(!context.configured)throw Error('Połącz skrzynkę kontakt@cleanfleet.pl w Ustawieniach Bill.');
    if(body.acknowledged!==true)throw Error('Potwierdź rzeczywiste saldo faktury przed wysyłką.');
    if(!/^[0-9a-f-]{36}$/i.test(String(body.requestId||'')))throw Error('Nieprawidłowa próba wysyłki.');
    const existing=checked(await db.from('bill_reminder_emails').select('state').eq('id',body.requestId).maybeSingle());
    if(existing)return json({state:existing.state});
+   if(!context.recipient)throw Error(context.recipientIssue);
    if(body.recipient!==context.recipient||body.amount!==context.amount)throw Error('Adres lub saldo faktury zmieniły się. Otwórz podgląd ponownie.');
    if(body.subject!==context.subject||body.text!==context.text)throw Error('Treść przypomnienia zmieniła się. Otwórz podgląd ponownie.');
    const record={id:body.requestId,invoice_id:context.row.id,actor_id:userId,recipient:context.recipient,subject:context.subject,body:context.text,amount_cents:context.amount,currency:context.row.payload.currency,state:'sending'};

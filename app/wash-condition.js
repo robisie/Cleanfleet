@@ -1,7 +1,7 @@
 (function (root) {
   'use strict';
 
-  const levels = {1: 'Lekki', 2: 'Typowy', 3: 'Mocny', 4: 'Bardzo mocny'};
+  const levels = {1: 'Minimalny', 2: 'Lekki', 3: 'Typowy', 4: 'Mocny', 5: 'Bardzo mocny'};
   const groups = [
     {key: 'waste', label: 'Śmieci i resztki', details: [
       ['cabin_trash', 'Śmieci w kabinie'],
@@ -47,9 +47,32 @@
 
   function options(level) {
     const choices = Object.entries(levels).map(([value, label]) =>
-      `<option value="${value}"${Number(level) === Number(value) ? ' selected' : ''}>${value}/4 · ${label}</option>`
+      `<option value="${value}"${Number(level) === Number(value) ? ' selected' : ''}>${value}/5 · ${label}</option>`
     );
     return '<option value="">Nie oceniono</option>' + choices.join('');
+  }
+
+  function stars(level) {
+    const value = Math.max(0, Math.min(5, Number(level) || 0));
+    return `<span class="cf-condition-stars cf-condition-stars--${value}" aria-hidden="true">${'★'.repeat(value)}<span class="cf-condition-empty">${'☆'.repeat(5 - value)}</span></span>`;
+  }
+
+  function ratingPicker(level, name) {
+    const value = Number(level) || 0;
+    return `<div class="cf-condition-rating" role="radiogroup" aria-label="Stopień zabrudzenia przed praniem">
+      ${Object.entries(levels).map(([n, label]) => `<label class="cf-condition-rate" title="${n}/5 · ${label}">
+        <input type="radio" name="${name}" value="${n}"${value === Number(n) ? ' checked' : ''}>
+        <span aria-hidden="true">★</span><span class="cf-sr-only">${n}/5 · ${label}</span>
+      </label>`).join('')}
+      <button type="button" class="cf-condition-clear" data-condition-clear="${name}">Wyczyść ocenę</button>
+    </div>`;
+  }
+
+  function reveal(record) {
+    if (!record.condition_level) return '';
+    const level = Number(record.condition_level);
+    const details = describe(record.condition_factors);
+    return `<details class="cf-condition-reveal"><summary aria-label="Pokaż opis zabrudzeń: ${level} na 5, ${levels[level]}">${stars(level)}<span class="cf-sr-only"> ${level}/5 · ${levels[level]}</span></summary><div class="cf-condition-description"><strong>${levels[level]}</strong>${details ? ` · ${details}` : ' · Brak zaznaczonych opisów'}</div></details>`;
   }
 
   function picker(factors) {
@@ -90,5 +113,5 @@
     return descriptions.join(' · ');
   }
 
-  root.CFWashCondition = {levels, options, picker, describe};
+  root.CFWashCondition = {levels, options, picker, describe, stars, ratingPicker, reveal};
 })(globalThis);

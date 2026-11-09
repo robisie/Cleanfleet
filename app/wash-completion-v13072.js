@@ -376,7 +376,7 @@
 
         ${row.notes?`<div class="cf-completion-existing-note"><strong>Uwagi ze zlecenia:</strong><br>${esc(row.notes)}</div>`:''}
 
-        ${bulk?'':`<div class="cf-completion-condition"><strong>Stan auta przed praniem</strong><small>Opcjonalnie · oceń stopień zabrudzenia przy odbiorze auta.</small><select id="cfCompleteCondition" aria-label="Stan czystości przed praniem">${window.CFWashCondition.options(row.condition_level)}</select><div class="cf-condition-factors" id="cfCompleteConditionFactors">${window.CFWashCondition.picker(row.condition_factors)}</div></div>`}
+        ${bulk?'':`<div class="cf-completion-condition"><strong>Stan auta przed praniem</strong><small>Opcjonalnie · oceń stopień zabrudzenia przy odbiorze auta.</small>${window.CFWashCondition.ratingPicker(row.condition_level,'cfCompleteCondition')}<div class="cf-condition-factors" id="cfCompleteConditionFactors">${window.CFWashCondition.picker(row.condition_factors)}</div></div>`}
 
         <div class="cf-completion-grid">
           <label class="field cf-completion-span-2"><span>Opis wykonania</span><textarea id="cfCompleteNotes" rows="3" placeholder="Krótki opis wykonanej pracy">${esc(row.completion_notes||'')}</textarea></label>
@@ -401,10 +401,11 @@
       overlay.querySelectorAll('[data-close]').forEach(x=>x.addEventListener('click',close));
       overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
 
-      const conditionInput=overlay.querySelector('#cfCompleteCondition');
+      const conditionInput=()=>overlay.querySelector('input[name="cfCompleteCondition"]:checked');
       const conditionTags=overlay.querySelector('#cfCompleteConditionFactors');
-      const syncConditionTags=()=>{if(conditionTags)conditionTags.hidden=!conditionInput?.value;};
-      conditionInput?.addEventListener('change',syncConditionTags);
+      const syncConditionTags=()=>{if(conditionTags)conditionTags.hidden=!conditionInput()?.value;};
+      overlay.querySelectorAll('input[name="cfCompleteCondition"]').forEach(input=>input.addEventListener('change',syncConditionTags));
+      overlay.querySelector('[data-condition-clear="cfCompleteCondition"]')?.addEventListener('click',()=>{const selected=conditionInput();if(selected)selected.checked=false;syncConditionTags();});
       syncConditionTags();
       const servicesEl=overlay.querySelector('#cfCompleteServices');
       const extraServiceEl=overlay.querySelector('#cfCompleteExtraService');
@@ -572,7 +573,7 @@
         const serviceIds=selectedIds();
         const cost=costEl.value==='' ? null : Number(costEl.value);
         const notes=overlay.querySelector('#cfCompleteNotes').value.trim();
-        const conditionLevel=overlay.querySelector('#cfCompleteCondition')?.value?Number(overlay.querySelector('#cfCompleteCondition').value):null;
+        const conditionLevel=Number(overlay.querySelector('input[name="cfCompleteCondition"]:checked')?.value)||null;
         const conditionFactors=conditionLevel?[...overlay.querySelectorAll('#cfCompleteConditionFactors input:checked')].map(input=>input.value):[];
 
         clearFormError();

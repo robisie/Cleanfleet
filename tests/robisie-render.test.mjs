@@ -237,8 +237,15 @@ test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów
  module.namespace.testRender(row,persistent);assert.ok(module.namespace.testShops().includes('Nowy Sklep'));
  module.namespace.testPdfChooser();
  assert.equal((node('#dialog').innerHTML.match(/name="pdfModule"/g)||[]).length,PDF.MODULES.length);
+ const scopeChoice=node('#dialog').innerHTML.match(/<input[^>]*value="scopeChanges"[^>]*>/)?.[0];
+ assert.ok(scopeChoice);
+ assert.doesNotMatch(scopeChoice,/checked/);
  await node('#modal-form').onsubmit({preventDefault(){},target:{pdfModule:['data','rooms']}});
  assert.ok(printedHtml.includes('data-module="data"'));assert.ok(printedHtml.includes('data-module="rooms"'));assert.ok(!printedHtml.includes('data-module="offer"'));
+ module.namespace.testPdfChooser();
+ await node('#modal-form').onsubmit({preventDefault(){},target:{pdfModule:['works','scopeChanges']}});
+ assert.match(printedHtml,/data-module="scopeChanges"/);
+ assert.match(printedHtml,/<span>Różnica względem uzgodnionej oferty<\/span>/);
  // Category hints are shared; selecting individual walls stores quantity and its calculation for editing.
  module.namespace.testRender({...row,payload:{...row.payload,rooms:[{id:'r',name:'Pokój',length:4,width:3,height:2.6}]}},{catalog:structuredClone(catalog),markup:35,company:{}});
  module.namespace.testLineDialog();assert.ok(node('#dialog').innerHTML.includes('list="category-suggestions"'));assert.ok(node('#dialog').innerHTML.includes('Wybierz konkretne ściany'));

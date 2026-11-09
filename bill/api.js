@@ -23,6 +23,7 @@ export async function login(email,password){const s=await request('/auth/v1/toke
 export function logout(){session=null;localStorage.removeItem(SESSION_KEY);}
 
 export const call=(body,options={})=>request("/functions/v1/cleanfleet-bill",{method:"POST",body:JSON.stringify(body),timeoutMs:90000,...options});
+export const smsCall=(body,options={})=>request("/functions/v1/bill-sms",{method:"POST",body:JSON.stringify(body),timeoutMs:30000,...options});
 
 export const ksefAssignments=()=>request('/rest/v1/rs_ksef_links?select=*');
 const stockRpc=(name,args={})=>request('/rest/v1/rpc/'+name,{method:'POST',body:JSON.stringify(args),timeoutMs:90000});

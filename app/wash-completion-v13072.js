@@ -2,6 +2,8 @@
   'use strict';
 
   const STYLE_ID='cf-wash-completion-v13072-style';
+  const CONDITION_LEVELS={1:'Lekki',2:'Typowy',3:'Mocny',4:'Bardzo mocny'};
+  const CONDITION_FACTORS={mud:'Błoto',sand:'Piasek',stains:'Plamy',fur:'Sierść',trash:'Śmieci',odor:'Zapach'};
   let opening=false;
 
   function esc(value){
@@ -137,6 +139,12 @@
       .cf-completion-services-head strong{font-size:13px}
       .cf-completion-extra{display:flex;align-items:center;gap:9px;margin:0 0 10px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#f8f7f3;font-size:13px;font-weight:700;cursor:pointer}
       .cf-completion-extra input{width:19px;height:19px;margin:0;accent-color:var(--green-ink)}
+      .cf-completion-condition{margin-top:16px;padding:13px;border:1px solid var(--line-strong);border-radius:10px;background:#fafbf6}
+      .cf-completion-condition strong,.cf-completion-condition small{display:block;margin-bottom:8px}
+      .cf-completion-condition select{width:100%;min-height:42px;font-size:16px}
+      .cf-completion-factors[hidden]{display:none}.cf-completion-factors{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+      .cf-completion-factors label{display:inline-flex;align-items:center;gap:5px;padding:7px 9px;border:1px solid var(--line-strong);border-radius:8px;background:#fff;cursor:pointer}
+      .cf-completion-factors input{width:18px;height:18px;accent-color:var(--green-ink)}
       .cf-completion-photo-choice{margin:14px 0 0}
       .cf-completion-grid input:disabled{background:#f2f2ef;color:var(--ink);opacity:1}
       .cf-completion-services{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -309,7 +317,7 @@
       if(typeof cfSupabase==='undefined')throw new Error('Brak połączenia z bazą.');
       const [{data:rows,error:rowError},catalog]=await Promise.all([
         cfSupabase.from('wash_records')
-          .select('id,company_id,plate,type,brand,notes,wash_date,duration_hours,wash_start_time,wash_end_time,performed_by,cost,currency,order_cost,order_currency,approved,paid,work_items,completion_notes')
+          .select('id,company_id,plate,type,brand,notes,wash_date,duration_hours,wash_start_time,wash_end_time,performed_by,cost,currency,order_cost,order_currency,approved,paid,work_items,completion_notes,condition_level,condition_factors')
           .in('id',ids),
         fetchCatalog(true)
       ]);
@@ -373,6 +381,8 @@
 
         ${row.notes?`<div class="cf-completion-existing-note"><strong>Uwagi ze zlecenia:</strong><br>${esc(row.notes)}</div>`:''}
 
+        ${bulk?'':`<div class="cf-completion-condition"><strong>Stan auta przed praniem</strong><small>Opcjonalnie · oceń stopień zabrudzenia przy odbiorze auta.</small><select id="cfCompleteCondition" aria-label="Stan czystości przed praniem"><option value="">Nie oceniono</option>${Object.entries(CONDITION_LEVELS).map(([level,label])=>`<option value="${level}" ${Number(row.condition_level)===Number(level)?'selected':''}>${level}/4 · ${label}</option>`).join('')}</select><div class="cf-completion-factors" id="cfCompleteConditionFactors">${Object.entries(CONDITION_FACTORS).map(([key,label])=>`<label><input type="checkbox" value="${key}" ${row.condition_factors?.includes(key)?'checked':''}>${label}</label>`).join('')}</div></div>`}
+
         <div class="cf-completion-grid">
           <label class="field cf-completion-span-2"><span>Opis wykonania</span><textarea id="cfCompleteNotes" rows="3" placeholder="Krótki opis wykonanej pracy">${esc(row.completion_notes||'')}</textarea></label>
           <div class="cf-completion-span-2 cf-completion-total-row">
@@ -396,6 +406,11 @@
       overlay.querySelectorAll('[data-close]').forEach(x=>x.addEventListener('click',close));
       overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
 
+      const conditionInput=overlay.querySelector('#cfCompleteCondition');
+      const conditionTags=overlay.querySelector('#cfCompleteConditionFactors');
+      const syncConditionTags=()=>{if(conditionTags)conditionTags.hidden=!conditionInput?.value;};
+      conditionInput?.addEventListener('change',syncConditionTags);
+      syncConditionTags();
       const servicesEl=overlay.querySelector('#cfCompleteServices');
       const extraServiceEl=overlay.querySelector('#cfCompleteExtraService');
       const costEl=overlay.querySelector('#cfCompleteCost');
@@ -562,6 +577,8 @@
         const serviceIds=selectedIds();
         const cost=costEl.value==='' ? null : Number(costEl.value);
         const notes=overlay.querySelector('#cfCompleteNotes').value.trim();
+        const conditionLevel=overlay.querySelector('#cfCompleteCondition')?.value?Number(overlay.querySelector('#cfCompleteCondition').value):null;
+        const conditionFactors=conditionLevel?[...overlay.querySelectorAll('#cfCompleteConditionFactors input:checked')].map(input=>input.value):[];
 
         clearFormError();
         const dateEl=overlay.querySelector('#cfCompleteDate');
@@ -592,7 +609,9 @@
             p_performed_by:performer,
             p_cost:finalCost,
             p_service_ids:serviceIds,
-            p_completion_notes:notes||null
+            p_completion_notes:notes||null,
+            p_condition_level:conditionLevel,
+            p_condition_factors:conditionFactors
           });
           if(error)throw error;
 
@@ -607,7 +626,7 @@
               durationHours:data?.duration_hours_per_vehicle??null,
               performer,
               cost:data?.cost_by_id?.[id]??finalCost,
-              notes
+              notes,...(bulk?{}:{conditionLevel,conditionFactors})
             });
           }catch(localError){
             console.warn('CleanFleet local completion refresh:',localError);

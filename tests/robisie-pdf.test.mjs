@@ -31,3 +31,13 @@ test('zmiany zakresu i różnica względem oferty wymagają wybrania części PD
  assert.match(onlyChanges,/<span>Różnica względem uzgodnionej oferty<\/span>/);
  assert.match(onlyChanges,/Dodatkowa praca/);
 });
+
+
+test('podgląd A4 udostępnia pobranie PDF bez dialogu drukowania',()=>{
+ const {project,settings}=fixture();
+ const html=buildDocument(project,settings,{modules:['works']});
+ assert.match(html,/id="pdf-download" hidden>Pobierz PDF</);
+ assert.match(html,/aria-label="Podgląd stron A4"/);
+ assert.match(html,/pdf-layout\.js\?v=/);
+ assert.doesNotMatch(html,/window\.print|Drukuj \/ zapisz jako PDF/);
+});

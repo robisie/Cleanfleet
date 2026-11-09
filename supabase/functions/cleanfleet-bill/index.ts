@@ -14,6 +14,7 @@ const secret=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const db=createClient(Deno.env.get('SUPABASE_URL')!,secret,{auth:{persistSession:false,autoRefreshToken:false}});
 const credentials=createStateCodec(secret,'saved-credentials-v1'),codec=createStateCodec(secret,'bill-ksef-v1'),api=ksefApi();
 const gusCodec=createStateCodec(secret,'bill-gus-config-v1');
+const smtpCodec=createStateCodec(secret,'bill-smtp-config-v1');
 async function savedGusKey(){const row=checked(await db.from('bill_settings').select('payload').single());return row?.payload?.gusKeyCiphertext?(await gusCodec.open(row.payload.gusKeyCiphertext,SELLER.nip,'gus-config')).key:'';}
 async function acceptedSales(range:any){const rows=checked(await db.from('bill_invoices').select('id,number,status,ksef_number,payload,xml').eq('status','accepted').gte('payload->>issueDate',range.from).lte('payload->>issueDate',range.to).order('created_at',{ascending:false}).limit(1000));return (await Promise.all(rows.map(acceptedBillMetadata))).filter(Boolean);}
 const archive=createArchiveService({authorizeKsef:authKsef,secret,api,localSales:acceptedSales});
@@ -28,6 +29,10 @@ async function reconcileVault(userId:string){
  return true;
 }
 async function fleetAttachment(id:string){return checked(await db.from('bill_fleet_attachments').select('*').eq('invoice_id',id).maybeSingle());}
+async function savedSmtp(userId:string){
+ const row=checked(await db.from('bill_smtp_credentials').select('ciphertext').eq('user_id',userId).maybeSingle());
+ return row?await smtpCodec.open(row.ciphertext,userId,'smtp-config'):null;
+}
 async function reminderContext(id:string,userId:string){
  const {reminderAmount,reminderText}=await import('./reminder.js');
  const row=await invoice(id);if(row.creator_id!==userId)throw Error('Nie znaleziono faktury.');
@@ -42,8 +47,7 @@ async function reminderContext(id:string,userId:string){
  const amount=reminderAmount(row,{evidence:checked(evidence),project:checked(project)?.payload,fleetPaid:fleet.some((x:any)=>x.paid)||legacy.some((x:any)=>x.paid)});
  const recipient=String(p.buyer?.email||'').trim().toLowerCase();
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)||recipient.length>254)throw Error('Uzupełnij poprawny e-mail nabywcy na fakturze.');
- const key=Deno.env.get('BILL_REMINDER_RESEND_API_KEY')||'';
- return {row,amount,recipient,...reminderText(row,amount),configured:Boolean(key)};
+ return {row,amount,recipient,...reminderText(row,amount),configured:Boolean(await savedSmtp(userId))};
 }
 async function canonicalFleet(id:string,payload:any){return guardFleetPayload(payload,await fleetAttachment(id));}
 async function canonicalCorrection(payload:any){if(!payload?.correction)return payload;const parent=await invoice(payload.correction.originalId),seed=correctionSeed(parent);return {...payload,source:seed.source,correction:{...seed.correction,mode:payload.correction.mode,reason:payload.correction.reason}};}
@@ -84,11 +88,26 @@ Deno.serve(async req=>{
   if(role.error||role.data?.role!=='admin')return json({error:'Dostęp tylko dla administratora.'},403);
   const raw=await req.text();if(raw.length>300000)return json({error:'Żądanie jest za duże.'},413);
   const body=JSON.parse(raw);
+  if(body.action==='smtp-config'){
+   const config=await savedSmtp(userId);return json({configured:Boolean(config),host:config?.host||'',port:465,username:config?.username||''});
+  }
+  if(body.action==='smtp-save'){
+   const {smtpInput,smtpTransport}=await import('./smtp.js');const config=smtpInput(body);
+   const transport=await smtpTransport(config);
+   try{await transport.verify();}catch(_){throw Error('Nie udało się zalogować do SMTP. Sprawdź serwer, port 465, login i hasło do aplikacji pocztowej.');}
+   finally{transport.close();}
+   const ciphertext=await smtpCodec.seal({...config,userId,scope:'smtp-config',expires:Number.MAX_SAFE_INTEGER});
+   checked(await db.from('bill_smtp_credentials').upsert({user_id:userId,ciphertext,updated_at:new Date().toISOString()},{onConflict:'user_id'}));
+   return json({configured:true});
+  }
+  if(body.action==='smtp-remove'){
+   checked(await db.from('bill_smtp_credentials').delete().eq('user_id',userId));return json({configured:false});
+  }
   if(body.action==='reminder-preview'||body.action==='reminder-send'){
    const context=await reminderContext(String(body.id||''),userId);
    const history=checked(await db.from('bill_reminder_emails').select('id,recipient,amount_cents,currency,state,created_at,sent_at').eq('invoice_id',context.row.id).order('created_at',{ascending:false}).limit(10));
    if(body.action==='reminder-preview')return json({recipient:context.recipient,subject:context.subject,text:context.text,amount:context.amount,currency:context.row.payload.currency,configured:context.configured,history});
-   if(!context.configured)throw Error('Wysyłka nie jest skonfigurowana. Zweryfikuj domenę cleanfleet.pl i dodaj klucz usługi e-mail.');
+   if(!context.configured)throw Error('Połącz skrzynkę kontakt@cleanfleet.pl w Ustawieniach Bill.');
    if(body.acknowledged!==true)throw Error('Potwierdź rzeczywiste saldo faktury przed wysyłką.');
    if(!/^[0-9a-f-]{36}$/i.test(String(body.requestId||'')))throw Error('Nieprawidłowa próba wysyłki.');
    const existing=checked(await db.from('bill_reminder_emails').select('state').eq('id',body.requestId).maybeSingle());
@@ -98,12 +117,12 @@ Deno.serve(async req=>{
    const inserted=await db.from('bill_reminder_emails').insert(record);
    if(inserted.error?.code==='23505')return json({state:'sending'});
    checked(inserted);
-   let response:Response;
-   try{response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+Deno.env.get('BILL_REMINDER_RESEND_API_KEY'),'Content-Type':'application/json','Idempotency-Key':body.requestId},body:JSON.stringify({from:'Robisię-Fer <kontakt@cleanfleet.pl>',to:[context.recipient],subject:context.subject,text:context.text})});}
-   catch(error){checked(await db.from('bill_reminder_emails').update({state:'uncertain'}).eq('id',body.requestId));throw Error('Nie udało się potwierdzić wysyłki. Sprawdź historię przed ponowną próbą.');}
-   if(!response.ok){checked(await db.from('bill_reminder_emails').update({state:'failed'}).eq('id',body.requestId));throw Error('Serwer poczty odrzucił wiadomość. Sprawdź konfigurację nadawcy.');}
-   const result=await response.json();
-   checked(await db.from('bill_reminder_emails').update({state:'sent',provider_id:String(result.id||''),sent_at:new Date().toISOString()}).eq('id',body.requestId));
+   const config=await savedSmtp(userId),{smtpTransport}=await import('./smtp.js');
+   const transport=await smtpTransport(config);let result:any;
+   try{result=await transport.sendMail({from:'Robisię-Fer <kontakt@cleanfleet.pl>',to:context.recipient,subject:context.subject,text:context.text});}
+   catch(error){checked(await db.from('bill_reminder_emails').update({state:'uncertain'}).eq('id',body.requestId));throw Error('Nie udało się potwierdzić wysyłki. Sprawdź folder Wysłane i historię przed ponowną próbą.');}
+   finally{transport.close();}
+   checked(await db.from('bill_reminder_emails').update({state:'sent',provider_id:String(result.messageId||''),sent_at:new Date().toISOString()}).eq('id',body.requestId));
    return json({state:'sent'});
   }
   if(String(body.action||'').startsWith('ksef-')){const result=await archive(body,userId);return result instanceof Uint8Array?new Response(result,{headers:{...headers,'Content-Type':'application/octet-stream'}}):json(result);}

@@ -1,0 +1,57 @@
+.cf-condition-factors[hidden] {
+  display: none;
+}
+
+.cf-condition-factors {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  align-items: start;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.cf-condition-tile {
+  border: 1px solid #dce5c4;
+  border-radius: 9px;
+  background: #f8faef;
+}
+
+.cf-condition-tile:has(input:checked) {
+  border-color: #7d9222;
+  background: #edf3d7;
+}
+
+.cf-condition-tile summary {
+  padding: 11px 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cf-condition-tile:has(input:checked) summary::after {
+  content: ' ✓';
+  color: #526316;
+}
+
+.cf-condition-choices {
+  display: grid;
+  padding: 0 10px 6px;
+}
+
+.cf-condition-choices label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  margin: 0;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.cf-condition-choices input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex: 0 0 18px;
+  accent-color: #869f13;
+}

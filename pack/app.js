@@ -1,6 +1,6 @@
 import {mountCurrentItems} from './current-items.js?v=2';
 import {mountTodayBadges} from './today-badges.js?v=2';
-import {client,administrator,modules,applications} from './auth.js?v=131';
+import {client,administrator,modules,applications} from './auth.js?v=132';
 import {mountTiles} from './tiles.js?v=114';
 const $=id=>document.getElementById(id),db=client(),tabs=new Map();
 let user=null,epoch=0,current='',frame=null,disposeTiles=null,leaving=false,tileBadges=null,currentItemsPanel=null;

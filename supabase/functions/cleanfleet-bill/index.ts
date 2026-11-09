@@ -28,6 +28,23 @@ async function reconcileVault(userId:string){
  return true;
 }
 async function fleetAttachment(id:string){return checked(await db.from('bill_fleet_attachments').select('*').eq('invoice_id',id).maybeSingle());}
+async function reminderContext(id:string,userId:string){
+ const {reminderAmount,reminderText}=await import('./reminder.js');
+ const row=await invoice(id);if(row.creator_id!==userId)throw Error('Nie znaleziono faktury.');
+ await reconcileVault(userId);
+ const p=row.payload,source=p.source||{};
+ const [evidence,project,fleet,legacy]=await Promise.all([
+  db.from('bill_payment_evidence').select('manual_paid,bank_cents').eq('invoice_id',row.id).maybeSingle(),
+  source.app==='robisie'?db.from('rs_projects').select('payload').eq('id',source.id).eq('owner_id',userId).maybeSingle():Promise.resolve({data:null,error:null}),
+  source.fleetId?fleetPaymentEvidence(db,[row.id]):Promise.resolve([]),
+  fleetPaymentEvidence(db,[row.id],{legacy:true,userId})
+ ]);
+ const amount=reminderAmount(row,{evidence:checked(evidence),project:checked(project)?.payload,fleetPaid:fleet.some((x:any)=>x.paid)||legacy.some((x:any)=>x.paid)});
+ const recipient=String(p.buyer?.email||'').trim().toLowerCase();
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)||recipient.length>254)throw Error('Uzupełnij poprawny e-mail nabywcy na fakturze.');
+ const from=Deno.env.get('BILL_REMINDER_FROM')||'',key=Deno.env.get('BILL_REMINDER_RESEND_API_KEY')||'';
+ return {row,amount,recipient,...reminderText(row,amount),configured:Boolean(from&&key)};
+}
 async function canonicalFleet(id:string,payload:any){return guardFleetPayload(payload,await fleetAttachment(id));}
 async function canonicalCorrection(payload:any){if(!payload?.correction)return payload;const parent=await invoice(payload.correction.originalId),seed=correctionSeed(parent);return {...payload,source:seed.source,correction:{...seed.correction,mode:payload.correction.mode,reason:payload.correction.reason}};}
 async function canonicalFinal(payload:any,userId:string,currentId?:string){
@@ -67,6 +84,28 @@ Deno.serve(async req=>{
   if(role.error||role.data?.role!=='admin')return json({error:'Dostęp tylko dla administratora.'},403);
   const raw=await req.text();if(raw.length>300000)return json({error:'Żądanie jest za duże.'},413);
   const body=JSON.parse(raw);
+  if(body.action==='reminder-preview'||body.action==='reminder-send'){
+   const context=await reminderContext(String(body.id||''),userId);
+   const history=checked(await db.from('bill_reminder_emails').select('id,recipient,amount_cents,currency,state,created_at,sent_at').eq('invoice_id',context.row.id).order('created_at',{ascending:false}).limit(10));
+   if(body.action==='reminder-preview')return json({recipient:context.recipient,subject:context.subject,text:context.text,amount:context.amount,currency:context.row.payload.currency,configured:context.configured,history});
+   if(!context.configured)throw Error('Wysyłka nie jest skonfigurowana. Dodaj zweryfikowany adres nadawcy i klucz usługi e-mail.');
+   if(body.acknowledged!==true)throw Error('Potwierdź rzeczywiste saldo faktury przed wysyłką.');
+   if(!/^[0-9a-f-]{36}$/i.test(String(body.requestId||'')))throw Error('Nieprawidłowa próba wysyłki.');
+   const existing=checked(await db.from('bill_reminder_emails').select('state').eq('id',body.requestId).maybeSingle());
+   if(existing)return json({state:existing.state});
+   if(body.recipient!==context.recipient||body.amount!==context.amount)throw Error('Adres lub saldo faktury zmieniły się. Otwórz podgląd ponownie.');
+   const record={id:body.requestId,invoice_id:context.row.id,actor_id:userId,recipient:context.recipient,subject:context.subject,body:context.text,amount_cents:context.amount,currency:context.row.payload.currency,state:'sending'};
+   const inserted=await db.from('bill_reminder_emails').insert(record);
+   if(inserted.error?.code==='23505')return json({state:'sending'});
+   checked(inserted);
+   let response:Response;
+   try{response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+Deno.env.get('BILL_REMINDER_RESEND_API_KEY'),'Content-Type':'application/json','Idempotency-Key':body.requestId},body:JSON.stringify({from:Deno.env.get('BILL_REMINDER_FROM'),to:[context.recipient],subject:context.subject,text:context.text})});}
+   catch(error){checked(await db.from('bill_reminder_emails').update({state:'uncertain'}).eq('id',body.requestId));throw Error('Nie udało się potwierdzić wysyłki. Sprawdź historię przed ponowną próbą.');}
+   if(!response.ok){checked(await db.from('bill_reminder_emails').update({state:'failed'}).eq('id',body.requestId));throw Error('Serwer poczty odrzucił wiadomość. Sprawdź konfigurację nadawcy.');}
+   const result=await response.json();
+   checked(await db.from('bill_reminder_emails').update({state:'sent',provider_id:String(result.id||''),sent_at:new Date().toISOString()}).eq('id',body.requestId));
+   return json({state:'sent'});
+  }
   if(String(body.action||'').startsWith('ksef-')){const result=await archive(body,userId);return result instanceof Uint8Array?new Response(result,{headers:{...headers,'Content-Type':'application/octet-stream'}}):json(result);}
   if(body.action==='fleet-create'){
    if(!/^[0-9a-f-]{36}$/i.test(body.id||'')||!Array.isArray(body.recordIds)||body.recordIds.length>200||!Number.isSafeInteger(body.expectedCents)||body.expectedCents<=0)throw Error('Nieprawidłowy wybór aut.');

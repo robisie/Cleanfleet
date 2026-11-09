@@ -70,7 +70,16 @@ async function reminderContext(id:string,userId:string){
   source.fleetId?fleetPaymentEvidence(db,[row.id]):Promise.resolve([]),
   fleetPaymentEvidence(db,[row.id],{legacy:true,userId})
  ]);
- const amount=reminderAmount(row,{evidence:checked(evidence),project:checked(project)?.payload,fleetPaid:fleet.some((x:any)=>x.paid)||legacy.some((x:any)=>x.paid)});
+ let linkedProject=checked(project)?.payload,settlementId=row.id;
+ if(!linkedProject&&row.status==='accepted'&&row.ksef_number&&p.currency==='PLN'){
+  const link=checked(await db.from('rs_ksef_links').select('project_id,document').eq('kind','sales').eq('owner_id',userId).eq('ksef_number',row.ksef_number).maybeSingle());
+  const doc=link?.document,total=invoiceAmount(p)/100;
+  if(link&&(source.app!=='robisie'||source.id===link.project_id)&&!doc?.referenceOnly&&doc?.id&&doc.number===row.number&&doc.payload?.currency==='PLN'&&Number(doc.grossAmount)===total){
+   const linked=checked(await db.from('rs_projects').select('payload').eq('id',link.project_id).eq('owner_id',userId).maybeSingle());
+   if(linked?.payload?.invoiceSettlements?.some((x:any)=>x.id===doc.id&&x.number===row.number&&Number(x.total)===total)){linkedProject=linked.payload;settlementId=doc.id;}
+  }
+ }
+ const amount=reminderAmount(row,{evidence:checked(evidence),project:linkedProject,settlementId,fleetPaid:fleet.some((x:any)=>x.paid)||legacy.some((x:any)=>x.paid)});
  const [template,smtp,recipient]=await Promise.all([savedReminderTemplate(userId),savedSmtp(userId),reminderRecipient(p.buyer||{})]);
  return {row,amount,...recipient,...reminderText(row,amount,template),configured:Boolean(smtp)};
 }

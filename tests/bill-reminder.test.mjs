@@ -16,3 +16,15 @@ test('edytowana treść podstawia dane faktury bez zmiany zapisanego szablonu',(
  assert.equal(template.body,'Do zapłaty {{kwota}} do {{termin}} na {{rachunek}}.');
  assert.throws(()=>validReminderTemplate({subject:'Nagłówek\nBcc: x@y.pl',body:'Wiadomość'}),/Temat/);
 });
+test('termin dzisiaj dopuszcza tylko powiadomienie, nie wysyłkę e-mail',()=>{
+ const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+ const due={...invoice,payload:{...invoice.payload,dueDate:today}};
+ assert.equal(reminderAmount(due,{allowDueToday:true}),10000);
+ assert.throws(()=>reminderAmount(due),/po terminie/);
+ assert.throws(()=>reminderAmount(due,{allowDueToday:true,evidence:{manual_paid:true}}),/zapłacona/);
+});
+test('powiązanie sprzedażowe Robisię uwzględnia wpłaty w projekcie',()=>{
+ const project={invoiceSettlements:[{id:'linked',allocations:[{paid:30}],existingReceipts:[{amount:20}]}]};
+ assert.equal(reminderAmount(invoice,{project,settlementId:'linked'}),5000);
+ assert.throws(()=>reminderAmount(invoice,{project:{invoiceSettlements:[{id:'linked',allocations:[{paid:100}]}]},settlementId:'linked'}),/rozliczona/);
+});

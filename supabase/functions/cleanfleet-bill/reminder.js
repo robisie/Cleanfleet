@@ -16,10 +16,23 @@ export function reminderAmount(row,{evidence,project,fleetPaid=false}={}){
  return remaining;
 }
 
-export function reminderText(row,amount){
+export const DEFAULT_REMINDER_TEMPLATE={
+ subject:'Przypomnienie o płatności — faktura {{numer}}',
+ body:'Dzień dobry,\n\nprzypominamy o płatności za fakturę {{numer}}, której termin upłynął {{termin}}. Według naszych danych do zapłaty pozostało {{kwota}}.\n\nProsimy o przelew na rachunek {{rachunek}}, wpisując numer faktury w tytule płatności. Jeżeli płatność została już wykonana, prosimy o wiadomość zwrotną z potwierdzeniem.\n\nZ poważaniem,\nRobisię-Fer sp. z o.o.'
+};
+
+export function validReminderTemplate(input){
+ const subject=String(input?.subject||'').trim(),body=String(input?.body||'').trim();
+ if(!subject||subject.length>180||/[\r\n\x00-\x1f]/.test(subject))throw Error('Temat wiadomości musi mieć od 1 do 180 znaków i mieścić się w jednej linii.');
+ if(!body||body.length>4000||/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(body))throw Error('Treść wiadomości musi mieć od 1 do 4000 znaków.');
+ return {subject,body};
+}
+
+export function reminderText(row,amount,template=DEFAULT_REMINDER_TEMPLATE){
  const p=row.payload,number=String(row.number||'');
  const money=new Intl.NumberFormat('pl-PL',{style:'currency',currency:p.currency||'PLN'}).format(amount/100);
- const subject=`Przypomnienie o płatności — faktura ${number}`;
- const text=`Dzień dobry,\n\nprzypominamy o płatności za fakturę ${number}, której termin upłynął ${p.dueDate}. Według naszych danych do zapłaty pozostało ${money}.\n\nProsimy o przelew na rachunek ${p.bank||'wskazany na fakturze'}, wpisując numer faktury w tytule płatności. Jeżeli płatność została już wykonana, prosimy o wiadomość zwrotną z potwierdzeniem.\n\nZ poważaniem,\nRobisię-Fer sp. z o.o.`;
+ const values={numer:number,termin:p.dueDate,kwota:money,rachunek:p.bank||'wskazany na fakturze'};
+ const fill=value=>String(value).replace(/\{\{(numer|termin|kwota|rachunek)\}\}/g,(_,key)=>values[key]);
+ const subject=fill(template.subject),text=fill(template.body);
  return {subject,text};
 }

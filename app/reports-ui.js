@@ -574,7 +574,7 @@ function vrpCondition(record) {
  if (!record.condition_level) return '—';
  const condition = root.CFWashCondition;
  return [
-  `${record.condition_level}/4`,
+  `${record.condition_level}/5`,
   condition?.levels[record.condition_level],
   condition?.describe(record.condition_factors)
  ].filter(Boolean).join(' · ');

@@ -1,12 +1,12 @@
 import {invoiceAmount} from './invoice.js';
 
-export function reminderAmount(row,{evidence,project,fleetPaid=false}={}){
+export function reminderAmount(row,{evidence,project,fleetPaid=false,allowDueToday=false,settlementId=row.id}={}){
  const p=row.payload||{},today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
- if(!row.number||row.status==='draft'||p.correction||!/^20\d\d-\d\d-\d\d$/.test(p.dueDate||'')||p.dueDate>=today)throw Error('Przypomnienie dotyczy tylko faktury po terminie płatności.');
+ if(!row.number||row.status==='draft'||p.correction||!/^20\d\d-\d\d-\d\d$/.test(p.dueDate||'')||(allowDueToday?p.dueDate>today:p.dueDate>=today))throw Error('Przypomnienie dotyczy tylko faktury po terminie płatności.');
  const total=invoiceAmount(p);if(total<=0)throw Error('Faktura nie ma kwoty do zapłaty.');
  if(evidence?.manual_paid||fleetPaid)throw Error('Faktura jest oznaczona jako zapłacona.');
  const fromInvoice=Math.round(Number(p.paid?.amount||0)*100);
- const settlement=project?.invoiceSettlements?.find(x=>x.id===row.id);
+ const settlement=project?.invoiceSettlements?.find(x=>x.id===settlementId);
  const fromProject=settlement?[...(settlement.allocations||[]).map(x=>x.paid),...(settlement.existingReceipts||[]).map(x=>x.amount)].reduce((s,v)=>s+Math.round(Number(v||0)*100),0):0;
  const bank=Number(evidence?.bank_cents||0);
  const paid=Math.max(fromInvoice,fromProject,bank);

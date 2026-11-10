@@ -38,6 +38,10 @@ async function savedReminderTemplate(userId:string){
  const template=checked(await db.from('bill_reminder_templates').select('subject,body').eq('user_id',userId).maybeSingle());
  return upgradeReminderTemplate(template);
 }
+async function savedReceiptTemplate(userId:string){
+ const {DEFAULT_RECEIPT_TEMPLATE}=await import('./receipt.js');
+ return checked(await db.from('bill_payment_receipt_templates').select('subject,body').eq('user_id',userId).maybeSingle())||DEFAULT_RECEIPT_TEMPLATE;
+}
 async function reminderRecipient(buyer:any){
  const country=partyCountry(buyer);
  const nip=String(buyer.nip||'').replace(/[\s-]/g,'').toUpperCase();
@@ -157,6 +161,49 @@ Deno.serve(async req=>{
    checked(await db.from('bill_reminder_templates').upsert({user_id:userId,...template,updated_at:new Date().toISOString()},{onConflict:'user_id'}));
    return json(template);
   }
+  if(body.action==='receipt-template')return json(await savedReceiptTemplate(userId));
+  if(body.action==='receipt-template-save'){
+   const {validReceiptTemplate}=await import('./receipt.js'),template=validReceiptTemplate(body);
+   checked(await db.from('bill_payment_receipt_templates').upsert({user_id:userId,...template,updated_at:new Date().toISOString()},{onConflict:'user_id'}));
+   return json(template);
+  }
+  if(['receipt-preview','receipt-send','receipt-dismiss'].includes(body.action)){
+   const row=await invoice(String(body.id||''));if(row.creator_id!==userId)throw Error('Nie znaleziono faktury.');
+   await reconcileVault(userId);
+   const evidence=checked(await db.from('bill_payment_evidence').select('manual_paid,bank_cents').eq('invoice_id',row.id).maybeSingle());
+   const {receiptText}=await import('./receipt.js');
+   const content=receiptText(row,evidence,await savedReceiptTemplate(userId));
+   const prior=checked(await db.from('bill_payment_receipt_emails').select('state,recipient,sent_at,request_id').eq('invoice_id',row.id).maybeSingle());
+   if(body.action==='receipt-preview'){
+    const recipient=await reminderRecipient(row.payload.buyer||{});
+    return json({...content,...recipient,configured:Boolean(await savedSmtp(userId)),state:prior?.state||null,sentAt:prior?.sent_at||null});
+   }
+   if(body.action==='receipt-dismiss'){
+    if(prior)return json({state:prior.state});
+    const saved=await db.from('bill_payment_receipt_emails').insert({invoice_id:row.id,actor_id:userId,request_id:crypto.randomUUID(),state:'dismissed'});
+    if(saved.error?.code==='23505')return json({state:'dismissed'});
+    checked(saved);return json({state:'dismissed'});
+   }
+   if(body.acknowledged!==true||!/^[0-9a-f-]{36}$/i.test(String(body.requestId||'')))throw Error('Potwierdź wysyłkę w podglądzie.');
+   if(prior&&prior.state!=='dismissed')return json({state:prior.state});
+   const recipient=await reminderRecipient(row.payload.buyer||{});
+   if(!recipient.recipient)throw Error(recipient.recipientIssue);
+   if(body.recipient!==recipient.recipient||body.subject!==content.subject||body.text!==content.text||body.amount!==content.amount)throw Error('Dane płatności lub wiadomości zmieniły się. Otwórz podgląd ponownie.');
+   const config=await savedSmtp(userId);if(!config)throw Error('Połącz skrzynkę kontakt@cleanfleet.pl w Ustawieniach Bill.');
+   const record={actor_id:userId,request_id:body.requestId,recipient:recipient.recipient,subject:content.subject,body:content.text,amount_cents:content.amount,currency:content.currency,state:'sending'};
+   const claim=prior?await db.from('bill_payment_receipt_emails').update(record).eq('invoice_id',row.id).eq('state','dismissed').select('invoice_id').maybeSingle():await db.from('bill_payment_receipt_emails').insert({invoice_id:row.id,...record}).select('invoice_id').maybeSingle();
+   if(claim.error?.code==='23505'||!claim.data)return json({state:'sending'});
+   checked(claim);
+   let transport,result;
+   try{
+    const {smtpTransport}=await import('./smtp.js');transport=await smtpTransport(config);
+    result=await transport.sendMail({from:'Robisię-Fer <kontakt@cleanfleet.pl>',to:recipient.recipient,subject:content.subject,text:content.text});
+    if(!result.accepted?.some((address:string)=>address.toLowerCase()===recipient.recipient.toLowerCase()))throw Error('Serwer nie potwierdził odbiorcy.');
+   }catch(_){checked(await db.from('bill_payment_receipt_emails').update({state:'uncertain'}).eq('invoice_id',row.id).eq('request_id',body.requestId));throw Error('Nie udało się potwierdzić wysyłki. Sprawdź folder Wysłane przed ponowną próbą.');}
+   finally{transport?.close();}
+   checked(await db.from('bill_payment_receipt_emails').update({state:'sent',provider_id:String(result.messageId||''),sent_at:new Date().toISOString()}).eq('invoice_id',row.id).eq('request_id',body.requestId));
+   return json({state:'sent'});
+  }
   if(body.action==='reminder-preview'||body.action==='reminder-send'){
    const {invoiceMailAttachment,reminderPdfName}=await import('../../../bill/reminder-attachment.js');
    const context=await reminderContext(String(body.id||''),userId);
@@ -240,13 +287,13 @@ Deno.serve(async req=>{
   }
   if(body.action==='bootstrap'){
    await reconcileVault(userId);
-   const [invoices,parties,settings,counters,config,projects,companies,billing,payments]=await Promise.all([
+   const [invoices,parties,settings,counters,config,projects,companies,billing,payments,receipts]=await Promise.all([
     db.from('bill_invoices').select('id,number,payload,revision,status,ksef_number,ksef_session,ksef_reference,ksef_message,created_at,updated_at').order('created_at',{ascending:false}).limit(1000),
     db.from('bill_parties').select('*').order('updated_at',{ascending:false}).limit(1000),db.from('bill_settings').select('payload').single(),db.from('bill_counters').select('*'),
     db.from('cf_ksef_credentials').select('nip').eq('user_id',userId).eq('environment','production').maybeSingle(),
     db.from('rs_projects').select('id,contract_number,name:payload->>name').eq('owner_id',userId).order('created_at',{ascending:false}).limit(250),
-    db.from('companies').select('id,name,nip,address').eq('active',true),db.from('billing_companies').select('id,company_id,name,tax_id,address,currency').eq('active',true),db.from('bill_payment_evidence').select('invoice_id,manual_paid,bank_cents,bank_payments,bank_candidates,bill_invoices!inner(creator_id)').eq('bill_invoices.creator_id',userId).limit(1000)]);
-   return json({invoices:checked(invoices),payments:checked(payments),parties:checked(parties),settings:{bank:checked(settings)?.payload?.bank||'',gusConfigured:!!checked(settings)?.payload?.gusKeyCiphertext},counters:checked(counters),ksefConfigured:checked(config)?.nip===SELLER.nip,sources:{projects:checked(projects).map((r:any)=>({id:r.id,name:r.name,number:r.contract_number})),companies:checked(companies),billing:checked(billing)}});
+    db.from('companies').select('id,name,nip,address').eq('active',true),db.from('billing_companies').select('id,company_id,name,tax_id,address,currency').eq('active',true),db.from('bill_payment_evidence').select('invoice_id,manual_paid,bank_cents,bank_payments,bank_candidates,bill_invoices!inner(creator_id)').eq('bill_invoices.creator_id',userId).limit(1000),db.from('bill_payment_receipt_emails').select('invoice_id,state,recipient,sent_at,bill_invoices!inner(creator_id)').eq('bill_invoices.creator_id',userId).limit(1000)]);
+   return json({invoices:checked(invoices),payments:checked(payments),receipts:checked(receipts),parties:checked(parties),settings:{bank:checked(settings)?.payload?.bank||'',gusConfigured:!!checked(settings)?.payload?.gusKeyCiphertext},counters:checked(counters),ksefConfigured:checked(config)?.nip===SELLER.nip,sources:{projects:checked(projects).map((r:any)=>({id:r.id,name:r.name,number:r.contract_number})),companies:checked(companies),billing:checked(billing)}});
   }
   if(body.action==='correction-history'){
    const page=body.page;

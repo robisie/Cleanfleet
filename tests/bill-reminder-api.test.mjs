@@ -6,7 +6,7 @@ import {readFile} from 'node:fs/promises';
 import {partyCountry} from '../supabase/functions/cleanfleet-bill/invoice.js';
 import {reminderText,upgradeReminderTemplate} from '../supabase/functions/cleanfleet-bill/reminder.js';
 import {sendReminderMail} from '../supabase/functions/cleanfleet-bill/smtp.js';
-import {invoiceMailAttachment,MAX_REMINDER_PDF_BASE64,reminderPdfName} from '../bill/reminder-attachment.js';
+import {invoiceMailAttachment,reminderPdfName} from '../bill/reminder-attachment.js';
 
 test('reminder uses the contact from the directory and sends the confirmed preview',async()=>{
  const id='10000000-0000-4000-8000-000000000001';
@@ -28,11 +28,13 @@ test('reminder uses the contact from the directory and sends the confirmed previ
  }};
  const source=stripTypeScriptTypes(await readFile(new URL('../supabase/functions/cleanfleet-bill/index.ts',import.meta.url),'utf8'));
  const imports=new Map([...source.matchAll(/import\s*\{([^}]+)\}\s*from\s*['"]([^'"]+)['"]/g)].map(m=>[m[2],m[1].split(',').map(s=>s.trim())]));
- const implementations={createClient:()=>db,createArchiveService:()=>async()=>{},ksefApi:()=>async()=>{},createStateCodec:()=>({open:async()=>({})}),fleetPaymentEvidence:async()=>[],partyCountry,invoiceMailAttachment,MAX_REMINDER_PDF_BASE64,reminderPdfName};
+ const implementations={createClient:()=>db,createArchiveService:()=>async()=>{},ksefApi:()=>async()=>{},createStateCodec:()=>({open:async()=>({})}),fleetPaymentEvidence:async()=>[],partyCountry};
  const context=vm.createContext({console,Request,Response,JSON,crypto,Deno:{env:{get:()=>''},serve:fn=>handler=fn}});
  const synthetic=values=>new vm.SyntheticModule(Object.keys(values),function(){for(const [name,value] of Object.entries(values))this.setExport(name,value);},{context});
  const module=new vm.SourceTextModule(source,{context,importModuleDynamically:async spec=>{
-  const values=spec==='./reminder.js'?{reminderAmount:()=>7000,reminderText,upgradeReminderTemplate}:{sendReminderMail,smtpTransport:async()=>({sendMail:async mail=>{deliveries.push(mail);if(mail.attachments&&smtpError)throw smtpError;return {};},close(){}})};
+  const values=spec==='./reminder.js'?{reminderAmount:()=>7000,reminderText,upgradeReminderTemplate}
+   :spec==='../../../bill/reminder-attachment.js'?{invoiceMailAttachment,reminderPdfName}
+   :{sendReminderMail,smtpTransport:async()=>({sendMail:async mail=>{deliveries.push(mail);if(mail.attachments&&smtpError)throw smtpError;return {};},close(){}})};
   const imported=synthetic(values);await imported.link(()=>{});await imported.evaluate();return imported;
  }});
  await module.link(spec=>synthetic(Object.fromEntries((imports.get(spec)||[]).map(name=>[name,implementations[name]||(()=>{})]))));
@@ -60,7 +62,7 @@ test('reminder uses the contact from the directory and sends the confirmed previ
  assert.equal(deliveries[0].to,preview.recipient);
  assert.equal(deliveries[0].text,preview.text);
  assert.equal(deliveries[0].attachments,undefined);
- const pdf=btoa('%PDF-1.4\n%%EOF\n'),attachment={invoiceId:id,version:invoice.updated_at,pdf};
+ const pdf=btoa('%PDF-1.4\n'+' '.repeat(250000)+'\n%%EOF\n'),attachment={invoiceId:id,version:invoice.updated_at,pdf};
  const send=fields=>request('reminder-send',{...confirmation,requestId:crypto.randomUUID(),...fields});
  assert.equal((await send({attachment})).attached,true);
  assert.deepEqual(deliveries[1].attachments[0],{filename:'Faktura_A1-11-2026.pdf',content:pdf,encoding:'base64',contentType:'application/pdf'});

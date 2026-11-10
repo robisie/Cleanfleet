@@ -1,5 +1,5 @@
 export const MAX_REMINDER_PDF_BYTES=4*1024*1024;
-export const MAX_REMINDER_PDF_BASE64=4*Math.ceil(MAX_REMINDER_PDF_BYTES/3);
+const MAX_REMINDER_PDF_BASE64=4*Math.ceil(MAX_REMINDER_PDF_BYTES/3);
 
 export function reminderPdfName(number){
  const safe=String(number||'').replace(/[^a-zA-Z0-9._-]+/g,'-').slice(0,120);

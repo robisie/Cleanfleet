@@ -2,8 +2,7 @@ import {invoiceGroups} from './invoice-groups.js?v=1.0.38';
 import * as KSEF from './ksef.js?v=1.0.57';
 import * as C from './core.js?v=1.0.57';
 import * as API from './api.js?v=1.0.70';
-import {documentHtml,preview,previewHtml} from './pdf.js?v=1.0.64';
-import {MAX_REMINDER_PDF_BYTES} from './reminder-attachment.js?v=1.0.71';
+import {preview,previewHtml} from './pdf.js?v=1.0.64';
 import * as Demand from './payment-demand.js?v=1.0.38';
 import {paymentStatus} from './payment-status.js?v=1.0.61';
 async function fleetPreview(row){const a=await API.call({action:'fleet-attachment',id:row.id});const {previewFleet}=await import('./fleet-pdf.js?v=1.0.57');await previewFleet(a);}
@@ -140,7 +139,11 @@ async function prepareReminderPdf(draft){
    (async()=>{
     const row=await API.call({action:'document',id:draft.id},{signal:controller.signal,timeoutMs:15000});
     if(row?.id!==draft.id||!row.number||!row.updated_at||!row.payload?.lines?.length)return null;
-    const {createInvoicePdf}=await import('./invoice-download.js?v=1.0.64');
+    const [{documentHtml},{createInvoicePdf},{MAX_REMINDER_PDF_BYTES}]=await Promise.all([
+     import('./pdf.js?v=1.0.64'),
+     import('./invoice-download.js?v=1.0.64'),
+     import('./reminder-attachment.js?v=1.0.71')
+    ]);
     const html=await documentHtml(row);
     const file=await createInvoicePdf(html,draft.attachmentName.slice(0,-4),controller.signal);
     if(!file.size||file.size>MAX_REMINDER_PDF_BYTES)return null;

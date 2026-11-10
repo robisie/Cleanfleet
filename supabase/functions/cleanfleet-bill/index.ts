@@ -10,7 +10,6 @@ import {reconcileBillPayments} from '../_shared/bill-bank-match.js';
 import {createStateCodec,hash} from '../cleanfleet-ksef/core.js';
 import {normalize,newInvoice,party,partyCountry,invoiceXml,invoiceAmount,advanceAllocation,SELLER,today,validBank,correctionSeed,storedPayload,externalReference} from './invoice.js';
 import {ksefApi,authenticate,openSession,invoiceStatus,KsefError} from './ksef.js';
-import {invoiceMailAttachment,MAX_REMINDER_PDF_BASE64,reminderPdfName} from '../../../bill/reminder-attachment.js';
 const secret=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const db=createClient(Deno.env.get('SUPABASE_URL')!,secret,{auth:{persistSession:false,autoRefreshToken:false}});
 const credentials=createStateCodec(secret,'saved-credentials-v1'),codec=createStateCodec(secret,'bill-ksef-v1'),api=ksefApi();
@@ -121,7 +120,8 @@ Deno.serve(async req=>{
   if(error||!data.user)return json({error:'Zaloguj się ponownie.'},401);
   const userId=data.user.id,role=await db.from('user_roles').select('role').eq('user_id',userId).single();
   if(role.error||role.data?.role!=='admin')return json({error:'Dostęp tylko dla administratora.'},403);
-  const raw=await req.text();if(raw.length>MAX_REMINDER_PDF_BASE64+300000)return json({error:'Żądanie jest za duże.'},413);
+  // A 4 MiB reminder attachment takes up to 5.6 MB after base64 encoding.
+  const raw=await req.text();if(raw.length>6000000)return json({error:'Żądanie jest za duże.'},413);
   const body=JSON.parse(raw);
   if(body.action!=='reminder-send'&&raw.length>300000)return json({error:'Żądanie jest za duże.'},413);
   if(body.action==='smtp-config'){
@@ -158,6 +158,7 @@ Deno.serve(async req=>{
    return json(template);
   }
   if(body.action==='reminder-preview'||body.action==='reminder-send'){
+   const {invoiceMailAttachment,reminderPdfName}=await import('../../../bill/reminder-attachment.js');
    const context=await reminderContext(String(body.id||''),userId);
    const history=checked(await db.from('bill_reminder_emails').select('id,recipient,amount_cents,currency,state,created_at,sent_at').eq('invoice_id',context.row.id).order('created_at',{ascending:false}).limit(10));
    if(body.action==='reminder-preview')return json({recipient:context.recipient,recipientSource:context.recipientSource,recipientIssue:context.recipientIssue,subject:context.subject,text:context.text,amount:context.amount,currency:context.row.payload.currency,configured:context.configured,attachmentName:reminderPdfName(context.row.number),history});

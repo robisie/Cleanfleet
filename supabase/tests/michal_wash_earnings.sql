@@ -4,6 +4,9 @@ do $$
 declare
  w public.wash_records%rowtype;
  record_id uuid;
+ earning_id uuid;
+ employee_percent numeric;
+ paid_amount numeric;
  n integer;
  remaining integer;
 begin
@@ -31,6 +34,19 @@ begin
  update public.wash_records set wash_date=current_date where id=record_id;
  select count(*) into n from public.cf_earnings where source_wash_record_id=record_id;
  if n<>1 then raise exception 'Michal completed wash not added';end if;
+ select id into earning_id from public.cf_earnings where source_wash_record_id=record_id;
+ select coalesce((select r.employee_percent from public.cf_earning_rules r where lower(btrim(r.contractor))='tvm' limit 1),0)
+ into employee_percent;
+ update public.wash_records set cost=400 where id=record_id;
+ if not exists(select 1 from public.cf_earnings where id=earning_id and total_amount=400
+  and employee_amount=round(400*employee_percent/100.0,2) and my_amount=400-employee_amount)
+ then raise exception 'Price-only correction did not update the existing split';end if;
+ update public.cf_earnings set employee_paid=true,note='Keep payout and note' where id=earning_id
+ returning employee_amount into paid_amount;
+ update public.wash_records set cost=500 where id=record_id;
+ if not exists(select 1 from public.cf_earnings where id=earning_id and total_amount=500
+  and employee_paid and employee_amount=paid_amount and my_amount=500-paid_amount and note='Keep payout and note')
+ then raise exception 'Correction changed a recorded payout';end if;
  update public.wash_records set approved=false where id=record_id;
  select count(*) into n from public.cf_earnings where source_wash_record_id=record_id;
  if n<>0 then raise exception 'Completion undo retained entry';end if;

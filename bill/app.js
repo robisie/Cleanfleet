@@ -24,7 +24,7 @@ async function refresh(){data=await API.call({action:'bootstrap'});if(API.invoic
 function login(error=''){$('#app').innerHTML=`<div class="login"><div class="brand">Bill<span>.</span></div><p class="muted">Faktury · Robisię-Fer</p><div class="card"><h1>Zaloguj się</h1><p class="muted">Użyj konta administratora CleanFleet.</p><form id="login">${field('email','E-mail','','email','required autocomplete="username"')}${field('password','Hasło','','password','required autocomplete="current-password"')}<p class="error" role="alert">${e(error)}</p><button class="primary" type="submit">Otwórz faktury</button></form></div></div>`;}
 function render(){
  const title=view==='edit'?(editor.number?'Edytuj '+editor.number:editor?.payload?.correction?'Nowa korekta':'Nowa faktura'):view==='detail'?(selected.number||'Szkic faktury'):view==='parties'?'Kontrahenci':view==='ksef'?'KSeF':view==='settings'?'Ustawienia':'Faktury';
- $('#app').innerHTML=`<header class="topbar"><div><div class="brand">Bill<span>.</span></div><small>Robisię-Fer · CleanFleet & Robisię</small></div><div class="row"><span class="muted small">1.0.70</span>${button('logout','Wyloguj')}</div></header><div class="shell"><nav>${[['invoices','Faktury'],['parties','Kontrahenci'],['ksef','KSeF'],['settings','Ustawienia']].map(([v,l])=>button('nav',l,view===v?'active':'',`data-view="${v}"`)).join('')}<div class="links"><a href="/app/">CleanFleet ↗</a><a href="/app/robisie/">Robisię ↗</a></div></nav><main><div class="toolbar"><div><h1>${e(title)}</h1><p class="muted">${view==='edit'?'Wspólne dane i numeracja. Logo wybierasz osobno.':view==='invoices'?'Sprzedaż obu marek w jednym miejscu.':view==='detail'?e(brandName(selected.payload.brand)):''}</p></div><div class="actions">${view==='invoices'?button('new','+ Wystaw fakturę','primary'):view==='parties'?button('new-party','+ Dodaj kontrahenta','primary'):['edit','detail'].includes(view)?button('back','← Wróć do faktur'):''}</div></div><p id="page-error" class="error" role="alert"></p>${view==='invoices'?list():view==='parties'?parties():view==='ksef'?KSEF.view():view==='settings'?settings()+smtpSettings()+smsSettings()+reminderTemplateSettings():view==='edit'?edit():detail()}</main></div>`;
+ $('#app').innerHTML=`<header class="topbar"><div><div class="brand">Bill<span>.</span></div><small>Robisię-Fer · CleanFleet & Robisię</small></div><div class="row"><span class="muted small">1.0.71</span>${button('logout','Wyloguj')}</div></header><div class="shell"><nav>${[['invoices','Faktury'],['parties','Kontrahenci'],['ksef','KSeF'],['settings','Ustawienia']].map(([v,l])=>button('nav',l,view===v?'active':'',`data-view="${v}"`)).join('')}<div class="links"><a href="/app/">CleanFleet ↗</a><a href="/app/robisie/">Robisię ↗</a></div></nav><main><div class="toolbar"><div><h1>${e(title)}</h1><p class="muted">${view==='edit'?'Wspólne dane i numeracja. Logo wybierasz osobno.':view==='invoices'?'Sprzedaż obu marek w jednym miejscu.':view==='detail'?e(brandName(selected.payload.brand)):''}</p></div><div class="actions">${view==='invoices'?button('new','+ Wystaw fakturę','primary'):view==='parties'?button('new-party','+ Dodaj kontrahenta','primary'):['edit','detail'].includes(view)?button('back','← Wróć do faktur'):''}</div></div><p id="page-error" class="error" role="alert"></p>${view==='invoices'?list():view==='parties'?parties():view==='ksef'?KSEF.view():view==='settings'?settings()+smtpSettings()+smsSettings()+reminderTemplateSettings():view==='edit'?edit():detail()}</main></div>`;
  if(view==='edit'){syncCorrectionControls();if(editor.number){for(const node of document.querySelectorAll('#source-select,[name=documentType],#robisie-invoice-mode'))node.disabled=true;}if(editor.payload.source?.invoiceMode==='detailed'){const cur=document.querySelector('[name=currency]');if(cur)cur.disabled=true;}if(isFleet(editor)){for(const node of document.querySelectorAll('[name=currency],#source-select'))node.disabled=true;}}
  if(view==='ksef')KSEF.mount($('#ksef-panel'),API.call,{projects:data.sources?.projects||[],assign:API.assignKsef,preview:API.previewKsefPurchase,loadLinks:API.ksefAssignments,findPurchases:API.investmentPurchases,allocationContext:API.ksefAllocationContext,unassign:API.unassignKsef,historyState:API.ksefHistoryState,markHistory:API.markKsefHistory,index:API.ksefDocumentIndex,storeMetadata:API.storeKsefMetadata,storeXml:API.storeKsefXml,stock:API.ksefStock,correctCostContext:API.correctCostContext,applyCostCorrection:API.applyCostCorrection,setReturn:API.setKsefReturn,cfContext:API.cleanfleetCostContext,cfCompanies:API.cleanfleetCompanies,cfLinks:API.cleanfleetCostLinks,cfSave:API.saveCleanfleetCosts,bank:data.settings.bank||'',userId:API.getSession()?.user?.id});
 }
@@ -130,6 +130,38 @@ async function sendSavedInvoice(){if(selected?.status!=='issued')throw Error('Na
 function download(text,name,type){const url=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
 async function backToInvoices(){if(!await abandon())return false;dirty=false;view='invoices';render();return true;}
 async function abandon(){if(!dirty)return true;return window.confirm('Szkic ma niezapisane zmiany. Opuścić formularz?');}
+async function prepareReminderPdf(draft){
+ const controller=new AbortController();
+ let timer;
+ try{
+  return await Promise.race([
+   new Promise(resolve=>{timer=setTimeout(()=>{controller.abort();resolve(null);},30000);}),
+   (async()=>{
+    const row=await API.call({action:'document',id:draft.id},{signal:controller.signal,timeoutMs:15000});
+    if(row?.id!==draft.id||!row.number||!row.updated_at||!row.payload?.lines?.length)return null;
+    const [{documentHtml},{createInvoicePdf},{MAX_REMINDER_PDF_BYTES}]=await Promise.all([
+     import('./pdf.js?v=1.0.64'),
+     import('./invoice-download.js?v=1.0.64'),
+     import('./reminder-attachment.js?v=1.0.71')
+    ]);
+    const html=await documentHtml(row);
+    const file=await createInvoicePdf(html,draft.attachmentName.slice(0,-4),controller.signal);
+    if(!file.size||file.size>MAX_REMINDER_PDF_BYTES)return null;
+    const pdf=await new Promise((resolve,reject)=>{
+     const reader=new FileReader();
+     reader.onload=()=>resolve(String(reader.result).split(',')[1]);
+     reader.onerror=()=>reject(reader.error);
+     reader.readAsDataURL(file);
+    });
+    return {invoiceId:row.id,version:row.updated_at,pdf};
+   })()
+  ]);
+ }catch{
+  return null;
+ }finally{
+  clearTimeout(timer);
+ }
+}
 async function openReminderPreview(id){
   reminderDraft={id,requestId:crypto.randomUUID(),...(await API.call({action:'reminder-preview',id}))};
   const d=reminderDraft,history=d.history.length?`<details><summary>Historia przypomnień (${d.history.length})</summary>${d.history.map(h=>`<p>${e(h.created_at.slice(0,16).replace('T',' '))} · ${e(h.recipient)} · ${e({sent:'Wysłano',sending:'Wysyłanie',uncertain:'Sprawdź wynik',failed:'Nie wysłano'}[h.state]||h.state)}</p>`).join('')}</details>`:'';
@@ -141,6 +173,8 @@ async function openReminderPreview(id){
    ${field('reminderPreviewSubject','Temat',d.subject,'text','readonly')}
    <label class="field">Treść<textarea rows="10" readonly>${e(d.text)}</textarea></label>
    <p>Kwota pozostała: <strong>${e(C.money(d.amount,d.currency))}</strong></p>
+   <label class="row"><input id="reminder-attach-pdf" type="checkbox" checked> Dołącz fakturę PDF</label>
+   <p class="muted small">${d.attachmentName?e(d.attachmentName)+' · ':''}Jeśli PDF nie będzie dostępny, wyślemy samą wiadomość.</p>
    ${history}
    ${d.configured?'':'<p class="notice">Połącz skrzynkę kontakt@cleanfleet.pl w Ustawieniach Bill.</p>'}
    ${canSend?'<p class="muted">Klikając „Wyślij”, potwierdzasz saldo i wysyłasz wiadomość na wskazany adres.</p>':''}
@@ -159,9 +193,12 @@ document.addEventListener('click',event=>{const b=event.target.closest('[data-ac
  if(action==='open'){selected=data.invoices.find(r=>r.id===b.dataset.id);view='detail';render();return;}
  if(action==='reminder-preview'){await work(()=>openReminderPreview(b.dataset.id||selected?.id));return;}
  if(action==='reminder-send'){if(!reminderDraft?.recipient||!reminderDraft.configured)throw Error('Otwórz podgląd przypomnienia z poprawnym adresem odbiorcy.');await work(async()=>{
-  const d=reminderDraft,result=await API.call({action:'reminder-send',id:d.id,recipient:d.recipient,amount:d.amount,subject:d.subject,text:d.text,requestId:d.requestId,acknowledged:true});
+  const d=reminderDraft,includePdf=$('#reminder-attach-pdf').checked;
+  const attachment=includePdf&&d.attachmentName?await prepareReminderPdf(d):null;
+  const result=await API.call({action:'reminder-send',id:d.id,recipient:d.recipient,amount:d.amount,subject:d.subject,text:d.text,requestId:d.requestId,acknowledged:true,attachment});
   if(result.state!=='sent')throw Error('Wysyłka jest już w toku lub wymaga sprawdzenia w historii.');
-  reminderDraft=null;closeModal();toast('Przypomnienie wysłane.');
+  reminderDraft=null;closeModal();
+  toast(result.attached?'Przypomnienie wysłane z fakturą PDF.':includePdf&&result.attached===false?'Przypomnienie wysłane bez faktury. Nie udało się dołączyć PDF.':'Przypomnienie wysłane.');
  });return;}
  if(action==='bank-link-review'){
   const row=data.invoices.find(r=>r.id===b.dataset.id),choice=(data.payments.find(p=>p.invoice_id===row?.id)?.bank_candidates||[]).find(p=>p.incomeId===b.dataset.income);

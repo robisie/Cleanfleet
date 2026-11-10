@@ -10,6 +10,7 @@ import {reconcileBillPayments} from '../_shared/bill-bank-match.js';
 import {createStateCodec,hash} from '../cleanfleet-ksef/core.js';
 import {normalize,newInvoice,party,partyCountry,invoiceXml,invoiceAmount,advanceAllocation,SELLER,today,validBank,correctionSeed,storedPayload,externalReference} from './invoice.js';
 import {ksefApi,authenticate,openSession,invoiceStatus,KsefError} from './ksef.js';
+import {invoiceMailAttachment,MAX_REMINDER_PDF_BASE64,reminderPdfName} from '../../../bill/reminder-attachment.js';
 const secret=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const db=createClient(Deno.env.get('SUPABASE_URL')!,secret,{auth:{persistSession:false,autoRefreshToken:false}});
 const credentials=createStateCodec(secret,'saved-credentials-v1'),codec=createStateCodec(secret,'bill-ksef-v1'),api=ksefApi();
@@ -120,8 +121,9 @@ Deno.serve(async req=>{
   if(error||!data.user)return json({error:'Zaloguj się ponownie.'},401);
   const userId=data.user.id,role=await db.from('user_roles').select('role').eq('user_id',userId).single();
   if(role.error||role.data?.role!=='admin')return json({error:'Dostęp tylko dla administratora.'},403);
-  const raw=await req.text();if(raw.length>300000)return json({error:'Żądanie jest za duże.'},413);
+  const raw=await req.text();if(raw.length>MAX_REMINDER_PDF_BASE64+300000)return json({error:'Żądanie jest za duże.'},413);
   const body=JSON.parse(raw);
+  if(body.action!=='reminder-send'&&raw.length>300000)return json({error:'Żądanie jest za duże.'},413);
   if(body.action==='smtp-config'){
    const config=await savedSmtp(userId);return json({configured:Boolean(config),host:config?.host||'',port:465,username:config?.username||''});
   }
@@ -158,7 +160,7 @@ Deno.serve(async req=>{
   if(body.action==='reminder-preview'||body.action==='reminder-send'){
    const context=await reminderContext(String(body.id||''),userId);
    const history=checked(await db.from('bill_reminder_emails').select('id,recipient,amount_cents,currency,state,created_at,sent_at').eq('invoice_id',context.row.id).order('created_at',{ascending:false}).limit(10));
-   if(body.action==='reminder-preview')return json({recipient:context.recipient,recipientSource:context.recipientSource,recipientIssue:context.recipientIssue,subject:context.subject,text:context.text,amount:context.amount,currency:context.row.payload.currency,configured:context.configured,history});
+   if(body.action==='reminder-preview')return json({recipient:context.recipient,recipientSource:context.recipientSource,recipientIssue:context.recipientIssue,subject:context.subject,text:context.text,amount:context.amount,currency:context.row.payload.currency,configured:context.configured,attachmentName:reminderPdfName(context.row.number),history});
    if(!context.configured)throw Error('Połącz skrzynkę kontakt@cleanfleet.pl w Ustawieniach Bill.');
    if(body.acknowledged!==true)throw Error('Potwierdź rzeczywiste saldo faktury przed wysyłką.');
    if(!/^[0-9a-f-]{36}$/i.test(String(body.requestId||'')))throw Error('Nieprawidłowa próba wysyłki.');
@@ -171,13 +173,15 @@ Deno.serve(async req=>{
    const inserted=await db.from('bill_reminder_emails').insert(record);
    if(inserted.error?.code==='23505')return json({state:'sending'});
    checked(inserted);
-   const config=await savedSmtp(userId),{smtpTransport}=await import('./smtp.js');
-   const transport=await smtpTransport(config);let result:any;
-   try{result=await transport.sendMail({from:'Robisię-Fer <kontakt@cleanfleet.pl>',to:context.recipient,subject:context.subject,text:context.text});}
+   const config=await savedSmtp(userId),{smtpTransport,sendReminderMail}=await import('./smtp.js');
+   const transport=await smtpTransport(config);
+   const attachment=invoiceMailAttachment(body.attachment,context.row);
+   let delivery;
+   try{delivery=await sendReminderMail(transport,{from:'Robisię-Fer <kontakt@cleanfleet.pl>',to:context.recipient,subject:context.subject,text:context.text},attachment);}
    catch(error){checked(await db.from('bill_reminder_emails').update({state:'uncertain'}).eq('id',body.requestId));throw Error('Nie udało się potwierdzić wysyłki. Sprawdź folder Wysłane i historię przed ponowną próbą.');}
    finally{transport.close();}
-   checked(await db.from('bill_reminder_emails').update({state:'sent',provider_id:String(result.messageId||''),sent_at:new Date().toISOString()}).eq('id',body.requestId));
-   return json({state:'sent'});
+   checked(await db.from('bill_reminder_emails').update({state:'sent',provider_id:String(delivery.result.messageId||''),sent_at:new Date().toISOString()}).eq('id',body.requestId));
+   return json({state:'sent',attached:delivery.attached});
   }
   if(String(body.action||'').startsWith('ksef-')){const result=await archive(body,userId);return result instanceof Uint8Array?new Response(result,{headers:{...headers,'Content-Type':'application/octet-stream'}}):json(result);}
   if(body.action==='fleet-create'){

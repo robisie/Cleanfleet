@@ -9,3 +9,24 @@ export async function smtpTransport(config){
  const nodemailer=(await import('npm:nodemailer@^9')).default;
  return nodemailer.createTransport({host:config.host,port:465,secure:true,auth:{user:config.username,pass:config.password},tls:{rejectUnauthorized:true},connectionTimeout:15000,greetingTimeout:15000,socketTimeout:30000});
 }
+
+export async function sendReminderMail(transport,mail,attachment){
+ if(attachment){
+  try{
+   const result=await transport.sendMail({...mail,attachments:[attachment]});
+   return {result,attached:true};
+  }catch(error){
+   // Only retry if SMTP explicitly rejected the message. A lost reply after
+   // DATA can mean it was delivered, so it must remain an uncertain send.
+   const definitive=error.responseCode>=500&&error.responseCode<600&&
+    ['DATA','MAIL FROM'].includes(error.command);
+   const attachmentRejected=error.responseCode===552||
+    /\b5\.6\.\d+\b|attachment|file type|message size|message too (?:large|big)/i.test(error.response||'');
+   const exceedsAdvertisedLimit=error.command==='MAIL FROM'&&error.code==='EMESSAGE'&&
+    /^Message size larger than allowed\b/.test(error.message||'');
+   if(!exceedsAdvertisedLimit&&!(definitive&&attachmentRejected))throw error;
+  }
+ }
+ const result=await transport.sendMail(mail);
+ return {result,attached:false};
+}

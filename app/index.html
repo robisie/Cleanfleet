@@ -3238,8 +3238,12 @@ body.cf-boot-lock{overflow:hidden !important;touch-action:none;}
         <span class="menu-item-title">💾 Backup floty i rozliczeń</span>
         <span class="menu-item-sub">Pojazdy, prania, faktury i spółki wybranej firmy (Excel)</span>
       </button>
+      <button class="menu-item" id="cfFullBackup">
+        <span class="menu-item-title">💾 Kopia całego ekosystemu</span>
+        <span class="menu-item-sub">CleanFleet, ROBISIĘ i BILL w jednym zaszyfrowanym pliku.</span>
+      </button>
       <button class="menu-item" id="cfUnifiedBackupExport">
-        <span class="menu-item-title">💾 Backup całej aplikacji</span>
+        <span class="menu-item-title">💾 Kopia danych CleanFleet</span>
         <span class="menu-item-sub">Panel administratora i wszystkie firmy w jednym pliku ZIP (bez zdjęć)</span>
       </button>
       <button class="menu-item" id="cfUnifiedBackupRestore">
@@ -6105,7 +6109,8 @@ function cfShowBackupHub(){
   companySelect.value=cfActiveCompanyId||'';companyLabel.append(companySelect);sheet.append(companyLabel);
   const status=document.createElement('p');status.setAttribute('role','status');sheet.append(status);
   const options=[
-    ['cfUnifiedBackupExport','Backup całej aplikacji','Panel administratora i wszystkie firmy w jednym pliku ZIP, bez zdjęć.'],
+    ['cfFullBackup','Kopia całego ekosystemu','CleanFleet, ROBISIĘ i BILL w jednym zaszyfrowanym pliku.'],
+    ['cfUnifiedBackupExport','Kopia danych CleanFleet','Panel administratora i wszystkie firmy w jednym pliku ZIP, bez zdjęć.'],
     ['cfUnifiedBackupRestore','Przywróć backup aplikacji','Wybierz panel administratora lub konkretne firmy z pliku ZIP.'],
     ['exportExcelBtn','Backup floty i rozliczeń','Pobierz dane wybranej firmy w pliku Excel.'],
     ['importBtn','Importuj / przywróć dane','Przywróć flotę i rozliczenia z pliku Excel.']
@@ -16840,6 +16845,7 @@ document.addEventListener('focusin',e=>{
 </script>
 <script src="/app/unified-backup.js?v=20260929-3"></script>
 <script src="/app/unified-backup-export-ui.js?v=20260929-4"></script>
+<script src="/app/full-backup-ui.js?v=1"></script>
 <script src="/app/unified-backup-restore-ui.js?v=20260929-1"></script>
 <script src="/app/weather-v6.js?v=20260923-13068"></script>
 <script src="/app/weather-refresh-v12311.js?v=20260923-13068"></script>

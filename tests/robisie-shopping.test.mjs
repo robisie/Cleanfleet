@@ -1,4 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import * as S from '../app/robisie/shopping.js';import * as C from '../app/robisie/core.js';
+import {buildDocument} from '../app/robisie/pdf.js';
 const purchase=(id='purchase',quantity=6,amount=60)=>({id,date:'2026-10-25',shop:'Leroy Merlin sp. z o.o.',invoice:'FV/1',sourceKsefNumber:'KSEF-'+id,amount,charge:amount,invoiceItems:[{index:1,name:'Płyta OSB 22 mm',quantity,unit:'szt.',gross:amount}]});
 const add=(p,quantity=10,values={})=>S.saveItem(p,{name:'Płyta OSB',shop:'Leroy Merlin',quantity,unit:'szt.',...values},null,()=>`item-${(p.shoppingList||[]).length}`);
 test('new and legacy investments support isolated shopping lists without affecting financial totals',()=>{
@@ -44,4 +45,46 @@ test('removing a mistaken link restores source capacity and original shopping da
  let p=add({purchases:[purchase()]},6),line=S.purchaseLines(p)[0];const before=C.totals(p);p=S.link(p,'item-0',line.key,6);p=S.unlink(p,'item-0','purchase',1,{reject:true});
  assert.equal(S.rows(p)[0].name,'Płyta OSB');assert.equal(S.rows(p)[0].remaining,6);assert.equal(S.rows(p)[0].amount,null);assert.equal(S.available(p,line),6);assert.equal(S.suggestions(p).length,0);assert.deepEqual(C.totals(p),before);
  p=S.toggle(p,'item-0','2026-10-25');p=S.link(p,'item-0',line.key,6);p=S.unlink(p,'item-0','purchase',1,{reject:true});assert.equal(S.rows(p)[0].state,'bought');assert.equal(S.rows(p)[0].date,'2026-10-25');assert.equal(S.rows(p)[0].linked,0);
+});
+test('planned budget uses only remaining quantity and never changes invoice costs',()=>{
+ let project=add({purchases:[purchase()]},10,{description:'Białe, 22 mm',productUrl:'https://sklep.example/plyta?wariant=bialy',unitPrice:'42,50'});
+ const actual=C.totals(project);
+ assert.equal(S.rows(project)[0].description,'Białe, 22 mm');
+ assert.equal(S.totals(project).plannedRemainingCents,42500);
+ project=S.link(project,'item-0',S.purchaseLines(project)[0].key,6);
+ assert.equal(S.rows(project)[0].remaining,4);
+ assert.equal(S.remainingEstimate(S.rows(project)[0]),17000);
+ assert.equal(S.totals(project).amount,60);
+ assert.deepEqual(C.totals(project),actual);
+ project=S.toggle(add(project,1,{name:'Drugi produkt'}),'item-1',C.today());
+ assert.equal(S.totals(project).unpriced,0);
+ assert.equal(S.totals(project).plannedRemainingCents,17000);
+});
+test('missing and zero prices remain distinct; a fractional unit rounds the remaining total',()=>{
+ let project=add({purchases:[]},8.91,{unit:'m²',unitPrice:'42,50'});
+ project=add(project,2,{name:'Darmowa próbka',unitPrice:0});
+ project=add(project,1,{name:'Bez ceny'});
+ assert.equal(S.totals(project).plannedRemainingCents,37868);
+ assert.equal(S.totals(project).unpriced,1);
+ project=S.saveItem(project,{...project.shoppingList[0],boughtQuantity:3,boughtDate:C.today()},'item-0');
+ assert.equal(S.totals(project).plannedRemainingCents,25118);
+ assert.equal(S.totals(project).unpriced,1);
+});
+test('product links and prices are validated before saving',()=>{
+ const project={purchases:[]};
+ for(const link of ['javascript:alert(1)','ftp://example.com/a','https://user:pass@example.com/a','www.example.com/a'])
+  assert.throws(()=>add(project,1,{productUrl:link}),/link/i);
+ assert.throws(()=>add(project,1,{unitPrice:'1,999'}),/Cena jednostkowa/);
+ assert.throws(()=>add(project,1,{unitPrice:'-2'}),/Cena jednostkowa/);
+ assert.equal(S.saveItem(project,{name:'Próbka',quantity:1,unitPrice:0},null,()=>'x').shoppingList[0].unitPrice,0);
+});
+test('shopping PDF carries the description, product URL, estimate and missing-price warning',()=>{
+ let project=add({purchases:[]},3,{description:'Kolor biały',productUrl:'https://sklep.example/panele?variant=white',unitPrice:'40,00'});
+ project=add(project,1,{name:'Bez ceny'});
+ const html=buildDocument({payload:{...C.newProject('Mieszkanie','Inwestor'),shoppingList:project.shoppingList},contract_number:'UM/1'},{},{modules:['shopping']});
+ assert.match(html,/Kolor biały/);
+ assert.match(html,/class="shopping-product-link" href="https:\/\/sklep\.example\/panele\?variant=white"/);
+ assert.match(html,/120,00/);
+ assert.match(html,/Niepełna wycena — liczba pozycji bez ceny: 1/);
+ assert.match(html,/Cena jedn\./);
 });

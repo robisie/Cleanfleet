@@ -1,7 +1,7 @@
-import * as Shopping from './shopping.js?v=1.0.82';
+import * as Shopping from './shopping.js?v=1.0.114';
 import * as C from './core.js?v=1.0.108';
 
-const layoutUrl=new URL('./pdf-layout.js?v=1.0.113',import.meta.url).href;
+const layoutUrl=new URL('./pdf-layout.js?v=1.0.114',import.meta.url).href;
 const canvasUrl=new URL('../vendor/html2canvas-1.4.1.min.js',import.meta.url).href;
 const pdfUrl=new URL('../vendor/jspdf-2.5.1.umd.min.js',import.meta.url).href;
 
@@ -41,10 +41,12 @@ function purchasesTable(items){
  }).join(''):`<tr><td colspan="7" class="empty">Brak zapisanych pozycji.</td></tr>`}</tbody></table>`;
 }
 function shoppingTable(project){
- const items=Shopping.rows(project.payload).filter(item=>item.remaining>0),groups=new Map();
+ const items=Shopping.rows(project.payload).filter(item=>item.remaining>0),groups=new Map(),budget=Shopping.totals(project.payload);
  for(const item of items){const shop=item.shop||'Sklep nieokreślony';if(!groups.has(shop))groups.set(shop,[]);groups.get(shop).push(item);}
  if(!items.length)return '<p class="empty">Wszystkie zakupy są odhaczone. Brak pozycji do kupienia.</p>';
- return '<p class="note">Lista pozostałych zakupów. Przy zakupach częściowych podano tylko ilość pozostałą do kupienia.</p>'+[...groups].sort((a,b)=>a[0].localeCompare(b[0],'pl')).map(([shop,rows])=>`<h3>${esc(shop)}</h3>${table(['Kupione','Co kupić','Ilość','Jedn.'],rows.map(item=>`<tr><td><span class="shopping-tick" aria-label="Miejsce na zaznaczenie zakupu"></span></td><td>${esc(item.name)}</td><td>${esc(new Intl.NumberFormat('pl-PL',{maximumFractionDigits:6}).format(item.remaining))}</td><td>${esc(item.unit||'—')}</td></tr>`),'shopping-table')}`).join('');
+ const detail=item=>`<strong>${esc(item.name)}</strong>${item.description?`<span class="shopping-description">${esc(item.description)}</span>`:''}${item.productUrl?`<a class="shopping-product-link" href="${esc(Shopping.productUrl(item.productUrl))}" target="_blank" rel="noopener noreferrer">${esc(item.productUrl)}</a>`:''}`;
+ const tables=[...groups].sort((a,b)=>a[0].localeCompare(b[0],'pl')).map(([shop,rows])=>`<h3>${esc(shop)}</h3>${table(['Kupione','Co kupić / opis / link','Ilość','Jedn.','Cena jedn.','Do wydania'],rows.map(item=>`<tr><td><span class="shopping-tick" aria-label="Miejsce na zaznaczenie zakupu"></span></td><td>${detail(item)}</td><td>${esc(new Intl.NumberFormat('pl-PL',{maximumFractionDigits:6}).format(item.remaining))}</td><td>${esc(item.unit||'—')}</td><td>${item.unitPrice==null?'—':esc(money(item.unitPrice))}</td><td>${Shopping.remainingEstimate(item)==null?'Brak ceny':esc(money(Shopping.remainingEstimate(item)/100))}</td></tr>`),'shopping-table')}`).join('');
+ return '<p class="note">Ilości i koszty dotyczą wyłącznie zakupów pozostałych do zrobienia. Ceny są planowane i nie zmieniają kosztów z faktur.</p>'+tables+totals([['Planowane wydatki na pozostałe zakupy',money(budget.plannedRemainingCents/100)]])+(budget.unpriced?`<p class="note">Niepełna wycena — liczba pozycji bez ceny: ${budget.unpriced}. Suma obejmuje tylko wycenione pozycje.</p>`:'');
 }
 function documentNumbers(project){const p=project.payload;return [
  ['Umowa',project.contract_number],['Wymiary pomieszczeń',C.attachment(project,'WYM')],
@@ -89,7 +91,7 @@ export function buildDocument(project,settings,{modules=DEFAULT_MODULES,logoUrl=
  #pdf-preview{padding:12px}#pdf-preview img{display:block;width:100%;max-width:210mm;height:auto;margin:0 auto 16px;background:white;box-shadow:0 2px 8px #0002}
 
  /* Materials have an independent A4 layout; other document tables keep their styles. */
- .shopping-table th:first-child{width:13%}.shopping-table th:nth-child(2){width:59%}.shopping-table th:nth-child(3){width:16%}.shopping-table th:last-child{width:12%}.shopping-table td:nth-child(3){text-align:right;font-variant-numeric:tabular-nums}.shopping-tick{display:block;width:4mm;height:4mm;border:1px solid #51595f;margin:0 auto}.shopping-table td{padding:2.5mm 2mm}
+ .shopping-table{font-size:8pt;line-height:1.35}.shopping-table th,.shopping-table td{padding:1.6mm 1mm}.shopping-table th:first-child{width:8%}.shopping-table th:nth-child(2){width:42%}.shopping-table th:nth-child(3){width:10%}.shopping-table th:nth-child(4){width:8%}.shopping-table th:nth-child(5),.shopping-table th:nth-child(6){width:16%}.shopping-table td:nth-child(3),.shopping-table td:nth-child(5),.shopping-table td:nth-child(6){text-align:right;font-variant-numeric:tabular-nums}.shopping-tick{display:block;width:4mm;height:4mm;border:1px solid #51595f;margin:0 auto}.shopping-description,.shopping-product-link{display:block;margin-top:1mm;white-space:pre-wrap;overflow-wrap:anywhere}.shopping-product-link{color:#184f70;text-decoration:underline}
  .purchases-table{font-size:8pt;line-height:1.35;table-layout:fixed}
  .purchases-table th,.purchases-table td{padding:1.6mm 1.1mm;overflow-wrap:normal;word-break:normal;hyphens:none;white-space:normal}
  .purchases-table td.purchase-date,.purchases-table td.purchase-money{white-space:nowrap}.purchases-table td.purchase-document{overflow-wrap:anywhere}

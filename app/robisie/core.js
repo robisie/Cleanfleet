@@ -216,11 +216,18 @@ export function tripLineData(trip){
 
 // The purchase document threshold is a workflow reminder, independent of settlement.
 export const purchaseNeedsInvoice=item=>number(item.amount)>450&&!item.sourceKsefNumber&&item.documentType!=='invoice';
-export function roomWorkAmount(project,roomId){
- const all=project.works||[],rows=all.filter(l=>(l.roomId||'')===roomId),full=workTotals(all,project.workDiscount??project.discount,project.sourceCalculation?.works);
- if(full.sourceAmountApplied){const raw=all.reduce((s,l)=>s+calculationValue(l),0);return round(raw?full.after*rows.reduce((s,l)=>s+calculationValue(l),0)/raw:0);}
- return workTotals(rows,project.workDiscount??project.discount).after;
+export function roomLineAmount(project,kind,roomId){
+ const type=kind==='works'?'works':'offer',all=project[type]||[];
+ const rows=all.filter(l=>(l.roomId||'')===roomId);
+ const discount=type==='works'?(project.workDiscount??project.discount):project.discount;
+ const full=workTotals(all,discount,project.sourceCalculation?.[type]);
+ if(full.sourceAmountApplied){
+  const raw=all.reduce((s,l)=>s+calculationValue(l),0);
+  return round(raw?full.after*rows.reduce((s,l)=>s+calculationValue(l),0)/raw:0);
+ }
+ return workTotals(rows,discount).after;
 }
+export const roomWorkAmount=(project,roomId)=>roomLineAmount(project,'works',roomId);
 
 // Shared settlement reads the native project entries; it never stores a second copy.
 export function settlementRows(project){

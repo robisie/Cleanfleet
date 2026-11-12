@@ -89,3 +89,24 @@ test('summary ignores case and redundant spaces but keeps different units and ca
  const result=C.aggregate([{...base,serviceId:'a'},{...base,serviceId:'b',name:'  listwy   przypodłogowe ',category:' podłogi ',unit:' MB ',qty:3,price:20},{...base,serviceId:'a',unit:'szt.',qty:4},{...base,serviceId:'a',category:'INNE',qty:5},{...base,included:false,qty:100}]);
  assert.equal(result.length,3);const combined=result.find(row=>row.unit==='mb'&&row.category==='PODŁOGI');assert.equal(combined.qty,5);assert.equal(combined.value,80);
 });
+
+test('podsumowania pomieszczeń w ofercie i kalkulacji są niezależne oraz respektują rabaty',()=>{
+ const p=C.newProject('Klient','Projekt');
+ p.offer=[{roomId:'a',qty:2,price:100},{roomId:'b',qty:1,price:50},{roomId:'a',qty:5,price:100,included:false}];
+ p.works=[{roomId:'a',qty:1,price:300},{roomId:'b',qty:1,price:100}];
+ p.discount=10;p.workDiscount=20;
+ assert.equal(C.roomLineAmount(p,'offer','a'),180);
+ assert.equal(C.roomLineAmount(p,'offer','b'),45);
+ assert.equal(C.roomLineAmount(p,'works','a'),240);
+ assert.equal(C.roomLineAmount(p,'works','b'),80);
+ assert.equal(C.roomWorkAmount(p,'a'),240);
+ assert.equal(C.roomLineAmount(p,'offer','missing'),0);
+});
+test('historyczna kwota źródłowa jest proporcjonalnie rozdzielana między pomieszczenia',()=>{
+ const p=C.newProject('Klient','Projekt');
+ p.offer=[{id:'x',roomId:'a',qty:1,price:100},{id:'y',roomId:'b',qty:1,price:300}];
+ p.discount=0;
+ p.sourceCalculation={offer:{amount:600,basis:C.calculationBasis(p.offer,p.discount)}};
+ assert.equal(C.roomLineAmount(p,'offer','a'),150);
+ assert.equal(C.roomLineAmount(p,'offer','b'),450);
+});

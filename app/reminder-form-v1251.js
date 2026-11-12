@@ -36,6 +36,13 @@
     throw new Error('Brak połączenia z bazą.');
   }
 
+  async function ksefRequest(client,body){
+    const result=await client.functions.invoke('cleanfleet-reminder-ksef',{body});
+    if(result.error){let detail;try{detail=await result.error.context?.clone().json();}catch(_){}throw Error(detail?.error||result.error.message);}
+    if(result.data?.error)throw Error(result.data.error);
+    return result.data||{};
+  }
+
   async function companies(){
     try{if(typeof cfCompanies!=='undefined'&&Array.isArray(cfCompanies)&&cfCompanies.length)return cfCompanies}catch(_){}
     if(window.CFCalendarEngine?.loadAll){const d=await window.CFCalendarEngine.loadAll();return d?.companies||[]}
@@ -65,7 +72,9 @@
     const mode=reminder?.reminder_mode||'at_time';
     const custom=parts(reminder?.custom_remind_at||null);
     const isPay=!!reminder?.is_payment;
-    const mailEnabled=!!reminder?.mail_invoice_enabled;
+    const invoiceSource=reminder?.invoice_source||(reminder?.mail_invoice_enabled?'email':'manual');
+    const mailEnabled=invoiceSource==='email';
+    const ksefStatus=reminder?.ksef_scan_status||'off',ksefCandidates=Array.isArray(reminder?.ksef_candidates)?reminder.ksef_candidates:[];
     const mailCandidate=reminder?.mail_candidate&&typeof reminder.mail_candidate==='object'?reminder.mail_candidate:null;
     const initialStartIso=reminder?.start_at||reminder?.due_at||reminder?.remind_at||null;
     const mailStateLabel=({off:'Wyłączone',waiting:'Oczekiwanie na fakturę',applied:'Dane pobrane z faktury',needs_review:'Faktura wymaga sprawdzenia',error:'Błąd sprawdzania poczty',missing:'Brak faktury — kwota niepotwierdzona'})[reminder?.mail_scan_status||'off']||'Wyłączone';
@@ -93,7 +102,16 @@
           <label class="cf-rem-range-field"><span>Nr faktury</span><input id="cfrInvoice" value="${esc(reminder?.invoice_number||'')}"></label>
         </div>
         <div id="cfrMailBox" class="cf-rem-range-span2" style="display:${isPay?'block':'none'};border:1px solid #dde2de;border-radius:12px;background:#fff;padding:12px">
-          <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800"><input id="cfrMailEnabled" type="checkbox" style="width:17px;height:17px" ${mailEnabled?'checked':''}>Pobieraj kwotę, termin i numer faktury z e-maila</label>
+          <label class="cf-rem-range-field"><span>Źródło danych faktury</span><select id="cfrInvoiceSource"><option value="manual" ${invoiceSource==='manual'?'selected':''}>Uzupełniam ręcznie</option><option value="ksef" ${invoiceSource==='ksef'?'selected':''}>KSeF — faktury zakupowe</option><option value="email" ${invoiceSource==='email'?'selected':''}>E-mail — faktura z załącznika</option></select></label>
+          <div id="cfrKsefFields" style="display:${invoiceSource==='ksef'?'block':'none'};margin-top:12px">
+            <label class="cf-rem-range-field"><span>NIP dostawcy</span><input id="cfrKsefNip" inputmode="numeric" maxlength="16" value="${esc(reminder?.ksef_seller_nip||'')}" placeholder="10 cyfr"></label>
+            <label class="cf-rem-range-field"><span>Numer faktury lub opis zawiera (opcjonalnie)</span><input id="cfrKsefMatch" maxlength="160" value="${esc(reminder?.ksef_match_text||'')}" placeholder="np. numer umowy lub leasing"></label>
+            <p style="font-size:12px">Korzystamy z zapisanego połączenia KSeF. Dopasowujemy NIP i miesiąc terminu płatności. Przy kilku fakturach wybierzesz właściwą. Poczta nie będzie sprawdzana dla tego przypomnienia.</p>
+            <p style="font-size:12px" role="status">Status: <strong>${esc(({off:'Wyłączone',waiting:'Oczekiwanie na fakturę',applied:'Dane pobrane z KSeF',needs_review:'Wybierz lub sprawdź fakturę',error:'Odczyt KSeF wymaga ponowienia',missing:'Brak pasującej faktury'})[ksefStatus]||'Oczekiwanie na fakturę')}</strong>${reminder?.ksef_last_error?'<br>'+esc(reminder.ksef_last_error):''}</p>
+            ${reminder?.ksef_number?`<p style="font-size:12px">Źródło: <a href="/bill/?ksef=${encodeURIComponent(reminder.ksef_number)}&kind=purchases&month=${encodeURIComponent((ksefCandidates.find(c=>c.ksef_number===reminder.ksef_number)?.invoice_date||parts(reminder.due_at).date).slice(0,7))}" target="_blank" rel="noopener">${esc(reminder.ksef_number)}</a></p>`:''}
+            ${ksefStatus==='needs_review'?ksefCandidates.map((c,i)=>`<div style="border:1px solid #d3d9d5;border-radius:10px;padding:10px;margin:10px 0;font-size:12px"><strong>${esc(c.invoice_number)}</strong> · ${esc(c.seller)}<p>${esc(String(c.amount))} ${esc(c.currency)} · termin: ${esc(c.due_date||'do uzupełnienia')}</p>${(c.warnings||[]).map(w=>`<p>${esc(w)}</p>`).join('')}<p><a href="/bill/?ksef=${encodeURIComponent(c.ksef_number)}&kind=purchases&month=${encodeURIComponent(c.invoice_date?.slice(0,7)||'')}" target="_blank" rel="noopener">Otwórz fakturę w Bill</a></p>${!c.due_date?`<label class="cf-rem-range-field"><span>Termin do przypomnienia</span><input type="date" data-ksef-date="${i}"></label>`:''}<button type="button" class="cf-rem-range-btn" data-ksef-apply="${i}" ${c.currency!=='PLN'?'disabled':''}>Zastosuj tę fakturę</button></div>`).join(''):''}
+          </div>
+          <label style="display:none"><input id="cfrMailEnabled" type="checkbox" style="width:17px;height:17px" ${mailEnabled?'checked':''}>Pobieraj kwotę, termin i numer faktury z e-maila</label>
           <div id="cfrMailFields" style="display:${mailEnabled?'grid':'none'};grid-template-columns:1fr 1fr;gap:10px 12px;margin-top:12px">
             <label class="cf-rem-range-field" style="grid-column:1/-1"><span>Folder poczty</span><select id="cfrMailFolder"><option value="${esc(reminder?.mail_folder||'')}">${esc(reminder?.mail_folder||'Wybierz folder')}</option></select></label>
             <button class="cf-rem-range-btn" id="cfrMailFoldersBtn" type="button" style="grid-column:1/-1;justify-self:start">Pobierz foldery poczty</button>
@@ -103,7 +121,7 @@
             <p style="grid-column:1/-1">Poczta jest sprawdzana codziennie od początku miesiąca do dnia wymagalności włącznie. Po pobraniu faktury sprawdzanie tego przypomnienia kończy się.</p><input id="cfrMailDays" type="hidden" value="2">
           </div>
           <div id="cfrMailState" style="display:${mailEnabled?'block':'none'};margin-top:10px;padding:9px 10px;border-radius:9px;background:#f7f7f4;border:1px solid #e0e4e1;font-size:11px;line-height:1.45;color:#5d665f">Status: <strong>${esc(mailStateLabel)}</strong>${reminder?.mail_source_received_at?' · wiadomość '+esc(reminder.mail_source_received_at):''}${reminder?.mail_source_attachment?' · '+esc(reminder.mail_source_attachment):''}${reminder?.mail_last_error?'<br>'+esc(reminder.mail_last_error):''}</div>
-          ${mailCandidate&&reminder?.mail_scan_status==='needs_review' ? '<div style="margin-top:10px;padding:10px;border-radius:10px;background:#fff8dc;border:1px solid #eadc98;font-size:12px;line-height:1.45"><strong>Odczyt do sprawdzenia</strong><br>Nr: '+esc(mailCandidate.invoice_number||'—')+' · Kwota: '+(mailCandidate.amount!=null?esc(String(mailCandidate.amount)+' '+String(mailCandidate.currency||'')):'—')+' · Termin: '+esc(mailCandidate.due_date||'—')+'<br><button class="cf-rem-range-btn" id="cfrMailApplyCandidate" type="button" style="margin-top:8px">Zastosuj te dane</button></div>' : ''}
+          ${mailEnabled&&mailCandidate&&reminder?.mail_scan_status==='needs_review' ? '<div id="cfrMailReview" style="margin-top:10px;padding:10px;border-radius:10px;background:#fff8dc;border:1px solid #eadc98;font-size:12px;line-height:1.45"><strong>Odczyt do sprawdzenia</strong><br>Nr: '+esc(mailCandidate.invoice_number||'—')+' · Kwota: '+(mailCandidate.amount!=null?esc(String(mailCandidate.amount)+' '+String(mailCandidate.currency||'')):'—')+' · Termin: '+esc(mailCandidate.due_date||'—')+'<br><button class="cf-rem-range-btn" id="cfrMailApplyCandidate" type="button" style="margin-top:8px">Zastosuj te dane</button></div>' : ''}
         </div>
         <label class="cf-rem-range-field cf-rem-range-span2"><span>Notatka</span><textarea id="cfrNotes">${esc(reminder?.notes||'')}</textarea></label>
       </div>
@@ -112,17 +130,29 @@
     </div>`;
     document.getElementById('cfReminderRangeOverlay')?.remove();document.body.appendChild(host);
     let saving=false;const close=()=>{if(!saving)host.remove();};host.querySelectorAll('[data-close]').forEach(b=>b.onclick=close);host.addEventListener('click',e=>{if(e.target===host)close()});
-    const modeEl=host.querySelector('#cfrMode'),payEl=host.querySelector('#cfrPayment'),mailEl=host.querySelector('#cfrMailEnabled');
+    const modeEl=host.querySelector('#cfrMode'),payEl=host.querySelector('#cfrPayment'),mailEl=host.querySelector('#cfrMailEnabled'),sourceEl=host.querySelector('#cfrInvoiceSource');
+    sourceEl.value=invoiceSource;
     modeEl.onchange=()=>host.querySelector('#cfrCustomWrap').style.display=modeEl.value==='custom'?'grid':'none';
     const syncPaymentVisibility=()=>{
       host.querySelector('#cfrPayFields').style.display=payEl.checked?'grid':'none';
       host.querySelector('#cfrMailBox').style.display=payEl.checked?'block':'none';
-      if(!payEl.checked)mailEl.checked=false;
+      if(!payEl.checked)sourceEl.value='manual';
+      mailEl.checked=payEl.checked&&sourceEl.value==='email';
+      host.querySelector('#cfrKsefFields').style.display=payEl.checked&&sourceEl.value==='ksef'?'block':'none';
+      const mailReview=host.querySelector('#cfrMailReview');if(mailReview)mailReview.style.display=payEl.checked&&sourceEl.value==='email'?'block':'none';
       host.querySelector('#cfrMailFields').style.display=payEl.checked&&mailEl.checked?'grid':'none';
       host.querySelector('#cfrMailState').style.display=payEl.checked&&mailEl.checked?'block':'none';
     };
     payEl.onchange=syncPaymentVisibility;
-    mailEl.onchange=()=>{syncPaymentVisibility();if(mailEl.checked&&host.querySelector('#cfrMailFolder').options.length<=1)loadMailFolders();};
+    sourceEl.onchange=()=>{syncPaymentVisibility();if(mailEl.checked&&host.querySelector('#cfrMailFolder').options.length<=1)loadMailFolders();};
+    mailEl.onchange=()=>{sourceEl.value=mailEl.checked?'email':'manual';sourceEl.onchange();};
+    host.querySelectorAll('[data-ksef-apply]').forEach(button=>button.onclick=async()=>{
+      const candidate=ksefCandidates[Number(button.dataset.ksefApply)];if(!candidate||!reminder?.id||sourceEl.value!=='ksef')return;
+      if(host.querySelector('#cfrKsefNip').value!==reminder.ksef_seller_nip||host.querySelector('#cfrKsefMatch').value!==(reminder.ksef_match_text||'')){toast('Najpierw zapisz zmienioną regułę KSeF.');return;}
+      button.disabled=true;
+      try{const client=await db();await ksefRequest(client,{action:'apply',reminder_id:reminder.id,ksef_number:candidate.ksef_number,due_date:host.querySelector('[data-ksef-date="'+button.dataset.ksefApply+'"]')?.value||'',confirmed:true});close();toast('Zastosowano dane faktury z KSeF.');if(typeof onSaved==='function')await onSaved();}
+      catch(error){toast(error.message||'Nie udało się zastosować faktury.');button.disabled=false;}
+    });
 
     async function loadMailFolders(){
       const btn=host.querySelector('#cfrMailFoldersBtn'),select=host.querySelector('#cfrMailFolder');
@@ -181,11 +211,14 @@
       if(modeEl.value==='custom'&&!customAt){toast('Podaj własny termin przypomnienia.');return}
       const client=await db();const {data:{user}}=await client.auth.getUser();if(!user){toast('Brak zalogowanego użytkownika.');return}
       const isPayment=payEl.checked;
-      const useMail=isPayment&&mailEl.checked;
-      const mailFolder=useMail?host.querySelector('#cfrMailFolder').value.trim():'';
-      const mailSender=useMail?host.querySelector('#cfrMailSender').value.trim().toLowerCase():'';
-      const mailSubject=useMail?host.querySelector('#cfrMailSubject').value.trim():'';
-      const mailAttachment=useMail?host.querySelector('#cfrMailAttachment').value.trim():'';
+      const source=isPayment?(sourceEl.value||'manual'):'manual',useKsef=source==='ksef';
+      const useMail=isPayment&&source==='email';
+      const ksefNip=host.querySelector('#cfrKsefNip').value.replace(/[\s-]/g,'').replace(/^PL/i,''),ksefMatch=host.querySelector('#cfrKsefMatch').value.trim();
+      if(useKsef&&(!/^\d{10}$/.test(ksefNip)||[6,5,7,2,3,4,5,6,7].reduce((sum,w,i)=>sum+w*Number(ksefNip[i]),0)%11!==Number(ksefNip[9]))){toast('Podaj poprawny NIP dostawcy.');return;}
+      const mailFolder=host.querySelector('#cfrMailFolder').value.trim();
+      const mailSender=host.querySelector('#cfrMailSender').value.trim().toLowerCase();
+      const mailSubject=host.querySelector('#cfrMailSubject').value.trim();
+      const mailAttachment=host.querySelector('#cfrMailAttachment').value.trim();
       const mailDays=useMail?Number(host.querySelector('#cfrMailDays').value):2;
       if(useMail&&!mailFolder){toast('Wybierz folder poczty z fakturami.');return}
       if(useMail&&!mailSender&&!mailSubject&&!mailAttachment){toast('Podaj nadawcę, fragment tematu albo fragment nazwy załącznika.');return}
@@ -196,16 +229,19 @@
       const mailConfigChanged=!reminder||oldConfig!==newConfig||useMail!==!!reminder?.mail_invoice_enabled||dueChanged;
       const mailAnchor=useMail?(dueChanged?startAt:(reminder?.mail_anchor_due_at||startAt)):null;
       const preserveMail=useMail&&!mailConfigChanged;
+      const sourceChanged=source!==invoiceSource,ksefConfigChanged=!reminder||sourceChanged||ksefNip!==(reminder.ksef_seller_nip||'')||ksefMatch!==(reminder.ksef_match_text||'')||dueChanged,preserveKsef=useKsef&&!ksefConfigChanged;
+      const ksefFields={invoice_source:source,ksef_seller_nip:ksefNip||null,ksef_match_text:ksefMatch||null,ksef_anchor_due_at:useKsef?(preserveKsef?reminder.ksef_anchor_due_at||startAt:startAt):null,ksef_scan_status:useKsef?(preserveKsef?reminder.ksef_scan_status||'waiting':'waiting'):'off',ksef_last_checked_at:preserveKsef?reminder.ksef_last_checked_at||null:null,ksef_last_error:preserveKsef?reminder.ksef_last_error||null:null,ksef_number:preserveKsef?reminder.ksef_number||null:null,ksef_candidates:preserveKsef?reminder.ksef_candidates||[]:[]};
       const payload={
-        user_id:user.id,title,notes:host.querySelector('#cfrNotes').value.trim(),category:host.querySelector('#cfrCategory').value,priority:host.querySelector('#cfrPriority').value,
+        ...ksefFields,user_id:user.id,title,notes:host.querySelector('#cfrNotes').value.trim(),category:host.querySelector('#cfrCategory').value,priority:host.querySelector('#cfrPriority').value,
         company_id:host.querySelector('#cfrCompany').value||null,vehicle_plate:host.querySelector('#cfrPlate').value.trim().toUpperCase()||null,
         is_payment:isPayment,amount:isPayment&&host.querySelector('#cfrAmount').value!==''?Number(host.querySelector('#cfrAmount').value):null,payee:isPayment?(host.querySelector('#cfrPayee').value.trim()||null):null,invoice_number:isPayment?(host.querySelector('#cfrInvoice').value.trim()||null):null,
         start_at:startAt,end_at:endAt,due_at:startAt,reminder_mode:modeEl.value,custom_remind_at:modeEl.value==='custom'?customAt:null,remind_at:reminderAt(startAt,modeEl.value,customAt),recurrence:host.querySelector('#cfrRecurrence').value,status:reminder?.status||'active',push_sent_at:null,
-        mail_invoice_enabled:useMail,mail_folder:useMail?mailFolder:null,mail_sender:useMail?(mailSender||null):null,mail_subject_contains:useMail?(mailSubject||null):null,mail_attachment_contains:useMail?(mailAttachment||null):null,mail_scan_days_before:useMail?mailDays:2,mail_anchor_due_at:mailAnchor,
+        mail_invoice_enabled:useMail,mail_folder:mailFolder||null,mail_sender:mailSender||null,mail_subject_contains:mailSubject||null,mail_attachment_contains:mailAttachment||null,mail_scan_days_before:useMail?mailDays:2,mail_anchor_due_at:mailAnchor,
         mail_scan_status:useMail?(preserveMail?(reminder?.mail_scan_status||'waiting'):'waiting'):'off',
         mail_last_checked_at:preserveMail?(reminder?.mail_last_checked_at||null):null,mail_last_error:preserveMail?(reminder?.mail_last_error||null):null,
         mail_source_message_uid:preserveMail?(reminder?.mail_source_message_uid||null):null,mail_source_subject:preserveMail?(reminder?.mail_source_subject||null):null,mail_source_received_at:preserveMail?(reminder?.mail_source_received_at||null):null,mail_source_attachment:preserveMail?(reminder?.mail_source_attachment||null):null,mail_invoice_detected_at:preserveMail?(reminder?.mail_invoice_detected_at||null):null,mail_candidate:preserveMail?(reminder?.mail_candidate||null):null
       };
+      if((useKsef&&ksefConfigChanged)||(sourceChanged&&source!=='manual')){payload.amount=null;payload.invoice_number=null;}
       const saveBtn=host.querySelector('[data-save]');
       const saveLabel=saveBtn.textContent;
       saveBtn.disabled=true;
@@ -223,11 +259,11 @@
         // Jeżeli edytujemy przypomnienie cykliczne, ta sama reguła mailowa ma
         // obowiązywać także wszystkie już istniejące przyszłe wystąpienia tej serii.
         // Każde przyszłe wystąpienie zachowuje własną kotwicę terminu/miesiąca.
-        if(reminder?.id && host.querySelector('#cfrRecurrence').value!=='none'){
-          const currentBase=reminder.mail_anchor_due_at||reminder.due_at||reminder.start_at||reminder.remind_at;
+        if(reminder?.id && host.querySelector('#cfrRecurrence').value!=='none'&&(sourceChanged||mailConfigChanged||ksefConfigChanged)){
+          const currentBase=reminder.ksef_anchor_due_at||reminder.mail_anchor_due_at||reminder.due_at||reminder.start_at||reminder.remind_at;
           const currentTitle=String(reminder.title||'').trim();
           let futureSelect=client.from('cf_reminders')
-            .select('id,due_at,start_at,remind_at,mail_anchor_due_at')
+            .select('id,due_at,start_at,remind_at,mail_anchor_due_at,ksef_anchor_due_at')
             .eq('user_id',user.id)
             .eq('recurrence',host.querySelector('#cfrRecurrence').value)
             .eq('title',currentTitle)
@@ -243,11 +279,12 @@
             for(const futureRow of futureRows||[]){
               const futureAnchor=futureRow.mail_anchor_due_at||futureRow.due_at||futureRow.start_at||futureRow.remind_at||null;
               const {error:futureError}=await client.from('cf_reminders').update({
+                ...ksefFields,...(source!=='manual'?{amount:null,invoice_number:null}:{}),ksef_anchor_due_at:useKsef?(futureRow.ksef_anchor_due_at||futureRow.due_at):null,ksef_scan_status:useKsef?'waiting':'off',ksef_candidates:[],ksef_number:null,ksef_last_checked_at:null,ksef_last_error:null,
                 mail_invoice_enabled:useMail,
-                mail_folder:useMail?mailFolder:null,
-                mail_sender:useMail?(mailSender||null):null,
-                mail_subject_contains:useMail?(mailSubject||null):null,
-                mail_attachment_contains:useMail?(mailAttachment||null):null,
+                mail_folder:mailFolder||null,
+                mail_sender:mailSender||null,
+                mail_subject_contains:mailSubject||null,
+                mail_attachment_contains:mailAttachment||null,
                 mail_scan_days_before:useMail?mailDays:2,
                 mail_anchor_due_at:useMail?futureAnchor:null,
                 mail_scan_status:useMail?'waiting':'off',
@@ -266,6 +303,10 @@
         }
 
         let scanResult=null;
+        if(useKsef&&saved?.id){
+          saveBtn.textContent='Sprawdzam KSeF…';
+          try{scanResult=await ksefRequest(client,{action:'scan',reminder_id:saved.id});}catch(error){scanResult={error:error.message};}
+        }
         if(useMail&&saved?.id){
           saveBtn.textContent='Sprawdzam pocztę…';
           toast('Przypomnienie zapisane. Sprawdzam pocztę…');
@@ -283,7 +324,7 @@
         host.remove();
         if(typeof onSaved==='function')await onSaved();
 
-        if(!useMail){
+        if(!useMail&&!useKsef){
           toast(reminder?'Przypomnienie zaktualizowane.':'Przypomnienie dodane.');
         }else if(scanResult?.status==='applied'){
           const amount=Number(scanResult.amount);
@@ -294,7 +335,7 @@
         }else if(scanResult?.status==='waiting'||scanResult?.found===false){
           toast('Nie znaleziono jeszcze pasującej faktury. Automat będzie sprawdzał ponownie.');
         }else if(scanResult?.error){
-          toast('Przypomnienie zapisane. Sprawdzenie poczty teraz nie powiodło się — automat spróbuje ponownie.');
+          toast('Przypomnienie zapisane. '+(useKsef?'KSeF: '+scanResult.error:'Sprawdzenie poczty teraz nie powiodło się — automat spróbuje ponownie.'));
         }else{
           toast(reminder?'Przypomnienie zaktualizowane.':'Przypomnienie dodane.');
         }

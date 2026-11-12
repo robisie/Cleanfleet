@@ -225,7 +225,7 @@ async function cfShowReminders(){
       const at=cfReminderEffectiveAt(r);
       const bucket=cfReminderBucket(r,now);
       const invoiceTarget=cfReminderInvoiceTarget(r);
-      const needsReview=r.mail_invoice_enabled&&r.mail_scan_status==='needs_review';
+      const needsReview=(r.mail_invoice_enabled&&r.mail_scan_status==='needs_review')||(r.invoice_source==='ksef'&&r.ksef_scan_status==='needs_review');
       const company=(cfCompanies||[]).find(c=>String(c.id)===String(r.company_id));
       const meta=[
         cfReminderCategoryLabel(r.category),
@@ -233,6 +233,7 @@ async function cfShowReminders(){
         r.payee||'',
         r.invoice_number ? `Faktura: ${r.invoice_number}` : '',
         r.mail_invoice_enabled ? (({waiting:'Poczta: oczekiwanie na fakturę',applied:'Poczta: dane z faktury',needs_review:'Poczta: faktura do sprawdzenia',error:'Poczta: błąd sprawdzania',missing:'Brak faktury — kwota niepotwierdzona'})[r.mail_scan_status]||'Poczta: automatyczny odczyt') : '',
+        r.invoice_source==='ksef'?(({waiting:'KSeF: oczekiwanie na fakturę',applied:'KSeF: dane z faktury',needs_review:'KSeF: wybierz lub sprawdź fakturę',error:'KSeF: błąd odczytu',missing:'KSeF: brak faktury'})[r.ksef_scan_status]||'KSeF'):'',
         company ? cfCompanyDisplayName(company) : '',
         r.vehicle_plate||''
       ].filter(Boolean).join(' · ');
@@ -271,7 +272,7 @@ async function cfShowReminders(){
     list.querySelectorAll('[data-reminder-snooze]').forEach(b=>b.addEventListener('click',()=>snoozeReminder(b.dataset.reminderSnooze)));
     list.querySelectorAll('[data-reminder-review]').forEach(b=>b.addEventListener('click',async()=>{
       await cfOpenReminderForm(rows.find(r=>String(r.id)===String(b.dataset.reminderReview)),load);
-      const confirm=document.getElementById('cfrMailApplyCandidate');
+      const confirm=document.querySelector('[data-ksef-apply]')||document.getElementById('cfrMailApplyCandidate');
       confirm?.scrollIntoView?.({block:'center'});
       confirm?.focus?.({preventScroll:true});
     }));
@@ -283,7 +284,8 @@ async function cfShowReminders(){
     const r=rows.find(x=>String(x.id)===String(id));
     if(!r) return;
     const nowIso=new Date().toISOString();
-    const recurrenceBase=(r.mail_invoice_enabled&&r.mail_anchor_due_at)?r.mail_anchor_due_at:(r.due_at||r.remind_at);
+    const automatic=r.mail_invoice_enabled||r.invoice_source==='ksef';
+    const recurrenceBase=r.invoice_source==='ksef'?(r.ksef_anchor_due_at||r.due_at):(r.mail_invoice_enabled&&r.mail_anchor_due_at)?r.mail_anchor_due_at:(r.due_at||r.remind_at);
     const nextDue=cfReminderAdvanceIso(recurrenceBase,r.recurrence);
     if(nextDue){
       let nextCustom=null;
@@ -297,9 +299,10 @@ async function cfShowReminders(){
       const nextRemind=cfReminderCalcRemindAt(nextDue,r.reminder_mode||'at_time',nextCustom);
       const {error}=await cfSupabase.from('cf_reminders').insert({
         user_id:r.user_id,title:r.title,notes:r.notes,category:r.category,priority:r.priority,
-        company_id:r.company_id,vehicle_plate:r.vehicle_plate,amount:r.mail_invoice_enabled?null:r.amount,payee:r.payee,invoice_number:r.mail_invoice_enabled?null:r.invoice_number,
+        company_id:r.company_id,vehicle_plate:r.vehicle_plate,amount:automatic?null:r.amount,payee:r.payee,invoice_number:automatic?null:r.invoice_number,
         is_payment:r.is_payment,remind_at:nextRemind,due_at:nextDue,reminder_mode:r.reminder_mode||'at_time',
         custom_remind_at:nextCustom,recurrence:r.recurrence,status:'active',
+        invoice_source:r.invoice_source||(r.mail_invoice_enabled?'email':'manual'),ksef_seller_nip:r.ksef_seller_nip||null,ksef_match_text:r.ksef_match_text||null,ksef_anchor_due_at:r.invoice_source==='ksef'?nextDue:null,ksef_scan_status:r.invoice_source==='ksef'?'waiting':'off',ksef_candidates:[],ksef_number:null,ksef_last_checked_at:null,ksef_last_error:null,
         mail_invoice_enabled:!!r.mail_invoice_enabled,
         mail_folder:r.mail_invoice_enabled?(r.mail_folder||null):null,
         mail_sender:r.mail_invoice_enabled?(r.mail_sender||null):null,

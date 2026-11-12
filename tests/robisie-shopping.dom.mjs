@@ -46,6 +46,23 @@ test('shopping PDF is selected in the document chooser and its direct button pri
  t.$('[data-action="shopping-print"]').click();for(let i=0;i<20&&!t.previews.length;i++)await new Promise(r=>setImmediate(r));assert.equal(t.previews.length,1);assert(t.previews[0].includes('data-module="shopping"'));assert(t.previews[0].includes('Grunt do kupienia'));assert(!t.previews[0].includes('data-module="contract"'));
  }finally{await t.close()}
 });
+test('shopping editor shows planned cost and product link in the app and the PDF',async()=>{
+ const t=await setup();try{
+  t.n.shoppingDialog();
+  t.fill('name','Płyta OSB');t.fill('quantity',5);t.fill('unit','szt.');
+  t.fill('unitPrice','25,50');t.fill('productUrl','https://sklep.example/produkt?a=1&b=2');t.fill('description','Wersja wodoodporna');
+  await t.submit();
+  assert.equal(t.db.payload.shoppingList[0].unitPrice,25.5);
+  assert.equal(t.db.payload.shoppingList[0].description,'Wersja wodoodporna');
+  assert.match(t.$('.shopping-plan-meta').textContent,/127,50/);
+  assert.equal(t.$('.shopping-plan-meta a').href,'https://sklep.example/produkt?a=1&b=2');
+  assert.match(t.$('.shopping-page .metrics').textContent,/127,50/);
+  t.$('[data-action="shopping-print"]').click();for(let i=0;i<20&&!t.previews.length;i++)await new Promise(r=>setImmediate(r));
+  assert.match(t.previews[0],/Wersja wodoodporna/);
+  assert.match(t.previews[0],/sklep\.example\/produkt\?a=1&amp;b=2/);
+  assert.match(t.previews[0],/127,50/);
+ }finally{await t.close()}
+});
 test('To nie to dismisses the selected proposal, survives refresh and exposes mistaken-link removal outside details',async()=>{
  const t=await setup();try{
  t.db.payload.shoppingList=[{id:'need',name:'Płyta OSB',originalName:'Płyta OSB',shop:'Leroy',quantity:2,unit:'szt.',boughtQuantity:0,links:[]}];

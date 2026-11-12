@@ -201,6 +201,15 @@ export async function preparePreview(){
     const width=Math.min(WIDTH_MM,HEIGHT_MM*canvas.width/canvas.height);
     const height=Math.min(HEIGHT_MM,width*canvas.height/canvas.width);
     pdf.addImage(new Uint8Array(await image.arrayBuffer()),'JPEG',(WIDTH_MM-width)/2,(HEIGHT_MM-height)/2,width,height);
+    // The page is rasterized; restore clickable product URLs as PDF annotations.
+    const pageBox=page.getBoundingClientRect();
+    for(const link of page.querySelectorAll('a.shopping-product-link[href]')){
+     const box=link.getBoundingClientRect();
+     if(box.width>0&&box.height>0&&/^https?:$/.test(new URL(link.href).protocol))
+      pdf.link((WIDTH_MM-width)/2+(box.left-pageBox.left)*width/pageBox.width,
+       (HEIGHT_MM-height)/2+(box.top-pageBox.top)*height/pageBox.height,
+       box.width*width/pageBox.width,box.height*height/pageBox.height,{url:link.href});
+    }
     const url=URL.createObjectURL(image);
     imageUrls.push(url);
     const img=new Image(canvas.width,canvas.height);

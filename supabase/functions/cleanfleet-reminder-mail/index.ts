@@ -189,7 +189,7 @@ async function scanReminder(r:any){
       mail_candidate:best
     };
     if(!auto){
-      const u=await db.from('cf_reminders').update({...sourcePatch,mail_scan_status:'needs_review'}).eq('id',r.id).eq('user_id',r.user_id);
+      const u=await db.from('cf_reminders').update({...sourcePatch,mail_scan_status:'needs_review'}).eq('id',r.id).eq('mail_invoice_enabled',true).eq('user_id',r.user_id);
       if(u.error)throw u.error;return {found:true,review:true};
     }
     const oldDue=r.due_at,lp=localParts(oldDue),newDue=localIso(best.due_date,lp.time||'09:00');
@@ -201,7 +201,7 @@ async function scanReminder(r:any){
       const diff=new Date(oldDue).getTime()-new Date(r.custom_remind_at).getTime();
       patch.custom_remind_at=new Date(new Date(newDue).getTime()-diff).toISOString();
     }
-    const u=await db.from('cf_reminders').update(patch).eq('id',r.id).eq('user_id',r.user_id).eq('due_at',r.due_at).eq('status',r.status).eq('mail_scan_status',r.mail_scan_status);if(u.error)throw u.error;
+    const u=await db.from('cf_reminders').update(patch).eq('id',r.id).eq('mail_invoice_enabled',true).eq('user_id',r.user_id).eq('due_at',r.due_at).eq('status',r.status).eq('mail_scan_status',r.mail_scan_status);if(u.error)throw u.error;
     return {found:true,applied:true};
   }finally{clearTimeout(timer);try{client.close();}catch{}}
 }
@@ -218,7 +218,7 @@ Deno.serve(async(req:Request)=>{
       const result=await scanReminder(r);
       if(result.skipped){stats.skipped++;continue;}
       if(result.expired){
-        if(r.mail_scan_status!=='needs_review'){const u=await db.from('cf_reminders').update({mail_scan_status:'missing',mail_last_error:'Brak faktury — kwota niepotwierdzona'}).eq('id',r.id).eq('user_id',r.user_id).eq('mail_scan_status',r.mail_scan_status);if(u.error)throw u.error;}
+        if(r.mail_scan_status!=='needs_review'){const u=await db.from('cf_reminders').update({mail_scan_status:'missing',mail_last_error:'Brak faktury — kwota niepotwierdzona'}).eq('id',r.id).eq('mail_invoice_enabled',true).eq('user_id',r.user_id).eq('mail_scan_status',r.mail_scan_status);if(u.error)throw u.error;}
         stats.skipped++;continue;
       }
       stats.checked++;
@@ -227,12 +227,12 @@ Deno.serve(async(req:Request)=>{
       else if(result.review)stats.review++;
       else {
         stats.waiting++;
-        await db.from('cf_reminders').update({mail_scan_status:warsawDay(r.mail_anchor_due_at||r.due_at)===warsawDay()?'missing':'waiting',mail_last_checked_at:new Date().toISOString(),mail_last_error:warsawDay(r.mail_anchor_due_at||r.due_at)===warsawDay()?'Brak faktury — kwota niepotwierdzona':null}).eq('id',r.id).eq('user_id',r.user_id);
+        await db.from('cf_reminders').update({mail_scan_status:warsawDay(r.mail_anchor_due_at||r.due_at)===warsawDay()?'missing':'waiting',mail_last_checked_at:new Date().toISOString(),mail_last_error:warsawDay(r.mail_anchor_due_at||r.due_at)===warsawDay()?'Brak faktury — kwota niepotwierdzona':null}).eq('id',r.id).eq('mail_invoice_enabled',true).eq('user_id',r.user_id);
       }
     }catch(error){
       stats.errors++;
       const due=new Date(r.due_at);const status=Number.isFinite(due.getTime())&&Date.now()>due.getTime()+86400000?'error':'waiting';
-      await db.from('cf_reminders').update({mail_scan_status:status,mail_last_checked_at:new Date().toISOString(),mail_last_error:clean(error instanceof Error?error.message:String(error),500)}).eq('id',r.id).eq('user_id',r.user_id);
+      await db.from('cf_reminders').update({mail_scan_status:status,mail_last_checked_at:new Date().toISOString(),mail_last_error:clean(error instanceof Error?error.message:String(error),500)}).eq('id',r.id).eq('mail_invoice_enabled',true).eq('user_id',r.user_id);
       console.warn('CF_REMINDER_MAIL',r.id,error instanceof Error?error.message:String(error));
     }
   }

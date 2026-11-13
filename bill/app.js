@@ -10,7 +10,7 @@ const isFleetLines=r=>isFleet(r)&&r.payload.source.fleetLayout==='vehicle-lines'
 const canEditIssued=r=>r?.status==='issued'&&!!r.number&&!r.ksef_number&&!r.ksef_session&&!r.ksef_reference&&(r.payload.source?.app!=='external'||!!r.payload.correction);
 const isFleet=r=>r?.payload?.source?.fleetId===r?.id&&!r?.payload?.correction;
 const $=s=>document.querySelector(s),e=C.esc;
-let searchTimer,searchGeneration=0,demandCompensation=null,reminderDraft=null,receiptDraft=null,receiptTemplate=null,bankReceiptPromptShown=false,smtpConfig={configured:false,host:'',port:465,username:'kontakt@cleanfleet.pl'},reminderTemplate=null,smsConfig={configured:false};
+let searchTimer,searchGeneration=0,demandCompensation=null,reminderDraft=null,receiptDraft=null,receiptTemplate=null,bankReceiptPromptShown=false,receiptQueue=null,smtpConfig={configured:false,host:'',port:465,username:'kontakt@cleanfleet.pl'},reminderTemplate=null,smsConfig={configured:false};
 let investmentAmounts={id:null,options:[],detailed:null};
 let data={invoices:[],payments:[],receipts:[],parties:[],settings:{},counters:[]},view='invoices',selected=null,editor=null,dirty=false,busy=false,filters={q:'',month:'',brand:'',status:''},paymentEvidence=null;
 const brandFromUrl=()=>new URLSearchParams(location.search).get('brand')==='robisie'?'robisie':'cleanfleet';
@@ -24,7 +24,7 @@ async function refresh(){data=await API.call({action:'bootstrap'});if(API.invoic
 function login(error=''){$('#app').innerHTML=`<div class="login"><div class="brand">Bill<span>.</span></div><p class="muted">Faktury · Robisię-Fer</p><div class="card"><h1>Zaloguj się</h1><p class="muted">Użyj konta administratora CleanFleet.</p><form id="login">${field('email','E-mail','','email','required autocomplete="username"')}${field('password','Hasło','','password','required autocomplete="current-password"')}<p class="error" role="alert">${e(error)}</p><button class="primary" type="submit">Otwórz faktury</button></form></div></div>`;}
 function render(){
  const title=view==='edit'?(editor.number?'Edytuj '+editor.number:editor?.payload?.correction?'Nowa korekta':'Nowa faktura'):view==='detail'?(selected.number||'Szkic faktury'):view==='parties'?'Kontrahenci':view==='ksef'?'KSeF':view==='settings'?'Ustawienia':'Faktury';
- $('#app').innerHTML=`<header class="topbar"><div><div class="brand">Bill<span>.</span></div><small>Robisię-Fer · CleanFleet & Robisię</small></div><div class="row"><span class="muted small">1.0.72</span>${button('logout','Wyloguj')}</div></header><div class="shell"><nav>${[['invoices','Faktury'],['parties','Kontrahenci'],['ksef','KSeF'],['settings','Ustawienia']].map(([v,l])=>button('nav',l,view===v?'active':'',`data-view="${v}"`)).join('')}<div class="links"><a href="/app/">CleanFleet ↗</a><a href="/app/robisie/">Robisię ↗</a></div></nav><main><div class="toolbar"><div><h1>${e(title)}</h1><p class="muted">${view==='edit'?'Wspólne dane i numeracja. Logo wybierasz osobno.':view==='invoices'?'Sprzedaż obu marek w jednym miejscu.':view==='detail'?e(brandName(selected.payload.brand)):''}</p></div><div class="actions">${view==='invoices'?button('new','+ Wystaw fakturę','primary'):view==='parties'?button('new-party','+ Dodaj kontrahenta','primary'):['edit','detail'].includes(view)?button('back','← Wróć do faktur'):''}</div></div><p id="page-error" class="error" role="alert"></p>${view==='invoices'?list():view==='parties'?parties():view==='ksef'?KSEF.view():view==='settings'?settings()+smtpSettings()+smsSettings()+reminderTemplateSettings()+receiptTemplateSettings():view==='edit'?edit():detail()}</main></div>`;
+ $('#app').innerHTML=`<header class="topbar"><div><div class="brand">Bill<span>.</span></div><small>Robisię-Fer · CleanFleet & Robisię</small></div><div class="row"><span class="muted small">1.0.73</span>${button('logout','Wyloguj')}</div></header><div class="shell"><nav>${[['invoices','Faktury'],['parties','Kontrahenci'],['ksef','KSeF'],['settings','Ustawienia']].map(([v,l])=>button('nav',l,view===v?'active':'',`data-view="${v}"`)).join('')}<div class="links"><a href="/app/">CleanFleet ↗</a><a href="/app/robisie/">Robisię ↗</a></div></nav><main><div class="toolbar"><div><h1>${e(title)}</h1><p class="muted">${view==='edit'?'Wspólne dane i numeracja. Logo wybierasz osobno.':view==='invoices'?'Sprzedaż obu marek w jednym miejscu.':view==='detail'?e(brandName(selected.payload.brand)):''}</p></div><div class="actions">${view==='invoices'?button('new','+ Wystaw fakturę','primary'):view==='parties'?button('new-party','+ Dodaj kontrahenta','primary'):['edit','detail'].includes(view)?button('back','← Wróć do faktur'):''}</div></div><p id="page-error" class="error" role="alert"></p>${view==='invoices'?list():view==='parties'?parties():view==='ksef'?KSEF.view():view==='settings'?settings()+smtpSettings()+smsSettings()+reminderTemplateSettings()+receiptTemplateSettings():view==='edit'?edit():detail()}</main></div>`;
  if(view==='edit'){syncCorrectionControls();if(editor.number){for(const node of document.querySelectorAll('#source-select,[name=documentType],#robisie-invoice-mode'))node.disabled=true;}if(editor.payload.source?.invoiceMode==='detailed'){const cur=document.querySelector('[name=currency]');if(cur)cur.disabled=true;}if(isFleet(editor)){for(const node of document.querySelectorAll('[name=currency],#source-select'))node.disabled=true;}}
  if(view==='ksef')KSEF.mount($('#ksef-panel'),API.call,{projects:data.sources?.projects||[],assign:API.assignKsef,preview:API.previewKsefPurchase,loadLinks:API.ksefAssignments,findPurchases:API.investmentPurchases,allocationContext:API.ksefAllocationContext,unassign:API.unassignKsef,historyState:API.ksefHistoryState,markHistory:API.markKsefHistory,index:API.ksefDocumentIndex,storeMetadata:API.storeKsefMetadata,storeXml:API.storeKsefXml,stock:API.ksefStock,correctCostContext:API.correctCostContext,applyCostCorrection:API.applyCostCorrection,setReturn:API.setKsefReturn,cfContext:API.cleanfleetCostContext,cfCompanies:API.cleanfleetCompanies,cfLinks:API.cleanfleetCostLinks,cfSave:API.saveCleanfleetCosts,bank:data.settings.bank||'',userId:API.getSession()?.user?.id});
 }
@@ -186,19 +186,66 @@ async function openReminderPreview(id){
   </div>`);
 
 }
-function pendingBankReceipts(){return (data.invoices||[]).filter(row=>row.number&&row.status!=='draft'&&!row.payload?.correction&&Number(data.payments?.find(p=>p.invoice_id===row.id)?.bank_cents)>0&&!data.receipts?.some(r=>r.invoice_id===row.id));}
+function pendingBankReceipts(){
+ const payments=new Map((data.payments||[]).map(p=>[p.invoice_id,p]));
+ const decided=new Set((data.receipts||[]).map(r=>r.invoice_id));
+ return (data.invoices||[]).filter(row=>{
+  const mark=payments.get(row.id);
+  return row.number&&row.status!=='draft'&&!row.payload?.correction&&
+   (mark?.manual_paid===true||Number(mark?.bank_cents)>0)&&!decided.has(row.id);
+ });
+}
+function receiptQueueCurrent(){
+ if(!receiptQueue)return null;
+ const id=receiptQueue.ids[receiptQueue.index];
+ return id?data.invoices.find(row=>row.id===id)||null:null;
+}
+function receiptQueueProgress(){
+ const q=receiptQueue;if(!q)return '';
+ const step=q.index+1,total=q.ids.length;
+ return `<div class="receipt-progress"><span>Faktura ${step} z ${total}</span><span class="receipt-progress-bar" aria-label="Postęp: ${step} z ${total}">${q.ids.map((_,i)=>`<i class="${i<=q.index?'active':''}"></i>`).join('')}</span></div>`;
+}
+function finishReceiptQueue(){
+ const q=receiptQueue;if(!q)return;
+ receiptQueue=null;
+ modal('Podsumowanie powiadomień',`<div class="modal-body receipt-queue"><p>Obsłużono <strong>${q.ids.length}</strong> faktur w tej sesji.</p><div class="receipt-stats"><span>Wysłano <strong>${q.sent}</strong></span><span>Nie wysyłaj <strong>${q.dismissed}</strong></span><span>Przypomnij później <strong>${q.later}</strong></span></div><p class="muted">Odłożone decyzje pojawią się przy następnym uruchomieniu BILL. Nieudane lub niepotwierdzone wysyłki należy sprawdzić przed ponowną próbą.</p><footer>${button('close-modal','Zamknij','primary')}</footer></div>`);
+}
+function advanceReceiptQueue(outcome){
+ if(!receiptQueue)return;
+ if(outcome==='sent')receiptQueue.sent++;
+ else if(outcome==='dismissed')receiptQueue.dismissed++;
+ else receiptQueue.later++;
+ receiptQueue.index++;
+ receiptDraft=null;
+ closeModal();
+ if(receiptQueue.index>=receiptQueue.ids.length)finishReceiptQueue();
+ else showReceiptQueue();
+}
+function showReceiptQueue(){
+ const row=receiptQueueCurrent();
+ if(!row){if(receiptQueue)finishReceiptQueue();return;}
+ const mark=data.payments.find(p=>p.invoice_id===row.id);
+ const amount=mark?.bank_cents>0?Math.min(Number(mark.bank_cents),C.invoiceAmount(row.payload)):C.invoiceAmount(row.payload);
+ modal('Powiadomienia o płatnościach',`<div class="modal-body receipt-queue">
+ ${receiptQueueProgress()}
+ <div class="receipt-invoice"><div class="receipt-invoice-heading"><strong>Faktura ${e(row.number)}</strong><span aria-label="Płatność potwierdzona">✓</span></div><p>Kontrahent: ${e(row.payload?.buyer?.name||'Nieznany kontrahent')}</p><strong class="receipt-amount">${e(C.money(amount,row.payload.currency))}</strong><small>Płatność potwierdzona</small></div>
+ <p>Czy wysłać kontrahentowi wiadomość z podziękowaniem za otrzymanie płatności?</p>
+ <div class="receipt-actions">${button('receipt-preview','✉ Zobacz i wyślij','primary',`data-id="${e(row.id)}"`)}${button('receipt-dismiss','Nie wysyłaj','',`data-id="${e(row.id)}"`)}</div>
+ <footer>${button('receipt-later','Przypomnij później')}</footer></div>`);
+}
 function promptBankReceipt(){
  if(bankReceiptPromptShown||view!=='invoices'||$('#modal').open)return;
- const row=pendingBankReceipts()[0];if(!row)return;
+ const rows=pendingBankReceipts();
+ if(!rows.length)return;
  bankReceiptPromptShown=true;
- const mark=data.payments.find(p=>p.invoice_id===row.id),count=pendingBankReceipts().length;
- modal('Wpłata z wyciągu',`<div class="modal-body"><p>Bill rozpoznał wpłatę <strong>${e(C.money(Math.min(Number(mark.bank_cents),C.invoiceAmount(row.payload)),row.payload.currency))}</strong> do faktury <strong>${e(row.number)}</strong>. Czy wysłać kontrahentowi potwierdzenie zaksięgowania?</p>${count>1?`<p class="muted">Pozostałe faktury do decyzji: ${count-1}. Znajdziesz je na liście.</p>`:''}<footer>${button('receipt-dismiss','Nie wysyłaj','',`data-id="${e(row.id)}"`)}${button('close-modal','Później')}${button('receipt-preview','Zobacz wiadomość','primary',`data-id="${e(row.id)}"`)}</footer></div>`);
+ receiptQueue={ids:rows.map(row=>row.id),index:0,sent:0,dismissed:0,later:0};
+ showReceiptQueue();
 }
 async function openReceiptPreview(id){
  const d=await API.call({action:'receipt-preview',id});
  if(['sent','sending','uncertain'].includes(d.state))throw Error(d.state==='sent'?'Potwierdzenie zostało już wysłane.':'Wysyłka wymaga sprawdzenia w folderze Wysłane.');
  receiptDraft={id,requestId:crypto.randomUUID(),...d};
- modal('Potwierdzenie wpłaty',`<div class="modal-body">${field('receiptTo','Do (adres kontrahenta)',d.recipient,'email','readonly')}${d.recipientIssue?`<p class="notice">${e(d.recipientIssue)}</p>`:''}${field('receiptPreviewSubject','Temat',d.subject,'text','readonly')}<label class="field">Treść<textarea rows="10" readonly>${e(d.text)}</textarea></label><p>Zaksięgowano: <strong>${e(C.money(d.amount,d.currency))}</strong>${d.remaining?` · Pozostaje: <strong>${e(C.money(d.remaining,d.currency))}</strong>`:''}</p>${d.configured?'':'<p class="notice">Połącz pocztę SMTP w Ustawieniach Bill.</p>'}<p class="muted">Wiadomość wyśle się dopiero po kliknięciu „Wyślij”.</p><footer>${button('close-modal','Anuluj')}${button('receipt-send','Wyślij','primary',d.recipient&&d.configured?'':'disabled')}</footer></div>`);
+ modal('Potwierdzenie wpłaty',`<div class="modal-body">${field('receiptTo','Do (adres kontrahenta)',d.recipient,'email','readonly')}${d.recipientIssue?`<p class="notice">${e(d.recipientIssue)}</p>`:''}${field('receiptPreviewSubject','Temat',d.subject,'text','readonly')}<label class="field">Treść<textarea rows="10" readonly>${e(d.text)}</textarea></label><p>Zaksięgowano: <strong>${e(C.money(d.amount,d.currency))}</strong>${d.remaining?` · Pozostaje: <strong>${e(C.money(d.remaining,d.currency))}</strong>`:''}</p>${d.configured?'':'<p class="notice">Połącz pocztę SMTP w Ustawieniach Bill.</p>'}<p class="muted">Wiadomość wyśle się dopiero po kliknięciu „Wyślij”.</p><footer>${receiptQueueCurrent()?.id===id?button('receipt-back','Wróć do faktury'):button('close-modal','Anuluj')}${button('receipt-send','Wyślij','primary',d.recipient&&d.configured?'':'disabled')}</footer></div>`);
 }
 document.addEventListener('click',event=>{const b=event.target.closest('[data-action]');if(!b||busy)return;const action=b.dataset.action;void (async()=>{try{
  if(action==='close-modal'){closeModal();return;}
@@ -210,12 +257,14 @@ document.addEventListener('click',event=>{const b=event.target.closest('[data-ac
  if(action==='new'){if(!await abandon())return;await work(beginNew);return;}
  if(action==='open'){selected=data.invoices.find(r=>r.id===b.dataset.id);view='detail';render();return;}
  if(action==='reminder-preview'){await work(()=>openReminderPreview(b.dataset.id||selected?.id));return;}
- if(action==='receipt-preview'){if($('#modal').open)closeModal();await work(()=>openReceiptPreview(b.dataset.id||selected?.id));return;}
- if(action==='receipt-dismiss'){await work(async()=>{await API.call({action:'receipt-dismiss',id:b.dataset.id});closeModal();await refresh();render();toast('Potwierdzenie pominięte. Możesz wysłać je później z faktury.');});return;}
+ if(action==='receipt-preview'){if($('#modal').open)closeModal();await work(async()=>{try{await openReceiptPreview(b.dataset.id||selected?.id);}catch(err){if(receiptQueueCurrent()?.id===b.dataset.id)showReceiptQueue();throw err;}});return;}
+ if(action==='receipt-back'){closeModal();showReceiptQueue();return;}
+ if(action==='receipt-later'){advanceReceiptQueue('later');return;}
+ if(action==='receipt-dismiss'){await work(async()=>{const result=await API.call({action:'receipt-dismiss',id:b.dataset.id});if(result.state!=='dismissed')throw Error('Nie udało się zapisać decyzji. Sprawdź status wiadomości.');await refresh();render();if(receiptQueueCurrent()?.id===b.dataset.id)advanceReceiptQueue('dismissed');else closeModal();toast('Zapisano decyzję: nie wysyłaj.');});return;}
  if(action==='receipt-send'){if(!receiptDraft?.recipient||!receiptDraft.configured)throw Error('Otwórz podgląd z poprawnym adresem.');await work(async()=>{
   const d=receiptDraft,result=await API.call({action:'receipt-send',id:d.id,recipient:d.recipient,subject:d.subject,text:d.text,amount:d.amount,requestId:d.requestId,acknowledged:true});
   if(result.state!=='sent')throw Error('Wysyłka jest już w toku lub wymaga sprawdzenia.');
-  receiptDraft=null;closeModal();await refresh();render();toast('Potwierdzenie wpłaty wysłane.');
+  receiptDraft=null;await refresh();render();if(receiptQueueCurrent()?.id===d.id)advanceReceiptQueue('sent');else closeModal();toast('Potwierdzenie wpłaty wysłane.');
  });return;}
  if(action==='reminder-send'){if(!reminderDraft?.recipient||!reminderDraft.configured)throw Error('Otwórz podgląd przypomnienia z poprawnym adresem odbiorcy.');await work(async()=>{
   const d=reminderDraft,includePdf=$('#reminder-attach-pdf').checked;

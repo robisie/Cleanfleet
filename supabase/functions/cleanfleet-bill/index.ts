@@ -167,6 +167,13 @@ Deno.serve(async req=>{
    checked(await db.from('bill_payment_receipt_templates').upsert({user_id:userId,...template,updated_at:new Date().toISOString()},{onConflict:'user_id'}));
    return json(template);
   }
+  if(body.action==='reminder-dismiss'){
+   const row=await invoice(String(body.id||''));
+   if(row.creator_id!==userId)throw Error('Nie znaleziono faktury.');
+   if(row.status==='draft'||row.payload?.correction)throw Error('Nieprawidłowa faktura.');
+   checked(await db.from('bill_reminder_queue_decisions').upsert({invoice_id:row.id,actor_id:userId,decision:'dismissed'},{onConflict:'invoice_id'}));
+   return json({state:'dismissed'});
+  }
   if(['receipt-preview','receipt-send','receipt-dismiss'].includes(body.action)){
    const row=await invoice(String(body.id||''));if(row.creator_id!==userId)throw Error('Nie znaleziono faktury.');
    await reconcileVault(userId);
@@ -287,13 +294,15 @@ Deno.serve(async req=>{
   }
   if(body.action==='bootstrap'){
    await reconcileVault(userId);
-   const [invoices,parties,settings,counters,config,projects,companies,billing,payments,receipts]=await Promise.all([
+   const [invoices,parties,settings,counters,config,projects,companies,billing,payments,receipts,reminderDecisions,reminderSends]=await Promise.all([
     db.from('bill_invoices').select('id,number,payload,revision,status,ksef_number,ksef_session,ksef_reference,ksef_message,created_at,updated_at').order('created_at',{ascending:false}).limit(1000),
     db.from('bill_parties').select('*').order('updated_at',{ascending:false}).limit(1000),db.from('bill_settings').select('payload').single(),db.from('bill_counters').select('*'),
     db.from('cf_ksef_credentials').select('nip').eq('user_id',userId).eq('environment','production').maybeSingle(),
     db.from('rs_projects').select('id,contract_number,name:payload->>name').eq('owner_id',userId).order('created_at',{ascending:false}).limit(250),
-    db.from('companies').select('id,name,nip,address').eq('active',true),db.from('billing_companies').select('id,company_id,name,tax_id,address,currency').eq('active',true),db.from('bill_payment_evidence').select('invoice_id,manual_paid,bank_cents,bank_payments,bank_candidates,bill_invoices!inner(creator_id)').eq('bill_invoices.creator_id',userId).limit(1000),db.from('bill_payment_receipt_emails').select('invoice_id,state,recipient,sent_at,bill_invoices!inner(creator_id)').eq('bill_invoices.creator_id',userId).limit(1000)]);
-   return json({invoices:checked(invoices),payments:checked(payments),receipts:checked(receipts),parties:checked(parties),settings:{bank:checked(settings)?.payload?.bank||'',gusConfigured:!!checked(settings)?.payload?.gusKeyCiphertext},counters:checked(counters),ksefConfigured:checked(config)?.nip===SELLER.nip,sources:{projects:checked(projects).map((r:any)=>({id:r.id,name:r.name,number:r.contract_number})),companies:checked(companies),billing:checked(billing)}});
+    db.from('companies').select('id,name,nip,address').eq('active',true),db.from('billing_companies').select('id,company_id,name,tax_id,address,currency').eq('active',true),db.from('bill_payment_evidence').select('invoice_id,manual_paid,bank_cents,bank_payments,bank_candidates,bill_invoices!inner(creator_id)').eq('bill_invoices.creator_id',userId).limit(1000),db.from('bill_payment_receipt_emails').select('invoice_id,state,recipient,sent_at,bill_invoices!inner(creator_id)').eq('bill_invoices.creator_id',userId).limit(1000),
+    db.from('bill_reminder_queue_decisions').select('invoice_id,decision').eq('actor_id',userId).limit(1000),
+    db.from('bill_reminder_emails').select('invoice_id,state,bill_invoices!inner(creator_id)').eq('bill_invoices.creator_id',userId).eq('state','sent').limit(1000)]);
+   return json({invoices:checked(invoices),payments:checked(payments),receipts:checked(receipts),reminderDecisions:checked(reminderDecisions),reminderSends:checked(reminderSends),parties:checked(parties),settings:{bank:checked(settings)?.payload?.bank||'',gusConfigured:!!checked(settings)?.payload?.gusKeyCiphertext},counters:checked(counters),ksefConfigured:checked(config)?.nip===SELLER.nip,sources:{projects:checked(projects).map((r:any)=>({id:r.id,name:r.name,number:r.contract_number})),companies:checked(companies),billing:checked(billing)}});
   }
   if(body.action==='correction-history'){
    const page=body.page;

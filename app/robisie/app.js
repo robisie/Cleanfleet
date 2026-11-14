@@ -21,7 +21,7 @@ let stockPanel=null,stockMountGeneration=0;
 function closeStock(){stockMountGeneration++;stockPanel?.unmount();}
 async function mountStockPanel(){
  const host=$('#robisie-stock-panel'),generation=++stockMountGeneration;
- try{const module=await import('../../bill/ksef.js?v=1.0.56');if(generation!==stockMountGeneration||view!=='stock'||$('#robisie-stock-panel')!==host)return;stockPanel=module;module.mountStock(host,API.ksefCall,API.stockIntegration(all,row=>{const updated={...row,payload:C.captureCatalog(config.payload,row.payload)};all=all.map(r=>r.id===row.id?updated:r);if(selected?.id===row.id&&!dirty)selected=structuredClone(updated);}));}
+ try{const module=await import('../../bill/ksef.js?v=1.0.57');if(generation!==stockMountGeneration||view!=='stock'||$('#robisie-stock-panel')!==host)return;stockPanel=module;module.mountStock(host,API.ksefCall,API.stockIntegration(all,row=>{const updated={...row,payload:C.captureCatalog(config.payload,row.payload)};all=all.map(r=>r.id===row.id?updated:r);if(selected?.id===row.id&&!dirty)selected=structuredClone(updated);}));}
  catch(error){if(generation===stockMountGeneration&&view==='stock')host.textContent='Nie udało się wczytać towarów: '+error.message;}
 }
 let earningsGeneration=0,earningsModule=null,earningsRows=null,earningsError='',earningsYear=C.today().slice(0,4),earningsMonth='';

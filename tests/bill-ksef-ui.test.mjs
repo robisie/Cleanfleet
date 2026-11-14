@@ -227,3 +227,20 @@ test('document hide refreshes partial writes and can resume after a failed posit
  const result=await n.testDocumentHide(integration,number(1),true);assert.match(result.message,/Zapisano 1 z 3/);assert.equal(reads,2);assert.deepEqual(writes,[1]);fail=false;
  await n.testDocumentHide(integration,number(1),true);assert.deepEqual(writes,[1,2,3]);assert(goods.every(r=>r.hidden));
 });
+
+
+test('first invoice list load waits after KSeF 429 and repeats exactly the same selected range',async()=>{
+ const {n,root}=await setup(undefined,{fastTimers:true}),calls=[];
+ n.setupTest(root,async body=>{calls.push({...body});if(calls.length===1)throw Object.assign(Error('KSeF ograniczył liczbę zapytań.'),{status:429,retryAfter:2});return {invoices:[row(1)],page:0,hasMore:false,ticket:'reused'};});
+ await n.run(n.load);
+ assert.equal(calls.length,2);assert.deepEqual(calls[1],calls[0]);
+ assert.equal(n.testState().state.loaded,true);assert.equal(n.testState().state.listError,false);assert.equal(n.testState().state.rows.length,1);
+});
+test('initial invoice-list cooldown can be cancelled without another KSeF request',async()=>{
+ const {n,root}=await setup(),calls=[];
+ n.setupTest(root,async body=>{calls.push(body);throw Object.assign(Error('KSeF limit'),{status:429,retryAfter:60});});
+ const pending=n.run(n.load);await new Promise(r=>setImmediate(r));
+ assert.match(n.testState().message,/Kontynuacja za/);
+ root.onclick({target:{closest:()=>({dataset:{kf:'cancel'}})},stopPropagation(){}});await pending;
+ assert.equal(calls.length,1);assert.equal(n.testState().busy,false);assert.match(n.testState().message,/Anulowano/);
+});

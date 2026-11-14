@@ -41,6 +41,9 @@ export const deleteStockUnitAlias=key=>request('/rest/v1/rs_stock_unit_aliases?s
 export function stockIntegration(rows,onChange=()=>{}){return {
  userId:getSession()?.user?.id,
  projects:rows.map(r=>({id:r.id,name:r.payload.name,number:r.contract_number})),
+ unitAliases:stockUnitAliases,
+ unitSave:saveStockUnitAlias,
+ unitDelete:deleteStockUnitAlias,
  index:()=>stockRpc('rs_ksef_document_index'),
  historyState:()=>stockRpc('rs_ksef_history_state'),
  markHistory:to=>stockRpc('rs_ksef_mark_history',{p_to:to}),

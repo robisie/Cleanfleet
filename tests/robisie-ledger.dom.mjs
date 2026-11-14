@@ -23,7 +23,7 @@ test('ledger keeps full descriptions, moves balance to details and updates filte
   assert.equal(document.querySelectorAll('.ledger-table tbody tr').length,2);assert.match(summary(),/200,00/);assert.match(summary(),/100,00/);
   const input=document.querySelector('#ledger-search');input.focus();input.value='Zwrot';input.dispatchEvent(new window.Event('input',{bubbles:true}));
   assert.equal(document.activeElement,input);assert.equal(document.querySelectorAll('.ledger-description').length,1);assert.match(summary(),/200,00/);assert.match(summary(),/0,00/);
-  const dates=document.querySelector('#ledger-dates');dates.value='undated';dates.dispatchEvent(new window.Event('change',{bubbles:true}));
+  const dates=document.querySelector('#ledger-dates');input.dispatchEvent(new window.Event('change',{bubbles:true}));assert.equal(document.querySelector('#ledger-dates'),dates);dates.value='undated';dates.dispatchEvent(new window.Event('change',{bubbles:true}));
   assert.equal(document.querySelectorAll('.ledger-description').length,0);assert.match(summary(),/0,00/);assert.match(document.querySelector('.metric.gold').textContent,/50,00/);
  }finally{await window.happyDOM.abort()}
 });

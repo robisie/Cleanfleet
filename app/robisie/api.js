@@ -35,6 +35,9 @@ export const rpc=(name,args={})=>request('/rest/v1/rpc/'+name,{method:'POST',bod
 // Magazyn uses Robisię's authenticated session, including KSeF reads and quantity writes.
 export const ksefCall=(body,options={})=>request('/functions/v1/cleanfleet-bill',{method:'POST',body:JSON.stringify(body),timeoutMs:90000,...options});
 const stockRpc=(name,args={})=>request('/rest/v1/rpc/'+name,{method:'POST',body:JSON.stringify(args),timeoutMs:90000});
+export const stockUnitAliases=()=>request('/rest/v1/rs_stock_unit_aliases?select=source_key,canonical_unit&order=source_key.asc');
+export const saveStockUnitAlias=({key,canonical})=>request('/rest/v1/rs_stock_unit_aliases?on_conflict=user_id,source_key',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify({user_id:getSession().user.id,source_key:key,canonical_unit:canonical})});
+export const deleteStockUnitAlias=key=>request('/rest/v1/rs_stock_unit_aliases?source_key=eq.'+encodeURIComponent(key),{method:'DELETE',headers:{Prefer:'return=representation'}});
 export function stockIntegration(rows,onChange=()=>{}){return {
  userId:getSession()?.user?.id,
  projects:rows.map(r=>({id:r.id,name:r.payload.name,number:r.contract_number})),

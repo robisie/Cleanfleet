@@ -80,7 +80,7 @@ export function supplierSuggestionDialog(candidates,label,signal,unavailable=0,o
   details.hidden=!details.hidden;button.setAttribute('aria-expanded',String(!details.hidden));button.textContent=details.hidden?'⌄':'⌃';
  };
  for(const button of dialog.querySelectorAll('[data-supplier-pdf]'))button.onclick=async()=>{
-  if(!onPdf)return;button.disabled=true;try{await onPdf(button.dataset.number);}catch(error){dialog.querySelector('[data-selection-total]').textContent='Podgląd PDF: '+error.message;}finally{if(button.isConnected)button.disabled=false;}
+  if(!onPdf)return;button.disabled=true;dialog.close();try{await onPdf(button.dataset.number,()=>{if(dialog.isConnected&&!dialog.open)dialog.showModal();});}catch(error){if(dialog.isConnected&&!dialog.open)dialog.showModal();dialog.querySelector('[data-selection-total]').textContent='Podgląd PDF: '+error.message;}finally{if(button.isConnected)button.disabled=false;}
  };
  dialog.querySelector('[data-select-all]').onclick=()=>{dialog.querySelectorAll('input[name="supplierLine"]').forEach(box=>box.checked=true);update();};
  dialog.querySelector('[data-select-none]').onclick=()=>{dialog.querySelectorAll('input[name="supplierLine"]').forEach(box=>box.checked=false);update();};

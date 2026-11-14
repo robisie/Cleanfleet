@@ -73,13 +73,15 @@
     return new Promise((resolve,reject)=>{
       const times=[];
       const tx=db.transaction(STORE,'readonly');
-      const cursor=tx.objectStore(STORE).index('recordId').openCursor(String(recordId));
+      // Older devices may have a v1 store created by photo-local-ui without indexes.
+      // Scan the store so both legacy schemas and numeric record IDs remain readable.
+      const cursor=tx.objectStore(STORE).openCursor();
       cursor.onsuccess=()=>{
         const item=cursor.result;
         if(!item)return;
         const photo=item.value;
         const capturedAt=photo.capturedAt??cameraFileTime(photo.name);
-        if(['przed','po'].includes(photo.kind)&&Number.isFinite(capturedAt))times.push(capturedAt);
+        if(String(photo.recordId)===String(recordId)&&['przed','po'].includes(photo.kind)&&Number.isFinite(capturedAt))times.push(capturedAt);
         item.continue();
       };
       tx.oncomplete=()=>resolve(times);

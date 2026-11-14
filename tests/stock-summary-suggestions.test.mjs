@@ -42,3 +42,35 @@ test('supplier selection renders inspectable products, PDF preview and selective
  assert.match(markup,/Klej &amp; grunt/);assert.match(markup,/data-supplier-pdf/);assert.match(markup,/name="supplierLine"/);
  assert.match(markup,/Podgląd PDF faktury/);
 });
+
+test('warehouse normalizes case and standard abbreviations only in the display summary',async()=>{
+ const {unitDisplay,unitReview,unitKey}=await import('../bill/stock-units.js');
+ const rows=[
+  item('a',1,{item:{index:1,name:'Klej',unit:'kg',gross:100}}),
+  item('b',1,{item:{index:1,name:'Zaprawa',unit:'KG',gross:50}}),
+  item('c',1,{item:{index:1,name:'Wkręt',unit:'sztuki',gross:100}}),
+  item('d',1,{item:{index:1,name:'Element',unit:'ST',gross:30}})
+ ];
+ const untouched=structuredClone(rows);
+ const before=stockSummaryData(rows);
+ assert.equal(before.byUnit.get('kg').purchased,20);
+ assert.equal(before.byUnit.get('szt.').purchased,10);
+ assert.equal(before.byUnit.get('st').purchased,10);
+ assert.equal(unitDisplay('m2'),'m²');
+ assert.equal(unitDisplay('MB'),'mb');
+ assert.equal(unitDisplay('PCE'),'pce');
+ assert.equal(unitReview(rows)[0].suggested,'szt.');
+ assert.equal(unitKey('ST'),'st');
+ const aliases={st:'szt.'};
+ const after=stockSummaryData(rows,aliases);
+ assert.equal(after.byUnit.get('szt.').purchased,20);
+ assert.equal(after.byUnit.has('st'),false);
+ assert.deepEqual(rows,untouched);
+ assert.match(stockSummaryMarkup(rows,{unitAliases:aliases}),/szt\./);
+});
+test('different mass and length units are never merged without explicit conversion',async()=>{
+ const {unitDisplay,unitReview}=await import('../bill/stock-units.js');
+ assert.equal(unitDisplay('g'),'g');assert.equal(unitDisplay('kg'),'kg');
+ assert.equal(unitDisplay('m'),'m');assert.equal(unitDisplay('mb'),'mb');
+ assert.equal(unitReview([item('a',1,{item:{index:1,name:'Montaż',unit:'PCE',gross:10}})]).length,1);
+});

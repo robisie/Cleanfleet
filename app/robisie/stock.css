@@ -34,3 +34,15 @@ dialog.kf-assignment-modal{width:min(920px,calc(100vw - 32px));max-width:calc(10
 .kf-supplier-modal .kf-supplier-product small{display:block;font-size:12px;color:#647184}
 .kf-supplier-modal [data-supplier-pdf]{margin-top:12px}
 @media(max-width:550px){.kf-supplier-modal .kf-supplier-invoice-head{gap:7px;padding:10px}.kf-supplier-modal .kf-supplier-invoice-head>strong{font-size:12px}.kf-supplier-modal .kf-supplier-product{gap:7px}}
+
+/* Warehouse-only unit review */
+.kf-unit-modal{width:min(760px,calc(100vw - 32px))}
+.kf-unit-dialog header{display:flex;align-items:center;justify-content:space-between;gap:15px}
+.kf-unit-dialog header h2{margin:0}.kf-unit-dialog header button{min-width:44px}
+.kf-unit-proposal{padding:16px;border:1px solid #dee4e9;border-radius:12px;background:#f8fafb;margin:18px 0}
+.kf-unit-proposal h3{font-size:26px;margin:8px 0 4px}
+.kf-unit-proposal .field{margin:12px 0}
+.kf-unit-proposal [data-unit-custom-wrap][hidden]{display:none}
+.kf-unit-saved{margin:18px 0}.kf-unit-saved summary{cursor:pointer;font-weight:650}
+.kf-unit-saved-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 4px;border-bottom:1px solid #e3e8ee}
+.kf-unit-saved-row span{overflow-wrap:anywhere}.kf-unit-dialog [data-unit-error]{margin-top:12px}

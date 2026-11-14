@@ -1,4 +1,4 @@
-export const VERSION='1.0.115';
+export const VERSION='1.0.117';
 export const MODULES=[['overview','Panel inwestycji'],['ledger','Wspólne rozliczenie'],['data','Dane inwestycji'],['contract','Umowa'],['rooms','Pomieszczenia'],['offer','Oferta wstępna'],['works','Kalkulacja końcowa'],['payments','Etapy i płatności'],['journal','Dziennik prac'],['handover','Odbiór inwestycji'],['summary','Zestawienie prac'],['shopping','Do kupienia'],['purchases','Zakupy i materiały']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -249,6 +249,12 @@ export function settlementTotals(project){
  const rows=settlementRows(project),groups=new Map();let plus=0,minus=0,withheld=0;
  for(const row of rows){plus=round(plus+row.plus);minus=round(minus+row.minus);if(row.id.endsWith(':withheld'))withheld=round(withheld+row.minus);const group=groups.get(row.category)||{category:row.category,plus:0,minus:0,count:0};group.plus=round(group.plus+row.plus);group.minus=round(group.minus+row.minus);group.count++;groups.set(row.category,group);}
  return {rows,groups:[...groups.values()],plus,minus,withheld,expenses:round(minus-withheld),balance:round(plus-minus),undated:rows.filter(r=>!r.date).length,unexplained:rows.filter(r=>r.needsExplanation).length};
+}
+export function settlementSelection(rows,{category='',search='',dateFilter='all'}={}){
+ const query=String(search).trim().toLocaleLowerCase('pl');
+ const filtered=rows.filter(row=>(!category||row.category===category)&&(!query||[row.description,row.category].join(' ').toLocaleLowerCase('pl').includes(query))&&(dateFilter!=='undated'||!row.date));
+ const incomeCents=filtered.reduce((sum,row)=>sum+Math.round(number(row.plus)*100),0),expenseCents=filtered.reduce((sum,row)=>sum+Math.round(number(row.minus)*100),0);
+ return {rows:filtered,count:filtered.length,income:incomeCents/100,expense:expenseCents/100,balance:(incomeCents-expenseCents)/100};
 }
 export function settlementReceipt(data,previous={}){
  const gross=round(number(data.gross)),rate=number(data.rate||0);if(gross<=0||rate<0||rate>=100)throw Error('Podaj dodatnią wpłatę i potrącenie od 0 do mniej niż 100%.');

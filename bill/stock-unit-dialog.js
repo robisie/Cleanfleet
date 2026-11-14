@@ -20,9 +20,9 @@ export function openStockUnitDialog({rows,aliases={},save,remove,onChange}){
     <select data-unit-choice><option value="" ${current.suggested?'':'selected'}>Wybierz odpowiednik…</option>${choices}<option value="__separate">Pozostaw jako osobną jednostkę</option><option value="__custom">Dodaj inną jednostkę do wzorca…</option></select></label>
     <label class="field" data-unit-custom-wrap hidden>Nowa jednostka<input data-unit-custom maxlength="40" placeholder="np. wiadro"></label>
     ${current.suggested?`<p class="muted">Propozycja: <strong>${esc(current.suggested)}</strong>. Dopasowanie zostanie zapamiętane dopiero po Twoim potwierdzeniu.</p>`:''}
-   <div class="actions"><button type="button" data-unit-skip>Pomiń teraz</button><button type="button" data-unit-save class="primary">Zatwierdź i zapamiętaj</button></div></section>`:'<p class="notice">Wszystkie znalezione jednostki mają zatwierdzoną interpretację albo należą do podstawowego słownika.</p>'}
+   </section>`:'<p class="notice">Wszystkie znalezione jednostki mają zatwierdzoną interpretację albo należą do podstawowego słownika.</p>'}
    ${mappingRows().length?`<details class="kf-unit-saved"><summary>Zapisane własne powiązania (${mappingRows().length})</summary>${mappingRows().map(([key,canonical])=>`<div class="kf-unit-saved-row"><span><strong>${esc(key)}</strong> → ${esc(canonical)}</span><button type="button" data-unit-remove="${esc(key)}" aria-label="Usuń powiązanie ${esc(key)}">Cofnij</button></div>`).join('')}</details>`:''}
-   <p data-unit-error class="error" role="alert"></p></div><footer><button type="button" data-unit-close>Zamknij</button></footer></div>`;
+   <p data-unit-error class="error" role="alert"></p></div><footer class="kf-unit-fixed-actions"><button type="button" data-unit-close>Zamknij</button>${current?`<button type="button" data-unit-skip>Pomiń teraz</button><button type="button" data-unit-save class="primary">Zatwierdź i zapamiętaj</button>`:''} </footer></div>`;
   const selector=dialog.querySelector('[data-unit-choice]'),wrap=dialog.querySelector('[data-unit-custom-wrap]');
   if(selector)selector.onchange=()=>{wrap.hidden=selector.value!=='__custom';};
   dialog.querySelectorAll('[data-unit-close]').forEach(button=>button.onclick=close);

@@ -1,5 +1,5 @@
 import * as Shopping from './shopping.js?v=1.0.114';
-import * as C from './core.js?v=1.0.121';
+import * as C from './core.js?v=1.0.122';
 
 const layoutUrl=new URL('./pdf-layout.js?v=1.0.114',import.meta.url).href;
 const canvasUrl=new URL('../vendor/html2canvas-1.4.1.min.js',import.meta.url).href;

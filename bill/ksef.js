@@ -149,7 +149,7 @@ async function suggestSupplierInvoices(sourceNumber,target,signal){
  if(!candidates.length)return;
  const selected=await chooseSupplierInvoices(candidates,target.label,signal,unavailable);if(!selected?.length)return;check(signal);
  stockRows=await integration.stock();check(signal);
- const chosen=selected.map(choice=>({choice,candidate:candidates.find(c=>c.metadata.ksefNumber===choice.number)})).filter(entry=>entry.candidate),failures=[];let saved=0,cancelled=false;
+ const chosen=selected.map(entry=>{const choice=typeof entry==='string'?{number:entry,indices:candidates.find(c=>c.metadata.ksefNumber===entry)?.indices||[]}:entry;return {choice,candidate:candidates.find(c=>c.metadata.ksefNumber===choice.number)};}).filter(entry=>entry.candidate),failures=[];let saved=0,cancelled=false;
  try{
   for(const [index,{candidate,choice}] of chosen.entries()){
    if(signal.aborted){cancelled=true;break;}progress('Przypisywanie faktur od tego wystawcy: '+(index+1)+' z '+chosen.length+'…');

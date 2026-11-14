@@ -46,3 +46,25 @@ dialog.kf-assignment-modal{width:min(920px,calc(100vw - 32px));max-width:calc(10
 .kf-unit-saved{margin:18px 0}.kf-unit-saved summary{cursor:pointer;font-weight:650}
 .kf-unit-saved-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 4px;border-bottom:1px solid #e3e8ee}
 .kf-unit-saved-row span{overflow-wrap:anywhere}.kf-unit-dialog [data-unit-error]{margin-top:12px}
+
+/* iPhone-friendly unit editor: only the content scrolls; header/actions remain accessible. */
+dialog.kf-unit-modal{box-sizing:border-box;position:fixed;max-width:calc(100vw - 24px);width:min(760px,calc(100vw - 24px));max-height:calc(100dvh - 24px);height:min(760px,calc(100dvh - 24px));margin:auto;padding:0;overflow:hidden;overscroll-behavior:contain}
+dialog.kf-unit-modal[open]{display:flex;flex-direction:column}
+.kf-unit-modal .kf-unit-dialog{display:flex;flex-direction:column;flex:1;min-height:0;max-height:100%;overflow:hidden}
+.kf-unit-modal .kf-unit-dialog>header,.kf-unit-modal .kf-unit-dialog>footer{flex:0 0 auto;position:relative;z-index:2;background:#fff}
+.kf-unit-modal .kf-unit-dialog>.modal-body{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;padding:18px 24px}
+.kf-unit-modal .kf-unit-fixed-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:flex-end;border-top:1px solid #e0e5ea;padding:14px 20px max(14px,env(safe-area-inset-bottom))}
+.kf-unit-modal .kf-unit-fixed-actions button{min-height:44px;white-space:normal}
+@media(max-width:600px){
+ dialog.kf-unit-modal{height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);width:calc(100vw - 20px);max-width:calc(100vw - 20px);border-radius:18px}
+ .kf-unit-modal .kf-unit-dialog>header{padding:14px 16px}
+ .kf-unit-modal .kf-unit-dialog>header h2{font-size:21px;line-height:1.25}
+ .kf-unit-modal .kf-unit-dialog>.modal-body{padding:14px 16px}
+ .kf-unit-modal .kf-unit-fixed-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px max(12px,env(safe-area-inset-bottom))}
+ .kf-unit-modal .kf-unit-fixed-actions button{width:100%;font-size:14px;padding:10px 8px}
+ .kf-unit-modal .kf-unit-fixed-actions [data-unit-save]{grid-column:1/-1;grid-row:1}
+ .kf-unit-modal .kf-unit-fixed-actions [data-unit-skip]{grid-column:2;grid-row:2}
+ .kf-unit-modal .kf-unit-fixed-actions [data-unit-close]{grid-column:1;grid-row:2}
+ .kf-unit-modal .kf-unit-proposal{padding:12px}
+}
+@supports not (height:100dvh){dialog.kf-unit-modal{height:calc(100vh - 24px);max-height:calc(100vh - 24px)}}

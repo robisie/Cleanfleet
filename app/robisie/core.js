@@ -1,4 +1,4 @@
-export const VERSION='1.0.117';
+export const VERSION='1.0.122';
 export const MODULES=[['overview','Panel inwestycji'],['ledger','Wspólne rozliczenie'],['data','Dane inwestycji'],['contract','Umowa'],['rooms','Pomieszczenia'],['offer','Oferta wstępna'],['works','Kalkulacja końcowa'],['payments','Etapy i płatności'],['journal','Dziennik prac'],['handover','Odbiór inwestycji'],['summary','Zestawienie prac'],['shopping','Do kupienia'],['purchases','Zakupy i materiały']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -237,6 +237,8 @@ export function settlementRows(project){
  done.forEach((line,index)=>{const amount=index===done.length-1?round(t.works.done-workSum):round(weightTotal?t.works.done*weights[index]/weightTotal:0);workSum=round(workSum+amount);add(line,'works',-amount,line.settlementCategory||line.category||'Robocizna',line.name);});
  for(const item of project.purchases||[])add(item,'purchases',-purchasePayment(item).charged,item.settlementCategory||'Materiały i zakupy',item.description);
  for(const item of effectiveReceipts(project)){
+  // Purchase settlement is tracked in the purchase module, not as a new cash inflow here.
+  if(String(item.id).startsWith('purchase-payment:'))continue;
   const withheld=Math.max(0,number(item.settlementWithheld));
   add(item,item.invoiceId||item.purchaseId?'linked':'receipts',number(item.amount)+withheld,item.settlementCategory||(item.kind==='materials'?'Zaliczki materiałowe':'Wpłaty'),item.note||'Wpłata');
   if(withheld)add(item,'receipts',-withheld,'Potrącenia',`Potrącenie ${number(item.settlementRate)}% — ${item.note||'wpłata'}`,item.id+':withheld');

@@ -17,3 +17,20 @@ dialog.kf-assignment-modal{width:min(920px,calc(100vw - 32px));max-width:calc(10
 
 .robisie-stock .kf-stock-invoice.stock-unassigned,.robisie-stock .stock-unassigned .kf-stock-heading,.robisie-stock .stock-unassigned .stock-item{background:#f1f7e9}.robisie-stock .kf-stock-invoice.stock-unassigned{border-color:#d7e4ca}
 .kf-progress-dialog{width:min(520px,calc(100vw - 32px));max-height:calc(100dvh - 40px);border:0;border-radius:18px;padding:0;color:#20252d;background:#fff;box-shadow:0 24px 100px #0005}.kf-progress-dialog::backdrop{background:#15202c80;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}.kf-progress-content{padding:30px;text-align:center;overflow-wrap:anywhere}.kf-progress-content h2{margin:14px 0;font-size:23px}.kf-progress-content [data-progress-message]{font-size:18px;line-height:1.5;white-space:pre-wrap;min-height:54px}.kf-progress-content .muted{font-size:14px;margin:16px 0 24px}.kf-progress-content button{min-height:46px}.kf-progress-spinner{display:inline-block;width:38px;height:38px;border:4px solid #e9eddf;border-top-color:#919824;border-radius:50%;animation:kf-progress-spin .9s linear infinite}@keyframes kf-progress-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.kf-progress-spinner{animation:none;border-top-color:#919824}}
+
+/* Supplier invoice inspection and selective row assignment */
+.kf-supplier-modal .kf-supplier-invoice{display:block;padding:0;margin:0;border:0;border-bottom:1px solid #dfe5e7;cursor:default}
+.kf-supplier-modal .kf-supplier-invoice-head{display:flex;gap:12px;align-items:center;padding:13px}
+.kf-supplier-modal .kf-supplier-invoice-head>input{flex:none;width:20px;min-width:20px}
+.kf-supplier-modal .kf-supplier-invoice-head>span{flex:1;min-width:0}
+.kf-supplier-modal .kf-supplier-invoice-head>strong{white-space:nowrap}
+.kf-supplier-modal .kf-supplier-invoice-head button{padding:6px;min-width:42px;flex:none}
+.kf-supplier-modal .kf-supplier-details{padding:12px 16px;background:#fafbfc;border-top:1px solid #e5e7eb}
+.kf-supplier-modal .kf-supplier-details[hidden]{display:none}
+.kf-supplier-modal .kf-supplier-product{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #e6e9ed;cursor:pointer}
+.kf-supplier-modal .kf-supplier-product>input{flex:none;width:20px;min-width:20px}
+.kf-supplier-modal .kf-supplier-product>span{flex:1;min-width:0}
+.kf-supplier-modal .kf-supplier-product>strong{white-space:nowrap;font-size:13px}
+.kf-supplier-modal .kf-supplier-product small{display:block;font-size:12px;color:#647184}
+.kf-supplier-modal [data-supplier-pdf]{margin-top:12px}
+@media(max-width:550px){.kf-supplier-modal .kf-supplier-invoice-head{gap:7px;padding:10px}.kf-supplier-modal .kf-supplier-invoice-head>strong{font-size:12px}.kf-supplier-modal .kf-supplier-product{gap:7px}}

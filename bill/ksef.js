@@ -8,7 +8,7 @@ import {esc,today} from './core.js?v=1.0.38';
 import {openReceiptImport} from './receipt-import.js?v=1.0.51';
 import {monthDates,counterparty,invoicePdfName,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.46';
 import {hint,remember} from './cost-suggestions.js?v=1.0.38';
-import {wholeInvoiceFree,similarInvoiceCandidates,supplierSuggestionDialog} from './stock-suggestions.js?v=1.0.52';
+import {wholeInvoiceFree,similarInvoiceCandidates,supplierSuggestionDialog} from './stock-suggestions.js?v=1.0.53';
 const e=esc;
 const historyPages=new Map();
 const historyKey=()=>integration.userId?'robisie-ksef-history-v1:'+integration.userId:null;
@@ -143,20 +143,23 @@ async function assignWholeInvoice(number,signal){
  const saved=stockRows.filter(r=>r.metadata.ksefNumber===number);
  if(field&&saved.length===rows.length&&saved.every(r=>Number(r[field])===Number(r.capacity)&&!Number(r.returned)))await suggestSupplierInvoices(number,target,signal);
 }
-function chooseSupplierInvoices(candidates,label,signal,unavailable){return supplierSuggestionDialog(candidates,label,signal,unavailable);}
+function chooseSupplierInvoices(candidates,label,signal,unavailable){return supplierSuggestionDialog(candidates,label,signal,unavailable,number=>preview(number,signal));}
 async function suggestSupplierInvoices(sourceNumber,target,signal){
  const {candidates,unavailable}=similarInvoiceCandidates(stockRows,sourceNumber);
  if(!candidates.length)return;
  const selected=await chooseSupplierInvoices(candidates,target.label,signal,unavailable);if(!selected?.length)return;check(signal);
  stockRows=await integration.stock();check(signal);
- const chosen=candidates.filter(c=>selected.includes(c.metadata.ksefNumber)),failures=[];let saved=0,cancelled=false;
+ const chosen=selected.map(choice=>({choice,candidate:candidates.find(c=>c.metadata.ksefNumber===choice.number)})).filter(entry=>entry.candidate),failures=[];let saved=0,cancelled=false;
  try{
-  for(const [index,candidate] of chosen.entries()){
+  for(const [index,{candidate,choice}] of chosen.entries()){
    if(signal.aborted){cancelled=true;break;}progress('Przypisywanie faktur od tego wystawcy: '+(index+1)+' z '+chosen.length+'…');
    try{
     const current=stockRows.filter(r=>r.metadata.ksefNumber===candidate.metadata.ksefNumber);
     if(!wholeInvoiceFree(current)||current.length!==candidate.indices.length||current.some(r=>!candidate.indices.includes(r.item.index)))throw Error('Stan zmienił się. Sprawdź fakturę i przypisz ją ponownie.');
-    await assignSupplierInvoice({...candidate,rows:current},target,signal);saved++;
+    const selectedIndices=choice.indices.map(Number);if(!selectedIndices.length||selectedIndices.some(index=>!current.some(r=>Number(r.item.index)===index)))throw Error('Wybrane pozycje nie są już dostępne.');
+    const rows=current.filter(r=>selectedIndices.includes(Number(r.item.index)));
+    const amount=Math.round(rows.reduce((sum,row)=>sum+Math.round(Number(row.item.gross)*100),0))/100;
+    await assignSupplierInvoice({...candidate,indices:selectedIndices,rows,amount},target,signal);saved++;
    }catch(error){if(signal.aborted){cancelled=true;break;}failures.push(candidate.metadata.invoiceNumber+': '+(error.message||'Nie potwierdzono zapisu.'));}
   }
  }finally{stockRows=await integration.stock();}
@@ -164,7 +167,10 @@ async function suggestSupplierInvoices(sourceNumber,target,signal){
 }
 async function assignSupplierInvoice(candidate,target,signal){
  const number=candidate.metadata.ksefNumber;
- if(target.kind==='auto'||target.kind==='firmowe')return integration.setInvoiceUse({number,category:target.kind,indices:candidate.indices});
+ if(target.kind==='auto'||target.kind==='firmowe'){
+  if(candidate.indices.length!==stockRows.filter(r=>r.metadata.ksefNumber===number).length)throw Error('Dla kategorii Auto i Koszty firmowe przypisz wybrane pozycje osobno w Magazynie.');
+  return integration.setInvoiceUse({number,category:target.kind,indices:candidate.indices});
+ }
  const bytes=await singleBytes(candidate.metadata,signal);check(signal);const xml=decodeXml(bytes);
  if(target.kind==='cleanfleet'){
   const context=await integration.cfContext(number);check(signal);

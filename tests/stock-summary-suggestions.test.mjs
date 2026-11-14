@@ -33,3 +33,12 @@ test('supplier name fallback requires both NIPs missing and escapes invoice labe
  const rows=[item('source',1,{metadata:metadata('source','',{seller:{name:'BNP   Paribas'}})}),item('same',1,{metadata:metadata('same','',{seller:{name:' BNP Paribas '},invoiceNumber:'<img>'})}),item('different',1,{metadata:metadata('different','1111111111')}),item('empty',1,{metadata:metadata('empty','',{seller:{}})})];
  const {candidates}=similarInvoiceCandidates(rows,'source');assert.equal(candidates.length,1);assert.match(supplierSuggestionMarkup(candidates,'<Auto>'),/&lt;img&gt;/);assert.match(supplierSuggestionMarkup(candidates,'<Auto>'),/&lt;Auto&gt;/);
 });
+
+test('supplier selection renders inspectable products, PDF preview and selective amounts',async()=>{
+ const {suggestedAmount}=await import('../bill/stock-suggestions.js');
+ const candidate={metadata:metadata('x'),indices:[1,2],rows:[item('x',1),item('x',2,{item:{index:2,name:'Klej & grunt',gross:55.75},capacity:2,available:2})],amount:155.75};
+ assert.equal(suggestedAmount(candidate,[2]),55.75);
+ const markup=supplierSuggestionMarkup([candidate],'Robisię');
+ assert.match(markup,/Klej &amp; grunt/);assert.match(markup,/data-supplier-pdf/);assert.match(markup,/name="supplierLine"/);
+ assert.match(markup,/Podgląd PDF faktury/);
+});

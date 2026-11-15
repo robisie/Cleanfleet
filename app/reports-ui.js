@@ -31,7 +31,7 @@ const cell=(row,key)=>{
  if(key==='wash_base_cost')return washMoney(root.CFAdditionalServices?.base(row)??row.cost,row.currency);
  if(key==='completion_notes'&&row.additional_services?.length)return [row.completion_notes,root.CFAdditionalServices?.lines(row)].filter(Boolean).join('\n');
  if(key==='condition_factors')return root.CFWashCondition?.describe(row.condition_factors)||'—';
- if(key==='order_cost'||key==='final_cost')return washPrice(row)[key==='order_cost'?'order':'final']+(key==='final_cost'&&row.additional_services?.length?'\n'+root.CFAdditionalServices?.lines(row):'');
+ if(key==='order_cost'||key==='final_cost')return washPrice(row)[key==='order_cost'?'order':'final'];
  if(key==='cost'&&row.cost!=null){
   if(root.CFExchange)return root.CFExchange.format({...row,currency:row.currency||'PLN'}).replace('€','EUR').replace('zł','PLN');
   return Number(row.cost).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(row.currency||'PLN')+(row.currency==='EUR'?' / brak kursu PLN':'');

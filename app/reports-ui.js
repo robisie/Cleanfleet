@@ -20,15 +20,18 @@ function washPrice(row){
 }
 function reportCellHtml(row,key){
  const color=key==='final_cost'?washPrice(row).color:null;
- return color?'<strong style="color:'+color+'">'+esc(cell(row,key))+'</strong>':esc(cell(row,key));
+ const text=esc(cell(row,key)).replace(/\n/g,'<br>');return color?'<strong style="color:'+color+'">'+text+'</strong>':text;
 }
 function reportPdfCell(row,key){
  const content=cell(row,key),color=key==='final_cost'?washPrice(row).color:null;
  return color?{content,styles:{textColor:color}}:content;
 }
 const cell=(row,key)=>{
+ if(key==='additional_services')return root.CFAdditionalServices?.lines(row)||'—';
+ if(key==='wash_base_cost')return washMoney(root.CFAdditionalServices?.base(row)??row.cost,row.currency);
+ if(key==='completion_notes'&&row.additional_services?.length)return [row.completion_notes,root.CFAdditionalServices?.lines(row)].filter(Boolean).join('\n');
  if(key==='condition_factors')return root.CFWashCondition?.describe(row.condition_factors)||'—';
- if(key==='order_cost'||key==='final_cost')return washPrice(row)[key==='order_cost'?'order':'final'];
+ if(key==='order_cost'||key==='final_cost')return washPrice(row)[key==='order_cost'?'order':'final']+(key==='final_cost'&&row.additional_services?.length?'\n'+root.CFAdditionalServices?.lines(row):'');
  if(key==='cost'&&row.cost!=null){
   if(root.CFExchange)return root.CFExchange.format({...row,currency:row.currency||'PLN'}).replace('€','EUR').replace('zł','PLN');
   return Number(row.cost).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(row.currency||'PLN')+(row.currency==='EUR'?' / brak kursu PLN':'');
@@ -96,7 +99,7 @@ function renderColumnPicker(fields){
 }
 function columnPreset(name,defs){
  const sets={
-  basic:['company_name','plate','type','wash_date','performed_by','order_cost','final_cost','completion_notes'],
+  basic:['company_name','plate','type','wash_date','performed_by','order_cost','final_cost','completion_notes','additional_services'],
   billing:['company_name','plate','type','wash_date','performed_by','order_cost','final_cost','approved','paid','invoice_invoice_number','invoice_status'],
   invoice:['company_name','plate','wash_date','cost','invoice_invoice_number','invoice_invoice_date','invoice_status','invoice_paid_at'],
   vehicle:['company_name','plate','vehicle_type','vehicle_brand','vehicle_model','vehicle_production_year','vehicle_fleet_number','vehicle_driver_name']
@@ -248,7 +251,7 @@ async function prepareQuickWashReport(b,{from,to,companyId=null,columns:selected
   let expected=null;
   for(let offset=0;;offset+=pageSize){
    let query=b.db.from('wash_records')
-    .select('id,type,plate,wash_date,wash_start_time,wash_end_time,duration_hours,ordered_by,performed_by,completion_notes,order_cost,order_currency,cost,currency,approved,paid',{count:'exact'})
+    .select('id,type,plate,wash_date,wash_start_time,wash_end_time,duration_hours,ordered_by,performed_by,completion_notes,wash_base_cost,additional_services,order_cost,order_currency,cost,currency,approved,paid',{count:'exact'})
     .gte('wash_date',from).lte('wash_date',to)
     .order('wash_date').order('id');
    if(companyId)query=query.eq('company_id',companyId);

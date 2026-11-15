@@ -11,7 +11,7 @@
     return (Number(value)||0).toLocaleString('pl-PL',{minimumFractionDigits:2,maximumFractionDigits:2})+' zł';
   }
   function startingCost(row){
-    const value=row.order_currency===row.currency ? (row.order_cost??row.cost) : row.cost;
+    const value=row.wash_base_cost??(row.order_currency===row.currency ? (row.order_cost??row.cost) : row.cost);
     return Number(value??0).toFixed(2);
   }
   const twoDigits=value=>String(value).padStart(2,'0');
@@ -312,7 +312,7 @@
       if(typeof cfSupabase==='undefined')throw new Error('Brak połączenia z bazą.');
       const [{data:rows,error:rowError},catalog]=await Promise.all([
         cfSupabase.from('wash_records')
-          .select('id,company_id,plate,type,brand,notes,wash_date,duration_hours,wash_start_time,wash_end_time,performed_by,cost,currency,order_cost,order_currency,approved,paid,work_items,completion_notes,condition_level,condition_factors')
+          .select('id,company_id,plate,type,brand,notes,wash_date,duration_hours,wash_start_time,wash_end_time,performed_by,cost,wash_base_cost,additional_services,currency,order_cost,order_currency,approved,paid,work_items,completion_notes,condition_level,condition_factors')
           .in('id',ids),
         fetchCatalog(true)
       ]);
@@ -370,8 +370,8 @@
             <strong>Zakres wykonanych prac</strong>
             ${isAdmin()?'<button class="btn btn-outline" id="cfCompleteCatalogBtn" type="button">Cennik usług</button>':''}
           </div>
-          <label class="cf-completion-extra"><input type="checkbox" id="cfCompleteExtraService" ${savedIds.size>1&&catalog.some(item=>item.exclusive&&savedIds.has(String(item.id)))?'checked':''}><span>Usługa dodatkowa — pozwól dodać pozycję do kompleksowego sprzątania</span></label>
-          <div class="cf-completion-services" id="cfCompleteServices"></div>
+          <label class="cf-completion-extra"><input type="checkbox" id="cfCompleteExtraService" ${savedIds.size>1&&catalog.some(item=>item.exclusive&&savedIds.has(String(item.id)))?'checked':''}><span>Pozwól łączyć pozycje zakresu prac z kompleksowym sprzątaniem</span></label>
+          <div class="cf-completion-services" id="cfCompleteServices"></div>${bulk?'<p>Usługi dodatkowe dodawaj w zleceniu pojedynczego pojazdu.</p>':'<div id="cfCompleteAdditional"></div>'}
         </div>
 
         ${row.notes?`<div class="cf-completion-existing-note"><strong>Uwagi ze zlecenia:</strong><br>${esc(row.notes)}</div>`:''}
@@ -381,7 +381,7 @@
         <div class="cf-completion-grid">
           <label class="field cf-completion-span-2"><span>Opis wykonania</span><textarea id="cfCompleteNotes" rows="3" placeholder="Krótki opis wykonanej pracy">${esc(row.completion_notes||'')}</textarea></label>
           <div class="cf-completion-span-2 cf-completion-total-row">
-            <label class="field"><span>Kwota finalna ${bulk?'za jedno auto ':''}(${esc(currency)})</span><input id="cfCompleteCost" type="number" min="0" step="0.01" inputmode="decimal" value="${bulk?'':esc(startingCost(row))}" aria-describedby="cfCompleteCostHint">
+            <label class="field"><span>Kwota prania ${bulk?'za jedno auto ':''}(${esc(currency)})</span><input id="cfCompleteCost" type="number" min="0" step="0.01" inputmode="decimal" value="${bulk?'':esc(startingCost(row))}" aria-describedby="cfCompleteCostHint">
               <div class="cf-completion-total-hint" id="cfCompleteCostHint"></div>
             </label>
             ${currency==='PLN'?'<button class="btn btn-outline" id="cfCompleteRecalc" type="button">Przelicz z usług</button>':''}
@@ -411,6 +411,7 @@
       const extraServiceEl=overlay.querySelector('#cfCompleteExtraService');
       const costEl=overlay.querySelector('#cfCompleteCost');
       const costHint=overlay.querySelector('#cfCompleteCostHint');
+      let additionalEditor=null;
       let catalogRows=catalog;
 
       const selectedIds=()=>[...servicesEl.querySelectorAll('input[type="checkbox"]:checked')].map(x=>x.value);
@@ -467,7 +468,7 @@
       };
       const syncCostHint=()=>{
         const tip=bulk?'Zostaw puste, aby zachować kwotę zlecenia każdego auta.':'Możesz zmienić kwotę przed zapisem.';
-        costHint.textContent=`${tip} Suma z cennika: ${money(selectedTotal())}.`;
+        costHint.textContent=`${tip} Pranie: ${Number(costEl.value||0).toFixed(2)} ${currency} + dodatki: ${Number(additionalEditor?.total()||0).toFixed(2)} ${currency} = razem: ${(Number(costEl.value||0)+Number(additionalEditor?.total()||0)).toFixed(2)} ${currency}. Suma zakresu prac z cennika: ${money(selectedTotal())}.`;
       };
 
       renderServices(false);
@@ -480,7 +481,8 @@
         syncCostHint();
       });
       syncDuration();
-      syncCostHint();
+      if(!bulk)additionalEditor=window.CFAdditionalServices.editor(overlay.querySelector('#cfCompleteAdditional'),{items:row.additional_services||[],catalog,currency,onChange:syncCostHint});
+      syncCostHint();costEl.addEventListener('input',syncCostHint);
       startInput.addEventListener('input',syncDuration);
       endInput.addEventListener('input',syncDuration);
       timeMode.addEventListener('change',()=>{syncDuration();clearFormError();});
@@ -572,6 +574,8 @@
         const performer=overlay.querySelector('#cfCompletePerformer').value.trim();
         const serviceIds=selectedIds();
         const cost=costEl.value==='' ? null : Number(costEl.value);
+        let additionalServices;
+        try{additionalServices=additionalEditor?additionalEditor.read():[];}catch(error){showFormError(error.message,overlay.querySelector('#cfCompleteAdditional'));return;}
         const notes=overlay.querySelector('#cfCompleteNotes').value.trim();
         const conditionLevel=Number(overlay.querySelector('input[name="cfCompleteCondition"]:checked')?.value)||null;
         const conditionFactors=conditionLevel?[...overlay.querySelectorAll('#cfCompleteConditionFactors input:checked')].map(input=>input.value):[];
@@ -596,7 +600,7 @@
         saving=true;
         saveBtn.textContent='Zapisuję…';
         try{
-          const {data,error}=await cfSupabase.rpc('cf_complete_wash_records',{
+          const {data,error}=await cfSupabase.rpc('cf_complete_wash_with_extras',{
             p_wash_record_ids:completionIds,
             p_wash_date:washDate,
             p_start_time:start||null,
@@ -607,7 +611,8 @@
             p_service_ids:serviceIds,
             p_completion_notes:notes||null,
             p_condition_level:conditionLevel,
-            p_condition_factors:conditionFactors
+            p_condition_factors:conditionFactors,
+            p_additional_services:additionalServices
           });
           if(error)throw error;
 
@@ -622,7 +627,7 @@
               durationHours:data?.duration_hours_per_vehicle??null,
               performer,
               cost:data?.cost_by_id?.[id]??finalCost,
-              notes,...(bulk?{}:{conditionLevel,conditionFactors})
+              notes,...(bulk?{}:{conditionLevel,conditionFactors,washBaseCost:data?.wash_base_cost??finalCost,additionalServices:data?.additional_services??additionalServices})
             });
           }catch(localError){
             console.warn('CleanFleet local completion refresh:',localError);
@@ -657,7 +662,7 @@
             }
           }catch(_){}
 
-          const priceLabel=finalCost===null?'Kwoty zleceń':`${finalCost.toFixed(2)} ${currency}${bulk?' / auto':''}`;
+          const priceLabel=finalCost===null?'Kwoty zleceń':`${(finalCost+window.CFAdditionalServices.sum(additionalServices)).toFixed(2)} ${currency}${bulk?' / auto':''}`;
           toast(`${bulk?`Zakończono prania: ${pending.length}`:'Pranie zakończone'} · ${hours==null?'bez czasu':hoursLabel(hours)} · ${priceLabel}`);
         }catch(err){
           console.error('CleanFleet complete wash:',err);
@@ -678,9 +683,10 @@
   async function completeBus(id){
     injectStyles();
     const {data:row,error}=await cfSupabase.from('wash_records')
-      .select('id,plate,wash_date,wash_start_time,wash_end_time,performed_by,completion_notes,cost,currency,order_cost,order_currency,approved,paid').eq('id',id).single();
+      .select('id,plate,wash_date,wash_start_time,wash_end_time,performed_by,completion_notes,cost,wash_base_cost,additional_services,currency,order_cost,order_currency,approved,paid').eq('id',id).single();
     if(error)throw error;
     if(!row||row.approved||row.paid){toast('Ten BUS jest już wykonany.');return;}
+    const catalog=await fetchCatalog(true);
     const root=document.getElementById('modalRoot')||document.body;
     document.getElementById('cfWashCompletionOverlay')?.remove();
     const overlay=document.createElement('div');
@@ -695,8 +701,9 @@
         <label class="field"><span>Godzina do</span><input id="cfBusEnd" type="time"></label>
         <small id="cfBusPhotoHint" class="cf-completion-span-2" aria-live="polite"></small>
         <div class="cf-completion-duration cf-completion-span-2"><span>Czas prania</span><strong id="cfBusDuration">—</strong></div>
-        <label class="field cf-completion-span-2"><span>Kwota finalna (${esc(row.currency||'PLN')})</span><input id="cfBusCost" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(startingCost(row))}"></label>
+        <label class="field cf-completion-span-2"><span>Kwota prania (${esc(row.currency||'PLN')})</span><input id="cfBusCost" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(startingCost(row))}"></label>
       </div>
+      <div id="cfBusAdditional"></div><p id="cfBusTotal" aria-live="polite"></p>
       <div class="cf-completion-error" id="cfBusError" role="alert"></div>
       <div class="sheet-actions"><button class="btn btn-outline" data-close type="button">Anuluj</button><button class="btn btn-solid" id="cfBusSave" type="button">Zapisz i oznacz jako wykonane</button></div>
     </div>`;
@@ -704,6 +711,9 @@
     const checkbox=overlay.querySelector('#cfBusUsePhotos'),start=overlay.querySelector('#cfBusStart');
     const end=overlay.querySelector('#cfBusEnd'),date=overlay.querySelector('#cfBusDate');
     const costInput=overlay.querySelector('#cfBusCost');
+    let additionalEditor;
+    const syncTotal=()=>{overlay.querySelector('#cfBusTotal').textContent='Razem: '+(Number(costInput.value||0)+Number(additionalEditor?.total()||0)).toFixed(2)+' '+(row.currency||'PLN');};
+    additionalEditor=window.CFAdditionalServices.editor(overlay.querySelector('#cfBusAdditional'),{items:row.additional_services||[],catalog,currency:row.currency||'PLN',onChange:syncTotal});syncTotal();costInput.addEventListener('input',syncTotal);
     const hint=overlay.querySelector('#cfBusPhotoHint'),save=overlay.querySelector('#cfBusSave');
     const errorEl=overlay.querySelector('#cfBusError');
     let saving=false,ready=false,request=0,dateEdited=false;
@@ -750,19 +760,20 @@
       if(!start.value||!end.value||minutes===null||minutes<=0){showError('Podaj poprawne godziny początku i końca prania.');return;}
       const amount=Number(costInput.value);
       if(!costInput.value || !Number.isFinite(amount) || amount<0){showError('Podaj poprawną kwotę finalną.');return;}
-      const cost=Math.round(amount*100)/100;
+      let additionalServices;try{additionalServices=additionalEditor.read();}catch(error){showError(error.message);return;}
+      const baseCost=Math.round(amount*100)/100,cost=Math.round((baseCost+window.CFAdditionalServices.sum(additionalServices))*100)/100;
       const washDate=date.value,durationHours=minutes/60;
       saving=true;save.disabled=true;save.textContent='Zapisuję…';
       try{
         const {data:saved,error:saveError}=await cfSupabase.from('wash_records').update({
           approved:true,wash_date:washDate,wash_start_time:start.value,wash_end_time:end.value,
-          duration_hours:durationHours,cost
+          duration_hours:durationHours,cost,wash_base_cost:baseCost,additional_services:additionalServices
         }).eq('id',id).eq('approved',false).eq('paid',false).select('id').maybeSingle();
         if(saveError)throw saveError;
         if(!saved)throw new Error('Nie udało się zapisać prania. Odśwież listę i spróbuj ponownie.');
         saving=false;close();
         window.cfApplyCompletedWashLocal?.({
-          id,washDate,start:start.value,end:end.value,durationHours,cost,
+          id,washDate,start:start.value,end:end.value,durationHours,cost,washBaseCost:baseCost,additionalServices,
           performer:row.performed_by,notes:row.completion_notes
         });
         if(typeof loadAll==='function')Promise.resolve(loadAll()).catch(err=>console.warn('CleanFleet BUS refresh:',err));

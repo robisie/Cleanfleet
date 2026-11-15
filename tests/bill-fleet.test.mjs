@@ -77,3 +77,14 @@ test('Bill navigation uses Pack for both draft creation and existing documents, 
  assert.throws(()=>vm.runInContext("cfOpenBill('https://evil.invalid/bill/')",context),/adres Bill/);assert.throws(()=>vm.runInContext("cfOpenBill('/app/')",context),/adres Bill/);
  window.parent=window;vm.runInContext("cfOpenBill('/bill/?invoice=standalone')",context);assert.equal(location.href,'https://cleanfleet.pl/bill/?invoice=standalone');assert.equal(sent.length,2);
 });
+
+test('additional services become indented payable lines below their vehicle, without repeating plates',async()=>{
+ const a=attachment();a.options={layout:'vehicle-lines'};a.snapshot[0]={...a.snapshot[0],cost:330.10,wash_base_cost:150.10,additional_services:[{name:'Ozonowanie',price:100},{name:'Usunięcie naklejek',price:80}]};
+ const lines=[{name:'Pranie pojazdu — TEST001',unit:'szt.',qty:'1',price:'150.10'},{name:'Usługa dodatkowa — Ozonowanie',unit:'szt.',qty:'1',price:'100.00'},{name:'Usługa dodatkowa — Usunięcie naklejek',unit:'szt.',qty:'1',price:'80.00'},{name:'Pranie pojazdu — TEST002',unit:'szt.',qty:'1',price:'50.20'}];
+ const p=C.normalize(F.guardFleetPayload({...payload(),lines},a));assert.equal(C.invoiceAmount(p),38030);
+ const row={id,number:'A9/10/2026',status:'issued',payload:p},xml=C.invoiceXml(row);assert.equal((xml.match(/<FaWiersz>/g)||[]).length,4);assert(xml.includes('<P_15>380.30</P_15>'));
+ assert.equal(p.lines.filter(l=>l.name.includes('TEST001')).length,1);
+ const location=globalThis.location;globalThis.location={origin:'https://example.test'};
+ try{const html=await documentHtml(row);assert.match(html,/<tr class="fleet-subline"><td>2\.<\/td><td>Usługa dodatkowa — Ozonowanie/);assert(html.includes('padding-left:9mm'));assert(html.indexOf('Pranie pojazdu — TEST001')<html.indexOf('Usługa dodatkowa — Ozonowanie'));assert(html.indexOf('Usługa dodatkowa — Usunięcie naklejek')<html.indexOf('Pranie pojazdu — TEST002'));}finally{globalThis.location=location;}
+ for(const mutate of [p=>p.lines.splice(1,1),p=>p.lines.reverse(),p=>p.lines[1].price='99.99',p=>p.lines[1].name+=' — TEST001',p=>p.lines[1].qty='2']){const changed=structuredClone(p);mutate(changed);assert.throws(()=>F.guardFleetPayload(changed,a),/Każda pozycja/);}
+});

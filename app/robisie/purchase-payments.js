@@ -1,5 +1,5 @@
-import * as C from './core.js?v=1.0.78';
-import * as I from './invoices.js?v=1.0.68';
+import * as C from './core.js?v=1.0.125';
+import * as I from './invoices.js?v=1.0.125';
 
 export const eligible=row=>!!row?.number&&row.status!=='draft'&&row.originKind!=='purchases'&&!row.referenceOnly&&!row.payload?.correction&&row.payload?.currency==='PLN';
 export function rows(project,item){
@@ -15,7 +15,7 @@ export function rows(project,item){
  return result;
 }
 export function advances(project,itemId){
- return (project.receipts||[]).filter(r=>r.kind==='materials'&&C.number(r.amount)>0).map(r=>({...r,available:C.round(C.number(r.amount)-(project.purchases||[]).filter(x=>x.id!==itemId).reduce((s,x)=>s+C.number(x.receiptPayments?.[r.id]),0))})).filter(r=>r.available>0);
+ return (project.receipts||[]).filter(r=>(r.kind==='materials'||project.mixedSettlement&&r.kind==='work')&&C.number(r.amount)>0).map(r=>({...r,available:C.round(C.number(r.amount)-(project.purchases||[]).filter(x=>x.id!==itemId).reduce((s,x)=>s+C.number(x.receiptPayments?.[r.id]),0))})).filter(r=>r.available>0);
 }
 export function apply(project,candidate,choice,invoices){
  const p=structuredClone(project),old=p.purchases.find(x=>x.id===candidate.id),charge=C.round(candidate.charge),seen=new Set();
@@ -42,10 +42,15 @@ export function apply(project,candidate,choice,invoices){
  delete item.invoicePayments;delete item.receiptPayments;
  p.purchases=old?p.purchases.map(x=>x.id===item.id?item:x):[...p.purchases,item];
  // Removing an already recorded source releases money to the material advance pool.
- if(old?.paidAmount!=null&&old.paid&&C.number(old.paidAmount)>0&&!cash){
+ if(!p.mixedSettlement&&old?.paidAmount!=null&&old.paid&&C.number(old.paidAmount)>0&&!cash){
   const receipt={id:C.uid(),kind:'materials',stageId:'',date:old.paidDate||old.date,amount:C.round(old.paidAmount),note:'Gotówka odłączona od zakupu: '+(old.shop||'')+' '+(old.invoice||'')};
   p.receipts.push(receipt);
   for(const record of p.invoiceSettlements||[])record.existingReceipts=(record.existingReceipts||[]).map(r=>r.id==='purchase-payment:'+item.id?{id:receipt.id,kind:receipt.kind,date:receipt.date,amount:receipt.amount}:r);
+ }
+ if(p.mixedSettlement&&cash){
+  const receipt={id:C.uid(),kind:'materials',stageId:'',date:cash.date,amount:C.round(cash.amount),note:'Wpłata inwestora na zakup: '+(item.description||'')};
+  p.receipts||=[];p.receipts.push(receipt);item.paid=false;item.paidAmount=0;
+  item.receiptPayments={[receipt.id]:receipt.amount};
  }
  for(const row of list.filter(r=>r.source==='advance')){
   const receipt=advances(p,item.id).find(r=>r.id===row.id);
@@ -64,7 +69,7 @@ export function apply(project,candidate,choice,invoices){
   // A recorded advance linked to this invoice is already an inflow. Allocate it,
   // rather than creating another invoice payment for the same money.
   for(const link of record.existingReceipts||[]){
-   const receipt=(p.receipts||[]).find(r=>r.id===link.id&&r.kind==='materials');if(!receipt||desired<=0)continue;
+   const receipt=(p.receipts||[]).find(r=>r.id===link.id&&(r.kind==='materials'||project.mixedSettlement&&r.kind==='work'));if(!receipt||desired<=0)continue;
    const used=p.purchases.filter(x=>x.id!==item.id).reduce((s,x)=>s+C.number(x.receiptPayments?.[receipt.id]),0)+C.number(item.receiptPayments?.[receipt.id]);
    const reused=Math.min(desired,Math.max(0,C.round(C.number(receipt.amount)-used)));
    if(reused>0){item.receiptPayments={...item.receiptPayments,[receipt.id]:C.round(C.number(item.receiptPayments?.[receipt.id])+reused)};desired=C.round(desired-reused);}

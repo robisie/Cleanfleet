@@ -1,12 +1,12 @@
-import * as C from './core.js?v=1.0.78';
-import * as I from './invoices.js?v=1.0.68';
-import {eligible} from './purchase-payments.js?v=1.0.68';
+import * as C from './core.js?v=1.0.125';
+import * as I from './invoices.js?v=1.0.125';
+import {eligible} from './purchase-payments.js?v=1.0.125';
 const cents=value=>Math.round(C.number(value)*100);
 const oldest=(a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.id).localeCompare(String(b.id));
 export const purchases=project=>(project.purchases||[]).filter(p=>cents(C.purchasePayment(p).remaining)>0).slice().sort(oldest);
 export function sources(project,documents){
  I.refreshReceiptLinks(structuredClone(project));
- const free=new Map((project.receipts||[]).filter(r=>r.kind==='materials').map(r=>[r.id,Math.max(0,cents(r.amount)-(project.purchases||[]).reduce((s,p)=>s+cents(p.receiptPayments?.[r.id]),0))]));
+ const free=new Map((project.receipts||[]).filter(r=>(r.kind==='materials'||project.mixedSettlement&&r.kind==='work')).map(r=>[r.id,Math.max(0,cents(r.amount)-(project.purchases||[]).reduce((s,p)=>s+cents(p.receiptPayments?.[r.id]),0))]));
  // Historical imports have aggregate receipts and paid flags, without explicit allocations.
  let legacy=(project.purchases||[]).filter(p=>p.paidAmount==null&&p.paid).reduce((s,p)=>s+cents(p.amount),0);
  for(const receipt of project.receipts||[]){const used=Math.min(legacy,free.get(receipt.id)||0);legacy-=used;if(free.has(receipt.id))free.set(receipt.id,free.get(receipt.id)-used);}
@@ -46,7 +46,7 @@ export function plan(project,documents,choices,links=[]){
  for(const link of links){
   if(linkedReceipts.has(link.receiptId))throw Error('Jedną zaliczkę można powiązać tylko z jedną fakturą.');linkedReceipts.add(link.receiptId);
   if(!seen.has('invoice:'+link.invoiceId))throw Error('Zaznacz fakturę powiązaną z zaliczką.');
-  const receipt=next.receipts.find(r=>r.id===link.receiptId&&r.kind==='materials');if(!receipt)throw Error('Nie znaleziono zaliczki.');
+  const receipt=next.receipts.find(r=>r.id===link.receiptId&&(r.kind==='materials'||project.mixedSettlement&&r.kind==='work'));if(!receipt)throw Error('Nie znaleziono zaliczki.');
   const linked=next.invoiceSettlements.find(r=>(r.existingReceipts||[]).some(x=>x.id===receipt.id));
   if(linked){if(linked.id!==link.invoiceId)throw Error('Zaliczka jest już powiązana z inną fakturą.');continue;}
   const record=invoiceRecord(link.invoiceId);releasePlanned(record,cents(receipt.amount));record.existingReceipts||=[];record.existingReceipts.push({id:receipt.id,amount:receipt.amount,date:receipt.date,kind:receipt.kind});

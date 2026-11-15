@@ -16,11 +16,11 @@ test('ledger summary combines category, search and date filters without changing
 test('shared ledger omits purchase settlement credits from rows, balances, filters and PDF without changing purchase accounting',()=>{
  const p=C.newProject('Mixed','Investor');p.mixedSettlement=true;
  p.receipts=[{id:'advance',amount:1000,kind:'materials',date:'2026-10-24',note:'Wpłata inwestora'}];
- p.purchases=[{id:'screws',amount:126.84,charge:126.84,paid:true,paidAmount:126.84,paidDate:'2026-10-26',date:'2026-07-14',description:'Wkręty',shop:'Alicja Kuźnik'}];
+ p.purchases=[{id:'screws',amount:126.84,charge:126.84,paid:false,paidAmount:0,receiptPayments:{advance:126.84},paidDate:'2026-10-26',date:'2026-07-14',description:'Wkręty',shop:'Alicja Kuźnik'}];
  // Linking the generated purchase payment to an invoice must not make it visible again.
- p.invoiceSettlements=[{id:'invoice',number:'A1',existingReceipts:[{id:'purchase-payment:screws'}],allocations:[{key:'stage:s',kind:'stage',id:'s',paid:200,date:'2026-10-27'}]}];
+ p.invoiceSettlements=[{id:'invoice',number:'A1',existingReceipts:[],allocations:[{key:'stage:s',kind:'stage',id:'s',paid:200,date:'2026-10-27'}]}];
  const before=structuredClone(p),accounting=C.totals(p),receipts=C.effectiveReceipts(p),s=C.settlementTotals(p);
- assert.equal(receipts.find(r=>r.purchaseId==='screws').invoiceId,'invoice');
+ assert.equal(receipts.some(r=>r.purchaseId==='screws'),false);
  assert.deepEqual(s.rows.map(r=>r.id),['screws','advance','invoice:invoice:stage:s']);
  assert.equal(s.plus,1200);assert.equal(s.minus,126.84);assert.equal(s.balance,1073.16);
  assert.equal(s.rows.at(-1).balance,1073.16);

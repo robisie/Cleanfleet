@@ -1,4 +1,4 @@
-import * as C from './core.js?v=1.0.78';
+import * as C from './core.js?v=1.0.125';
 import {invoiceAmount} from '../../bill/core.js?v=1.0.15';
 export const amount=row=>invoiceAmount(row.payload)/100;
 export const linkedPaid=record=>C.round((record?.existingReceipts||[]).reduce((s,r)=>s+C.number(r.amount),0));
@@ -76,7 +76,7 @@ export function validateReceiptAllocations(project){
  const used=new Map();
  for(const item of project.purchases||[])for(const [id,value] of Object.entries(item.receiptPayments||{})){
   const receipt=(project.receipts||[]).find(r=>r.id===id),amount=Number(value);
-  if(!receipt||receipt.kind!=='materials'||!Number.isFinite(amount)||amount<0)throw Error('Nieprawidłowe rozliczenie wcześniejszej zaliczki.');
+  if(!receipt||receipt.kind!=='materials'&&!(project.mixedSettlement&&receipt.kind==='work')||!Number.isFinite(amount)||amount<0)throw Error('Nieprawidłowe rozliczenie wcześniejszej zaliczki.');
   used.set(id,C.round((used.get(id)||0)+amount));
   if(used.get(id)>C.number(receipt.amount)+.001)throw Error('Kwota rozliczeń zakupów przekracza wcześniejszą zaliczkę.');
  }

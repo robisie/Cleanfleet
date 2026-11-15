@@ -1,4 +1,4 @@
-export const VERSION='1.0.122';
+export const VERSION='1.0.125';
 export const MODULES=[['overview','Panel inwestycji'],['ledger','Wspólne rozliczenie'],['data','Dane inwestycji'],['contract','Umowa'],['rooms','Pomieszczenia'],['offer','Oferta wstępna'],['works','Kalkulacja końcowa'],['payments','Etapy i płatności'],['journal','Dziennik prac'],['handover','Odbiór inwestycji'],['summary','Zestawienie prac'],['shopping','Do kupienia'],['purchases','Zakupy i materiały']];
 export const uid=()=>crypto.randomUUID();
 export const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Warsaw'}).format(new Date());
@@ -65,13 +65,25 @@ export function purchasePaymentLabel(item){
 }
 export function effectiveReceipts(p){
  const invoiceReceipts=(p.invoiceSettlements||[]).flatMap(r=>(r.allocations||[]).filter(a=>a.paid>0).map(a=>({id:'invoice:'+r.id+':'+a.key,invoiceId:r.id,date:a.date||r.date,kind:['purchase','materials'].includes(a.kind)?'materials':'work',stageId:a.kind==='stage'?a.id:'',amount:a.paid,note:'Wpłata z faktury '+r.number})));
- const receipts=[...(p.receipts||[]),...invoiceReceipts,...(p.purchases||[]).filter(item=>item.paidAmount!=null&&purchasePayment({...item,invoicePayments:{},receiptPayments:{}}).paid>0).map(item=>({id:'purchase-payment:'+item.id,purchaseId:item.id,date:item.paidDate||item.date,kind:'materials',stageId:'',amount:purchasePayment({...item,invoicePayments:{},receiptPayments:{}}).paid,note:`Rozliczenie zakupu: ${item.shop||''} — ${item.description||''}`}))];
+ const receipts=[...(p.receipts||[]),...invoiceReceipts,...(p.purchases||[]).filter(item=>!p.mixedSettlement&&item.paidAmount!=null&&purchasePayment({...item,invoicePayments:{},receiptPayments:{}}).paid>0).map(item=>({id:'purchase-payment:'+item.id,purchaseId:item.id,date:item.paidDate||item.date,kind:'materials',stageId:'',amount:purchasePayment({...item,invoicePayments:{},receiptPayments:{}}).paid,note:`${p.mixedSettlement?'Wpłata inwestora na zakup':'Rozliczenie zakupu'}: ${item.shop||''} — ${item.description||''}`}))];
  return receipts.map(receipt=>{if(receipt.invoiceId)return receipt;const invoice=(p.invoiceSettlements||[]).find(r=>(r.existingReceipts||[]).some(x=>x.id===receipt.id));return invoice?{...receipt,invoiceId:invoice.id,note:`Wpłata z faktury ${invoice.number} — wcześniej odnotowana${receipt.note?': '+receipt.note:''}`}:receipt;});
+}
+// Presentation grouping keeps original receipts and allocation IDs intact.
+export function displayedReceipts(receipts){
+ const rows=[],groups=new Map();
+ for(const receipt of receipts){
+  if(!receipt.displayGroup||receipt.invoiceId||number(receipt.settlementWithheld)){rows.push({...receipt});continue;}
+  const key=JSON.stringify([receipt.displayGroup,receipt.kind,receipt.settlementCategory]);let group=groups.get(key);
+  if(!group){group={...receipt,amount:0,parts:[],grouped:true};groups.set(key,group);rows.push(group);}
+  group.parts.push(receipt);group.amount=round(group.amount+number(receipt.amount));
+  if(group.date!==(receipt.date||''))group.date='';
+ }
+ return rows;
 }
 // Presentation grouping only. Accounting keeps each allocation in effectiveReceipts.
 export function receiptRows(p){
  const rows=[],groups=new Map();
- for(const receipt of effectiveReceipts(p)){
+ for(const receipt of displayedReceipts(effectiveReceipts(p))){
   if(!receipt.invoiceId){rows.push({...receipt});continue;}
   const key=JSON.stringify([receipt.invoiceId,receipt.date]);let group=groups.get(key);
   if(!group){group={...receipt,amount:0,parts:[]};groups.set(key,group);rows.push(group);}
@@ -80,13 +92,13 @@ export function receiptRows(p){
  return rows.map(r=>{
   const parts=r.parts||[r],kinds=new Set(parts.map(x=>x.kind));
   const labels=[...new Set(parts.map(x=>x.kind==='materials'?'Materiały':p.stages?.find(s=>s.id===x.stageId)?.name||'Rozliczenie końcowe'))];
-  return {...r,kindLabel:p.mixedSettlement?'Wspólna pula':kinds.size>1?'Materiały i prace':r.kind==='materials'?'Zaliczka na materiały':'Za prace',stageLabel:labels.join(', ')};
+  return {...r,kindLabel:p.mixedSettlement?'Wspólna pula':kinds.size>1?'Materiały i prace':r.kind==='materials'?'Zaliczka na materiały':'Za prace',stageLabel:p.mixedSettlement?'Wspólne rozliczenie':labels.join(', ')};
  });
 }
 export function purchaseTotals(p){
  const items=p.purchases||[],payments=items.map(purchasePayment);
- const spent=round(items.reduce((s,x)=>s+(x.paidAmount!=null||x.ksefCorrections?.length?number(x.amount):purchasePayment(x).paid),0));
- const charged=round(payments.reduce((s,x)=>s+x.charged,0));
+ const spent=round(items.reduce((s,x)=>s+(p.mixedSettlement||x.paidAmount!=null||x.ksefCorrections?.length?number(x.amount):purchasePayment(x).paid),0));
+ const charged=round(p.mixedSettlement?items.reduce((s,x)=>s+number(x.charge),0):payments.reduce((s,x)=>s+x.charged,0));
  const outstanding=round(payments.reduce((s,x)=>s+x.remaining,0));
  const advances=p.mixedSettlement?round(Math.min(charged,Math.max(0,effectiveReceipts(p).reduce((s,x)=>s+number(x.amount),0)))):round(effectiveReceipts(p).filter(x=>x.kind==='materials').reduce((s,x)=>s+number(x.amount),0));
  return {spent,charged,outstanding,advances,actualBalance:round(advances-spent),balance:round(advances-charged),difference:round(charged-spent)};
@@ -122,7 +134,7 @@ export function totals(p){
  const accepted=activeOffer(p);
  const agreed=accepted?acceptedAmount(accepted):offer.after,workCredit=round(p.workCredit);
  const paid=p.mixedSettlement?round(effectiveReceipts(p).reduce((s,x)=>s+number(x.amount),0)-materials.advances):round(effectiveReceipts(p).filter(x=>x.kind!=='materials').reduce((s,x)=>s+number(x.amount),0));
- return {offer,works,materials,agreed,paid,workCredit,remaining:round(p.calculationPrecision==='source'?((works.sourceAmountApplied?works.done:(p.works||[]).filter(l=>l.done).reduce((s,l)=>s+calculationValue(l),0)*(1-number(p.workDiscount??p.discount)/100))+(p.purchases||[]).reduce((s,x)=>s+purchasePayment(x).charged,0)-effectiveReceipts(p).reduce((s,x)=>s+number(x.amount),0)-workCredit):works.done+materials.charged-paid-materials.advances-workCredit),workRemaining:round(works.done-paid-workCredit),change:round(works.after-agreed)};
+ return {offer,works,materials,agreed,paid,workCredit,remaining:round(p.mixedSettlement?works.done+materials.charged-paid-materials.advances-workCredit:p.calculationPrecision==='source'?((works.sourceAmountApplied?works.done:(p.works||[]).filter(l=>l.done).reduce((s,l)=>s+calculationValue(l),0)*(1-number(p.workDiscount??p.discount)/100))+(p.purchases||[]).reduce((s,x)=>s+purchasePayment(x).charged,0)-effectiveReceipts(p).reduce((s,x)=>s+number(x.amount),0)-workCredit):works.done+materials.charged-paid-materials.advances-workCredit),workRemaining:round(works.done-paid-workCredit),change:round(works.after-agreed)};
 }
 export function aggregate(lines){const map=new Map();for(const l of lines){if(l.included===false)continue;const key=serviceKey(l);const row=map.get(key)||{name:l.name,category:l.category,unit:l.unit,qty:0,value:0};row.qty+=number(l.qty);row.value=round(row.value+lineValue(l));map.set(key,row);}return [...map.values()].sort((a,b)=>a.category.localeCompare(b.category,'pl')||a.name.localeCompare(b.name,'pl'));}
 export function newProject(name,investor,date=today()){
@@ -215,7 +227,7 @@ export function tripLineData(trip){
 }
 
 // The purchase document threshold is a workflow reminder, independent of settlement.
-export const purchaseNeedsInvoice=item=>number(item.amount)>450&&!item.sourceKsefNumber&&item.documentType!=='invoice';
+export const purchaseNeedsInvoice=item=>number(item.amount)>450&&item.documentType!=='settlement-expense'&&!item.sourceKsefNumber&&item.documentType!=='invoice';
 export function roomLineAmount(project,kind,roomId){
  const type=kind==='works'?'works':'offer',all=project[type]||[];
  const rows=all.filter(l=>(l.roomId||'')===roomId);
@@ -235,12 +247,12 @@ export function settlementRows(project){
  const add=(item,kind,amount,category,description,id=item.id)=>rows.push({id:String(id??kind+':'+rows.length),kind,date:item.date||item.workDate||'',dateHint:item.dateHint||'',sequence:number(item.sourceSequence)||999999,category,description,plus:amount>0?round(amount):0,minus:amount<0?round(-amount):0,needsExplanation:!!item.needsExplanation});
  const done=(project.works||[]).filter(l=>l.done&&l.included!==false),weights=done.map(line=>Math.max(0,calculationValue(line)*factor)),weightTotal=weights.reduce((sum,n)=>sum+n,0);let workSum=0;
  done.forEach((line,index)=>{const amount=index===done.length-1?round(t.works.done-workSum):round(weightTotal?t.works.done*weights[index]/weightTotal:0);workSum=round(workSum+amount);add(line,'works',-amount,line.settlementCategory||line.category||'Robocizna',line.name);});
- for(const item of project.purchases||[])add(item,'purchases',-purchasePayment(item).charged,item.settlementCategory||'Materiały i zakupy',item.description);
- for(const item of effectiveReceipts(project)){
-  // Purchase settlement is tracked in the purchase module, not as a new cash inflow here.
+ for(const item of project.purchases||[])add(item,'purchases',-(project.mixedSettlement?number(item.charge):purchasePayment(item).charged),item.settlementCategory||'Materiały i zakupy',item.description);
+ for(const item of displayedReceipts(effectiveReceipts(project))){
+  // Earlier-receipt allocations add no inflow. Shared pools also include actual cash recorded at a purchase.
   if(String(item.id).startsWith('purchase-payment:'))continue;
   const withheld=Math.max(0,number(item.settlementWithheld));
-  add(item,item.invoiceId||item.purchaseId?'linked':'receipts',number(item.amount)+withheld,item.settlementCategory||(item.kind==='materials'?'Zaliczki materiałowe':'Wpłaty'),item.note||'Wpłata');
+  add(item,item.grouped?'grouped-receipts':item.invoiceId||item.purchaseId?'linked':'receipts',number(item.amount)+withheld,item.settlementCategory||(item.kind==='materials'?'Zaliczki materiałowe':'Wpłaty'),item.note||'Wpłata');
   if(withheld)add(item,'receipts',-withheld,'Potrącenia',`Potrącenie ${number(item.settlementRate)}% — ${item.note||'wpłata'}`,item.id+':withheld');
  }
  if(t.workCredit)add({id:'work-credit'},'credit',t.workCredit,'Obniżki','Uzgodniona obniżka za prace');

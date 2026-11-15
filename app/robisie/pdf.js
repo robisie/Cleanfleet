@@ -1,5 +1,5 @@
 import * as Shopping from './shopping.js?v=1.0.114';
-import * as C from './core.js?v=1.0.122';
+import * as C from './core.js?v=1.0.125';
 
 const layoutUrl=new URL('./pdf-layout.js?v=1.0.114',import.meta.url).href;
 const canvasUrl=new URL('../vendor/html2canvas-1.4.1.min.js',import.meta.url).href;
@@ -36,7 +36,7 @@ function purchasesTable(items){
  const columns=['purchase-date','purchase-shop','purchase-description','purchase-document','purchase-money','purchase-money','purchase-payment'];
  return `<table class="purchases-table"><colgroup>${[10.5,12,23.5,14,11,11,18].map(width=>`<col style="width:${width}%">`).join('')}</colgroup><thead><tr>${heads.map((label,i)=>`<th class="${columns[i]}">${esc(label)}</th>`).join('')}</tr></thead><tbody>${items.length?items.map(item=>{
   const payment=C.purchasePayment(item),label=payment.state==='full'?'Opłacono w całości':payment.state==='partial'?'Opłacono częściowo':'Nie opłacono';
-  const values=[date(item.date),esc(item.shop),esc(item.description),esc(item.invoice),esc(money(item.amount)),esc(money(item.charge)),`<span class="payment-status">${label}</span><span class="payment-amount">${esc(money(payment.paid))}</span>${payment.remaining?`<small class="payment-remaining">Pozostało: ${esc(money(payment.remaining))}</small>`:''}`];
+  const values=[date(item.date),esc(item.shop),esc(item.description),esc(item.purchaseDocuments?.length>1?item.purchaseDocuments.map(d=>d.number+' ('+(d.role==='advance'?'zaliczkowa':'końcowa')+')').join('; '):item.invoice),esc(money(item.amount)),esc(money(item.charge)),`<span class="payment-status">${label}</span><span class="payment-amount">${esc(money(payment.paid))}</span>${payment.remaining?`<small class="payment-remaining">Pozostało: ${esc(money(payment.remaining))}</small>`:''}`];
   return `<tr>${values.map((value,i)=>`<td class="${columns[i]}">${value}</td>`).join('')}</tr>`;
  }).join(''):`<tr><td colspan="7" class="empty">Brak zapisanych pozycji.</td></tr>`}</tbody></table>`;
 }

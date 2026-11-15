@@ -347,6 +347,11 @@ test('wszystkie moduły renderują dane inwestycji i wspólne numery dokumentów
  assert.match(node('#dialog').innerHTML,/data-allocation-check="1"[^>]*checked/);assert.ok(node('[data-allocation-total]').textContent.includes(C.money(100)));
  purchaseBoxes[1].checked=true;purchaseBoxes[1].onchange();assert.equal(node('#f-amount').value,150);assert.equal(node('#f-charge').value,150);
  module.namespace.testRender(ksefRow,structuredClone(shared));context.window.location.href='https://cleanfleet.pl/app/robisie/?project=p&purchaseKsef=source-number';await module.namespace.testOpenRequestedPurchase();assert.ok(node('#dialog').innerHTML.includes('Pozycje dokumentu zakupowego'));assert.ok(node('#dialog').innerHTML.includes('Rozliczenie zakupu z inwestorem'));
+ const combinedRow=structuredClone(ksefRow);combinedRow.payload.purchases[0].purchaseDocuments=[{role:'advance',number:'ZAL-1',date:'2026-07-30',amount:100,ksefNumber:'advance-number'},{role:'final',number:'ROZ-1',date:'2026-08-05',amount:10,ksefNumber:'source-number'}];
+ module.namespace.testRender(combinedRow,structuredClone(shared));
+ await listeners.get('click')({target:{closest:()=>({dataset:{action:'purchase-edit',id:combinedRow.payload.purchases[0].id},isConnected:true})}});
+ assert.match(node('#dialog').innerHTML,/Dokumenty jednego zakupu/);assert.match(node('#dialog').innerHTML,/ZAL-1/);assert.match(node('#dialog').innerHTML,/ROZ-1/);
+ assert.match(node('#dialog').innerHTML,/ksef=advance-number/);assert.doesNotMatch(node('#dialog').innerHTML,/Pozycje dokumentu zakupowego/);
  const resetRow=structuredClone(ksefRow);delete resetRow.payload.purchases[0].sourceKsefNumber;Object.assign(resetRow.payload.purchases[0],{invoice:'FV-1',supplierNip:'1234567890'});
  Object.assign(ksefFixture,{project_id:resetRow.id,kind:'purchases',ksef_number:'1234567890-20261001-ABCDEF123456-AA'});Object.assign(ksefFixture.document,{number:'FV-1',importedAmount:100});
  const priorPurchase=structuredClone(resetRow.payload.purchases[0]);module.namespace.testRender(resetRow,structuredClone(shared));

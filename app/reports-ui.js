@@ -18,15 +18,17 @@ function washPrice(row){
   color
  };
 }
+const amountColor=row=>row._quickKind==='additional'?null:row._quickKind==='total'?'#176337':washPrice(row).color;
 function reportCellHtml(row,key){
- const color=key==='final_cost'?washPrice(row).color:null;
+ const color=key==='final_cost'?amountColor(row):null;
  const text=esc(cell(row,key)).replace(/\n/g,'<br>');return color?'<strong style="color:'+color+'">'+text+'</strong>':text;
 }
 function reportPdfCell(row,key){
- const content=cell(row,key),color=key==='final_cost'?washPrice(row).color:null;
+ const content=cell(row,key),color=key==='final_cost'?amountColor(row):null;
  return color?{content,styles:{textColor:color}}:content;
 }
 const cell=(row,key)=>{
+ if(row._quickDisplay&&Object.hasOwn(row._quickDisplay,key))return row._quickDisplay[key];
  if(key==='additional_services')return root.CFAdditionalServices?.lines(row)||'—';
  if(key==='wash_base_cost')return washMoney(root.CFAdditionalServices?.base(row)??row.cost,row.currency);
  if(key==='completion_notes'&&row.additional_services?.length)return [row.completion_notes,root.CFAdditionalServices?.lines(row)].filter(Boolean).join('\n');
@@ -229,6 +231,21 @@ function setupPDF(orientation='landscape'){
  const doc=new root.jspdf.jsPDF({orientation,unit:'mm',format:'a4'});doc.addFileToVFS('CleanFleet.ttf',root.CFReportFont);doc.addFont('CleanFleet.ttf','CleanFleet','normal');doc.setFont('CleanFleet');return doc;
 }
 const quickWashColumns=['type','plate','wash_date','wash_duration','ordered_by','performed_by','completion_notes','order_cost','final_cost'];
+function quickServiceRows(rows){
+ return rows.flatMap(row=>{
+  const extras=Array.isArray(row.additional_services)?row.additional_services:[];
+  if(!extras.length)return [row];
+  const extraSum=extras.reduce((sum,item)=>sum+Math.round(Number(item.price)*100),0)/100;
+  const base=row.wash_base_cost!=null?Number(row.wash_base_cost):Math.round((Number(row.cost)-extraSum)*100)/100;
+  const main={...row,cost:base,additional_services:[],_quickKind:'wash'};
+  main._quickDisplay=Object.fromEntries(quickWashColumns.map(key=>[key,cell(main,key)]));
+  main._quickDisplay.completion_notes='Pranie'+(row.completion_notes?' — '+row.completion_notes:'');
+  const blank=()=>Object.fromEntries(quickWashColumns.map(key=>[key,'']));
+  const children=extras.map((item,index)=>({...row,id:row.id+':extra:'+index,cost:Number(item.price),additional_services:[],_quickKind:'additional',_quickDisplay:{...blank(),completion_notes:'Usługa dodatkowa — '+item.name,final_cost:washMoney(item.price,row.currency)}}));
+  const total={...row,id:row.id+':total',cost:0,additional_services:[],_quickKind:'total',_quickDisplay:{...blank(),completion_notes:'Razem za pojazd',final_cost:washMoney(row.cost,row.currency)}};
+  return [main,...children,total];
+ });
+}
 async function prepareQuickWashReport(b,{from,to,companyId=null,columns:selectedColumns=quickWashColumns}){
  if(!b.canReports?.()&&!b.isAdmin?.())throw Error('Brak uprawnień do raportów.');
  if(!Array.isArray(selectedColumns)||!selectedColumns.length||selectedColumns.some(key=>!quickWashColumns.includes(key))||new Set(selectedColumns).size!==selectedColumns.length){
@@ -290,6 +307,8 @@ async function prepareQuickWashReport(b,{from,to,companyId=null,columns:selected
  for(const row of report.rows){
   row.wash_duration=b.formatWashDuration(row.wash_start_time,row.wash_end_time,row.duration_hours);
  }
+ report.sourceRowCount=report.rows.length;
+ report.rows=quickServiceRows(report.rows);
  report.fields.completion_notes.label='Opis usługi';
  report.loadedAt=new Date().toISOString();
  report.pdfColumnStyles={
@@ -300,10 +319,10 @@ async function prepareQuickWashReport(b,{from,to,companyId=null,columns:selected
  const filenameBase='CleanFleet_prania_'+from+(from===to?'':'_'+to);
  const columns=report.cfg.columns.map(key=>({
   key,label:report.fields[key].label,value:row=>cell(row,key),
-  color:key==='final_cost'?row=>washPrice(row).color:undefined
+  color:key==='final_cost'?amountColor:undefined
  }));
  return {
-  rows:report.rows,columns,filenameBase,
+  rows:report.rows,recordCount:report.sourceRowCount,columns,filenameBase,
   async download(){
    await checkAccess();
    return exportPDFVectorFallback(report,{filename:filenameBase+'.pdf',compact:true});
@@ -396,7 +415,7 @@ function adminPdfSourceTable(doc,r,y,logo){
  for(let i=0;i<cols.length;i+=10){
    const chunk=cols.slice(i,i+10);
    if(i||y>145){doc.addPage();y=adminPdfHeader(doc,r,logo);}
-   doc.setTextColor(23,27,24);doc.setFontSize(11.5);doc.text('DANE ŹRÓDŁOWE ('+r.rows.length+')',10,y);y+=6;
+   doc.setTextColor(23,27,24);doc.setFontSize(11.5);doc.text(r.sourceRowCount!=null?'POZYCJE USŁUG · '+r.sourceRowCount+' wpisów':'DANE ŹRÓDŁOWE ('+r.rows.length+')',10,y);y+=6;
    if(cols.length>10){doc.setTextColor(96,103,98);doc.setFontSize(6.8);doc.text('Kolumny '+(i+1)+'–'+Math.min(i+10,cols.length)+' · numer wiersza łączy części tabeli',10,y);y+=4;}
    doc.autoTable({
      head:[[...chunk.map(k=>r.fields[k]?.label||k)]],

@@ -28,6 +28,10 @@ export const smsCall=(body,options={})=>request("/functions/v1/bill-sms",{method
 export const ksefAssignments=()=>request('/rest/v1/rs_ksef_links?select=*');
 const stockRpc=(name,args={})=>request('/rest/v1/rpc/'+name,{method:'POST',body:JSON.stringify(args),timeoutMs:90000});
 export const ksefDocumentIndex=()=>stockRpc('rs_ksef_document_index');
+export const ksefArchiveIndex=()=>stockRpc('bill_ksef_archive_index');
+export const storeKsefArchive=(kind,rows)=>stockRpc('bill_ksef_archive_store',{p_kind:kind,p_rows:rows});
+export const ksefArchiveContent=(number,hash)=>request('/rest/v1/bill_ksef_archive?select=content,metadata&ksef_number=eq.'+encodeURIComponent(number)+'&content=not.is.null').then(rows=>rows.find(r=>r.metadata.invoiceHash===hash)?.content||null);
+
 export const ksefHistoryState=()=>stockRpc('rs_ksef_history_state');
 export const markKsefHistory=to=>stockRpc('rs_ksef_mark_history',{p_to:to});
 export const storeKsefMetadata=rows=>stockRpc('rs_ksef_store_metadata',{p_rows:rows});

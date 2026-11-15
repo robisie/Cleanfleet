@@ -20,7 +20,7 @@ async function setup(correctionChoice,{fastTimers=false,storage}={}){
  const root={innerHTML:'',querySelector:node,querySelectorAll:()=>[]};let count=0;
  const context=vm.createContext({console,crypto,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,Blob,File,Map,Set,AbortController,DOMException,atob,btoa,localStorage:storage,setTimeout:fastTimers?(fn,ms)=>setTimeout(fn,0):setTimeout,clearTimeout,URL:{createObjectURL:blob=>{const key='blob:'+(count++);blobUrls.set(key,blob);return key;},revokeObjectURL:key=>blobUrls.delete(key)},confirm:()=>true,window:{JSZip:Zip,CFKsefRenderer:{generateInvoice:async()=>new Blob(['%PDF-1.7 fixture'])}},DOMParser:class{parseFromString(){return {doctype:null,documentElement:{localName:'Faktura'},getElementsByTagName:()=>[]};}},document:{}});
  const code=await readFile(new URL('../bill/ksef.js',import.meta.url),'utf8');
- const m=new vm.SourceTextModule(code+`\nexport function setupTest(node,call,rows=[],kind='purchases'){root=node;api=call;state=initial();state.kind=kind;state.loaded=true;state.rows=rows;state.query={kind:state.kind,from:state.from,to:state.to,dateType:state.dateType,sort:'Desc'};state.selected=new Set(rows.map(r=>r.ksefNumber));draw();}export {run,load,downloadSelected,historyRead,singleBytes};export async function testDocumentHide(options,number,hidden){integration=options;stockRows=await options.stock();await run(signal=>hideStockDocument(number,hidden,signal));return {message,rows:stockRows};}export async function testReceiptRemaining(options,number,destination){integration=options;chooseReceiptDestination=async()=>destination;await run(signal=>assignReceiptInvoice(number,signal));return message;}export async function testUndoReturned(options,number,index){integration=options;stockRows=await options.stock();await run(signal=>returnStock(number,index,true,signal));return {message,rows:stockRows};}export async function testAssignment(options,project,number,known=[],duplicateChoice){if(duplicateChoice!==undefined)chooseDuplicate=async()=>duplicateChoice;integration=options;assignments=known;chooseInvestment=async()=>project;await run(signal=>assignInvestment(number,signal));return message;}export async function testDemand(options,number){integration=options;await run(signal=>paymentDemand(number,signal));return message;}export async function testSupplierSuggestions(options,rows,source,selected,target={kind:'firmowe',label:'Koszty firmowe'}){integration=options;stockRows=rows;chooseSupplierInvoices=async(candidates,label,signal,unavailable)=>typeof selected==='function'?selected(candidates,label,signal,unavailable):selected;await run(signal=>suggestSupplierInvoices(source,target,signal));return {message,rows:stockRows};}export function testState(){return {state,ready,message,busy:!!controller};}`,{context});
+ const m=new vm.SourceTextModule(code+`\nexport function setupTest(node,call,rows=[],kind='purchases'){root=node;api=call;state=initial();state.kind=kind;state.loaded=true;state.rows=rows;state.query={kind:state.kind,from:state.from,to:state.to,dateType:state.dateType,sort:'Desc'};state.selected=new Set(rows.map(r=>r.ksefNumber));draw();}export {run,load,downloadSelected,historyRead,singleBytes};export function testSyncStock(node,call,options){root=node;api=call;integration=options;state.stock=true;state.kind='purchases';draw();void run(loadStock);}export async function testDocumentHide(options,number,hidden){integration=options;stockRows=await options.stock();await run(signal=>hideStockDocument(number,hidden,signal));return {message,rows:stockRows};}export async function testReceiptRemaining(options,number,destination){integration=options;chooseReceiptDestination=async()=>destination;await run(signal=>assignReceiptInvoice(number,signal));return message;}export async function testUndoReturned(options,number,index){integration=options;stockRows=await options.stock();await run(signal=>returnStock(number,index,true,signal));return {message,rows:stockRows};}export async function testAssignment(options,project,number,known=[],duplicateChoice){if(duplicateChoice!==undefined)chooseDuplicate=async()=>duplicateChoice;integration=options;assignments=known;chooseInvestment=async()=>project;await run(signal=>assignInvestment(number,signal));return message;}export async function testDemand(options,number){integration=options;await run(signal=>paymentDemand(number,signal));return message;}export async function testSupplierSuggestions(options,rows,source,selected,target={kind:'firmowe',label:'Koszty firmowe'}){integration=options;stockRows=rows;chooseSupplierInvoices=async(candidates,label,signal,unavailable)=>typeof selected==='function'?selected(candidates,label,signal,unavailable):selected;await run(signal=>suggestSupplierInvoices(source,target,signal));return {message,rows:stockRows};}export function testState(){return {state,ready,message,busy:!!controller};}`,{context});
  await m.link(spec=>{const values=spec.includes('stock-sync')?StockSync:spec.includes('ksef-progress')?Progress:spec.includes('cost-correction')?(correctionChoice!==undefined?{costCorrectionDialog:async()=>correctionChoice}:CostCorrection):spec.includes('ksef-relations')?Relations:spec.includes('stock.js')?Stock:spec.includes('stock-suggestions')?SupplierSuggestions:spec.includes('cost-suggestions')?Suggestions:spec.includes('receipt-import')?ReceiptImport:spec.includes('purchase-import')?Import:spec.includes('ksef-data')?D:C;return new vm.SyntheticModule(Object.keys(values),function(){for(const[k,v]of Object.entries(values))this.setExport(k,v);},{context});});await m.evaluate();return {n:m.namespace,root,blobUrls,node};
 }
 const number=i=>'6351861297-20261016-123456789ABC-'+String(i).padStart(2,'0');
@@ -76,7 +76,7 @@ test('Magazyn summary opens from the main stock panel',async()=>{
 test('one rejected XML does not hide saved goods or stop reading the next invoice',async()=>{
  const {n,root}=await setup(),bytes=new TextEncoder().encode('<Faktura/>'),docs=await Promise.all([1,2].map(async i=>({metadata:{...row(i),invoiceHash:await D.digest(bytes)},hasPreview:false}))),attempts=[];
  const goods=[{metadata:row(3),item:{index:1,name:'Zapisana farba',unit:'szt.',gross:100},capacity:1,assigned:0,returned:0,available:1}];
- n.mountStock(root,async body=>body.action==='ksef-list'?{invoices:[],hasMore:false}:{content:Buffer.from(bytes).toString('base64')},{index:async()=>docs,storeMetadata:async()=>{},stock:async()=>goods,storeXml:async number=>{attempts.push(number);if(number===docs[0].metadata.ksefNumber)throw Error('XML nie zgadza się z metadanymi KSeF.');docs[1].hasPreview=true;}});
+ n.testSyncStock(root,async body=>body.action==='ksef-list'?{invoices:[],hasMore:false}:{content:Buffer.from(bytes).toString('base64')},{index:async()=>docs,storeMetadata:async()=>{},stock:async()=>goods,storeXml:async number=>{attempts.push(number);if(number===docs[0].metadata.ksefNumber)throw Error('XML nie zgadza się z metadanymi KSeF.');docs[1].hasPreview=true;}});
  for(let i=0;i<100&&n.testState().busy;i++)await new Promise(resolve=>setTimeout(resolve,1));
  assert.equal(attempts.length,2);assert.match(root.innerHTML,/Zapisana farba/);assert.match(root.innerHTML,/Problemy z dokumentami \(1\)/);assert.match(root.innerHTML,/FV\/1/);assert.ok(!root.innerHTML.includes('Brak pozostałych towarów.'));n.unmount();
 });
@@ -89,7 +89,7 @@ test('unread corrections keep saved stock visible and block allocating uncertain
 test('KSeF panel escapes metadata, merges pages and changes month without keeping old selection',async()=>{
  const {n,root}=await setup(),calls=[];n.setupTest(root,async body=>{calls.push(body);return {invoices:[row(body.page+1)],page:body.page,hasMore:body.page===0,ticket:'encrypted'};});
  await n.run(n.load);await n.run(signal=>n.load(signal,true));assert.equal(n.testState().state.rows.length,2);assert.equal(calls[1].page,1);assert.equal(calls[1].ticket,'encrypted');assert.match(root.innerHTML,/&lt;img src=x/);assert.ok(!root.innerHTML.includes('<img src=x'));
- root.onchange({target:{id:'kf-all',checked:true,dataset:{}}});assert.equal(n.testState().state.selected.size,2);root.onchange({target:{id:'kf-month',value:'2026-02',dataset:{}}});assert.equal(n.testState().state.from,'2026-02-01');assert.equal(n.testState().state.to,'2026-02-28');assert.equal(n.testState().state.rows.length,0);assert.equal(n.testState().state.selected.size,0);assert.equal(n.testState().state.query,null);
+ root.onchange({target:{id:'kf-all',checked:true,dataset:{}}});assert.equal(n.testState().state.selected.size,2);root.onchange({target:{id:'kf-month',value:'2026-02',dataset:{}}});assert.equal(n.testState().state.from,'2026-02-01');assert.equal(n.testState().state.to,'2026-02-28');assert.equal(n.testState().state.rows.length,0);assert.equal(n.testState().state.selected.size,0);assert.equal(n.testState().state.query.from,'2026-02-01');
 });
 test('selected PDFs use one bulk export, verify AES/hashes and produce only selected PDFs in ZIP',async()=>{
  const {n,root,blobUrls}=await setup(),xml=new TextEncoder().encode('<Faktura>Łódź</Faktura>'),rows=[row(1),row(2)].map(r=>({...r,seller:{name:'Leroy-Merlin'},invoiceNumber:'FV/123/2026'}));for(const r of rows)r.invoiceHash=await D.digest(xml);const archive=new Zip();for(const r of rows)archive.file(r.ksefNumber+'.xml',xml);const plain=await archive.generateAsync({type:'uint8array',compression:'STORE'});const key=crypto.getRandomValues(new Uint8Array(32)),iv=crypto.getRandomValues(new Uint8Array(16)),aes=await crypto.subtle.importKey('raw',key,'AES-CBC',false,['encrypt']),encrypted=new Uint8Array(await crypto.subtle.encrypt({name:'AES-CBC',iv},aes,plain));const b64=bytes=>Buffer.from(bytes).toString('base64'),calls=[];
@@ -104,16 +104,20 @@ test('failed refresh keeps the previously loaded list and selection, marks it st
  const {n,root}=await setup();n.setupTest(root,async()=>{const error=Error('KSeF jest chwilowo niedostępny (HTTP 503).');error.retryable=true;throw error;},[row(1)]);await n.run(n.load);assert.equal(n.testState().state.rows.length,1);assert.equal(n.testState().state.selected.size,1);assert.equal(n.testState().state.listError,true);assert.match(root.innerHTML,/Ponów pobieranie listy/);assert.match(root.innerHTML,/mogą być nieaktualne/);
 });
 test('failed initial load does not claim an empty successful invoice list',async()=>{
- const {n,root}=await setup();n.setupTest(root,async()=>{throw Error('HTTP 503');});n.testState().state.loaded=false;await n.run(n.load);assert.match(root.innerHTML,/Lista nie została jeszcze pobrana/);assert.doesNotMatch(root.innerHTML,/Wczytano 0 faktur/);assert.equal(n.testState().state.loaded,false);
+ const {n,root}=await setup();n.setupTest(root,async()=>{throw Error('HTTP 503');});n.testState().state.loaded=false;await n.run(n.load);assert.match(root.innerHTML,/Brak zapisanych faktur/);assert.doesNotMatch(root.innerHTML,/Wczytano 0 faktur/);assert.equal(n.testState().state.loaded,false);
 });
 test('an accepted Bill-only correction can be included in PDF ZIP without waiting for KSeF export indexing',async()=>{
  const {n,root,blobUrls}=await setup(),xml='<Faktura>saved accepted correction</Faktura>',r={...row(4),billId:'bill-correction',invoiceNumber:'KA4/10/2026',invoiceType:'Kor',grossAmount:0,invoiceHash:await D.digest(new TextEncoder().encode(xml))};const calls=[];
  n.setupTest(root,async body=>{calls.push(body.action);assert.equal(body.action,'document');assert.equal(body.id,'bill-correction');return {status:'accepted',ksef_number:r.ksefNumber,xml};},[r]);assert.match(root.innerHTML,/Źródło: Bill/);assert.match(root.innerHTML,/Korekta/);await n.run(n.downloadSelected);assert.ok(n.testState().ready,n.testState().message);const zip=await Zip.loadAsync(await blobUrls.get(n.testState().ready.url).arrayBuffer());assert.ok(zip.file(D.invoicePdfName(r)));assert.deepEqual(calls,['document']);
 });
-test('returning to KSeF refreshes a previously loaded sales list',async()=>{
- const {n,root}=await setup();let requests=0;n.setupTest(root,async()=>{},[row(1)]);n.testState().state.kind='sales';n.mount(root,async()=>{requests++;return {invoices:[row(1),{...row(4),invoiceNumber:'KA4/10/2026',invoiceType:'Kor',grossAmount:0}],page:0,hasMore:false,ticket:'encrypted'};});await new Promise(resolve=>setImmediate(resolve));assert.equal(requests,1);assert.equal(n.testState().state.rows.length,2);assert.match(root.innerHTML,/KA4\/10\/2026/);
+test('returning to KSeF shows saved sales without issuing any KSeF request',async()=>{
+ const {n,root}=await setup();let requests=0,reads=0;
+ const entry={...row(4),issueDate:C.today(),invoiceNumber:'KA4/11/2026',invoiceType:'Kor',grossAmount:0};
+ n.setupTest(root,async()=>{},[],'sales');
+ const options={archiveIndex:async()=>{reads++;return [{kind:'sales',metadata:entry,hasContent:true}];}};
+ for(let i=0;i<2;i++){n.mount(root,async()=>{requests++;throw Error('Must not call KSeF');},options);await settleStock(n);assert.match(root.innerHTML,/KA4\/11\/2026/);n.unmount();}
+ assert.equal(requests,0);assert.equal(reads,2);
 });
-
 test('KSeF assignment verifies XML hash before persisting and refuses a conflicting Bill investment',async()=>{
  const {n,root}=await setup(),bytes=new TextEncoder().encode('<Faktura>test</Faktura>'),entry={...row(7),invoiceHash:await D.digest(bytes)},saved=[];
  const options={projects:[{id:'project',name:'Test'}],loadLinks:async()=>[],assign:async args=>{saved.push(args);return {document:{}};}};
@@ -171,11 +175,11 @@ test('KSeF rate limit waits, retries the same read and supports cancelling the c
 test('successful history scan persists its date and next session checks recent storage dates',async()=>{
  const entries=new Map(),storage={getItem:key=>entries.get(key),setItem:(key,value)=>entries.set(key,value)},requests=[];const {n,root}=await setup(undefined,{storage});const integration={userId:'test-owner',index:async()=>[],stock:async()=>[],storeMetadata:async()=>{}};const api=async body=>{requests.push(body);return {invoices:[],hasMore:false,ticket:'test'};};
  const settle=async()=>{for(let i=0;i<100&&n.testState().busy;i++)await new Promise(r=>setTimeout(r,1));assert.equal(n.testState().busy,false);};
- n.mountStock(root,api,integration);await settle();assert.equal(requests[0].from,'2026-01-01');assert(entries.get('robisie-ksef-history-v1:test-owner'));n.reset();requests.length=0;n.mountStock(root,api,integration);await settle();assert.equal(requests.length,0);n.reset();const key='robisie-ksef-history-v1:test-owner',saved=JSON.parse(entries.get(key));saved.checkedAt=Date.now()-6*60000;entries.set(key,JSON.stringify(saved));n.mountStock(root,api,integration);await settle();assert.equal(requests.length,1);assert(requests[0].from>'2026-09-01');n.reset();
+ n.testSyncStock(root,api,integration);await settle();assert.equal(requests[0].from,'2026-01-01');assert(entries.get('robisie-ksef-history-v1:test-owner'));n.reset();requests.length=0;n.testSyncStock(root,api,integration);await settle();assert.equal(requests.length,0);n.reset();const key='robisie-ksef-history-v1:test-owner',saved=JSON.parse(entries.get(key));saved.checkedAt=Date.now()-6*60000;entries.set(key,JSON.stringify(saved));n.testSyncStock(root,api,integration);await settle();assert.equal(requests.length,1);assert(requests[0].from>'2026-09-01');n.reset();
 });
 test('failed history resumes completed ranges and hides a row even while corrections are blocked',async()=>{
  const {n,root}=await setup();let requests=[],fail=true,hidden=false;const docs=[],goods=()=>[{metadata:row(1),item:{index:1,name:'Towar do ukrycia',unit:'szt.',gross:100},capacity:1,assigned:0,returned:0,available:1,hidden}];const integration={index:async()=>docs,stock:async()=>goods(),storeMetadata:async()=>{},setHidden:async value=>{assert.equal(value.index,1);hidden=value.hidden;}};
- const api=async body=>{requests.push(body.from);if(requests.length===2&&fail){fail=false;throw Error('Test sieci');}return {invoices:[],hasMore:false};};const settle=async()=>{for(let i=0;i<100&&n.testState().busy;i++)await new Promise(r=>setTimeout(r,1));};n.mountStock(root,api,integration);await settle();assert.equal(n.testState().state.stockCorrectionsIncomplete,true);
+ const api=async body=>{requests.push(body.from);if(requests.length===2&&fail){fail=false;throw Error('Test sieci');}return {invoices:[],hasMore:false};};const settle=async()=>{for(let i=0;i<100&&n.testState().busy;i++)await new Promise(r=>setTimeout(r,1));};n.testSyncStock(root,api,integration);await settle();assert.equal(n.testState().state.stockCorrectionsIncomplete,true);
  const click=data=>root.onclick({target:{closest:()=>({dataset:data})},stopPropagation(){}});click({kf:'stock-hide',number:number(1),index:'1',hidden:'true'});await settle();assert(hidden);assert.doesNotMatch(root.innerHTML,/<strong>Towar do ukrycia<\/strong>/);click({kf:'stock-refresh'});await settle();assert.equal(requests.filter(x=>x==='2026-01-01').length,1);assert.equal(n.testState().state.stockCorrectionsIncomplete,false);n.reset();
 });
 
@@ -188,17 +192,17 @@ test('fresh server checkpoint is reused on another session with no KSeF or dupli
 });
 test('overlap metadata scan skips all unchanged documents and does not recalculate saved stock',async()=>{
  const {n,root}=await setup();const documents=Array.from({length:100},(_,i)=>({metadata:{...row(i),invoiceHash:'same-'+i,invoiceType:'VAT'},hasPreview:true}));let writes=0,stockReads=0,indexReads=0,xmlReads=0,marks=0;const queries=[];
- n.mountStock(root,async body=>{if(body.action!=='ksef-list'){xmlReads++;assert.fail('Old XML must not be fetched');}queries.push(body);return {invoices:documents.map(d=>({...d.metadata,invoiceType:'Vat'})),hasMore:false};},{userId:'owner',historyState:async()=>({to:C.today(),checkedAt:Date.now()-6*60000}),markHistory:async()=>marks++,index:async()=>{indexReads++;return documents;},stock:async()=>{stockReads++;return [];},storeMetadata:async()=>writes++});
+ n.testSyncStock(root,async body=>{if(body.action!=='ksef-list'){xmlReads++;assert.fail('Old XML must not be fetched');}queries.push(body);return {invoices:documents.map(d=>({...d.metadata,invoiceType:'Vat'})),hasMore:false};},{userId:'owner',historyState:async()=>({to:C.today(),checkedAt:Date.now()-6*60000}),markHistory:async()=>marks++,index:async()=>{indexReads++;return documents;},stock:async()=>{stockReads++;return [];},storeMetadata:async()=>writes++});
  await settleStock(n);assert.equal(queries.length,1);assert.equal(queries[0].dateType,'PermanentStorage');assert.equal(queries[0].from,new Date(Date.parse(C.today()+'T12:00:00Z')-2*86400000).toISOString().slice(0,10));assert.deepEqual({writes,stockReads,indexReads,xmlReads,marks},{writes:0,stockReads:1,indexReads:1,xmlReads:0,marks:1});n.reset();
 });
 test('new correction with an old issue date downloads only its XML, retains old goods and advances shared cursor',async()=>{
  const {n,root}=await setup(),bytes=new TextEncoder().encode('<Faktura>new correction</Faktura>'),old={...row(1),invoiceType:'VAT',invoiceHash:'old-hash'},added={...row(2),issueDate:'2026-02-02',permanentStorageDate:C.today()+'T10:00:00Z',invoiceType:'Kor',invoiceHash:await D.digest(bytes)};let documents=[{metadata:old,hasPreview:true,references:[]}],posts=[],downloads=[],marks=0,stockReads=0;
- n.mountStock(root,async body=>{if(body.action==='ksef-list')return {invoices:[old,added],hasMore:false};downloads.push(body.number);return {content:Buffer.from(bytes).toString('base64')};},{userId:'owner',historyState:async()=>({to:C.today(),checkedAt:Date.now()-6*60000}),markHistory:async()=>marks++,index:async()=>documents,stock:async()=>{stockReads++;return [];},storeMetadata:async rows=>{posts.push(...rows);documents.push(...rows.map(metadata=>({metadata,hasPreview:false,references:[]})));},storeXml:async number=>{documents=documents.map(d=>d.metadata.ksefNumber===number?{...d,hasPreview:true,references:[{ksefNumber:old.ksefNumber}]}:d);}});
+ n.testSyncStock(root,async body=>{if(body.action==='ksef-list')return {invoices:[old,added],hasMore:false};downloads.push(body.number);return {content:Buffer.from(bytes).toString('base64')};},{userId:'owner',historyState:async()=>({to:C.today(),checkedAt:Date.now()-6*60000}),markHistory:async()=>marks++,index:async()=>documents,stock:async()=>{stockReads++;return [];},storeMetadata:async rows=>{posts.push(...rows);documents.push(...rows.map(metadata=>({metadata,hasPreview:false,references:[]})));},storeXml:async number=>{documents=documents.map(d=>d.metadata.ksefNumber===number?{...d,hasPreview:true,references:[{ksefNumber:old.ksefNumber}]}:d);}});
  await settleStock(n);assert.deepEqual(downloads,[added.ksefNumber]);assert.equal(posts.length,1);assert.equal(posts[0].ksefNumber,added.ksefNumber);assert.equal(marks,1);assert.equal(stockReads,2);assert.equal(n.testState().state.stockCorrectionsIncomplete,false);n.reset();
 });
 test('failed correction and failed checkpoint read preserve saved goods without claiming synchronization',async()=>{
  for(const failState of [false,true]){const {n,root}=await setup();let marks=0;const metadata={...row(1),invoiceType:'Kor',invoiceHash:'invalid'},goods=[{metadata:row(2),item:{index:1,name:'Zapisany produkt',unit:'szt.',gross:100},capacity:1,assigned:0,returned:0,available:1}];
- n.mountStock(root,async body=>body.action==='ksef-list'?{invoices:[],hasMore:false}:{content:Buffer.from('<Faktura/>').toString('base64')},{historyState:async()=>{if(failState)throw Error('Odczyt znacznika przerwany');return {to:C.today(),checkedAt:Date.now()-6*60000};},markHistory:async()=>marks++,index:async()=>failState?[]:[{metadata,hasPreview:false}],stock:async()=>goods,storeMetadata:async()=>{}});await settleStock(n);assert.equal(marks,0);assert.match(root.innerHTML,/Zapisany produkt/);assert.equal(n.testState().state.stockCorrectionsIncomplete,true);n.reset();}
+ n.testSyncStock(root,async body=>body.action==='ksef-list'?{invoices:[],hasMore:false}:{content:Buffer.from('<Faktura/>').toString('base64')},{historyState:async()=>{if(failState)throw Error('Odczyt znacznika przerwany');return {to:C.today(),checkedAt:Date.now()-6*60000};},markHistory:async()=>marks++,index:async()=>failState?[]:[{metadata,hasPreview:false}],stock:async()=>goods,storeMetadata:async()=>{}});await settleStock(n);assert.equal(marks,0);assert.match(root.innerHTML,/Zapisany produkt/);assert.equal(n.testState().state.stockCorrectionsIncomplete,true);n.reset();}
 });
 test('manual refresh checks recent KSeF metadata even with a fresh shared checkpoint',async()=>{
  const {n,root}=await setup();let requests=0;const integration={historyState:async()=>({to:C.today(),checkedAt:Date.now()}),markHistory:async()=>{},index:async()=>[],stock:async()=>[],storeMetadata:async()=>{}};n.mountStock(root,async()=>{requests++;return {invoices:[],hasMore:false};},integration);await settleStock(n);assert.equal(requests,0);root.onclick({target:{closest:()=>({dataset:{kf:'stock-refresh'}})},stopPropagation(){}});await settleStock(n);assert.equal(requests,1);n.reset();
@@ -243,4 +247,72 @@ test('initial invoice-list cooldown can be cancelled without another KSeF reques
  assert.match(n.testState().message,/Kontynuacja za/);
  root.onclick({target:{closest:()=>({dataset:{kf:'cancel'}})},stopPropagation(){}});await pending;
  assert.equal(calls.length,1);assert.equal(n.testState().busy,false);assert.match(n.testState().message,/Anulowano/);
+});
+
+function archiveBackend(seed=[]){
+ const saved=new Map(seed.map(d=>[d.kind+'|'+d.metadata.ksefNumber,structuredClone(d)]));
+ const options={archiveIndex:async()=>[...saved.values()].map(d=>structuredClone(d)),archiveContent:async(number,hash)=>[...saved.values()].find(d=>d.metadata.ksefNumber===number&&d.metadata.invoiceHash===hash)?.content||null,
+  storeArchive:async(kind,rows)=>{for(const {metadata,content}of rows){const key=kind+'|'+metadata.ksefNumber,old=saved.get(key),same=old?.metadata.invoiceHash===metadata.invoiceHash,original=content||(same?old?.content:null);saved.set(key,{kind,metadata:structuredClone(metadata),content:original,hasContent:!!original});}}
+ };
+ return {saved,options};
+}
+const currentRow=i=>({...row(i),issueDate:C.today(),invoicingDate:C.today()+'T10:00:00Z',permanentStorageDate:C.today()+'T10:00:00Z'});
+test('saved purchases survive remount, filtering and switching kind without KSeF calls',async()=>{
+ const {n,root}=await setup(),backend=archiveBackend([{kind:'purchases',metadata:currentRow(1),hasContent:false},{kind:'sales',metadata:currentRow(2),hasContent:false}]);let remote=0;
+ n.mount(root,async()=>{remote++;assert.fail('Opening or filtering must not contact KSeF');},backend.options);await settleStock(n);
+ assert.equal(n.testState().state.rows.length,1);assert.match(root.innerHTML,/FV\/1/);
+ root.onclick({target:{closest:()=>({dataset:{kf:'kind',kind:'sales'}})},stopPropagation(){}});
+ assert.equal(n.testState().state.rows[0].ksefNumber,number(2));
+ root.onchange({target:{id:'kf-month',value:'2026-02',dataset:{}}});assert.equal(n.testState().state.rows.length,0);
+ root.onchange({target:{id:'kf-month',value:C.today().slice(0,7),dataset:{}}});assert.equal(n.testState().state.rows.length,1);
+ n.unmount();n.mount(root,async()=>{remote++;},backend.options);await settleStock(n);assert.equal(n.testState().state.rows.length,1);assert.equal(remote,0);
+});
+test('refresh saves missing originals once; a new session reuses them for previews',async()=>{
+ const {n,root}=await setup(),bytes=new TextEncoder().encode('<Faktura>saved original</Faktura>'),hash=await D.digest(bytes),entries=[1,2].map(i=>({...currentRow(i),invoiceHash:hash}));
+ const backend=archiveBackend([{kind:'sales',metadata:entries[0],content:Buffer.from(bytes).toString('base64'),hasContent:true}]),calls=[];
+ const api=async body=>{calls.push({...body});return body.action==='ksef-list'?{invoices:entries,page:0,hasMore:false,ticket:'ticket'}:{content:Buffer.from(bytes).toString('base64')};};
+ n.focusInvoice('',C.today().slice(0,7),'sales');n.mount(root,api,backend.options);await settleStock(n);assert.equal(calls.length,0);
+ await n.run(n.load);assert.deepEqual(calls.filter(x=>x.action==='ksef-document').map(x=>x.number),[entries[1].ksefNumber]);
+ await n.run(n.load);assert.equal(calls.filter(x=>x.action==='ksef-document').length,1);
+ const next=await setup();next.n.focusInvoice('',C.today().slice(0,7),'sales');next.n.mount(next.root,()=>assert.fail('Saved XML requires no KSeF call'),backend.options);await settleStock(next.n);
+ await next.n.run(async signal=>assert.deepEqual(Array.from(await next.n.singleBytes(entries[1],signal)),Array.from(bytes)));
+ assert.equal(next.n.testState().state.rows.length,2);
+});
+test('failed original download retains successful documents and next refresh fills only the gap',async()=>{
+ const {n,root}=await setup(),bytes=new TextEncoder().encode('<Faktura>resume</Faktura>'),hash=await D.digest(bytes),entries=[1,2].map(i=>({...currentRow(i),invoiceHash:hash}));
+ const backend=archiveBackend(),downloads=[];let fail=true;
+ n.focusInvoice('',C.today().slice(0,7),'sales');n.mount(root,async body=>{if(body.action==='ksef-list')return {invoices:entries,page:0,hasMore:false};downloads.push(body.number);if(body.number===number(2)&&fail){fail=false;throw Error('Przerwany odczyt');}return {content:Buffer.from(bytes).toString('base64')};},backend.options);await settleStock(n);
+ await n.run(n.load);assert.match(n.testState().message,/Przerwany odczyt/);assert.equal(backend.saved.size,2);assert.equal(backend.saved.get('sales|'+number(1)).hasContent,true);
+ await n.run(n.load);assert.deepEqual(downloads,[number(1),number(2),number(2)]);assert.equal(backend.saved.get('sales|'+number(2)).hasContent,true);
+});
+test('refresh persists every metadata page; previously parsed warehouse invoices are not downloaded again',async()=>{
+ const {n,root}=await setup(),entries=[1,2].map(i=>({...currentRow(i),seller:{nip:'1234567890',name:'Sklep'},ksefNumber:number(i).replace('6351861297','1234567890'),invoiceHash:'known-'+i}));
+ const backend=archiveBackend(),calls=[];
+ const options={...backend.options,index:async()=>entries.map(metadata=>({metadata,hasPreview:true})),storeMetadata:async()=>{},storeXml:async()=>assert.fail('Known parsed invoice must not be reparsed')};
+ n.mount(root,async body=>{calls.push(body);assert.equal(body.action,'ksef-list');return {invoices:[entries[body.page]],page:body.page,hasMore:body.page===0,ticket:'t'};},options);await settleStock(n);assert.equal(calls.length,0);
+ await n.run(n.load);assert.deepEqual(calls.map(c=>c.page),[0,1]);assert.equal(backend.saved.size,2);assert.equal(n.testState().state.rows.length,2);
+});
+test('warehouse mount reads saved stock even with no history checkpoint and never starts a KSeF scan',async()=>{
+ const {n,root}=await setup();let remote=0;const goods=[{metadata:currentRow(1),item:{index:1,name:'Zapisana farba',unit:'szt.',gross:100},capacity:1,assigned:0,returned:0,available:1}];
+ const options={index:async()=>[{metadata:currentRow(1),hasPreview:true}],stock:async()=>goods,historyState:async()=>null};
+ for(let i=0;i<2;i++){n.mountStock(root,async()=>{remote++;throw Error('Opening stock must not contact KSeF');},options);await settleStock(n);assert.match(root.innerHTML,/Zapisana farba/);assert.equal(n.testState().state.stockComplete,true);n.unmount();}
+ assert.equal(remote,0);
+});
+test('warehouse refresh parses cached original without downloading the invoice from KSeF again',async()=>{
+ const {n,root}=await setup(),bytes=new TextEncoder().encode('<Faktura>already downloaded in Bill</Faktura>'),metadata={...currentRow(1),seller:{nip:'1234567890',name:'Sklep'},ksefNumber:number(1).replace('6351861297','1234567890'),invoiceHash:await D.digest(bytes)};
+ const backend=archiveBackend([{kind:'purchases',metadata,content:Buffer.from(bytes).toString('base64'),hasContent:true}]);let parsed=false,remote=0;
+ const options={...backend.options,userId:'owner',index:async()=>[{metadata,hasPreview:parsed}],stock:async()=>[],historyState:async()=>({to:C.today(),checkedAt:Date.now()}),markHistory:async()=>{},storeMetadata:async()=>{},storeXml:async(number,xml)=>{assert.equal(xml,new TextDecoder().decode(bytes));parsed=true;}};
+ n.mountStock(root,async body=>{remote++;assert.equal(body.action,'ksef-list');return {invoices:[metadata],hasMore:false};},options);await settleStock(n);assert.equal(remote,0);
+ root.onclick({target:{closest:()=>({dataset:{kf:'stock-refresh'}})},stopPropagation(){}});await settleStock(n);
+ assert.equal(parsed,true);assert.equal(remote,1);assert.equal(n.testState().state.stockComplete,true);
+});
+
+test('chosen period and invoice kind survive a new session without contacting KSeF',async()=>{
+ const data=new Map(),storage={getItem:k=>data.get(k),setItem:(k,v)=>data.set(k,v)},backend=archiveBackend([{kind:'sales',metadata:{...row(1),issueDate:'2026-02-10'},hasContent:false}]);
+ const options={...backend.options,userId:'same-owner'},first=await setup(undefined,{storage});
+ first.n.mount(first.root,()=>assert.fail('Must show saved invoices'),options);await settleStock(first.n);
+ first.root.onclick({target:{closest:()=>({dataset:{kf:'kind',kind:'sales'}})},stopPropagation(){}});
+ first.root.onchange({target:{id:'kf-month',value:'2026-02',dataset:{}}});assert.equal(first.n.testState().state.rows.length,1);first.n.unmount();
+ const next=await setup(undefined,{storage});next.n.mount(next.root,()=>assert.fail('Must restore saved invoices'),options);await settleStock(next.n);
+ assert.equal(next.n.testState().state.kind,'sales');assert.equal(next.n.testState().state.from,'2026-02-01');assert.equal(next.n.testState().state.rows.length,1);
 });

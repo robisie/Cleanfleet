@@ -63,6 +63,7 @@
 
   let refreshing=false;
   async function refreshStates(){
+    if(window.cfCanEditRecordPhotos?.()!==true)return;
     if(refreshing){scheduleRefresh(100);return;}refreshing=true;
     try{
     const rows=await allPhotos();
@@ -88,6 +89,7 @@
   }
 
   function ensureClearButton(){
+    if(window.cfCanEditRecordPhotos?.()!==true)return;
     const actions=document.querySelector('#cfPhotoOverlay .cf-photo-local-actions');
     if(!actions||actions.querySelector('[data-local-clear]'))return;
     const btn=document.createElement('button');

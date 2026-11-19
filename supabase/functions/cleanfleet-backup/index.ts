@@ -8,7 +8,7 @@ const TABLES = [
   'cf_purchases','cf_reminders','cf_service_catalog','cf_tax_payments',
   'cf_user_activity_daily','cf_user_presence','companies','company_users',
   'invoice_items','invoices','notification_log','push_notification_log',
-  'push_subscriptions','user_roles','vehicles','wash_change_requests',
+  'push_subscriptions','user_roles','vehicles','cf_vehicle_archive_requests','wash_change_requests',
   'wash_record_photos','wash_records','website_content','website_events'
 ] as const;
 const ALLOWED_ORIGINS = new Set(['https://cleanfleet.pl','https://www.cleanfleet.pl']);

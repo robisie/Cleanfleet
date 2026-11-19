@@ -23,6 +23,7 @@
   const isAdmin=()=>{try{return typeof cfIsAdmin==='function'&&cfIsAdmin();}catch(_){return false;}};
 
   const canUsePhotos=()=>{try{return window.cfCanUseRecordPhotos?.()===true;}catch(_){return false;}};
+  const canEditPhotos=()=>{try{return window.cfCanEditRecordPhotos?.()===true;}catch(_){return false;}};
 
   function slug(v,fallback='inne'){
     const s=String(v||fallback).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
@@ -183,7 +184,7 @@
   function ensurePhotoModal(){
     let o=document.getElementById('cfPhotoOverlay');if(o)return o;
     o=document.createElement('div');o.id='cfPhotoOverlay';o.className='cf-photo-overlay';o.setAttribute('aria-hidden','true');
-    o.innerHTML=`<div class="cf-photo-modal" role="dialog" aria-modal="true" aria-label="Zdjęcia wpisu"><div class="cf-photo-head"><div><div class="cf-photo-title" id="cfPhotoTitle">Zdjęcia</div><div class="cf-photo-sub" id="cfPhotoSub"></div></div><button type="button" class="cf-photo-close" data-photo-close aria-label="Zamknij">×</button></div><div class="cf-photo-body"><div class="cf-photo-tabs"><button type="button" class="cf-photo-tab active" data-photo-kind="przed">PRZED</button><button type="button" class="cf-photo-tab" data-photo-kind="po">PO</button></div><div class="cf-photo-actions"><button type="button" data-photo-add>📷 Dodaj zdjęcie</button><button type="button" class="primary" data-photo-save>Zapisz zdjęcia</button><input type="file" data-photo-input accept="image/*" multiple hidden></div><div class="cf-photo-status" data-photo-status></div><div class="cf-photo-section-title">Nowe zdjęcia przed zapisem</div><div class="cf-photo-grid" data-photo-pending></div><div class="cf-photo-section-title">Zapisane zdjęcia</div><div class="cf-photo-grid cf-photo-saved" data-photo-saved></div><div class="cf-photo-note">Zdjęcia są zapisane tylko na tym urządzeniu. ZIP zawiera foldery <strong>typ / data / tablica / przed|po</strong>.</div></div></div>`;
+    o.innerHTML=`<div class="cf-photo-modal" role="dialog" aria-modal="true" aria-label="Zdjęcia wpisu"><div class="cf-photo-head"><div><div class="cf-photo-title" id="cfPhotoTitle">Zdjęcia</div><div class="cf-photo-sub" id="cfPhotoSub"></div></div><button type="button" class="cf-photo-close" data-photo-close aria-label="Zamknij">×</button></div><div class="cf-photo-body"><div class="cf-photo-tabs"><button type="button" class="cf-photo-tab active" data-photo-kind="przed">PRZED</button><button type="button" class="cf-photo-tab" data-photo-kind="po">PO</button></div><div class="cf-photo-actions"><button type="button" data-photo-add>📷 Dodaj zdjęcie</button><button type="button" class="primary" data-photo-save>Zapisz zdjęcia</button><input type="file" data-photo-input accept="image/*" multiple hidden></div><div class="cf-photo-status" data-photo-status></div><div class="cf-photo-section-title" data-photo-pending-title>Nowe zdjęcia przed zapisem</div><div class="cf-photo-grid" data-photo-pending></div><div class="cf-photo-section-title">Zapisane zdjęcia</div><div class="cf-photo-grid cf-photo-saved" data-photo-saved></div><div class="cf-photo-note">Zdjęcia są zapisane tylko na tym urządzeniu.</div></div></div>`;
     document.body.appendChild(o);
     o.addEventListener('click',e=>{if(e.target===o||e.target.closest('[data-photo-close]'))closePhotoModal();});
     o.querySelectorAll('[data-photo-kind]').forEach(b=>b.addEventListener('click',()=>{if(!photoState||photoState.busy)return;photoState.kind=b.dataset.photoKind;renderPhotoModal();}));
@@ -201,10 +202,17 @@
     overlay.classList.add('open');
     overlay.setAttribute('aria-hidden','false');
     photoState={record:{id:recordId,plate:'',type:'',brand:''},kind:'przed',existing:[],pending:{przed:[],po:[]},signed:new Map(),busy:false};
+    overlay.classList.toggle('cf-photos-readonly',!canEditPhotos());
+    for(const selector of ['.cf-photo-actions','[data-photo-pending-title]','[data-photo-pending]']){
+      overlay.querySelector(selector).style.display=canEditPhotos()?'':'none';
+    }
+    overlay.querySelector('.cf-photo-note').textContent=canEditPhotos()
+      ? 'Zdjęcia lokalne są synchronizowane z serwerem; pracownicy widzą zdjęcia już przesłane.'
+      : 'Możesz przeglądać zdjęcia zapisane na serwerze i pobrać je jako ZIP.';
     renderPhotoModal();
     document.dispatchEvent(new CustomEvent('cf:photos-open',{detail:{recordId}}));
     const status=overlay.querySelector('[data-photo-status]');
-    if(status)status.textContent='Zdjęcia są zapisywane lokalnie na tym urządzeniu.';
+    if(status)status.textContent=canEditPhotos()?'Zdjęcia są zapisywane lokalnie na tym urządzeniu.':'Ładowanie zdjęć…';
     if(!dbReady())return;
     try{
       const {data:rec,error}=await cfSupabase.from('wash_records').select('id,company_id,plate,type,brand,order_date,order_due_date,wash_date,schedule_proposed_date').eq('id',recordId).maybeSingle();
@@ -212,11 +220,11 @@
       if(rec&&photoState&&String(photoState.record?.id)===String(recordId)){
         photoState.record=rec;
         renderPhotoModal();
-        if(status)status.textContent='Zdjęcia są zapisywane lokalnie na tym urządzeniu.';
+        if(!canEditPhotos())await loadSharedPhotos();
       }
     }catch(e){
       console.warn('CleanFleet local photo metadata',e);
-      if(status)status.textContent='Zdjęcia są zapisywane lokalnie na tym urządzeniu.';
+      if(status)status.textContent=canEditPhotos()?'Zdjęcia są zapisywane lokalnie na tym urządzeniu.':'Nie udało się pobrać zdjęć.';
     }
   }
   function closePhotoModal(){if(photoState?.busy)return;const o=document.getElementById('cfPhotoOverlay');if(o){o.classList.remove('open');o.setAttribute('aria-hidden','true');o.querySelector('[data-photo-pending]')?.replaceChildren();}if(photoState){Object.values(photoState.pending).flat().forEach(x=>URL.revokeObjectURL(x.url));}photoState=null;document.dispatchEvent(new CustomEvent('cf:photos-close'));}
@@ -224,6 +232,57 @@
     if(!photoState)return;
     const missing=photoState.existing.filter(r=>!photoState.signed.has(r.storage_path));
     await Promise.all(missing.map(async r=>{const {data,error}=await cfSupabase.storage.from(PHOTO_BUCKET).createSignedUrl(r.storage_path,3600);if(!error&&data?.signedUrl)photoState.signed.set(r.storage_path,data.signedUrl);}));
+  }
+  async function loadSharedPhotos(){
+    const s=photoState;
+    if(!s||canEditPhotos())return;
+    const {data,error}=await cfSupabase.from('wash_record_photos')
+      .select('id,kind,storage_path,created_at').eq('wash_record_id',s.record.id).order('created_at');
+    if(error)throw error;
+    if(photoState!==s)return;
+    s.existing=data||[];
+    await loadSignedUrls();
+    if(photoState!==s)return;
+    renderPhotoModal();
+    const o=document.getElementById('cfPhotoOverlay');
+    const body=o?.querySelector('.cf-photo-body');
+    let button=body?.querySelector('[data-photo-shared-zip]');
+    if(!button&&body){
+      button=document.createElement('button');button.type='button';button.dataset.photoSharedZip='1';
+      button.className='btn btn-solid';button.textContent='Pobierz paczkę ZIP';
+      button.style.margin='12px 0';body.append(button);
+      button.addEventListener('click',downloadSharedZip);
+    }
+    if(button)button.disabled=!s.existing.length;
+    const status=o?.querySelector('[data-photo-status]');
+    if(status)status.textContent=s.existing.length?`Na serwerze: ${s.existing.length} zdjęć.`:'Brak zdjęć przesłanych na serwer.';
+  }
+  async function downloadSharedZip(){
+    const s=photoState,button=document.querySelector('[data-photo-shared-zip]');
+    if(!s||!s.existing.length||!window.CFPhotoZipStream)return;
+    button.disabled=true;button.textContent='Przygotowuję ZIP…';
+    try{
+      const entries=[{path:'przed/'},{path:'po/'}];
+      const pathById=new Map();
+      for(const [i,row] of s.existing.entries()){
+        if(!['przed','po'].includes(row.kind))continue;
+        const ext=(row.storage_path.match(/\.([a-z0-9]{2,5})$/i)?.[1]||'jpg').toLowerCase();
+        entries.push({id:row.id,path:`${row.kind}/${String(i+1).padStart(3,'0')}.${ext}`});
+        pathById.set(row.id,row.storage_path);
+      }
+      const getPhoto=async id=>{
+        const {data,error}=await cfSupabase.storage.from(PHOTO_BUCKET).download(pathById.get(id));
+        if(error)throw error;
+        return {blob:data,mime:data.type};
+      };
+      const name=`CleanFleet_${plateSlug(s.record.plate)}_${localYmd(new Date())}.zip`;
+      const response=window.CFPhotoZipStream.response({name,createdAt:Date.now(),entries},getPhoto);
+      const blob=await response.blob();
+      const url=URL.createObjectURL(blob),link=document.createElement('a');
+      link.href=url;link.download=name;document.body.append(link);link.click();link.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),60000);
+    }catch(e){toast(e.message||'Nie udało się pobrać ZIP-a.');}
+    finally{button.disabled=false;button.textContent='Pobierz paczkę ZIP';}
   }
   function renderPhotoModal(){
     const o=ensurePhotoModal(),s=photoState;if(!s)return;
@@ -236,7 +295,7 @@
     o.querySelector('[data-photo-saved]').innerHTML=saved.length?saved.map(r=>{const u=s.signed.get(r.storage_path);return u?`<div class="cf-photo-thumb"><a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="Zapisane zdjęcie"></a></div>`:'';}).join(''):'<div class="cf-photo-sub">Brak zapisanych zdjęć.</div>';
     const save=o.querySelector('[data-photo-save]');save.disabled=s.busy||!arr.length;save.textContent=s.busy?'Zapisywanie…':'Zapisz zdjęcia';
     o.querySelector('[data-photo-add]').disabled=s.busy;
-    o.querySelector('[data-photo-status]').textContent=s.busy?'Zapisywanie lokalnie…':'Zdjęcia są zapisywane lokalnie na tym urządzeniu.';
+    o.querySelector('[data-photo-status]').textContent=s.busy?'Zapisywanie lokalnie…':canEditPhotos()?'Zdjęcia są zapisywane lokalnie na tym urządzeniu.':`Na serwerze: ${s.existing.length} zdjęć.`;
     document.dispatchEvent(new CustomEvent('cf:photos-render'));
   }
   // Decode only one original at a time; keep full quality files for the ZIP.
@@ -259,6 +318,7 @@
     finally{image?.close?.();if(url){image.src='';URL.revokeObjectURL(url)}if(canvas){canvas.width=0;canvas.height=0}}
   };
   async function addPhotoFiles(files){
+    if(!canEditPhotos())return false;
     if(!photoState||photoState.busy)return false;
     const selected=[...files],state=photoState,kind=state.kind;state.busy=true;renderPhotoModal();
     try{

@@ -207,7 +207,7 @@
       overlay.querySelector(selector).style.display=canEditPhotos()?'':'none';
     }
     overlay.querySelector('.cf-photo-note').textContent=canEditPhotos()
-      ? 'Zdjęcia lokalne są synchronizowane z serwerem; pracownicy widzą zdjęcia już przesłane.'
+      ? 'Zdjęcia zostają na tym urządzeniu. Tylko wybrane przez Ciebie zdjęcia wysłane na serwer będą widoczne dla pracowników.'
       : 'Możesz przeglądać zdjęcia zapisane na serwerze i pobrać je jako ZIP.';
     renderPhotoModal();
     document.dispatchEvent(new CustomEvent('cf:photos-open',{detail:{recordId}}));

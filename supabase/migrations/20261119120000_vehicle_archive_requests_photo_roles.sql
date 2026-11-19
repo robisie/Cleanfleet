@@ -46,6 +46,7 @@ create trigger cf_vehicle_archive_guard before insert or update on public.vehicl
 drop policy if exists cf_vehicles_delete on public.vehicles;
 create policy cf_vehicles_delete on public.vehicles for delete to authenticated
   using (public.cf_is_admin());
+revoke truncate on public.vehicles from anon,authenticated;
 
 create or replace function public.cf_request_vehicle_archive(p_company_id uuid,p_plate text)
 returns uuid language plpgsql security definer set search_path='' as $$

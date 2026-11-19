@@ -5764,7 +5764,8 @@ document.querySelectorAll('[data-quick-wash]').forEach(button=>{
 });
 
 // Narrow bridge: photo modules can read the live role held inside this closure.
-window.cfCanUseRecordPhotos = () => cfIsAdmin();
+window.cfCanUseRecordPhotos = () => cfIsAdmin() || cfIsFleetEmployee();
+window.cfCanEditRecordPhotos = () => cfIsAdmin();
 function cfIsCleanFleetEmployee(){ return cfCurrentRole==='cleanfleet_employee'; }
 function cfIsFleetEmployee(){ return cfCurrentRole==='fleet_employee' || cfCurrentRole==='cleanfleet_employee'; }
 function cfEmployeeOwn(r){ return !!(r && cfIsFleetEmployee() && r.created_by===cfCurrentUserId); }
@@ -8070,6 +8071,7 @@ async function cfLoadChangeNotifications(){
       .limit(100);
     if(error) throw error;
     const requestIds = [...new Set((data||[]).filter(n=>['wash_change_request','wash_change_request_result'].includes(n.type)).map(n=>n.entity_id).filter(Boolean))];
+    const vehicleIds = [...new Set((data||[]).filter(n=>['vehicle_archive_request','vehicle_archive_result'].includes(n.type)).map(n=>n.entity_id).filter(Boolean))];
     let pendingCount = 0;
     if(requestIds.length){
       const { data:reqs, error:reqError } = await cfSupabase
@@ -8079,7 +8081,12 @@ async function cfLoadChangeNotifications(){
       if(reqError) throw reqError;
       pendingCount = (reqs||[]).filter(r=>r.status === 'pending').length;
     }
-    const unreadCount = (data||[]).filter(n=>!n.read_at && ['wash_change_request','wash_change_request_result','wash_completed','employee_registered','wash_schedule_proposed','wash_schedule_counter','wash_schedule_confirmed','wash_schedule_rejected'].includes(n.type)).length;
+    if(vehicleIds.length){
+      const {data:vehicleRequests,error:vehicleError}=await cfSupabase.from('cf_vehicle_archive_requests').select('id,status').in('id',vehicleIds);
+      if(vehicleError)throw vehicleError;
+      pendingCount+=(vehicleRequests||[]).filter(r=>r.status==='pending').length;
+    }
+    const unreadCount = (data||[]).filter(n=>!n.read_at && ['wash_change_request','wash_change_request_result','vehicle_archive_request','vehicle_archive_result','wash_completed','employee_registered','wash_schedule_proposed','wash_schedule_counter','wash_schedule_confirmed','wash_schedule_rejected'].includes(n.type)).length;
     cfChangeUnreadCount = pendingCount;
     if(sub) sub.innerHTML = pendingCount ? `Do weryfikacji: <strong>${pendingCount}</strong>${unreadCount>pendingCount ? ` · Nowe: <strong>${unreadCount}</strong>` : ''}` : (unreadCount ? `Nowe powiadomienia: <strong>${unreadCount}</strong>` : 'Brak nowych powiadomień');
     renderAttentionPanel();
@@ -8241,6 +8248,14 @@ async function cfOpenChangeNotifications(){
   }
   const requestIds = [...new Set(items.filter(n=>['wash_change_request','wash_change_request_result'].includes(n.type)).map(n=>n.entity_id).filter(Boolean))];
   let requestsById = {};
+  const vehicleRequestIds=[...new Set(items.filter(n=>['vehicle_archive_request','vehicle_archive_result'].includes(n.type)).map(n=>n.entity_id).filter(Boolean))];
+  let vehicleRequestsById={};
+  if(vehicleRequestIds.length){
+    const {data:vehicleRequests,error:vehicleError}=await cfSupabase.from('cf_vehicle_archive_requests')
+      .select('id,company_id,plate,status,requested_by,created_at').in('id',vehicleRequestIds);
+    if(vehicleError){showToast('Nie udało się pobrać wniosków o pojazdy.');return;}
+    vehicleRequestsById=Object.fromEntries((vehicleRequests||[]).map(r=>[r.id,r]));
+  }
 
   if(requestIds.length){
     const { data:reqs, error:reqError } = await cfSupabase
@@ -8269,6 +8284,12 @@ async function cfOpenChangeNotifications(){
   const esc = (v) => htmlEscape(v == null ? '' : String(v));
 
   function statusInfo(note){
+    if(note.type==='vehicle_archive_request'||note.type==='vehicle_archive_result'){
+      const status=vehicleRequestsById[note.entity_id]?.status;
+      if(status==='pending')return {text:'DO DECYZJI',cls:'pending'};
+      if(status==='archived')return {text:'USUNIĘTY Z FLOTY',cls:'approved'};
+      if(status==='kept')return {text:'POZOSTAJE',cls:'rejected'};
+    }
     const req = note.entity_id ? requestsById[note.entity_id] : null;
     const status = req?.status;
     if(status === 'approved') return { text:'AKCEPTOWANY', cls:'approved' };
@@ -8311,7 +8332,7 @@ async function cfOpenChangeNotifications(){
       .delete()
       .eq('id',noteId)
       .eq('recipient_user_id',cfCurrentUserId)
-      .in('type',['wash_change_request','wash_change_request_result','wash_completed','employee_registered','wash_schedule_proposed','wash_schedule_counter','wash_schedule_confirmed','wash_schedule_rejected']);
+      .in('type',['wash_change_request','wash_change_request_result','vehicle_archive_request','vehicle_archive_result','wash_completed','employee_registered','wash_schedule_proposed','wash_schedule_counter','wash_schedule_confirmed','wash_schedule_rejected']);
     deleteQuery = cfScopeNotificationQuery(deleteQuery);
     const { error } = await deleteQuery;
     if(error) throw error;
@@ -8322,7 +8343,7 @@ async function cfOpenChangeNotifications(){
       .from('cf_notifications')
       .delete()
       .eq('recipient_user_id',cfCurrentUserId)
-      .in('type',['wash_change_request','wash_change_request_result','wash_completed','employee_registered','wash_schedule_proposed','wash_schedule_counter','wash_schedule_confirmed','wash_schedule_rejected']);
+      .in('type',['wash_change_request','wash_change_request_result','vehicle_archive_request','vehicle_archive_result','wash_completed','employee_registered','wash_schedule_proposed','wash_schedule_counter','wash_schedule_confirmed','wash_schedule_rejected']);
     clearQuery = cfScopeNotificationQuery(clearQuery);
     const { error } = await clearQuery;
     if(error) throw error;
@@ -8444,6 +8465,35 @@ async function cfOpenChangeNotifications(){
     }
   }
 
+  async function openVehicleRequest(note){
+    const req=vehicleRequestsById[note.entity_id];
+    if(!req){showToast('Wniosek nie jest już dostępny.');return;}
+    const box=document.createElement('div');
+    box.className='overlay';
+    box.innerHTML=`<div class="sheet" style="max-width:600px">
+      <button class="close" data-close-vehicle-request type="button" aria-label="Zamknij">×</button>
+      <h2>Wniosek o usunięcie z floty</h2>
+      <div class="cf-change-card">Pojazd: <strong>${esc(req.plate)}</strong><br>
+      ${req.status==='pending'?'Oczekuje na decyzję administratora.':req.status==='archived'?'Usunięty z aktywnej floty.':'Pozostawiony w aktywnej flocie.'}</div>
+      <div class="sheet-actions">
+        ${cfIsAdmin()&&req.status==='pending'?'<button type="button" class="btn btn-danger" data-archive-vehicle>Usuń z floty</button><button type="button" class="btn btn-outline" data-keep-vehicle>Zostaw pojazd</button>':''}
+        <button type="button" class="btn btn-outline" data-close-vehicle-request>Wróć</button>
+      </div></div>`;
+    document.getElementById('modalRoot').replaceChildren(box);
+    const back=async()=>{box.remove();await cfOpenChangeNotifications();};
+    box.querySelectorAll('[data-close-vehicle-request]').forEach(b=>b.addEventListener('click',back));
+    const decide=async decision=>{
+      try{
+        const {error}=await cfSupabase.rpc('cf_review_vehicle_archive',{p_request_id:req.id,p_decision:decision});
+        if(error)throw error;
+        showToast(decision==='archive'?'Pojazd usunięty z aktywnej floty.':'Pojazd pozostaje w aktywnej flocie.');
+        box.remove();await loadAll();await cfOpenChangeNotifications();
+      }catch(e){showToast(e.message||'Nie udało się zapisać decyzji.');}
+    };
+    box.querySelector('[data-archive-vehicle]')?.addEventListener('click',()=>decide('archive'));
+    box.querySelector('[data-keep-vehicle]')?.addEventListener('click',()=>decide('keep'));
+  }
+
   document.getElementById('modalRoot').innerHTML = `
     <div class="overlay" id="cfChangeNotificationsOverlay">
       <div class="sheet" style="max-width:720px;">
@@ -8477,7 +8527,9 @@ async function cfOpenChangeNotifications(){
         if(readError) console.warn('CleanFleet notification read:',readError.message);
         note.read_at = new Date().toISOString();
       }
-      if(note.type === 'employee_registered'){
+      if(note.type==='vehicle_archive_request'||note.type==='vehicle_archive_result'){
+        await openVehicleRequest(note);
+      } else if(note.type === 'employee_registered'){
         const employeeOverlay = document.createElement('div');
         employeeOverlay.className = 'overlay';
         employeeOverlay.id = 'cfEmployeeRegisteredOverlay';
@@ -8858,15 +8910,17 @@ function uid(){
         const v = plate ? registry[plate] : null;
         if(!plate || !v) throw new Error('Brak pojazdu do zapisu.');
         const existsRemotely = cfRemoteVehiclePlates.has(plate);
+        const renameFrom=oldPlate && oldPlate!==plate && cfRemoteVehiclePlates.has(oldPlate) ? oldPlate : null;
         let result;
-        if(existsRemotely){
+        if(existsRemotely || renameFrom){
           result = await cfSupabase.from('vehicles').update({
+            ...(renameFrom?{plate}:{}),
             type:v.typ||'',brand:v.marka||'',model:v.model||null,
             production_year:v.rocznik===''||v.rocznik==null?null:Number(v.rocznik),
             fleet_number:v.numer_taborowy||null,assigned_driver:!!v.przypisany,
             driver_name:v.przypisany?(v.kierowca||null):null,vehicle_notes:v.uwagi_pojazdu||null,billing_company_id:v.billing_company_id||null,currency:cfBillingCompanyCurrency(v.billing_company_id,v.waluta),
             in_fleet:v.in_fleet!==false,fleet_removed_at:v.in_fleet===false?(v.fleet_removed_at||null):null
-          }).eq('plate',plate).eq('company_id',cfActiveCompanyId);
+          }).eq('plate',renameFrom||plate).eq('company_id',cfActiveCompanyId);
         }else{
           result = await cfSupabase.from('vehicles').insert({
             plate,type:v.typ||'',brand:v.marka||'',company_id:cfActiveCompanyId,
@@ -8878,9 +8932,7 @@ function uid(){
           });
         }
         if(result?.error) throw result.error;
-        if(oldPlate && oldPlate !== plate){
-          const del = await cfSupabase.from('vehicles').delete().eq('plate',oldPlate).eq('company_id',cfActiveCompanyId);
-          if(del?.error) throw del.error;
+        if(renameFrom){
           cfRemoteVehiclePlates.delete(oldPlate);
         }
         cfRemoteVehiclePlates.add(plate);
@@ -9377,7 +9429,7 @@ function uid(){
     const label=menu.querySelector('#cfActiveSelectionCount');
     const photosBtn=menu.querySelector('#cfActiveSelectionPhotos');
     if(photosBtn){
-      photosBtn.hidden=!window.cfCanUseRecordPhotos?.();
+      photosBtn.hidden=!cfIsAdmin();
       photosBtn.disabled=count===0;
     }
     const hasUnpaid=records.some(r=>cfSelectedActiveRecordIds.has(r.id)&&!r.zaplacone);
@@ -9406,7 +9458,7 @@ function uid(){
 
   // Export the explicit selection in the current company, across every status.
   window.cfSelectedPhotoRecords = () => {
-    if(!window.cfCanUseRecordPhotos?.()) return [];
+    if(!cfIsAdmin()) return [];
     return records.filter(r => cfSelectedActiveRecordIds.has(r.id))
       .map(r => ({id:r.id,plate:r.tablica,type:r.typ,wash_date:r.data_prania,
         order_due_date:r.data_zlecenia_do,schedule_proposed_date:r.schedule_proposed_date,order_date:r.data_zlecenia}));
@@ -9665,7 +9717,7 @@ function uid(){
               ${recordFleetBadge(r.tablica)}
               ${r.priority != null && r.priority !== '' ? `<span class="record-priority-badge" title="Priorytet">P${escapeHtml(String(r.priority))}</span>` : ''}
               <button type="button" class="history-button" data-history-plate="${escapeHtml(r.tablica)}">Historia</button>
-              ${cfIsAdmin()?`<button type="button" class="history-button cf-record-photo-btn" data-cf-photos="${r.id}" title="Zdjęcia PRZED / PO" aria-label="Zdjęcia PRZED / PO">📷</button>`:''}
+              ${window.cfCanUseRecordPhotos?.()?`<button type="button" class="history-button cf-record-photo-btn" data-cf-photos="${r.id}" title="Zdjęcia PRZED / PO" aria-label="Zdjęcia PRZED / PO">📷</button>`:''}
             </div>
             ${r.zlecone && !r.zatwierdzone ? `
               <div class="record-meta">Zlecono: ${r.data_zlecenia ? fmtDate(r.data_zlecenia) : '—'} · ${r.schedule_status === 'pending_admin' ? `Proponowany termin: ${r.schedule_proposed_date ? fmtDate(r.schedule_proposed_date) : '—'}` : (r.schedule_status === 'pending_employee' ? `Proponowany przez administratora: ${r.schedule_proposed_date ? fmtDate(r.schedule_proposed_date) : '—'}` : `Termin: ${r.data_zlecenia_do ? fmtDate(r.data_zlecenia_do) : '—'}`)} · Przez: ${escapeHtml(r.kto_zlecil||'—')}</div>
@@ -11186,7 +11238,7 @@ function uid(){
       <div style="overflow-x:auto;">
         <table class="report"><thead><tr><th>Data prania</th><th>Typ</th><th>Kto zlecił</th><th>Termin</th><th>Wykonał</th><th>Kwota</th><th>Stan przed</th><th>Status</th><th></th></tr></thead><tbody>${historyRows}</tbody></table>
       </div>
-      <div class="history-actions"><button type="button" class="btn btn-solid" id="addWashBtn">Dodaj pranie</button>${info.in_fleet===false?'<button type="button" class="btn btn-solid" id="restoreVehicleBtn">Dodaj do floty</button>':'<button type="button" class="btn btn-danger" id="deleteVehicleBtn">Usuń z floty</button>'}</div>`;
+      <div class="history-actions"><button type="button" class="btn btn-solid" id="addWashBtn">Dodaj pranie</button>${info.in_fleet===false?(cfIsAdmin()?'<button type="button" class="btn btn-solid" id="restoreVehicleBtn">Dodaj do floty</button>':''):`<button type="button" class="btn btn-danger" id="deleteVehicleBtn">${cfIsAdmin()?'Usuń z floty':'Poproś o usunięcie z floty'}</button>`}</div>`;
     reportShell('Historia samochodu', '', body);
     document.getElementById('cfConditionHistoryFilter')?.addEventListener('change',e=>{
       const selected=e.target.value;
@@ -11266,8 +11318,17 @@ function uid(){
     });
 
     document.getElementById('deleteVehicleBtn')?.addEventListener('click', () => {
-      showConfirm('Usunąć z aktywnej floty?', `Pojazd ${plate} zniknie z aktywnej listy floty, ale jego karta i pełna historia pozostaną w bazie.`, async () => {
+      showConfirm(cfIsAdmin()?'Usunąć z aktywnej floty?':'Wysłać wniosek o usunięcie z floty?', cfIsAdmin()
+        ? `Pojazd ${plate} zniknie z aktywnej listy floty, ale jego karta i pełna historia pozostaną w bazie.`
+        : `Administrator zdecyduje, czy pojazd ${plate} pozostanie w aktywnej flocie. Do tego czasu nic się nie zmieni.`, async () => {
         try{
+          if(!cfIsAdmin()){
+            const {error}=await cfSupabase.rpc('cf_request_vehicle_archive',{p_company_id:cfActiveCompanyId,p_plate:plate});
+            if(error)throw error;
+            showToast('Wysłano wniosek do administratora.');
+            await cfLoadChangeNotifications();
+            return;
+          }
           const removedAt=new Date().toISOString();
           const { error } = await cfSupabase.from('vehicles').update({in_fleet:false,fleet_removed_at:removedAt}).eq('plate', plate).eq('company_id',cfActiveCompanyId);
           if(error) throw error;
@@ -11278,7 +11339,7 @@ function uid(){
           renderRecords();
           showToast('Pojazd usunięty z aktywnej floty. Historia została zachowana.');
         }catch(error){
-          showToast('Nie udało się usunąć pojazdu z floty: '+(error?.message||error));
+          showToast('Nie udało się obsłużyć pojazdu: '+(error?.message||error));
         }
       });
     });
@@ -16873,7 +16934,9 @@ document.addEventListener('focusin',e=>{
 <script src="/app/layout-v11913.js?v=20261010-15517"></script>
 <script src="/app/admin-dashboard-v1270.js?v=20260923-13068"></script>
 <script src="/app/operations-v1200.js?v=20261010-15517"></script>
+<script src="/app/photo-zip-stream.js?v=20261119"></script>
 <script src="/app/photo-local-v1240.js?v=20261115-photo-times2"></script>
+<script src="/app/photo-cloud-sync.js?v=20261119"></script>
 <script src="/app/photo-local-ui-v1232.js?v=20260919-13032"></script>
 <script src="/app/photo-camera-v1213.js?v=20261107-photo-times1"></script>
 <style>

@@ -91,6 +91,7 @@
   };
 
   async function persistStaged(recordId,kind){
+    if(window.cfCanEditRecordPhotos?.()!==true)throw new Error('Tylko administrator może zapisywać zdjęcia.');
     const session=window.cfPhotoSession?.get();
     if(!session||String(session.record.id)!==String(recordId))return 0;
     const items=[...session.pending[kind]];
@@ -108,6 +109,7 @@
 
   // Save a camera shot before allowing the next exposure. The original Blob stays intact.
   window.cfPhotoLocalStoreShot=async (recordId,kind,file)=>{
+    if(window.cfCanEditRecordPhotos?.()!==true)throw new Error('Aparat jest dostępny tylko dla administratora.');
     const session=window.cfPhotoSession?.get();
     if(!session||String(session.record?.id)!==String(recordId)||!['przed','po'].includes(kind))
       throw new Error('Nie wybrano wpisu do zapisu zdjęcia.');
@@ -530,6 +532,7 @@
     try{do{renderAgain=false;await renderLocalOnce(renderVersion)}while(renderAgain)}finally{renderRunning=false}
   }
   async function renderLocalOnce(version){
+    if(window.cfCanEditRecordPhotos?.()!==true)return;
     const m=document.getElementById('cfPhotoOverlay');if(!m||!m.classList.contains('open')||!currentRecordId)return;
     const box=ensureLocalBox();if(!box)return;
     const recordId=currentRecordId,kind=activeKind();
@@ -584,7 +587,7 @@
       const saved=e.target.closest?.('#cfPhotoOverlay [data-photo-saved] a');
       if(saved){e.preventDefault();e.stopPropagation();showPhotoPreview(async()=>saved.href,'Zapisane zdjęcie');return;}
       const save=e.target.closest?.('[data-photo-save]');
-      if(save){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();saveCurrent();}
+      if(save){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();if(window.cfCanEditRecordPhotos?.()===true)saveCurrent();}
     },true);
   }
 

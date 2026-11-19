@@ -1,6 +1,6 @@
 (function(root){
   'use strict';
-  const COMPANY_DIRECT=['billing_companies','vehicles','wash_records','invoices','cf_messages','cf_notifications','cf_purchases','cf_reminders'];
+  const COMPANY_DIRECT=['billing_companies','vehicles','wash_records','invoices','cf_messages','cf_notifications','cf_purchases','cf_reminders','cf_vehicle_archive_requests'];
   const CHILDREN={invoice_items:['invoices','invoice_id'],wash_change_requests:['wash_records','wash_record_id'],wash_record_photos:['wash_records','wash_record_id'],notification_log:['wash_records','record_id'],push_notification_log:['wash_records','wash_record_id']};
   function splitBackup(tables){
     const companies=tables.companies||[];
@@ -91,7 +91,7 @@
   const COMPANY_DELETE_ORDER=[
     'notification_log','push_notification_log','invoice_items','wash_record_photos',
     'wash_change_requests','cf_earnings','cf_tax_payments','cf_reminders',
-    'cf_messages','cf_notifications','cf_purchases','invoices','wash_records',
+    'cf_messages','cf_notifications','cf_vehicle_archive_requests','cf_purchases','invoices','wash_records',
     'vehicles','billing_companies'
   ];
   const COMPANY_INSERT_ORDER=[...COMPANY_DELETE_ORDER].reverse();

@@ -1,7 +1,8 @@
-/* Read-only, role-scoped tour of the Fleet employee interface. */
+/* Read-only Fleet employee tour, with an administrator preview of the same steps. */
 (()=>{
   'use strict';
-  const allowed=()=>document.body?.dataset.cfRole==='fleet_employee';
+  const preview=()=>document.body?.dataset.cfRole==='admin';
+  const allowed=()=>['fleet_employee','admin'].includes(document.body?.dataset.cfRole);
   const $=selector=>document.querySelector(selector);
   const isVisible=el=>!!(el && !el.hidden && getComputedStyle(el).display!=='none' && el.getClientRects().length);
   const main=selector=>({mode:'main',selector});
@@ -30,6 +31,30 @@
     {...menu('#cfLogoutBtn'),title:'Wylogowanie',text:'Po zakończeniu pracy możesz wylogować konto na tym urządzeniu. Samouczek nie naciska tego przycisku.'}
   ];
   let index=-1,root=null,previousFocus=null,previousScroll=null;
+  let previewLabels=null;
+  function setPreview(on){
+    const body=document.body;
+    if(!on){
+      body.classList.remove('cf-tour-employee-preview');
+      if(previewLabels){
+        for(const [selector,value] of previewLabels){
+          const el=$(selector);if(el)el.textContent=value;
+        }
+        previewLabels=null;
+      }
+      return;
+    }
+    if(!preview())return;
+    const labels=[
+      ['#financeBtnTitle','🧾 Faktury'],
+      ['#financeBtnSub','Lista wszystkich faktur z filtrowaniem po miesiącu'],
+      ['#exportPdfBtnTitle','📄 Generuj raport'],
+      ['#exportPdfBtnSub','Samodzielnie wybierz dane, zakres i format raportu']
+    ];
+    previewLabels=labels.map(([selector])=>[selector,$(selector)?.textContent]);
+    for(const [selector,value] of labels){const el=$(selector);if(el)el.textContent=value;}
+    body.classList.add('cf-tour-employee-preview');
+  }
   function closeMenus(){
     $('#menuOverlay')?.classList.remove('open');
     const lower=$('#bottomMobileMenu');
@@ -39,10 +64,15 @@
   function showSettings(){
     if(!allowed())return;
     closeMenus();
+    const adminPreview=preview();
     const panel=document.createElement('div');
     panel.id='cfEmployeeSettingsOverlay';
     panel.className='cf-employee-settings-overlay';
-    panel.innerHTML='<div class="cf-employee-settings-card" role="dialog" aria-modal="true" aria-labelledby="cfEmployeeSettingsTitle"><h2 id="cfEmployeeSettingsTitle">Ustawienia i pomoc</h2><p>Samouczek pokaże funkcje dostępne pracownikowi floty. Możesz go przerwać i wrócić do niego później.</p><div class="cf-employee-settings-actions"><button type="button" data-tour-start>Uruchom samouczek</button><button type="button" data-settings-close>Zamknij</button></div></div>';
+    panel.innerHTML='<div class="cf-employee-settings-card" role="dialog" aria-modal="true" aria-labelledby="cfEmployeeSettingsTitle"><h2 id="cfEmployeeSettingsTitle">Ustawienia i pomoc</h2><p></p><div class="cf-employee-settings-actions"><button type="button" data-tour-start></button><button type="button" data-settings-close>Zamknij</button></div></div>';
+    panel.querySelector('p').textContent=adminPreview
+      ? 'Zobaczysz dokładnie te same kroki i opisy, co pracownik floty. Pod spodem pozostają dane Twojego konta administratora; podgląd nie zmienia uprawnień.'
+      : 'Samouczek pokaże funkcje dostępne pracownikowi floty. Możesz go przerwać i wrócić do niego później.';
+    panel.querySelector('[data-tour-start]').textContent=adminPreview?'Zobacz samouczek pracownika':'Uruchom samouczek';
     document.body.append(panel);
     const dismiss=()=>{panel.remove();document.removeEventListener('keydown',escape);};
     const escape=e=>{if(e.key==='Escape')dismiss();};
@@ -109,7 +139,7 @@
   }
   function stop(){
     if(!root)return;
-    root.remove();root=null;index=-1;closeMenus();
+    root.remove();root=null;index=-1;closeMenus();setPreview(false);
     window.removeEventListener('resize',reposition);
     window.removeEventListener('scroll',reposition,true);
     document.removeEventListener('keydown',keys,true);
@@ -133,8 +163,11 @@
     if(!allowed())return;
     stop();closeMenus();
     previousFocus=document.activeElement;previousScroll=window.scrollY;
+    const adminPreview=preview();
+    setPreview(adminPreview);
     root=document.createElement('div');root.id='cfFleetEmployeeTour';
-    root.innerHTML='<div class="cf-tour-shade"></div><div class="cf-tour-halo" aria-hidden="true"></div><div class="cf-tour-card" role="dialog" aria-modal="true" aria-labelledby="cfTourTitle"><div class="cf-tour-count" data-tour-count></div><h2 id="cfTourTitle" data-tour-title></h2><p data-tour-text></p><div class="cf-tour-actions"><button type="button" data-tour-stop>Pomiń</button><button type="button" data-tour-prev>Wstecz</button><button type="button" data-tour-next>Dalej</button></div></div>';
+    root.innerHTML='<div class="cf-tour-shade"></div><div class="cf-tour-halo" aria-hidden="true"></div><div class="cf-tour-card" role="dialog" aria-modal="true" aria-labelledby="cfTourTitle"><div class="cf-tour-preview" data-tour-preview hidden>Podgląd pracownika floty</div><div class="cf-tour-count" data-tour-count></div><h2 id="cfTourTitle" data-tour-title></h2><p data-tour-text></p><div class="cf-tour-actions"><button type="button" data-tour-stop>Pomiń</button><button type="button" data-tour-prev>Wstecz</button><button type="button" data-tour-next>Dalej</button></div></div>';
+    root.querySelector('[data-tour-preview]').hidden=!adminPreview;
     document.body.append(root);
     root.querySelector('[data-tour-stop]').onclick=stop;
     root.querySelector('[data-tour-prev]').onclick=()=>show(index-1);
@@ -160,9 +193,21 @@
     .cf-tour-card{box-sizing:border-box;position:fixed;width:min(360px,calc(100vw - 24px));max-height:min(320px,calc(100dvh - 24px));overflow:auto;padding:17px;border-radius:16px;background:#fff;color:#171a18;box-shadow:0 14px 55px #0007;pointer-events:auto}
     .cf-tour-count{font:700 12px system-ui;color:#166e46}.cf-tour-card h2{margin:7px 0 8px;font:800 20px system-ui}.cf-tour-card p{margin:0 0 15px;font:15px/1.45 system-ui}
     .cf-tour-actions{display:flex;gap:7px;flex-wrap:wrap}.cf-tour-actions button:disabled{opacity:.45;cursor:default}
+    .cf-tour-preview{margin-bottom:7px;padding:5px 8px;border-radius:6px;background:#e7f2e9;color:#135b38;font:700 12px system-ui}
+    .cf-tour-preview[hidden]{display:none}
+    body.cf-tour-employee-preview #statsBtn,
+    body.cf-tour-employee-preview #exportExcelBtn,
+    body.cf-tour-employee-preview #cfUnifiedBackupExport,
+    body.cf-tour-employee-preview #cfUnifiedBackupRestore,
+    body.cf-tour-employee-preview #importBtn,
+    body.cf-tour-employee-preview #cfCompaniesBtn,
+    body.cf-tour-employee-preview #cfEmployeesBtn,
+    body.cf-tour-employee-preview #plateCameraBtn,
+    body.cf-tour-employee-preview #btnQuickWash,
+    body.cf-tour-employee-preview #attentionPanel{display:none!important}
   `;
   document.head.append(style);
   document.addEventListener('click',e=>{if(e.target.closest?.('#cfEmployeeSettingsBtn'))showSettings();});
-  new MutationObserver(()=>{if(!allowed()){stop();$('#cfEmployeeSettingsOverlay')?.remove();}}).observe(document.body,{attributes:true,attributeFilter:['data-cf-role']});
+  new MutationObserver(()=>{if(root)stop();if(!allowed())$('#cfEmployeeSettingsOverlay')?.remove();}).observe(document.body,{attributes:true,attributeFilter:['data-cf-role']});
   window.cfFleetEmployeeTour={start,stop};
 })();

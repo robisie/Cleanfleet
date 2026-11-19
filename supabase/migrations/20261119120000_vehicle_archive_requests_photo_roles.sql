@@ -25,7 +25,9 @@ create policy cf_vehicle_archive_read on public.cf_vehicle_archive_requests
 create or replace function public.cf_vehicle_archive_guard()
 returns trigger language plpgsql security definer set search_path='' as $$
 begin
-  if not public.cf_is_admin() then
+  if not public.cf_is_admin()
+     and coalesce(auth.role(),'') <> 'service_role'
+     and session_user not in ('postgres','supabase_admin') then
     if tg_op='INSERT' and (new.in_fleet is false or new.fleet_removed_at is not null) then
       raise exception 'Tylko administrator może archiwizować pojazd.';
     end if;

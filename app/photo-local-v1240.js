@@ -8,6 +8,7 @@
   let currentRecordId=null;
   let dbPromise=null;
   let busy=false;
+  const selectedForServer=new Set();
   const nativeCaptureTimes=new WeakMap();
   const enc=new TextEncoder();
 
@@ -510,19 +511,37 @@
     if(document.getElementById('cfPhotoLocal1240Style'))return;
     const s=document.createElement('style');s.id='cfPhotoLocal1240Style';s.textContent=`
       .cf-photo-viewer{box-sizing:border-box;position:fixed;inset:0;z-index:400500;display:flex;flex-direction:column;background:#080808;color:#fff;padding:max(64px,calc(env(safe-area-inset-top) + 12px)) max(10px,env(safe-area-inset-right)) max(18px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}.cf-photo-viewer-head{display:flex;flex:none;align-items:center;justify-content:space-between;gap:12px;padding-bottom:12px;font:700 14px system-ui}.cf-photo-viewer-head button{flex:none;min-height:44px;border:1px solid #777;border-radius:10px;padding:10px 14px;background:#292929;color:#fff;font:700 15px system-ui;touch-action:manipulation}.cf-photo-viewer-stage{position:relative;min-height:0;flex:1;display:flex;align-items:center;justify-content:center;overflow:auto}.cf-photo-viewer-stage img{display:block;width:100%;height:100%;object-fit:contain}.cf-photo-viewer [hidden]{display:none!important}.cf-photo-viewer [data-preview-status]{text-align:center;padding:15px;font:14px system-ui}.cf-photo-local-thumb .cf-photo-local-open{position:static;display:block;width:100%;height:100%;border-radius:0;background:transparent;line-height:normal;cursor:zoom-in}.cf-photo-local-thumb .cf-photo-local-remove{width:28px;height:28px;line-height:28px}
-      .cf-photo-local{margin:8px 0 12px;padding:10px;border:1px solid #dfe5da;border-radius:12px;background:#fbfcf8}.cf-photo-local-head{display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:900}.cf-photo-local-meta{font-size:9px;color:#626a63;margin-top:5px}.cf-photo-local-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px}.cf-photo-local-thumb{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:#ecefea}.cf-photo-local-thumb img{width:100%;height:100%;object-fit:cover}.cf-photo-local-thumb button{position:absolute;right:3px;top:3px;width:20px;height:20px;border:0;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:13px;line-height:20px;padding:0}.cf-photo-local-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.cf-photo-local-actions button{border:1px solid #ccd1c7;background:#fff;border-radius:9px;padding:8px 10px;font-size:10px;font-weight:900}.cf-photo-local-actions .primary{background:#9fbd17;border-color:#9fbd17;color:#111}.cf-local-zip-ready{box-sizing:border-box;position:fixed;inset:0;z-index:300500;background:rgba(15,18,16,.48);display:flex;align-items:center;justify-content:center;padding:max(18px,env(safe-area-inset-top)) 18px max(18px,env(safe-area-inset-bottom))}.cf-local-zip-card{width:min(390px,100%);max-height:calc(100dvh - 48px);overflow:auto;box-sizing:border-box;background:#fff;border-radius:20px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.3);color:#171a18}.cf-local-zip-card h3{margin:0 0 8px;font-size:20px}.cf-local-zip-card button{width:100%;border:0;border-radius:12px;padding:13px;font-weight:900;font-size:14px;margin-top:8px}.cf-local-zip-card [data-local-download]{display:block;text-align:center;text-decoration:none;border-radius:12px;padding:13px;font-weight:900;font-size:14px;margin-top:8px;background:#9fbd17;color:#111}.cf-local-zip-card [hidden]{display:none!important}.cf-local-zip-card [data-local-share]{background:#9fbd17;color:#111}.cf-local-zip-card [data-local-close]{background:#f0f2ef;color:#333}`;document.head.appendChild(s)
+      .cf-photo-local{margin:8px 0 12px;padding:10px;border:1px solid #dfe5da;border-radius:12px;background:#fbfcf8}.cf-photo-local-head{display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:900}.cf-photo-local-meta{font-size:9px;color:#626a63;margin-top:5px}.cf-photo-local-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px}.cf-photo-local-thumb{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:#ecefea}.cf-photo-local-thumb img{width:100%;height:100%;object-fit:cover}.cf-photo-local-thumb button{position:absolute;right:3px;top:3px;width:20px;height:20px;border:0;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:13px;line-height:20px;padding:0}.cf-photo-local-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.cf-photo-local-actions button{border:1px solid #ccd1c7;background:#fff;border-radius:9px;padding:8px 10px;font-size:10px;font-weight:900}.cf-photo-local-actions .primary{background:#9fbd17;border-color:#9fbd17;color:#111}.cf-local-zip-ready{box-sizing:border-box;position:fixed;inset:0;z-index:300500;background:rgba(15,18,16,.48);display:flex;align-items:center;justify-content:center;padding:max(18px,env(safe-area-inset-top)) 18px max(18px,env(safe-area-inset-bottom))}.cf-local-zip-card{width:min(390px,100%);max-height:calc(100dvh - 48px);overflow:auto;box-sizing:border-box;background:#fff;border-radius:20px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.3);color:#171a18}.cf-local-zip-card h3{margin:0 0 8px;font-size:20px}.cf-local-zip-card button{width:100%;border:0;border-radius:12px;padding:13px;font-weight:900;font-size:14px;margin-top:8px}.cf-local-zip-card [data-local-download]{display:block;text-align:center;text-decoration:none;border-radius:12px;padding:13px;font-weight:900;font-size:14px;margin-top:8px;background:#9fbd17;color:#111}.cf-local-zip-card [hidden]{display:none!important}.cf-local-zip-card [data-local-share]{background:#9fbd17;color:#111}.cf-local-zip-card [data-local-close]{background:#f0f2ef;color:#333}.cf-photo-local-publish,.cf-photo-local-published{position:absolute;left:3px;bottom:3px;border-radius:5px;padding:4px;font:700 11px system-ui}.cf-photo-local-publish{display:flex;align-items:center;gap:3px;background:rgba(255,255,255,.95);color:#111}.cf-photo-local-publish input{width:22px;height:22px;margin:0}.cf-photo-local-published{background:#e0f4e6;color:#146033}.cf-photo-local-actions [data-local-publish]{background:#166e46;color:#fff;border-color:#166e46;min-height:44px;font-size:12px}.cf-photo-local-actions button:disabled{opacity:.5}`;document.head.appendChild(s)
   }
 
   function ensureLocalBox(){
     const m=document.getElementById('cfPhotoOverlay');if(!m)return null;
     const anchor=m.querySelector('[data-photo-status]');if(!anchor)return null;
     let box=m.querySelector('.cf-photo-local');
-    if(!box){box=document.createElement('div');box.className='cf-photo-local';box.innerHTML='<div class="cf-photo-local-head"><span>Zdjęcia lokalne</span><span data-local-counts></span></div><div class="cf-photo-local-meta" data-local-meta></div><div data-local-progress></div><div class="cf-photo-local-grid" data-local-grid></div><div class="cf-photo-local-actions"><button class="primary" data-local-export type="button">Pobierz ZIP</button><button data-local-gallery type="button">Zapisz w Zdjęciach iPhone’a</button></div>';anchor.insertAdjacentElement('afterend',box);box.querySelector('[data-local-export]').onclick=()=>currentRecordId&&exportCombined(currentRecordId);box.querySelector('[data-local-gallery]').onclick=()=>currentRecordId&&saveToPhotos(currentRecordId)}
+    if(!box){box=document.createElement('div');box.className='cf-photo-local';box.innerHTML='<div class="cf-photo-local-head"><span>Zdjęcia na tym urządzeniu</span><span data-local-counts></span></div><div class="cf-photo-local-meta" data-local-meta></div><div data-local-progress></div><div class="cf-photo-local-grid" data-local-grid></div><div class="cf-photo-local-actions"><button data-local-publish type="button" disabled>Wyślij wybrane na serwer</button><button class="primary" data-local-export type="button">Pobierz ZIP</button><button data-local-gallery type="button">Zapisz w Zdjęciach iPhone’a</button></div>';anchor.insertAdjacentElement('afterend',box);box.querySelector('[data-local-publish]').onclick=publishSelected;box.querySelector('[data-local-export]').onclick=()=>currentRecordId&&exportCombined(currentRecordId);box.querySelector('[data-local-gallery]').onclick=()=>currentRecordId&&saveToPhotos(currentRecordId)}
     return box;
   }
 
   let renderVersion=0,renderRunning=false,renderAgain=false;
   let previewUrls=[];
+  function updatePublishButton(){
+    const button=document.querySelector('#cfPhotoOverlay [data-local-publish]');
+    if(button){button.disabled=busy||!selectedForServer.size;button.textContent=busy?'Wysyłanie…':`Wyślij wybrane na serwer (${selectedForServer.size})`;}
+  }
+  async function publishSelected(){
+    if(!currentRecordId||busy||!selectedForServer.size||window.cfCanEditRecordPhotos?.()!==true)return;
+    const recordId=currentRecordId;
+    busy=true;updatePublishButton();
+    const status=document.querySelector('#cfPhotoOverlay [data-local-progress]');
+    if(status)status.textContent='Wysyłanie wybranych zdjęć…';
+    try{
+      const {sent,existing}=await window.cfPhotoPublication.publish(recordId,[...selectedForServer]);
+      selectedForServer.clear();
+      if(status)status.textContent=`Na serwerze: ${sent+existing} wybranych zdjęć. Lokalne kopie pozostały na urządzeniu.`;
+      toast(`Wysłano ${sent} zdjęć na serwer.`);
+    }catch(error){console.warn('CleanFleet photo publication',error);if(status)status.textContent=error.message||'Nie udało się wysłać zdjęć.';}
+    finally{busy=false;updatePublishButton();await renderLocal();}
+  }
   function clearPreviews(){previewUrls.forEach(u=>URL.revokeObjectURL(u));previewUrls=[];document.querySelector('#cfPhotoOverlay [data-local-grid]')?.replaceChildren()}
   async function renderLocal(){
     renderVersion++;
@@ -540,19 +559,29 @@
     if(version!==renderVersion||recordId!==currentRecordId||kind!==activeKind()||!m.classList.contains('open')||document.querySelector('.cf-cam-overlay.open'))return;
     const before=allPhotos.filter(x=>x.kind==='przed'),after=allPhotos.filter(x=>x.kind==='po'),visible=kind==='po'?after:before;
     box.querySelector('[data-local-counts]').textContent=`PRZED ${before.length} · PO ${after.length}`;
-    box.querySelector('[data-local-meta]').textContent=before.length&&after.length?'Komplet gotowy do jednego ZIP-a.':before.length?'Zdjęcia PRZED zapisane lokalnie. Po praniu dodaj zdjęcia PO.':'Możesz pobrać ZIP w każdej chwili. Brakujące zdjęcia oznaczają pusty folder PRZED lub PO.';
+    box.querySelector('[data-local-meta]').textContent='Zapis pozostaje na tym urządzeniu. Zaznacz zdjęcia, które chcesz udostępnić pracownikom.';
     const exp=box.querySelector('[data-local-export]');exp.style.display='';exp.disabled=busy||!!window.cfPhotoSession?.get()?.busy;
     const grid=box.querySelector('[data-local-grid]');clearPreviews();
-    for(const p of visible){
-      const row=await getPhoto(p.id);if(!row)continue;
+    const fullRows=(await Promise.all(visible.map(p=>getPhoto(p.id)))).filter(Boolean);
+    let published=new Set(),statusChecked=false;
+    try{
+      if(window.cfPhotoPublication){published=await window.cfPhotoPublication.published(recordId,fullRows);statusChecked=true;}
+    }catch(error){console.warn('CleanFleet photo status',error);box.querySelector('[data-local-meta]').textContent='Nie udało się sprawdzić, które zdjęcia są na serwerze. Spróbuj ponownie po połączeniu z internetem.';}
+    if(version!==renderVersion||recordId!==currentRecordId||kind!==activeKind()||!m.classList.contains('open'))return;
+    for(const row of fullRows){
+      const p=visible.find(x=>x.id===row.id);
+      if(published.has(p.id))selectedForServer.delete(p.id);
       const blob=row.thumbnail||await window.cfPhotoThumbnail(row.blob||new Blob([row.bytes],{type:row.mime}));
       if(version!==renderVersion||recordId!==currentRecordId||kind!==activeKind()||!m.classList.contains('open')||document.querySelector('.cf-cam-overlay.open'))return;
       const url=blob?URL.createObjectURL(blob):null;if(url)previewUrls.push(url);
-      const cell=document.createElement('div');cell.className='cf-photo-local-thumb';cell.innerHTML='<button type="button" class="cf-photo-local-open" data-local-view aria-label="Otwórz zdjęcie"><img alt="Zdjęcie"></button><button type="button" class="cf-photo-local-remove" data-local-remove aria-label="Usuń">×</button>';
+      const cell=document.createElement('div');cell.className='cf-photo-local-thumb';cell.innerHTML='<button type="button" class="cf-photo-local-open" data-local-view aria-label="Otwórz zdjęcie"><img alt="Zdjęcie"></button><button type="button" class="cf-photo-local-remove" data-local-remove aria-label="Usuń lokalnie">×</button>';
+      if(published.has(p.id)){const badge=document.createElement('span');badge.className='cf-photo-local-published';badge.textContent='Na serwerze ✓';cell.append(badge);}
+      else if(statusChecked){const label=document.createElement('label');label.className='cf-photo-local-publish';const check=document.createElement('input');check.type='checkbox';check.checked=selectedForServer.has(p.id);check.setAttribute('aria-label','Wyślij zdjęcie na serwer');check.onchange=()=>{if(check.checked)selectedForServer.add(p.id);else selectedForServer.delete(p.id);updatePublishButton();};label.append(check,' Wyślij');cell.append(label);}
       if(url)cell.querySelector('img').src=url;
       cell.querySelector('[data-local-view]').onclick=()=>showPhotoPreview(async()=>{const original=await getPhoto(p.id);return original&&(original.blob||new Blob([original.bytes],{type:original.mime}));},`Zdjęcie · ${kind.toUpperCase()}`);
-      cell.querySelector('[data-local-remove]').onclick=async event=>{event.stopPropagation();if(busy||window.cfPhotoSession?.get()?.busy)return;await del(p.id);document.dispatchEvent(new CustomEvent('cf:photos-saved'));await renderLocal()};grid.appendChild(cell);
+      cell.querySelector('[data-local-remove]').onclick=async event=>{event.stopPropagation();if(busy||window.cfPhotoSession?.get()?.busy)return;selectedForServer.delete(p.id);await del(p.id);document.dispatchEvent(new CustomEvent('cf:photos-saved'));await renderLocal()};grid.appendChild(cell);
     }
+    updatePublishButton();
   }
 
   async function saveCurrent(){
@@ -571,9 +600,9 @@
   }
 
   function events(){
-    document.addEventListener('cf:photos-close',()=>{closePhotoPreview();renderVersion++;clearPreviews()});
+    document.addEventListener('cf:photos-close',()=>{closePhotoPreview();renderVersion++;selectedForServer.clear();clearPreviews()});
     document.addEventListener('cf:photos-open',e=>{
-      currentRecordId=e.detail.recordId;
+      currentRecordId=e.detail.recordId;selectedForServer.clear();
       renderLocal().catch(e=>toast(e?.message||'Nie udało się odczytać zdjęć lokalnych.'));
     });
     document.addEventListener('cf:photos-render',()=>{

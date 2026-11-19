@@ -3462,7 +3462,7 @@ async function cfRegisterServiceWorker(){
       console.info('CleanFleet: aktywowano Service Worker v1.56.35.');
     });
   }
-  cfPushRegistration = await navigator.serviceWorker.register('./sw.js?v=20261108-15625',{updateViaCache:'none'});
+  cfPushRegistration = await navigator.serviceWorker.register('./sw.js?v=20261119-manual-publish',{updateViaCache:'none'});
   try{ await cfPushRegistration.update(); }catch(_){ }
   await navigator.serviceWorker.ready;
   return cfPushRegistration;

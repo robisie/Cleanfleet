@@ -52,3 +52,13 @@ dialog.kf-assignment-modal{width:min(920px,calc(100vw - 32px));max-width:calc(10
 
 /* Supplier invoice suggestions */
 .kf-supplier-invoice{display:block;border:1px solid #dfe5eb;border-radius:10px;margin-bottom:8px;overflow:hidden}.kf-supplier-invoice-head{display:flex;gap:12px;align-items:center;padding:13px}.kf-supplier-invoice-head>input{flex:none;width:19px;min-width:19px}.kf-supplier-invoice-head>span{flex:1;min-width:0}.kf-supplier-invoice-head small,.kf-supplier-product small{display:block;color:#64748b;font-size:12px}.kf-supplier-invoice-head>strong{white-space:nowrap}.kf-supplier-invoice-head button{min-width:40px;padding:5px}.kf-supplier-details{padding:12px;border-top:1px solid #e5e7eb;background:#fafbfc}.kf-supplier-details[hidden]{display:none}.kf-supplier-products{margin-bottom:10px}.kf-supplier-product{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid #e7eaef;cursor:pointer}.kf-supplier-product input{width:19px;min-width:19px;flex:none}.kf-supplier-product span{flex:1;min-width:0}.kf-supplier-product>strong{white-space:nowrap;font-size:13px}.kf-supplier-details [data-supplier-pdf]{margin-top:7px}.kf-supplier-modal .modal-body{overflow-y:auto;max-height:68vh}@media(max-width:560px){.kf-supplier-invoice-head{gap:7px;padding:10px}.kf-supplier-invoice-head>strong{font-size:12px}.kf-supplier-product{gap:6px}}
+
+/* KSeF: subtly mark invoices already allocated to a business. */
+.kf-invoice.kf-assigned-robisie{background:#f0f8ef;border-radius:10px;padding-left:12px;padding-right:12px}
+.kf-invoice.kf-assigned-cleanfleet{background:#fff4e9;border-radius:10px;padding-left:12px;padding-right:12px}
+.kf-invoice.kf-assigned-robisie.kf-assigned-cleanfleet{background:linear-gradient(110deg,#f0f8ef 0%,#f0f8ef 50%,#fff4e9 50%,#fff4e9 100%)}
+.kf-invoice .kf-open:hover{background:transparent}
+.kf-assignment-labels{display:flex;gap:6px;flex-wrap:wrap}
+.kf-assignment-label{display:inline-block;border-radius:6px;padding:2px 7px;font-size:12px;font-weight:650;line-height:1.4}
+.kf-assignment-label.robisie{background:#dff0dd;color:#245c32}
+.kf-assignment-label.cleanfleet{background:#ffe6ce;color:#784315}

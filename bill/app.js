@@ -1,5 +1,5 @@
 import {invoiceGroups} from './invoice-groups.js?v=1.0.38';
-import * as KSEF from './ksef.js?v=1.0.63';
+import * as KSEF from './ksef.js?v=1.0.64';
 import * as C from './core.js?v=1.0.57';
 import * as API from './api.js?v=1.0.71';
 import {preview,previewHtml} from './pdf.js?v=1.0.65';

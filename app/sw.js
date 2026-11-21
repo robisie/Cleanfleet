@@ -189,7 +189,7 @@ self.addEventListener('fetch', event => {
       '<script src="/app/weather-refresh-v12311.js?v=20260923-13068"></script>\n' +
       '<script src="/app/layout-v11913.js?v=20261010-15517"></script>\n' +
       '<script src="/app/operations-v1200.js?v=20261119-manual-publish"></script>\n' +
-      '<script src="/app/photo-local-v1240.js?v=20261119-manual-publish"></script>\n' +
+      '<script src="/app/photo-local-v1240.js?v=20261121-grid3"></script>\n' +
       '<script src="/app/photo-local-ui-v1232.js?v=20260919-13032"></script>\n' +
       '<script src="/app/photo-camera-v1213.js?v=20261107-photo-times1"></script>\n' +
       '<script src="/app/ui-v1209.js?v=20260915-3"></script>\n' +

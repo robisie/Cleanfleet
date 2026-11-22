@@ -62,3 +62,7 @@ dialog.kf-assignment-modal{width:min(920px,calc(100vw - 32px));max-width:calc(10
 .kf-assignment-label{display:inline-block;border-radius:6px;padding:2px 7px;font-size:12px;font-weight:650;line-height:1.4}
 .kf-assignment-label.robisie{background:#dff0dd;color:#245c32}
 .kf-assignment-label.cleanfleet{background:#ffe6ce;color:#784315}
+
+/* Selected buyer stays visible; loading and editing are explicit secondary actions. */
+.buyer-summary{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:18px;border:1px solid #dce5e0;background:#f5f9f6;border-radius:12px;margin:0 0 16px}.buyer-summary-copy{display:flex;flex-direction:column;gap:6px;overflow-wrap:anywhere;min-width:0}.buyer-summary>div:first-child{min-width:0}.buyer-summary-copy strong{font-size:20px;line-height:1.35}.buyer-summary-copy>span{color:#596675;font-size:14px}.buyer-summary-copy .buyer-status{font-weight:700}.buyer-summary-copy .buyer-status.complete{color:#28614a}.buyer-summary-actions{display:flex;flex-wrap:wrap;gap:8px;flex-shrink:0}.buyer-summary-actions button{min-height:44px}.buyer-section{margin-top:12px;border:1px solid #e0e5e9;border-radius:10px;padding:0 16px}.buyer-section>summary{cursor:pointer;padding:15px 0;font-weight:650}.buyer-section-body{padding:4px 0 16px}.buyer-section .field{margin-bottom:12px}
+@media(max-width:760px){.buyer-summary{flex-direction:column;padding:16px;gap:14px}.buyer-summary-actions{width:100%}.buyer-summary-actions button{flex:1}.buyer-summary-copy strong{font-size:18px}.buyer-section{padding:0 12px}}

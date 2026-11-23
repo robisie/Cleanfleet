@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <title>CiaoPack — zamówienia z Włoch</title>
+  <link rel="stylesheet" href="./style.css?v=5">
+  <script src="/app/vendor/supabase-2.57.4.min.js"></script>
+  <script src="/app/vendor/zxing-browser-0.2.1.min.js"></script>
+  <script type="module" src="./app.js?v=5"></script>
+</head>
+<body>
+  <header class="top"><a class="back" href="/pack/">← RobisięPack</a><div class="brand"><span class="flag">🇮🇹</span><span>Ciao<span class="brand-accent">Pack</span></span></div><button id="logout" class="quiet" hidden>Wyloguj</button></header>
+  <main>
+    <section id="login" class="card login">
+      <p class="eyebrow">Zamówienia · zakupy · rozliczenia</p>
+      <h1>Witaj w CiaoPack</h1>
+      <p id="loginInfo">Sprawdzam dostęp…</p>
+      <form id="loginForm" hidden>
+        <label>E-mail<input name="email" type="email" autocomplete="username" required></label>
+        <label>Hasło<input name="password" type="password" autocomplete="current-password" required></label>
+        <button>Zaloguj się</button>
+      </form>
+      <p id="loginError" class="error" role="alert"></p>
+    </section>
+
+    <section id="setup" class="card login" hidden>
+      <p class="eyebrow">Zaproszenie do CiaoPack</p>
+      <h1>Ustal swoje hasło</h1>
+      <p id="setupEmail" class="muted"></p>
+      <form id="setupForm">
+        <label>Nowe hasło<input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+        <label>Powtórz hasło<input name="confirm" type="password" autocomplete="new-password" minlength="8" required></label>
+        <button type="submit">Zapisz hasło i otwórz CiaoPack</button>
+      </form>
+      <p id="setupError" class="error" role="alert"></p>
+    </section>
+
+    <div id="app" hidden>
+      <div class="heading"><div><p class="eyebrow">Twój panel zakupów</p><h1>CiaoPack</h1><p>Od zamówienia do wydania produktów i rozliczenia.</p></div><button id="newRound">＋ Nowa tura zakupów</button></div>
+      <div class="bar round-bar"><label>Aktywna tura zakupów<select id="roundSelect"></select></label><span id="roundStatus"></span></div>
+      <button id="homeButton" class="secondary home-button" hidden>← Kafelki CiaoPack</button>
+      <p id="notice" role="status"></p>
+      <section id="homeView"><div id="homeMetrics" class="metrics"></div><h2>Co chcesz zrobić?</h2><div class="dashboard-grid">
+        <button class="dashboard-tile" data-view="buyers"><span class="tile-icon">👥</span><strong>Klienci</strong><small id="buyersBadge"></small></button>
+        <button class="dashboard-tile" data-view="products"><span class="tile-icon">📦</span><strong>Towary</strong><small id="productsBadge"></small></button>
+        <button class="dashboard-tile" data-view="orders"><span class="tile-icon">📝</span><strong>Zamówienia</strong><small id="ordersBadge"></small></button>
+        <button class="dashboard-tile" data-view="shopping"><span class="tile-icon">🛒</span><strong>Zakupy</strong><small id="shoppingBadge"></small></button>
+        <button class="dashboard-tile" data-view="dispatch"><span class="tile-icon">📤</span><strong>Wydawanie</strong><small id="dispatchBadge"></small></button>
+        <button class="dashboard-tile" data-view="settlements"><span class="tile-icon">🧾</span><strong>Rozliczenia</strong><small id="settlementsBadge"></small></button>
+      </div></section>
+      <section id="buyersView" hidden><div class="section-title"><h2>Klienci</h2><button id="newBuyer">＋ Dodaj osobę</button></div><div id="buyersContent"></div></section>
+      <section id="productsView" hidden><div class="section-title"><h2>Towary</h2><button id="newProduct">＋ Dodaj produkt</button></div><div class="bar"><label>Szukaj po nazwie lub kodzie<input id="productSearch" type="search" placeholder="Nazwa albo numer kodu"></label><button id="scanProduct" class="secondary">▣ Skanuj kod</button></div><p class="muted">Zaznacz produkty, aby dodać je razem do zamówienia klienta.</p><div id="catalogSelection" class="selection-bar" hidden></div><div id="productsContent"></div></section>
+      <section id="ordersView" hidden><div class="section-title"><h2>Zamówienia klientów</h2></div><p class="muted">Wybierz klienta. Produkt dodasz z listy albo skanując jego kod.</p><div id="ordersContent"></div></section>
+      <section id="shoppingView" hidden><div class="section-title"><h2>Zbiorcza lista zakupów</h2><button id="scanShopping" class="secondary">▣ Znajdź na liście kodem</button></div><div class="actions" id="roundActions"></div><div id="shoppingContent"></div></section>
+      <section id="dispatchView" hidden><div class="section-title"><h2>Wydawanie towaru</h2></div><p class="muted">Otwórz klienta. Wydany produkt wskażesz na liście lub przez skan kodu.</p><div id="dispatchContent"></div></section>
+      <section id="settlementsView" hidden><div class="section-title"><h2>Rozliczenia klientów</h2></div><p class="muted">Kwoty wynikają z rzeczywiście wydanych ilości i cen zapisanych przy wydaniu.</p><div id="settlementsContent"></div></section>
+    </div>
+  </main>
+
+  <dialog id="editor" aria-labelledby="editorTitle"><div class="dialog-head"><h2 id="editorTitle"></h2><button type="button" class="close" data-close aria-label="Zamknij okno">×</button></div><p id="editorStatus" role="status"></p><div id="editorBody"></div></dialog>
+  <dialog id="scanner" aria-labelledby="scannerTitle"><div class="dialog-head"><h2 id="scannerTitle">Skanuj kod kreskowy</h2><button type="button" class="close" data-close aria-label="Zamknij aparat">×</button></div><div class="scan-stage"><video id="scanVideo" playsinline muted></video><div class="scan-guide" aria-hidden="true"></div></div><p id="scanStatus" role="status">Umieść kod w ramce.</p><button type="button" class="secondary" data-close>Zamknij aparat</button></dialog>
+</body>
+</html>

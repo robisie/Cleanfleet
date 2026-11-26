@@ -8,6 +8,8 @@ const require=createRequire(import.meta.url),{jsPDF}=require('../app/vendor/jspd
 const document=(count=3)=>{const items=Array.from({length:count},(_,i)=>({index:i+1,name:i===0?'Taśma flizelinowa - Żółć Łódź':i===1?'GNIAZDO DO PRZEDŁUŻACZA 6X2P+Z':'Wałek malarski do ścian i sufitów',quantity:i===0?2:1,unit:'szt.',gross:10+i}));const total=items.reduce((sum,i)=>sum+i.gross,0);return {metadata:{source:'nip-receipt',ksefNumber:'PARAGON-test',invoiceNumber:'000097/2049',issueDate:'2026-10-26',grossAmount:total,currency:'PLN',seller:{name:'LEROY-MERLIN POLSKA SP. Z O.O.',nip:'1234567890'},buyer:{identifier:{value:'6351861297'}}},preview:{items,gross:total,currency:'PLN'}};};
 test('receipt preview uses complete archived positions and rejects incomplete data',()=>{
  const data=savedReceiptData(document());assert.equal(data.items.length,3);assert.equal(data.total,33);assert.equal(data.items[0].quantity,2);
+ const discounted=document();discounted.metadata={...discounted.metadata,grossAmount:35,paidAmount:33,discountAmount:2,amountBasis:'beforeDiscount'};discounted.preview.items[0].gross+=2;
+ const reviewed=savedReceiptData(discounted);assert.equal(reviewed.paidAmount,33);assert.equal(reviewed.discountAmount,2);assert.equal(reviewed.total,35);
  assert.throws(()=>savedReceiptData({...document(),preview:{}}),/Brak pełnych/);
  const bad=document();bad.metadata.grossAmount=99;assert.throws(()=>savedReceiptData(bad),/Suma pozycji/);
 });

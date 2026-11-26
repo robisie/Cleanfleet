@@ -5,7 +5,7 @@ import {relatedGroups,historyRanges,isCorrection,decodeXml} from './ksef-relatio
 import {stockMarkup,stockStores,stockSummaryMarkup,returnDialog,useDialog,invoiceDestinationDialog,remainingReceiptRows} from './stock.js?v=1.0.59';
 import {selectedAmount,duplicatePurchases,allocationMarkup,mountAllocation,savedEntries} from './purchase-import.js?v=1.0.38';
 import {esc,today} from './core.js?v=1.0.38';
-import {openReceiptImport} from './receipt-import.js?v=1.0.51';
+import {openReceiptImport} from './receipt-import.js?v=1.0.52';
 import {monthDates,counterparty,invoicePdfName,visibleInvoices,mergeInvoices,bytesFromBase64,digest,verifyInvoice} from './ksef-data.js?v=1.0.46';
 import {hint,remember} from './cost-suggestions.js?v=1.0.38';
 import {wholeInvoiceFree,similarInvoiceCandidates,supplierSuggestionDialog} from './stock-suggestions.js?v=1.0.53';
@@ -298,7 +298,7 @@ async function pdf(bytes,row,signal){check(signal);await verifyInvoice(bytes,row
 }
 async function preview(number,signal,onClose=null){const row=invoice(number);if(!row)throw Error('Odśwież listę faktur.');const bytes=await singleBytes(row,signal);progress('Tworzenie podglądu PDF…');const blob=await pdf(bytes,row,signal);check(signal);openPdf(blob,row,onClose);progress('Podgląd PDF jest gotowy.');}
 async function previewReceipt(number,signal){
- const document=await integration.receiptDocument(number);check(signal);const {createReceiptPdf}=await import('./receipt-pdf.js?v=1.0.50');
+ const document=await integration.receiptDocument(number);check(signal);const {createReceiptPdf}=await import('./receipt-pdf.js?v=1.0.51');
  progress('Tworzenie podglądu paragonu…');const blob=await createReceiptPdf(document,{signal});check(signal);openPdf(blob,document.metadata);progress('Podgląd paragonu jest gotowy.');
 }
 function openPdf(blob,row,onClose=null){const url=URL.createObjectURL(blob),overlay=document.createElement('section');overlay.className='kf-pdf-overlay';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label',row.source==='nip-receipt'?'Podgląd PDF paragonu':'Podgląd PDF faktury');overlay.innerHTML=`<div class="kf-pdf-bar"><button type="button" data-close>× Zamknij</button><strong>${row.source==='nip-receipt'?'Paragon · ':''}${e(row.invoiceNumber)}</strong><a class="button primary" href="${e(url)}" download="${row.source==='nip-receipt'?'Paragon - ':''}${e(invoicePdfName(row,state.kind))}">Pobierz PDF</a><a class="button" href="${e(url)}" target="_blank" rel="noopener">Otwórz PDF ↗</a></div><iframe title="${row.source==='nip-receipt'?'PDF paragonu':'PDF faktury'}" src="${e(url)}"></iframe>`;const overflow=document.body.style.overflow;document.body.style.overflow='hidden';const close=()=>{overlay.remove();document.body.style.overflow=overflow;URL.revokeObjectURL(url);document.removeEventListener('keydown',key);onClose?.();};const key=event=>{if(event.key==='Escape'){event.preventDefault();close();}};overlay.querySelector('[data-close]').onclick=close;document.addEventListener('keydown',key);document.body.append(overlay);overlay.querySelector('button').focus();}

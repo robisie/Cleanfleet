@@ -43,3 +43,26 @@ test('batch reviews receipts independently, retries failures, skips and preserve
  await submit();assert.equal(writes.length,2);assert.notEqual(writes[0].hash,writes[1].hash);assert.match(writes[0].hash,/^[a-f0-9]{64}$/);
  dialog.querySelector('[data-skip]').click();assert.equal(form.elements.number.value,'TEST/4');dialog.querySelector('[data-cancel]').click();assert.equal(await done,'SAVED-TEST/2');assert.equal(writes.length,2);assert.equal(document.querySelector('dialog'),null);await window.happyDOM.abort();
 });
+test('receipt discount asks for selected basis, preserves actual payment and requires item amounts to reconcile',async()=>{
+ const window=new Window();globalThis.document=window.document;globalThis.FormData=window.FormData;
+ window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};window.HTMLDialogElement.prototype.close=function(){this.open=false;};
+ let saved;const scan={...structuredClone(data),paidAmount:25,discountAmount:5,items:[{...data.items[0],grossBeforeDiscount:30}]};
+ const done=openReceiptImport({scan:async()=>scan,save:async value=>{saved=value;return 'PARAGON-discount';}});
+ const dialog=document.querySelector('dialog'),form=dialog.querySelector('form'),bytes=new Uint8Array(120);bytes.set([0x89,0x50,0x4e]);const transfer=new window.DataTransfer();transfer.items.add(new window.File([bytes],'receipt.png'));form.elements.scan.files=transfer.files;
+ await dialog.querySelector('[data-read]').onclick();for(const input of form.querySelectorAll('[step]'))input.setAttribute('step','any');
+ assert.equal(dialog.querySelector('[data-discount-choice]').hidden,false);assert.match(dialog.querySelector('[data-discount-choice]').textContent,/Którą kwotę/);
+ assert.equal(form.elements.total.value,'25.00');
+ const before=dialog.querySelector('[name="amountBasis"][value="beforeDiscount"]');before.checked=true;form.onchange({target:before});
+ assert.equal(form.elements.total.value,'30.00');assert.equal(dialog.querySelector('[name="gross"]').value,'30');
+ await form.onsubmit({preventDefault(){}});assert.equal(await done,'PARAGON-discount');assert.equal(saved.data.total,30);assert.equal(saved.data.paidAmount,25);assert.equal(saved.data.discountAmount,5);assert.equal(saved.data.amountBasis,'beforeDiscount');await window.happyDOM.abort();
+});
+test('global discount without line breakdown waits for manual item amounts',async()=>{
+ const window=new Window();globalThis.document=window.document;globalThis.FormData=window.FormData;
+ window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};window.HTMLDialogElement.prototype.close=function(){this.open=false;};
+ let writes=0;const done=openReceiptImport({scan:async()=>({...structuredClone(data),discountAmount:5}),save:async()=>{writes++;return 'PARAGON-manual';}});
+ const dialog=document.querySelector('dialog'),form=dialog.querySelector('form'),bytes=new Uint8Array(120);bytes.set([0x89,0x50,0x4e]);const transfer=new window.DataTransfer();transfer.items.add(new window.File([bytes],'receipt.png'));form.elements.scan.files=transfer.files;
+ await dialog.querySelector('[data-read]').onclick();for(const input of form.querySelectorAll('[step]'))input.setAttribute('step','any');
+ const before=dialog.querySelector('[name="amountBasis"][value="beforeDiscount"]');before.checked=true;form.onchange({target:before});assert.equal(form.elements.total.value,'30.00');assert.equal(dialog.querySelector('[name="gross"]').value,'');
+ await form.onsubmit({preventDefault(){}});assert.equal(writes,0);assert.match(dialog.querySelector('[data-status]').textContent,/Razem brutto/i);
+ const paid=dialog.querySelector('[name="amountBasis"][value="paid"]');paid.checked=true;form.onchange({target:paid});assert.equal(dialog.querySelector('[name="gross"]').value,'25');await form.onsubmit({preventDefault(){}});assert.equal(await done,'PARAGON-manual');assert.equal(writes,1);await window.happyDOM.abort();
+});

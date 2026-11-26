@@ -12,7 +12,7 @@ begin
  begin
   paid:=coalesce((p_data->>'paidAmount')::numeric,total);discount:=coalesce((p_data->>'discountAmount')::numeric,0);basis:=coalesce(p_data->>'amountBasis','paid');
  exception when others then raise exception 'Nieprawidłowa kwota zapłaty lub rabatu.';end;
- if paid<0 or paid>1000000 or paid<>round(paid,2) or paid::text in ('NaN','Infinity','-Infinity') or discount<0 or discount>1000000 or discount<>round(discount,2) or discount::text in ('NaN','Infinity','-Infinity') or basis not in ('paid','beforeDiscount') or total<>paid+case when basis='beforeDiscount' then discount else 0 end then
+ if paid<0 or paid>1000000 or paid<>round(paid,2) or paid::text in ('NaN','Infinity','-Infinity') or discount<0 or discount>1000000 or discount<>round(discount,2) or discount::text in ('NaN','Infinity','-Infinity') or basis not in ('paid','beforeDiscount') or (basis='paid' and total<>paid) or (basis='beforeDiscount' and total<>paid+discount) then
   raise exception 'Kwota zapłacona, rabat i wybrana kwota rozliczenia muszą się zgadzać.';
  end if;
  if docdate is null or total is null or docdate>current_date+1 or docdate<date '2000-01-01' or total<0 or total>1000000 or total::text in ('NaN','Infinity','-Infinity') or total<>round(total,2) then raise exception 'Nieprawidłowa data lub kwota paragonu.';end if;

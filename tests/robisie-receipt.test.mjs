@@ -11,6 +11,15 @@ test('paragon z NIP-em zachowuje oddzielne pozycje i kwoty',()=>{
  }
  const item=candidate();item.items[0].quantity=0;assert.throws(()=>validateReceiptData(item));
 });
+test('wybrana kwota przed rabatem musi zgadzać się z zapłatą, rabatem i pozycjami',()=>{
+ const paid={...candidate(),paidAmount:45.50,discountAmount:4.50,amountBasis:'paid'};
+ assert.deepEqual(validateReceiptData(paid),paid);
+ const before={...paid,total:50,amountBasis:'beforeDiscount',items:[{...paid.items[0],gross:44},{...paid.items[1],gross:6}]};
+ assert.deepEqual(validateReceiptData(before),before);
+ assert.throws(()=>validateReceiptData({...before,total:49}),/kwota/i);
+ assert.throws(()=>validateReceiptData({...before,items:paid.items}),/Suma pozycji/);
+ assert.throws(()=>validateReceiptData({...before,discountAmount:-4.50}),/kwota/i);
+});
 test('magazyn pokazuje paragon i ceny bez przycisku faktury KSeF',()=>{
  const meta={source:'nip-receipt',ksefNumber:'PARAGON-test',invoiceNumber:'AB/123',issueDate:'2026-10-23',currency:'PLN',seller:{name:'Sklep',nip:'1234567890'}};
  const rows=candidate().items.map((item,index)=>({metadata:meta,item:{...item,index:index+1},capacity:item.quantity,assigned:0,available:item.quantity,returned:0,uses:{}}));
